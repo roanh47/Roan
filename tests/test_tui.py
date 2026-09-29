@@ -104,17 +104,50 @@ async def test_theme_switch(tmp_roan):
 
 
 @pytest.mark.asyncio
-async def test_model_picker_selects(tmp_roan):
-    from roan.tui import ModelPicker
+async def test_models_screen_saves_provider_and_model(tmp_roan):
+    from roan.tui import ModelsScreen
 
     app = RoanApp(FakeAgent())
     async with app.run_test() as pilot:
-        app._open_picker(["model-a", "model-b"])
+        app._open_models([("groq", "llama-x")], [("openai", "gpt-5")], ["local-a"])
         await pilot.pause()
-        assert isinstance(app.screen, ModelPicker)
+        assert isinstance(app.screen, ModelsScreen)
+        listing = app.screen.query_one("#models-list")
+        listing.focus()
+        listing.highlighted = 0
+        await pilot.pause()
         await pilot.press("enter")
         await pilot.pause()
-        assert config.load_config()["model"] == "model-a"
+        cfg = config.load_config()
+        assert cfg["model"] == "llama-x"
+        assert cfg["provider"] == "groq"
+
+
+@pytest.mark.asyncio
+async def test_models_screen_categories(tmp_roan):
+    from roan.tui import ModelsScreen
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        app._open_models([("groq", "free-a")], [("openai", "paid-a")], ["local-a"])
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, ModelsScreen)
+
+        listing = screen.query_one("#models-list")
+        assert listing.option_count == 1
+
+        from textual.widgets import Select
+
+        screen.query_one("#cat", Select).value = "paid"
+        await pilot.pause()
+        ids = [listing.get_option_at_index(i).id for i in range(listing.option_count)]
+        assert ids == ["openai|paid-a"]
+
+        screen.query_one("#cat", Select).value = "custom"
+        await pilot.pause()
+        ids = [listing.get_option_at_index(i).id for i in range(listing.option_count)]
+        assert ids == [f"{config.load_config()['provider']}|local-a"]
 
 
 @pytest.mark.asyncio

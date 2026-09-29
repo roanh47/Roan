@@ -70,22 +70,23 @@ Plain streaming text with the same slash commands.
 
 Inside the TUI:
 
-| Command | What it does |
-| --- | --- |
-| `/help` | List every command |
-| `/setup` | Show the active configuration |
-| `/model <name>` | Switch model (persists) |
-| `/models` | Live model list from the current provider |
-| `/free` | 100% free models (via models.dev) |
-| `/provider <name>` | Switch provider |
-| `/theme <name>` | `mocha`, `macchiato`, `frappe`, `latte` |
-| `/memory` | Show what Roan remembered |
-| `/new` | Start a fresh conversation |
-| `/sessions` | List saved sessions |
-| `/clear` | Clear the conversation |
-| `/quit` | Exit |
+- `/help` — list every command
+- `/setup` — open the setup screen (`F2`)
+- `/model <name>` — switch model (persists)
+- `/models` — live model list, click one to pick it
+- `/free` — 100% free models (via models.dev)
+- `/provider <name>` — switch provider
+- `/theme <name>` — `mocha`, `macchiato`, `frappe`, `latte`
+- `/memory` — show what Roan remembered
+- `/new` — start a fresh conversation (`Ctrl+N`)
+- `/sessions` — list saved sessions
+- `/clear` — clear the conversation (`Ctrl+L`)
+- `/quit` — exit
 
-Mouse clicks focus the input; scroll to read history.
+The first run opens the setup screen automatically. Tool calls appear inline as
+`● run_shell ls -la` with a `↳` result line, and the status bar shows the active
+model, provider and session. Up/Down arrows walk your input history; mouse
+clicks focus the prompt.
 
 ## Telegram channel
 

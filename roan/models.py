@@ -9,8 +9,14 @@ MODELS_DEV_URL = "https://models.dev/api.json"
 _TIMEOUT = 8
 
 
+_HEADERS = {
+    "Accept": "application/json",
+    "User-Agent": "Mozilla/5.0 (Roan agent harness)",
+}
+
+
 def _get(url: str, api_key: str | None = None) -> dict:
-    req = urllib.request.Request(url, headers={"Accept": "application/json"})
+    req = urllib.request.Request(url, headers=dict(_HEADERS))
     if api_key:
         req.add_header("Authorization", f"Bearer {api_key}")
     with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
@@ -38,8 +44,16 @@ def fetch_provider_models(base_url: str, api_key: str | None = None) -> list[str
     return sorted(set(out))
 
 
-def fetch_free_models() -> list[tuple[str, str]]:
-    """(provider, model) van models.dev waar cost 0 is."""
+def is_free(model: dict) -> bool:
+    """Een model is gratis als de kosten expliciet 0 zijn."""
+    cost = model.get("cost") or {}
+    if not cost:
+        return False
+    return not cost.get("input") and not cost.get("output")
+
+
+def list_dev(category: str = "free") -> list[tuple[str, str]]:
+    """(provider, model) van models.dev; category is 'free' of 'paid'."""
     try:
         data = _get(MODELS_DEV_URL)
     except Exception:
@@ -48,10 +62,15 @@ def fetch_free_models() -> list[tuple[str, str]]:
     for provider, pdata in data.items():
         models = (pdata or {}).get("models") or {}
         for mid, mdata in models.items():
-            cost = (mdata or {}).get("cost") or {}
-            if cost and not any(cost.get(k, 0) for k in ("input", "output")):
+            free = is_free(mdata or {})
+            if (category == "free" and free) or (category == "paid" and not free):
                 out.append((provider, mid))
     return out
+
+
+def fetch_free_models() -> list[tuple[str, str]]:
+    """(provider, model) van models.dev waar cost 0 is."""
+    return list_dev("free")
 
 
 def list_models(base_url: str, api_key: str | None = None) -> str:

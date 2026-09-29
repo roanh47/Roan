@@ -29,7 +29,7 @@ except Exception:
 from . import commands
 from .agent import Agent
 from .config import PROVIDER_PRESETS, ROAN_DIR, load_config, save_config
-from .models import fetch_provider_models, list_free, list_models
+from .models import fetch_provider_models, list_dev, list_free, list_models
 from .photo import render_photo
 from .themes import ACCENT, THEMES
 
@@ -155,32 +155,88 @@ class SetupScreen(ModalScreen):
         self.dismiss(True)
 
 
-class ModelPicker(ModalScreen):
-    """Klikbare dropdown om een model te kiezen."""
+class ModelsScreen(ModalScreen):
+    """Model-browser: Free / Paid / Custom, gefilterd per provider."""
 
     CSS = """
-    ModelPicker {
+    ModelsScreen {
         align: center middle;
     }
-    #picker {
-        width: 60%;
-        height: auto;
-        max-height: 70%;
+    #models-box {
+        width: 80%;
+        max-width: 110;
+        height: 80%;
         border: thick $accent;
         background: $panel;
+        padding: 1 2;
+    }
+    #models-filters {
+        height: auto;
+        margin-bottom: 1;
+    }
+    #models-filters Select {
+        width: 1fr;
+        margin-right: 1;
+    }
+    #models-list {
+        height: 1fr;
     }
     """
 
-    def __init__(self, models: list[str]):
+    def __init__(self, free: list[tuple[str, str]], paid: list[tuple[str, str]], custom: list[str]):
         super().__init__()
-        self.models = models
+        self.data = {"free": free, "paid": paid, "custom": custom}
 
     def compose(self) -> ComposeResult:
-        options = [Option(m, id=m) for m in self.models]
-        yield OptionList(*options, id="picker")
+        with Vertical(id="models-box"):
+            yield Static("Modellen", classes="title")
+            with Horizontal(id="models-filters"):
+                yield Select(
+                    [("Gratis", "free"), ("Betaald", "paid"), ("Deze provider", "custom")],
+                    value="free",
+                    id="cat",
+                    allow_blank=False,
+                )
+                yield Select([("alle providers", "__all__")], value="__all__", id="prov", allow_blank=False)
+            yield OptionList(id="models-list")
+
+    def on_mount(self) -> None:
+        self._refresh_providers()
+        self._rebuild()
+
+    def _current(self) -> list[tuple[str, str]]:
+        cat = self.query_one("#cat", Select).value
+        if cat == "custom":
+            return [(load_config()["provider"], m) for m in self.data["custom"]]
+        return self.data.get(cat, [])
+
+    def _refresh_providers(self) -> None:
+        providers = sorted({p for p, _ in self._current()})
+        sel = self.query_one("#prov", Select)
+        sel.set_options([("alle providers", "__all__")] + [(p, p) for p in providers])
+
+    def _rebuild(self) -> None:
+        prov = self.query_one("#prov", Select).value
+        items = [(p, m) for p, m in self._current() if prov in (None, "__all__", p)]
+        listing = self.query_one("#models-list", OptionList)
+        listing.clear_options()
+        cap = 400
+        for p, m in items[:cap]:
+            listing.add_option(Option(f"{m}  ·  {p}", id=f"{p}|{m}"))
+        if len(items) > cap:
+            listing.add_option(Option(f"… en nog {len(items) - cap} modellen (filter op provider)", id=None))
+
+    @on(Select.Changed)
+    def _on_select(self, event: Select.Changed) -> None:
+        if event.select.id == "cat":
+            self._refresh_providers()
+        self._rebuild()
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        self.dismiss(str(event.option.id))
+        if not event.option_id or "|" not in event.option_id:
+            return
+        provider, model = event.option_id.split("|", 1)
+        self.dismiss((provider, model))
 
 
 class RoanApp(App):
@@ -412,28 +468,38 @@ class RoanApp(App):
         self._update_status()
 
     def _cmd_models(self) -> None:
-        self._sysline("Modellen ophalen ...")
+        self._sysline("Modellen ophalen (models.dev + provider) ...")
         self._fetch_models()
 
     @work(thread=True, exclusive=True)
     def _fetch_models(self) -> None:
         cfg = load_config()
-        models = fetch_provider_models(cfg["base_url"], cfg["api_key"])
-        if not models:
-            self.call_from_thread(self._write, Markdown(list_models(cfg["base_url"], cfg["api_key"])))
-            return
-        self.call_from_thread(self._open_picker, models)
+        free = list_dev("free")
+        paid = list_dev("paid")
+        custom = fetch_provider_models(cfg["base_url"], cfg["api_key"])
+        self.call_from_thread(self._open_models, free, paid, custom)
 
-    def _open_picker(self, models: list[str]) -> None:
-        def chosen(model: str | None) -> None:
-            if not model:
+    def _open_models(self, free, paid, custom) -> None:
+        def chosen(result) -> None:
+            if not result:
                 return
-            save_config({"model": model})
+            provider, model = result
+            updates: dict = {"model": model}
+            if provider in PROVIDER_PRESETS:
+                updates["provider"] = provider
+            save_config(updates)
             self.agent.reload()
-            self._sysline(f"Model → {model}")
             self._update_status()
+            cfg = load_config()
+            if provider not in PROVIDER_PRESETS:
+                self._sysline(
+                    f"Model → {model}. Provider '{provider}' is niet bekend — "
+                    "stel base_url + api_key in via /setup."
+                )
+            else:
+                self._sysline(f"Model → {model}  ·  provider → {cfg['provider']}")
 
-        self.push_screen(ModelPicker(models), chosen)
+        self.push_screen(ModelsScreen(free, paid, custom), chosen)
 
     def _cmd_setup(self) -> None:
         self._open_setup()
