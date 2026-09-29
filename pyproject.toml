@@ -23,7 +23,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["roan"]
+packages = ["roan", "roan.channels"]
 
 [tool.setuptools.package-data]
 roan = ["assets/*.png", "assets/*.jpg"]

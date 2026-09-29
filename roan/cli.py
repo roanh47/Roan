@@ -10,6 +10,12 @@ def main() -> None:
         update()
         return
 
+    if args and args[0] == "telegram":
+        from .channels.telegram import run_telegram
+
+        run_telegram()
+        return
+
     if args and args[0] in ("--version", "-v", "version"):
         from importlib.metadata import version
 
