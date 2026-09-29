@@ -24,10 +24,12 @@ HELP = (
     "Commando's:\n"
     "/help — deze tekst\n"
     "/new — nieuw gesprek\n"
+    "/clear — zelfde als /new\n"
     "/model <naam> — model kiezen\n"
     "/models — modellen van de provider\n"
     "/free — 100% gratis modellen\n"
     "/provider <naam> — provider kiezen\n"
+    "/memory — wat Roan onthouden heeft\n"
     "/status — huidige configuratie"
 )
 
@@ -72,9 +74,14 @@ def handle_command(text: str, agent, reset_fn) -> str | None:
 
     if name in ("start", "help"):
         return HELP
-    if name == "new":
+    if name in ("new", "clear"):
         new = reset_fn()
         return f"Nieuwe sessie: {getattr(new, 'session_id', '?')}"
+    if name == "memory":
+        from ..memory import load_memory
+
+        mem = load_memory().strip()
+        return mem or "(nog niets onthouden)"
     if name == "model":
         if not args:
             return f"Huidig model: {load_config()['model']}"

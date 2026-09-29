@@ -117,6 +117,33 @@ def test_cmd_unknown():
     assert "Onbekend" in out
 
 
+def test_cmd_clear(tmp_roan):
+    out = tg.handle_command("/clear", FakeAgent(), lambda: FakeAgent())
+    assert "Nieuwe sessie" in out
+
+
+def test_cmd_memory_empty(tmp_roan):
+    out = tg.handle_command("/memory", FakeAgent(), lambda: FakeAgent())
+    assert "niets onthouden" in out
+
+
+def test_help_lists_new_commands():
+    assert "/memory" in tg.HELP
+    assert "/clear" in tg.HELP
+
+
+def test_channel_handles_command(tmp_roan):
+    ch = tg.TelegramChannel("dummy-token")
+    out = ch.handle_text("123", "/status")
+    assert "provider:" in out and "model:" in out
+
+
+def test_channel_unknown_command(tmp_roan):
+    ch = tg.TelegramChannel("dummy-token")
+    out = ch.handle_text("123", "/nope")
+    assert "Onbekend" in out
+
+
 # ---------- Channel ----------
 def test_channel_caches_agent_per_conversation(tmp_roan):
     ch = FakeChannel()

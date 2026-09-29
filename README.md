@@ -37,12 +37,16 @@ Requires Python 3.10+. Contributions welcome — tests run with
 
 ## Configure
 
-On first run Roan has no configuration. Either run `/setup` inside the TUI, or
-edit `~/.roan/config.json`:
+On first run Roan has no configuration. Run `roan init` (an interactive wizard
+that works over SSH), or edit `~/.roan/config.json`:
 
 ```json
 { "provider": "lmstudio", "model": "local-model" }
 ```
+
+Anything can also come from the environment, which overrides the file:
+`ROAN_PROVIDER`, `ROAN_BASE_URL`, `ROAN_API_KEY`, `ROAN_MODEL`,
+`ROAN_TELEGRAM_TOKEN`.
 
 Providers (all OpenAI-compatible): `lmstudio`, `ollama`, `groq`, `openrouter`,
 `gemini`, `deepseek`, `cerebras`, `together`, `mistral`, or `"custom"` with your
@@ -51,6 +55,17 @@ own `base_url`. Add an `api_key` when the provider needs one:
 ```json
 { "provider": "groq", "api_key": "gsk_...", "model": "llama-3.3-70b-versatile" }
 ```
+
+## Chat mode
+
+On a narrow terminal, a phone, or anywhere the full TUI doesn't fit:
+
+```sh
+roan chat
+```
+
+Plain streaming text with the same slash commands. Roan falls back to this mode
+automatically when there is no TTY (pipes, `ssh -T`, CI).
 
 ## Commands
 
