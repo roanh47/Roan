@@ -76,18 +76,50 @@ Inside the TUI:
 - `/models` — model browser: **Free / Paid / This provider**, live from
   models.dev, filterable per provider. Click a model to select it.
 - `/free` — 100% free models (via models.dev)
-- `/provider <name>` — switch provider
+- `/provider` — provider picker: **Free / Paid / Custom**, live from models.dev
 - `/theme <name>` — `mocha`, `macchiato`, `frappe`, `latte`
 - `/memory` — show what Roan remembered
+- `/language <nl|en>` — switch the UI and agent language
+- `/tui <fullscreen|default>` — switch renderer (relaunches, keeps the conversation)
 - `/new` — start a fresh conversation (`Ctrl+N`)
 - `/sessions` — list saved sessions
+- `/compact` — summarise the conversation to free context
 - `/clear` — clear the conversation (`Ctrl+L`)
 - `/quit` — exit
 
-The first run opens the setup screen automatically. Tool calls appear inline as
-`● run_shell ls -la` with a `↳` result line, and the status bar shows the active
-model, provider and session. Up/Down arrows walk your input history; mouse
+The first run opens the setup screen automatically: pick a provider, paste a key,
+then pick a model from `/models`. Tool calls appear inline as `● run_shell ls -la`
+with a `↳` result line you can **click to expand**. The status bar shows the
+active model, provider and session. Up/Down arrows walk your input history; mouse
 clicks focus the prompt.
+
+## Renderers
+
+Like Claude Code, Roan asks once whether you want the new fullscreen TUI, and
+remembers your answer.
+
+- **fullscreen** — draws on the terminal's alternate screen (like `vim`), so it
+  never flickers and mouse support is on. `/tui fullscreen`.
+- **default** — the classic renderer: everything stays in your terminal's native
+  scrollback, so `Cmd+F` and tmux copy mode work as usual.
+
+Switch at any time with `/tui fullscreen` or `/tui default`; the app relaunches
+and carries the conversation over. `/tui` with no argument prints the active
+renderer. Env overrides: `ROAN_NO_FLICKER=1` forces fullscreen,
+`ROAN_DISABLE_ALTERNATE_SCREEN=1` forces classic. After two failed fullscreen
+starts on a machine, Roan falls back to the classic renderer by itself.
+
+While the TUI is running:
+
+- `Ctrl+O` — transcript mode: `/` to search, `n`/`N` next/previous match, `g`/`G`
+  top/bottom, `q` or `Esc` to go back
+- `PgUp`/`PgDn`, `Ctrl+Home`/`Ctrl+End` — scroll the conversation
+- Scrolling up pauses auto-follow; a **N new messages** bar appears and clicking
+  it (or `Ctrl+End`) jumps back to the latest message
+- Mouse: click to focus the prompt, click list options, scroll lists and menus,
+  click a tool result to expand it
+
+Set `scroll_speed` in the config to multiply mouse-wheel distance.
 
 ## Telegram channel
 
