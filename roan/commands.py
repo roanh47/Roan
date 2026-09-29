@@ -24,6 +24,7 @@ COMMANDS: dict[str, Command] = {
     "memory": Command("memory", "Toon wat Roan onthouden heeft"),
     "new": Command("new", "Begin een nieuw gesprek"),
     "sessions": Command("sessions", "Toon opgeslagen sessies"),
+    "compact": Command("compact", "Vat het gesprek samen om context vrij te maken"),
     "quit": Command("quit", "Afsluiten"),
 }
 

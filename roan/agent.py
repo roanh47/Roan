@@ -16,6 +16,10 @@ from . import tools as T
 MAX_TOOL_ROUNDS = 12
 SESSIONS_DIR = ROAN_DIR / "sessions"
 
+# Context-compaction: boven deze geschatte omvang wordt het middenstuk samengevat.
+COMPACT_CHARS = 120_000
+KEEP_TAIL = 6
+
 TOOLS = [
     {
         "type": "function",
@@ -197,6 +201,46 @@ class Agent:
         self.messages = [{"role": "system", "content": _build_system_prompt()}]
         self.save()
 
+    # ---------- context-compaction ----------
+    def _estimate_chars(self) -> int:
+        return sum(len(json.dumps(m, ensure_ascii=False)) for m in self.messages)
+
+    def _summarize(self, msgs: list[dict]) -> str:
+        payload = json.dumps(msgs, ensure_ascii=False)[:60_000]
+        try:
+            resp = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Vat dit gesprek bondig samen: beslissingen, feiten, bestanden en "
+                            "openstaande punten. Alleen de samenvatting, geen inleiding."
+                        ),
+                    },
+                    {"role": "user", "content": payload},
+                ],
+            )
+            return resp.choices[0].message.content or ""
+        except Exception as e:
+            return f"(samenvatting mislukt: {e})"
+
+    def compact(self, force: bool = False) -> bool:
+        """Vervang het middenstuk van het gesprek door een samenvatting."""
+        if not force and self._estimate_chars() < COMPACT_CHARS:
+            return False
+        if len(self.messages) < KEEP_TAIL + 2:
+            return False
+        head = self.messages[:1]
+        middle = self.messages[1:-KEEP_TAIL]
+        tail = self.messages[-KEEP_TAIL:]
+        summary = self._summarize(middle)
+        self.messages = head + [
+            {"role": "system", "content": f"[Samenvatting van het eerdere gesprek]\n{summary}"}
+        ] + tail
+        self.save()
+        return True
+
     # ---------- tools ----------
     def _run_tool(self, name: str, args: dict) -> str:
         if name in self.mcp.routes:
@@ -233,6 +277,7 @@ class Agent:
 
     # ---------- chat ----------
     def send(self, user_text: str, on_event=None) -> str:
+        self.compact()
         self.messages.append({"role": "user", "content": user_text})
         for _ in range(MAX_TOOL_ROUNDS):
             resp = self.client.chat.completions.create(
@@ -262,6 +307,7 @@ class Agent:
 
     def send_stream(self, user_text: str, on_event=None):
         """Yield content-deltas terwijl het model antwoordt. Voert tools uit tussendoor."""
+        self.compact()
         self.messages.append({"role": "user", "content": user_text})
         for _ in range(MAX_TOOL_ROUNDS):
             stream = self.client.chat.completions.create(

@@ -73,7 +73,8 @@ Inside the TUI:
 - `/help` — list every command
 - `/setup` — open the setup screen (`F2`)
 - `/model <name>` — switch model (persists)
-- `/models` — live model list, click one to pick it
+- `/models` — model browser: **Free / Paid / This provider**, live from
+  models.dev, filterable per provider. Click a model to select it.
 - `/free` — 100% free models (via models.dev)
 - `/provider <name>` — switch provider
 - `/theme <name>` — `mocha`, `macchiato`, `frappe`, `latte`
@@ -122,7 +123,7 @@ Every tool from every server becomes available to the agent as
 ## Tools
 
 `run_shell`, `read_file`, `write_file`, `edit_file`, `list_files`, `glob_files`,
-`fetch_url`, `web_search`, `remember`.
+`fetch_url`, `web_search`, `todo_write`, `remember`.
 
 ## Files
 

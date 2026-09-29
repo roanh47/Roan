@@ -93,6 +93,39 @@ def test_clear_resets_history(tmp_roan):
     assert a.messages[0]["role"] == "system"
 
 
+# ---------- context-compaction ----------
+def test_compact_skips_when_small(tmp_roan):
+    a = make_agent([_resp(content="x")])
+    assert a.compact() is False
+
+
+def test_compact_replaces_middle(tmp_roan):
+    a = make_agent([_resp(content="SAMENVATTING")])
+    a.messages = [{"role": "system", "content": "sys"}] + [
+        {"role": "user", "content": f"bericht {i}"} for i in range(12)
+    ]
+    assert a.compact(force=True) is True
+    assert a.messages[0]["role"] == "system"
+    assert "SAMENVATTING" in a.messages[1]["content"]
+    # de laatste KEEP_TAIL berichten blijven staan
+    assert a.messages[-1]["content"] == "bericht 11"
+    assert len(a.messages) == 1 + 1 + agent_mod.KEEP_TAIL
+
+
+def test_compact_survives_summary_failure(tmp_roan):
+    class Boom(FakeClient):
+        def create(self, **kwargs):
+            raise RuntimeError("kapot")
+
+    a = make_agent([])
+    a.client = Boom([])
+    a.messages = [{"role": "system", "content": "s"}] + [
+        {"role": "user", "content": f"m{i}"} for i in range(12)
+    ]
+    assert a.compact(force=True) is True
+    assert "mislukt" in a.messages[1]["content"]
+
+
 # ---------- streaming ----------
 def _chunk(content=None, tool_calls=None):
     return SimpleNamespace(choices=[SimpleNamespace(delta=_msg(content, tool_calls))])

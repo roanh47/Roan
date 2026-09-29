@@ -413,6 +413,9 @@ class RoanApp(App):
         if name == "sessions":
             self._cmd_sessions()
             return True
+        if name == "compact":
+            self._cmd_compact()
+            return True
         if name == "setup":
             self._cmd_setup()
             return True
@@ -443,6 +446,20 @@ class RoanApp(App):
 
         mem = load_memory().strip()
         self._write(Markdown(mem or "_(nog niets onthouden)_"))
+
+    def _cmd_compact(self) -> None:
+        self._sysline("Gesprek samenvatten ...")
+        self._compact_worker()
+
+    @work(thread=True, exclusive=True)
+    def _compact_worker(self) -> None:
+        try:
+            ok = self.agent.compact(force=True)
+        except Exception:
+            ok = False
+        self.call_from_thread(
+            self._sysline, "Gesprek samengevat." if ok else "Niets om samen te vatten."
+        )
 
     def _cmd_sessions(self) -> None:
         from .agent import SESSIONS_DIR
