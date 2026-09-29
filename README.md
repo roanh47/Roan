@@ -1,40 +1,33 @@
 # Roan
 
-Een persoonlijke agent harness voor de terminal. Jouw naam, jouw modellen, jouw tools.
+A terminal-based agent harness. Bring any OpenAI-compatible model and a set of
+tools; Roan provides the agentic loop, tool-calling, and durable memory.
 
-Roan draait een chat-loop met tool-calling (shell, files, geheugen) bovenop elke
-OpenAI-compatibele provider — lokaal (LM Studio / Ollama) of cloud (Groq, OpenRouter,
-en elke andere `/v1`-endpoint).
-
-## Installatie
+## Install
 
 ```sh
-pip install roan          # zodra de naam op PyPI is geclaimd (PEP 541)
-# of lokaal:
 pip install -e .
 ```
 
-## Configuratie (`~/.roan/config.json`)
+## Configure (`~/.roan/config.json`)
 
 ```json
-{
-  "provider": "lmstudio",
-  "model": "local-model"
-}
+{ "provider": "lmstudio", "model": "local-model" }
 ```
 
-Providers (allemaal OpenAI-compatibel): `lmstudio`, `ollama`, `groq`, `openrouter`.
-Of `"provider": "custom"` met een eigen `base_url` + `api_key`.
+Providers (all OpenAI-compatible): `lmstudio`, `ollama`, `groq`, `openrouter`,
+or `"provider": "custom"` with your own `base_url` and `api_key`.
 
-Voorbeeld Groq (gratis tier):
+Groq (free tier) example:
+
 ```json
 { "provider": "groq", "api_key": "gsk_...", "model": "llama-3.3-70b-versatile" }
 ```
 
-## Bestanden
+## Files
 
-- `~/.roan/instructions.md` — de basis-instructieset (standaard: "Je naam is Roan…").
-- `~/.roan/memory.md` — duurzaam geheugen (het model kan `remember` aanroepen).
+- `~/.roan/instructions.md` — the system prompt (overrides the default).
+- `~/.roan/memory.md` — durable memory (the agent can call `remember`).
 
 ## Tools
 
@@ -42,5 +35,5 @@ Voorbeeld Groq (gratis tier):
 
 ## Status
 
-v0 — werkende loop + tool-calling + geheugen. Komend: provider-lijst via `/models`,
-TUI à la Claude Code, foto-rendering, MCP, streaming.
+v0 — working loop, tool-calling, memory. Next: provider discovery via `/models`,
+Claude-Code-style TUI, terminal image rendering, MCP, streaming.
