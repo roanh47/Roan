@@ -22,6 +22,8 @@ COMMANDS: dict[str, Command] = {
     "provider": Command("provider", "Zet of toon de provider", "/provider <naam>"),
     "setup": Command("setup", "Toon de huidige configuratie"),
     "memory": Command("memory", "Toon wat Roan onthouden heeft"),
+    "new": Command("new", "Begin een nieuw gesprek"),
+    "sessions": Command("sessions", "Toon opgeslagen sessies"),
     "quit": Command("quit", "Afsluiten"),
 }
 

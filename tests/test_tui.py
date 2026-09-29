@@ -8,6 +8,8 @@ from roan.tui import RoanApp
 
 class FakeAgent:
     model = "fake"
+    session_id = "test-session"
+    messages = []
 
     def __init__(self):
         self.sent = []
@@ -15,9 +17,19 @@ class FakeAgent:
     def reload(self):
         pass
 
+    def clear(self):
+        self.messages = []
+
+    def save(self):
+        pass
+
     def send(self, text):
         self.sent.append(text)
         return f"echo: {text}"
+
+    def send_stream(self, text):
+        self.sent.append(text)
+        yield f"echo: {text}"
 
 
 @pytest.fixture

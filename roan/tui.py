@@ -1,7 +1,7 @@
 import asyncio
 from pathlib import Path
 
-from textual import on
+from textual import on, work
 from textual.app import App, ComposeResult
 from textual.containers import VerticalScroll
 from textual.events import Click
@@ -121,6 +121,7 @@ class RoanApp(App):
             return True
         if name == "clear":
             self._messages().remove_children()
+            self.agent.clear()
             return True
         if name == "theme":
             self._cmd_theme(args)
@@ -139,6 +140,15 @@ class RoanApp(App):
             return True
         if name == "memory":
             self._cmd_memory()
+            return True
+        if name == "new":
+            self.agent.session_id = __import__("time").strftime("%Y%m%d-%H%M%S")
+            self.agent.clear()
+            self._messages().remove_children()
+            self._sysline(f"Nieuwe sessie: {self.agent.session_id}")
+            return True
+        if name == "sessions":
+            self._cmd_sessions()
             return True
         if name == "setup":
             self._cmd_setup()
@@ -169,6 +179,21 @@ class RoanApp(App):
 
         mem = load_memory().strip()
         self._write(Markdown(mem or "_(nog niets onthouden)_"))
+
+    def _cmd_sessions(self) -> None:
+        from .agent import SESSIONS_DIR
+
+        if not SESSIONS_DIR.exists():
+            self._sysline("Nog geen sessies.")
+            return
+        files = sorted(SESSIONS_DIR.glob("*.json"), reverse=True)
+        if not files:
+            self._sysline("Nog geen sessies.")
+            return
+        lines = ["**Sessies**", ""]
+        for f in files[:20]:
+            lines.append(f"- `{f.stem}`")
+        self._write(Markdown("\n".join(lines)))
 
     def _cmd_theme(self, args) -> None:
         if not args:
@@ -217,7 +242,7 @@ class RoanApp(App):
         self.query_one("#input", Input).focus()
 
     @on(Input.Submitted)
-    async def handle_submit(self, event: Input.Submitted) -> None:
+    def handle_submit(self, event: Input.Submitted) -> None:
         text = event.value.strip()
         if not text:
             return
@@ -227,20 +252,25 @@ class RoanApp(App):
             self._run_command(text)
             return
 
-        event.input.disabled = True
         self._write(Static(f"[bold {ACCENT}]❯ {text}[/bold {ACCENT}]"))
-        thinking = Static("[dim]…[/dim]", id="thinking")
-        self._write(thinking)
+        self._stream_response(text)
 
+    @work(thread=True, exclusive=True)
+    def _stream_response(self, text: str) -> None:
+        inp = self.query_one("#input", Input)
+        self.call_from_thread(setattr, inp, "disabled", True)
+        md = Markdown("…")
+        self.call_from_thread(self._write, md)
+        buf: list[str] = []
         try:
-            result = await asyncio.to_thread(self.agent.send, text)
+            for delta in self.agent.send_stream(text):
+                buf.append(delta)
+                self.call_from_thread(md.update, "".join(buf))
         except Exception as e:
-            result = f"Fout: {e}"
-
-        thinking.remove()
-        self._write(Markdown(result))
-        event.input.disabled = False
-        event.input.focus()
+            self.call_from_thread(md.update, f"**Fout:** {e}")
+        finally:
+            self.call_from_thread(setattr, inp, "disabled", False)
+            self.call_from_thread(inp.focus)
 
 
 def run_tui(avatar_path=None):
