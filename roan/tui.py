@@ -4,11 +4,15 @@ from pathlib import Path
 from textual import on
 from textual.app import App, ComposeResult
 from textual.containers import VerticalScroll
+from textual.events import Click
 from textual.widgets import Input, Markdown, Static
+
+from textual_image import renderable  # noqa: F401  (terminal-query moet vóór app-run)
+from textual_image.widget import Image
 
 from .agent import Agent
 from .config import ROAN_DIR
-from .photo import render_photo
+from .themes import ACCENT, THEMES
 
 BUNDLED_AVATAR = Path(__file__).parent / "assets" / "avatar.png"
 
@@ -17,11 +21,6 @@ class RoanApp(App):
     TITLE = "Roan"
 
     CSS = """
-    #top {
-        height: auto;
-        padding: 1 2;
-        background: $panel;
-    }
     #messages {
         height: 1fr;
         padding: 1 2;
@@ -30,9 +29,9 @@ class RoanApp(App):
         dock: bottom;
         margin: 1 2;
     }
-    .user {
-        color: $text;
-        padding: 1 0;
+    .title {
+        color: $accent;
+        text-style: bold;
     }
     """
 
@@ -60,20 +59,15 @@ class RoanApp(App):
 
     def compose(self) -> ComposeResult:
         avatar = self._resolve_avatar()
+        if avatar:
+            yield Image(avatar, width=26)
+        yield Static("Roan — je agent harness", classes="title")
         yield VerticalScroll(id="messages")
         yield Input(placeholder="Message Roan…", id="input")
 
-        if avatar:
-            self.avatar = render_photo(avatar)
-
-    def on_mount(self) -> None:
-        if getattr(self, "avatar", None):
-            msgs = self.query_one("#messages", VerticalScroll)
-            msgs.mount(Static(self.avatar))
-            msgs.mount(Static("[bold green]Roan[/bold green] — je agent harness\n"))
-        else:
-            msgs = self.query_one("#messages", VerticalScroll)
-            msgs.mount(Static("[bold green]Roan[/bold green] — je agent harness\n"))
+    @on(Click)
+    def _focus_input(self) -> None:
+        self.query_one("#input", Input).focus()
 
     @on(Input.Submitted)
     async def handle_submit(self, event: Input.Submitted) -> None:
@@ -84,7 +78,7 @@ class RoanApp(App):
         event.input.disabled = True
 
         msgs = self.query_one("#messages", VerticalScroll)
-        msgs.mount(Static(f"[bold cyan]❯ {text}[/bold cyan]\n"))
+        msgs.mount(Static(f"[bold {ACCENT}]❯ {text}[/bold {ACCENT}]\n"))
         msgs.mount(Static("…", id="thinking"))
         thinking = self.query_one("#thinking", Static)
 
@@ -103,4 +97,7 @@ class RoanApp(App):
 def run_tui(avatar_path=None):
     agent = Agent()
     app = RoanApp(agent, avatar_path)
+    for theme in THEMES:
+        app.register_theme(theme)
+    app.theme = "mocha"
     app.run()

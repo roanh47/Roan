@@ -9,6 +9,7 @@ dependencies = [
     "textual>=0.52",
     "pillow>=10.0",
     "packaging>=23.0",
+    "textual-image[textual]",
 ]
 
 [project.scripts]
