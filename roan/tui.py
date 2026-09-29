@@ -324,6 +324,7 @@ class RoanApp(App):
     def on_mount(self) -> None:
         self.query_one("#input", Input).focus()
         self._update_status()
+        self._render_history()
         from .config import has_config
 
         if not has_config():
@@ -337,6 +338,18 @@ class RoanApp(App):
             return
         cfg = load_config()
         self._sysline(f"model: {cfg['model']}  ·  provider: {cfg['provider']}")
+
+    def _render_history(self) -> None:
+        """Toon het herstelde gesprek zodat de context zichtbaar is."""
+        for msg in getattr(self.agent, "messages", [])[1:]:
+            role = msg.get("role")
+            content = msg.get("content")
+            if role == "user" and content:
+                self._write(Static(f"[bold {ACCENT}]❯ {content}[/bold {ACCENT}]"))
+            elif role == "assistant" and content:
+                self._write(Markdown(content))
+        if len(getattr(self.agent, "messages", [])) > 1:
+            self._sysline(f"(gesprek hersteld — {len(self.agent.messages) - 1} berichten)")
 
     def _update_status(self) -> None:
         cfg = load_config()

@@ -100,6 +100,21 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "todo_write",
+            "description": (
+                "Zet een takenlijst voor meerstaps-werk. items_json is een JSON-array "
+                'van {"text": "...", "done": false}.'
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {"items_json": {"type": "string"}},
+                "required": ["items_json"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "remember",
             "description": "Bewaar een duurzame notitie in het geheugen voor volgende sessies.",
             "parameters": {"type": "object", "properties": {"note": {"type": "string"}}, "required": ["note"]},
@@ -116,6 +131,7 @@ TOOL_FUNCS = {
     "glob_files": T.glob_files,
     "fetch_url": T.fetch_url,
     "web_search": T.web_search,
+    "todo_write": T.todo_write,
     "remember": remember,
 }
 

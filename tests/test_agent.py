@@ -114,7 +114,7 @@ def test_send_stream_tool_then_text(tmp_roan):
 
 def test_tools_registered():
     for name in ("run_shell", "read_file", "write_file", "edit_file", "glob_files",
-                 "fetch_url", "web_search", "remember", "list_files"):
+                 "fetch_url", "web_search", "remember", "list_files", "todo_write"):
         assert name in agent_mod.TOOL_FUNCS
 
 

@@ -3,7 +3,7 @@
 import pytest
 
 from roan import config
-from roan.tui import RoanApp, SetupScreen
+from roan.tui import HistoryInput, RoanApp, SetupScreen
 
 
 class FakeAgent:
@@ -233,7 +233,6 @@ async def test_setup_cancel_leaves_config(tmp_roan):
 
 
 def test_history_input_dedup_and_navigate():
-    from roan.tui import HistoryInput
 
     inp = HistoryInput()
     inp.add_history("een")
@@ -275,3 +274,24 @@ async def test_action_clear_chat(tmp_roan):
         app.action_clear_chat()
         await pilot.pause()
         assert len(app.query("#messages > *")) == 0
+
+
+@pytest.mark.asyncio
+async def test_restored_history_is_rendered(tmp_roan):
+    class HistAgent(FakeAgent):
+        def __init__(self):
+            super().__init__()
+            self.messages = [
+                {"role": "system", "content": "sys"},
+                {"role": "user", "content": "oude vraag"},
+                {"role": "assistant", "content": "oud antwoord"},
+            ]
+
+    app = RoanApp(HistAgent())
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        rendered = " ".join(str(w.render()) for w in app.query("#messages > *"))
+        assert "oude vraag" in rendered
+        assert "hersteld" in rendered
+        sources = " ".join(str(w.source) for w in app.query("Markdown"))
+        assert "oud antwoord" in sources

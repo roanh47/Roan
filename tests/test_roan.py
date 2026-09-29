@@ -103,3 +103,48 @@ def test_free_models_survives_error(monkeypatch):
 
     monkeypatch.setattr(models, "_get", boom)
     assert models.fetch_free_models() == []
+
+
+# ---------- tools ----------
+def test_todo_write_writes_file(tmp_roan):
+    from roan import tools
+
+    out = tools.todo_write('[{"text": "een", "done": true}, {"text": "twee"}]')
+    assert "2 items" in out
+    content = (tmp_roan / "todo.md").read_text()
+    assert "- [x] een" in content
+    assert "- [ ] twee" in content
+
+
+def test_todo_write_bad_json(tmp_roan):
+    from roan import tools
+
+    assert "Error" in tools.todo_write("niet json")
+
+
+def test_edit_file_replaces_once(tmp_roan):
+    from roan import tools
+
+    target = tmp_roan / "f.txt"
+    target.write_text("a b a")
+    tools.edit_file(str(target), "a", "X")
+    assert target.read_text() == "X b a"
+
+
+def test_edit_file_missing_old(tmp_roan):
+    from roan import tools
+
+    target = tmp_roan / "f.txt"
+    target.write_text("a")
+    assert "Error" in tools.edit_file(str(target), "zzz", "X")
+
+
+def test_list_and_glob(tmp_roan, monkeypatch):
+    from roan import tools
+
+    (tmp_roan / "one.txt").write_text("1")
+    (tmp_roan / "two.py").write_text("2")
+    assert "one.txt" in tools.list_files(str(tmp_roan))
+    monkeypatch.chdir(tmp_roan)
+    got = tools.glob_files("*.py")
+    assert "two.py" in got
