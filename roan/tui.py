@@ -10,7 +10,7 @@ from .agent import Agent
 from .config import ROAN_DIR
 from .photo import render_photo
 
-BUNDLED_AVATAR = Path(__file__).parent / "assets" / "avatar.jpg"
+BUNDLED_AVATAR = Path(__file__).parent / "assets" / "avatar.png"
 
 
 class RoanApp(App):

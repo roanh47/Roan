@@ -3,9 +3,12 @@ from pathlib import Path
 from rich.style import Style
 from rich.text import Text
 
+# Achtergrond waarop transparante PNG's worden gecomposiet (donkere terminal).
+_BG = (20, 22, 28)
+
 
 def render_photo(path: str, width: int = 24, height: int = 10) -> Text:
-    """Render an image as a grid of colored half-blocks (works in every terminal)."""
+    """Render een afbeelding als een raster van gekleurde half-blocks."""
     try:
         from PIL import Image
     except ImportError:
@@ -16,9 +19,17 @@ def render_photo(path: str, width: int = 24, height: int = 10) -> Text:
         return Text("")
 
     try:
-        img = Image.open(p).convert("RGB")
+        img = Image.open(p)
     except Exception:
         return Text("")
+
+    # Transparantie (RGBA/LA/P) → composite op een vaste achtergrond.
+    if img.mode in ("RGBA", "LA", "P"):
+        img = img.convert("RGBA")
+        bg = Image.new("RGBA", img.size, (*_BG, 255))
+        img = Image.alpha_composite(bg, img).convert("RGB")
+    else:
+        img = img.convert("RGB")
 
     img = img.resize((width, height * 2), Image.LANCZOS)
     px = img.load()

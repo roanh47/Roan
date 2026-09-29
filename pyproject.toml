@@ -16,4 +16,4 @@ build-backend = "setuptools.build_meta"
 packages = ["roan"]
 
 [tool.setuptools.package-data]
-roan = ["assets/*.jpg", "assets/*.png"]
+roan = ["assets/*.png", "assets/*.jpg"]
