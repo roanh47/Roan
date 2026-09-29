@@ -1,27 +1,14 @@
 import sys
 
-HELP = """Roan — agent harness
-
-Usage: Roan [command]
-
-Commands:
-  (none)      Start the TUI
-  init        Interactive setup: provider, api_key, model, telegram token
-  telegram    Run the agent as a Telegram bot
-  chat        Plain-text chat (handig op een telefoon / smalle terminal)
-  update      Update to the latest version for this channel
-  version     Show the version
-  help        Show this message
-
-`roan` (lowercase) works too.
-"""
-
 
 def main() -> None:
+    from .i18n import init_from_config, t
+
+    init_from_config()
     args = sys.argv[1:]
 
     if args and args[0] in ("help", "--help", "-h"):
-        print(HELP)
+        print(t("cli_help"))
         return
 
     if args and args[0] == "update":

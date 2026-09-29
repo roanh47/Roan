@@ -7,15 +7,7 @@ import sys
 from .agent import Agent
 from .channels.telegram import handle_command
 from .config import has_config, load_config
-
-BANNER = "Roan — agent harness.  /help voor commando's, /quit om te stoppen."
-
-ONBOARD = (
-    "Nog geen model geconfigureerd.\n"
-    "Draai `Roan init` om een provider + api_key + model in te stellen,\n"
-    "of zet ROAN_API_KEY / ROAN_MODEL in je omgeving.\n"
-    "Gratis opties: groq, openrouter (models met ':free')."
-)
+from .i18n import init_from_config, t
 
 
 def _print_help(agent: Agent) -> None:
@@ -24,16 +16,17 @@ def _print_help(agent: Agent) -> None:
 
 
 def run_repl(session_id: str | None = None) -> None:
+    init_from_config()
     if not has_config():
-        print(BANNER)
+        print(t("repl_banner"))
         print()
-        print(ONBOARD)
+        print(t("repl_onboard"))
         return
 
     agent = Agent(session_id=session_id)
     cfg = load_config()
-    print(BANNER)
-    print(f"model: {cfg['model']}  ·  provider: {cfg['provider']}\n")
+    print(t("repl_banner"))
+    print(t("repl_model_line", model=cfg["model"], provider=cfg["provider"]) + "\n")
 
     while True:
         try:
@@ -58,15 +51,13 @@ def run_repl(session_id: str | None = None) -> None:
                 sys.stdout.write(delta)
                 sys.stdout.flush()
         except KeyboardInterrupt:
-            print("\n(afgebroken)")
+            print("\n" + t("msg_aborted"))
         except Exception as e:
             msg = str(e)
-            print(f"\nFout: {msg}")
+            print("\n" + t("msg_error", error=msg))
             if any(s in msg.lower() for s in ("connection", "connect", "refused", "timeout", "getaddrinfo")):
-                print(
-                    f"\nKan geen verbinding maken met {cfg.get('base_url')}.\n"
-                    "Draai `Roan init` of /provider + /model om dit te wijzigen."
-                )
+                print("\n" + t("repl_conn_error", url=cfg.get("base_url")))
+                print(t("repl_conn_hint"))
         print()
 
     agent.stop()

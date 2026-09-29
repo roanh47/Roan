@@ -128,8 +128,12 @@ def test_cmd_memory_empty(tmp_roan):
 
 
 def test_help_lists_new_commands():
-    assert "/memory" in tg.HELP
-    assert "/clear" in tg.HELP
+    from roan.i18n import t
+
+    help_text = t("tg_help")
+    assert "/memory" in help_text
+    assert "/clear" in help_text
+    assert "/language" in help_text
 
 
 def test_channel_handles_command(tmp_roan):

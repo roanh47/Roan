@@ -27,14 +27,10 @@ DEFAULT_CONFIG = {
     "base_url": None,         # alleen bij provider == "custom"
     "api_key": None,          # overschrijft de preset-key indien ingesteld
     "model": "local-model",
+    "language": "nl",         # "nl" of "en"
 }
 
-DEFAULT_INSTRUCTIONS = (
-    "Je naam is Roan. Je bent een persoonlijke agent harness, gemaakt om Roan Heemstra "
-    "te assisteren en te spiegelen. Je helpt met taken in de terminal, schrijft code, "
-    "zoekt dingen op en voert opdrachten uit. Wees direct, technisch en behulpzaam. "
-    "Antwoord in het Nederlands tenzij anders gevraagd."
-)
+# De standaard-instructies staan per taal in roan/i18n.py (DEFAULT_INSTRUCTIONS).
 
 
 def load_config() -> dict:
@@ -51,6 +47,7 @@ def load_config() -> dict:
         ("base_url", "ROAN_BASE_URL"),
         ("api_key", "ROAN_API_KEY"),
         ("model", "ROAN_MODEL"),
+        ("language", "ROAN_LANGUAGE"),
         ("telegram_token", "ROAN_TELEGRAM_TOKEN"),
     ):
         if os.environ.get(env):
@@ -88,7 +85,9 @@ def has_config() -> bool:
 def load_instructions() -> str:
     if INSTRUCTIONS_PATH.exists():
         return INSTRUCTIONS_PATH.read_text()
-    return DEFAULT_INSTRUCTIONS
+    from . import i18n
+
+    return i18n.DEFAULT_INSTRUCTIONS.get(i18n.current_language(), i18n.DEFAULT_INSTRUCTIONS["en"])
 
 
 def save_config(updates: dict) -> dict:

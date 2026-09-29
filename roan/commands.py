@@ -1,31 +1,37 @@
-"""Slash-command registry voor de Roan TUI."""
+"""Slash-command registry voor de Roan TUI.
+
+De beschrijvingen zijn i18n-keys; help_text() vertaalt ze in de actieve taal.
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .i18n import t
+
 
 @dataclass
 class Command:
     name: str
-    description: str
+    description: str  # i18n-key
     usage: str = ""
 
 
 COMMANDS: dict[str, Command] = {
-    "help": Command("help", "Toon alle commando's"),
-    "clear": Command("clear", "Leeg het gesprek"),
-    "theme": Command("theme", "Wissel thema", "/theme <mocha|macchiato|frappe|latte>"),
-    "model": Command("model", "Zet of toon het actieve model", "/model <naam>"),
-    "models": Command("models", "Lijst modellen van de provider (live)"),
-    "free": Command("free", "Lijst 100% gratis modellen (models.dev)"),
-    "provider": Command("provider", "Zet of toon de provider", "/provider <naam>"),
-    "setup": Command("setup", "Toon de huidige configuratie"),
-    "memory": Command("memory", "Toon wat Roan onthouden heeft"),
-    "new": Command("new", "Begin een nieuw gesprek"),
-    "sessions": Command("sessions", "Toon opgeslagen sessies"),
-    "compact": Command("compact", "Vat het gesprek samen om context vrij te maken"),
-    "quit": Command("quit", "Afsluiten"),
+    "help": Command("help", "cmd_help"),
+    "clear": Command("clear", "cmd_clear"),
+    "theme": Command("theme", "cmd_theme", "/theme <mocha|macchiato|frappe|latte>"),
+    "model": Command("model", "cmd_model", "/model <naam>"),
+    "models": Command("models", "cmd_models"),
+    "free": Command("free", "cmd_free"),
+    "provider": Command("provider", "cmd_provider", "/provider <naam>"),
+    "setup": Command("setup", "cmd_setup"),
+    "memory": Command("memory", "cmd_memory"),
+    "new": Command("new", "cmd_new"),
+    "sessions": Command("sessions", "cmd_sessions"),
+    "compact": Command("compact", "cmd_compact"),
+    "language": Command("language", "cmd_language", "/language <nl|en>"),
+    "quit": Command("quit", "cmd_quit"),
 }
 
 
@@ -38,9 +44,10 @@ def names() -> list[str]:
 
 
 def help_text() -> str:
-    lines = ["**Commando's**", ""]
+    lines = [f"**{t('help_title')}**", ""]
     for name in names():
         cmd = COMMANDS[name]
         usage = f" `{cmd.usage}`" if cmd.usage else ""
-        lines.append(f"- **/{name}**{usage} — {cmd.description}")
+        lines.append(f"- **/{name}**{usage} — {t(cmd.description)}")
+    lines += ["", f"_{t('help_languages')}_"]
     return "\n".join(lines)

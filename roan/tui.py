@@ -30,6 +30,7 @@ from . import commands
 from .agent import Agent
 from .config import PROVIDER_PRESETS, ROAN_DIR, load_config, save_config
 from .models import fetch_provider_models, list_dev, list_free, list_models
+from .i18n import t
 from .photo import render_photo
 from .themes import ACCENT, THEMES
 
@@ -115,22 +116,22 @@ class SetupScreen(ModalScreen):
         provider = cfg.get("provider", "lmstudio")
         with Vertical(id="setup-box"):
             yield Static("Setup", classes="title")
-            yield Label("Provider")
+            yield Label(t("setup_provider"))
             yield Select(
                 [(name, name) for name in sorted(PROVIDER_PRESETS)],
                 value=provider if provider in PROVIDER_PRESETS else "lmstudio",
                 id="provider",
                 allow_blank=False,
             )
-            yield Label("API key (leeg = bestaande behouden)")
+            yield Label(t("setup_api_key"))
             yield Input(value="", password=True, placeholder="sk-…", id="api_key")
-            yield Label("Model")
+            yield Label(t("setup_model"))
             yield Input(value=cfg.get("model", ""), id="model")
-            yield Label("Base URL (alleen bij provider = custom)")
+            yield Label(t("setup_base_url"))
             yield Input(value=cfg.get("base_url") or "", id="base_url")
             with Horizontal(id="setup-actions"):
-                yield Button("Annuleren", id="cancel")
-                yield Button("Opslaan", id="save", variant="primary")
+                yield Button(t("setup_cancel"), id="cancel")
+                yield Button(t("setup_save"), id="save", variant="primary")
 
     @on(Button.Pressed)
     def _on_button(self, event: Button.Pressed) -> None:
@@ -189,15 +190,21 @@ class ModelsScreen(ModalScreen):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="models-box"):
-            yield Static("Modellen", classes="title")
+            yield Static(t("models_title"), classes="title")
             with Horizontal(id="models-filters"):
                 yield Select(
-                    [("Gratis", "free"), ("Betaald", "paid"), ("Deze provider", "custom")],
+                    [
+                        (t("models_free"), "free"),
+                        (t("models_paid"), "paid"),
+                        (t("models_custom"), "custom"),
+                    ],
                     value="free",
                     id="cat",
                     allow_blank=False,
                 )
-                yield Select([("alle providers", "__all__")], value="__all__", id="prov", allow_blank=False)
+                yield Select(
+                    [(t("models_all_providers"), "__all__")], value="__all__", id="prov", allow_blank=False
+                )
             yield OptionList(id="models-list")
 
     def on_mount(self) -> None:
@@ -213,7 +220,7 @@ class ModelsScreen(ModalScreen):
     def _refresh_providers(self) -> None:
         providers = sorted({p for p, _ in self._current()})
         sel = self.query_one("#prov", Select)
-        sel.set_options([("alle providers", "__all__")] + [(p, p) for p in providers])
+        sel.set_options([(t("models_all_providers"), "__all__")] + [(p, p) for p in providers])
 
     def _rebuild(self) -> None:
         prov = self.query_one("#prov", Select).value
@@ -224,7 +231,7 @@ class ModelsScreen(ModalScreen):
         for p, m in items[:cap]:
             listing.add_option(Option(f"{m}  ·  {p}", id=f"{p}|{m}"))
         if len(items) > cap:
-            listing.add_option(Option(f"… en nog {len(items) - cap} modellen (filter op provider)", id=None))
+            listing.add_option(Option(t("models_more", n=len(items) - cap), id=None))
 
     @on(Select.Changed)
     def _on_select(self, event: Select.Changed) -> None:
@@ -316,10 +323,10 @@ class RoanApp(App):
                 yield _HDImage(avatar, id="avatar")
             else:
                 yield Static(render_photo(avatar, width=self._photo_width()))
-        yield Static("Roan — je agent harness", classes="title")
+        yield Static(f"Roan — {t('app_subtitle')}", classes="title")
         yield VerticalScroll(id="messages")
         yield Static(id="status")
-        yield HistoryInput(placeholder="Message Roan…  (/help)", id="input")
+        yield HistoryInput(placeholder=t("input_placeholder"), id="input")
 
     def on_mount(self) -> None:
         self.query_one("#input", Input).focus()
@@ -328,12 +335,7 @@ class RoanApp(App):
         from .config import has_config
 
         if not has_config():
-            self._write(
-                Markdown(
-                    "**Nog geen model geconfigureerd.**\n\n"
-                    "Stel het hieronder in, of draai `Roan init` in een terminal."
-                )
-            )
+            self._write(Markdown(t("onboarding")))
             self._open_setup()
             return
         cfg = load_config()
@@ -349,13 +351,13 @@ class RoanApp(App):
             elif role == "assistant" and content:
                 self._write(Markdown(content))
         if len(getattr(self.agent, "messages", [])) > 1:
-            self._sysline(f"(gesprek hersteld — {len(self.agent.messages) - 1} berichten)")
+            self._sysline(t("msg_restored", n=len(self.agent.messages) - 1))
 
     def _update_status(self) -> None:
         cfg = load_config()
-        key = "key set" if cfg.get("api_key") else "no key"
+        key = t("status_key_set") if cfg.get("api_key") else t("status_no_key")
         self.query_one("#status", Static).update(
-            f"{cfg['model']}  ·  {cfg['provider']}  ·  {key}  ·  sessie {self.agent.session_id}"
+            f"{cfg['model']}  ·  {cfg['provider']}  ·  {key}  ·  {t('status_session')} {self.agent.session_id}"
         )
 
     # ---------- helpers ----------
@@ -405,10 +407,13 @@ class RoanApp(App):
             self._cmd_memory()
             return True
         if name == "new":
-            self.agent.session_id = __import__("time").strftime("%Y%m%d-%H%M%S")
+            import time
+
+            self.agent.session_id = time.strftime("%Y%m%d-%H%M%S")
             self.agent.clear()
             self._messages().remove_children()
-            self._sysline(f"Nieuwe sessie: {self.agent.session_id}")
+            self._update_status()
+            self._sysline(t("msg_new_session", id=self.agent.session_id))
             return True
         if name == "sessions":
             self._cmd_sessions()
@@ -416,39 +421,56 @@ class RoanApp(App):
         if name == "compact":
             self._cmd_compact()
             return True
+        if name == "language":
+            self._cmd_language(args)
+            return True
         if name == "setup":
             self._cmd_setup()
             return True
 
-        self._sysline(f"Onbekend commando: /{name}  (probeer /help)")
+        self._sysline(t("msg_unknown_cmd", name=name))
         return True
 
     def _cmd_free(self) -> None:
-        self._sysline("Gratis modellen ophalen van models.dev ...")
+        self._sysline(t("models_fetching"))
         self._write(Markdown(list_free()))
 
     def _cmd_provider(self, args) -> None:
         cfg = load_config()
         if not args:
-            self._sysline(f"Huidige provider: {cfg['provider']}")
+            self._sysline(t("msg_provider_current", provider=cfg["provider"]))
             return
         name = args[0].lower()
         if name not in PROVIDER_PRESETS:
-            self._sysline(f"Providers: {', '.join(sorted(PROVIDER_PRESETS))}")
+            self._sysline(t("msg_providers", names=", ".join(sorted(PROVIDER_PRESETS))))
             return
         save_config({"provider": name})
         self.agent.reload()
-        self._sysline(f"Provider → {name}")
+        self._sysline(t("msg_provider_set", name=name))
         self._update_status()
 
     def _cmd_memory(self) -> None:
         from .memory import load_memory
 
         mem = load_memory().strip()
-        self._write(Markdown(mem or "_(nog niets onthouden)_"))
+        self._write(Markdown(mem or t("msg_memory_empty")))
+
+    def _cmd_language(self, args) -> None:
+        from .i18n import LANGUAGES
+
+        if not args:
+            self._sysline(t("msg_languages", langs=", ".join(LANGUAGES)))
+            return
+        code = args[0].lower()
+        if code not in LANGUAGES:
+            self._sysline(t("msg_languages", langs=", ".join(LANGUAGES)))
+            return
+        new_code = self.agent.set_language(code)
+        self._update_status()
+        self._sysline(t("msg_language_set", lang=new_code))
 
     def _cmd_compact(self) -> None:
-        self._sysline("Gesprek samenvatten ...")
+        self._sysline(t("msg_summarizing"))
         self._compact_worker()
 
     @work(thread=True, exclusive=True)
@@ -458,20 +480,20 @@ class RoanApp(App):
         except Exception:
             ok = False
         self.call_from_thread(
-            self._sysline, "Gesprek samengevat." if ok else "Niets om samen te vatten."
+            self._sysline, t("msg_compacted") if ok else t("msg_nothing_to_compact")
         )
 
     def _cmd_sessions(self) -> None:
         from .agent import SESSIONS_DIR
 
         if not SESSIONS_DIR.exists():
-            self._sysline("Nog geen sessies.")
+            self._sysline(t("msg_no_sessions"))
             return
         files = sorted(SESSIONS_DIR.glob("*.json"), reverse=True)
         if not files:
-            self._sysline("Nog geen sessies.")
+            self._sysline(t("msg_no_sessions"))
             return
-        lines = ["**Sessies**", ""]
+        lines = [f"**{t('msg_sessions_title')}**", ""]
         for f in files[:20]:
             lines.append(f"- `{f.stem}`")
         self._write(Markdown("\n".join(lines)))
@@ -481,24 +503,24 @@ class RoanApp(App):
             self._write(Markdown(commands.help_text()))
             return
         name = args[0].lower()
-        if name not in [t.name for t in THEMES]:
-            self._sysline(f"Thema's: {', '.join(t.name for t in THEMES)}")
+        if name not in [t_.name for t_ in THEMES]:
+            self._sysline(t("msg_themes", names=", ".join(t_.name for t_ in THEMES)))
             return
         self.theme = name
-        self._sysline(f"Thema → {name}")
+        self._sysline(t("msg_theme_set", name=name))
 
     def _cmd_model(self, args) -> None:
         if not args:
             cfg = load_config()
-            self._sysline(f"Huidig model: {cfg['model']}")
+            self._sysline(t("msg_model_current", model=cfg["model"]))
             return
         cfg = save_config({"model": args[0]})
         self.agent.reload()
-        self._sysline(f"Model → {cfg['model']}")
+        self._sysline(t("msg_model_set", model=cfg["model"]))
         self._update_status()
 
     def _cmd_models(self) -> None:
-        self._sysline("Modellen ophalen (models.dev + provider) ...")
+        self._sysline(t("models_fetching"))
         self._fetch_models()
 
     @work(thread=True, exclusive=True)
@@ -522,12 +544,9 @@ class RoanApp(App):
             self._update_status()
             cfg = load_config()
             if provider not in PROVIDER_PRESETS:
-                self._sysline(
-                    f"Model → {model}. Provider '{provider}' is niet bekend — "
-                    "stel base_url + api_key in via /setup."
-                )
+                self._sysline(t("models_unknown_provider", model=model, provider=provider))
             else:
-                self._sysline(f"Model → {model}  ·  provider → {cfg['provider']}")
+                self._sysline(t("msg_model_set", model=model) + f"  ·  provider → {cfg['provider']}")
 
         self.push_screen(ModelsScreen(free, paid, custom), chosen)
 
@@ -542,7 +561,7 @@ class RoanApp(App):
             self._update_status()
             self._messages().remove_children()
             cfg = load_config()
-            self._sysline(f"Opgeslagen — model: {cfg['model']}  ·  provider: {cfg['provider']}")
+            self._sysline(t("setup_saved", model=cfg["model"], provider=cfg["provider"]))
 
         self.push_screen(SetupScreen(), done)
 
@@ -558,7 +577,7 @@ class RoanApp(App):
         self.agent.clear()
         self._messages().remove_children()
         self._update_status()
-        self._sysline(f"Nieuwe sessie: {self.agent.session_id}")
+        self._sysline(t("msg_new_session", id=self.agent.session_id))
 
     def action_setup(self) -> None:
         self._open_setup()
@@ -619,8 +638,10 @@ class RoanApp(App):
 
 def run_tui(avatar_path=None):
     from .config import migrate_legacy_dir
+    from .i18n import init_from_config
 
     migrate_legacy_dir()
+    init_from_config()
     agent = Agent()
     app = RoanApp(agent, avatar_path)
     app.run()

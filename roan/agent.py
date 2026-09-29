@@ -256,6 +256,25 @@ class Agent:
     def stop(self) -> None:
         self.mcp.stop_all()
 
+    # ---------- taal ----------
+    def set_language(self, lang: str) -> str:
+        """Wissel de taal van de agent en het programma, en herbouw de system-prompt."""
+        from .i18n import set_language as _set
+
+        code = _set(lang)
+        from .config import save_config
+
+        save_config({"language": code})
+        if self.messages:
+            self.messages[0] = {"role": "system", "content": _build_system_prompt()}
+        self.save()
+        return code
+
+    def language(self) -> str:
+        from .i18n import current_language
+
+        return current_language()
+
     @staticmethod
     def _dump_tool_call(tc) -> dict:
         if hasattr(tc, "model_dump"):

@@ -14,24 +14,11 @@ import urllib.parse
 import urllib.request
 
 from ..config import ROAN_DIR, load_config, save_config
+from ..i18n import LANGUAGES, set_language, t
 from .base import Channel
 
 API = "https://api.telegram.org/bot{token}/{method}"
 MAX_LEN = 4000
-HELP = (
-    "Roan — agent harness\n\n"
-    "Stuur gewoon een bericht om te praten.\n\n"
-    "Commando's:\n"
-    "/help — deze tekst\n"
-    "/new — nieuw gesprek\n"
-    "/clear — zelfde als /new\n"
-    "/model <naam> — model kiezen\n"
-    "/models — modellen van de provider\n"
-    "/free — 100% gratis modellen\n"
-    "/provider <naam> — provider kiezen\n"
-    "/memory — wat Roan onthouden heeft\n"
-    "/status — huidige configuratie"
-)
 
 
 # ---------- pure helpers (testbaar) ----------
@@ -73,10 +60,16 @@ def handle_command(text: str, agent, reset_fn) -> str | None:
     args = parts[1:]
 
     if name in ("start", "help"):
-        return HELP
+        return t("tg_help")
     if name in ("new", "clear"):
         new = reset_fn()
-        return f"Nieuwe sessie: {getattr(new, 'session_id', '?')}"
+        return t("msg_new_session", id=getattr(new, "session_id", "?"))
+    if name == "language":
+        if not args or args[0].lower() not in LANGUAGES:
+            return t("msg_languages", langs=", ".join(LANGUAGES))
+        code = set_language(args[0].lower())
+        save_config({"language": code})
+        return t("msg_language_set", lang=code)
     if name == "memory":
         from ..memory import load_memory
 
@@ -115,7 +108,7 @@ def handle_command(text: str, agent, reset_fn) -> str | None:
             f"model: {cfg['model']}\n"
             f"api_key: {'set' if cfg.get('api_key') else 'empty'}"
         )
-    return f"Onbekend commando: /{name} (probeer /help)"
+    return t("msg_unknown_cmd", name=name)
 
 
 # ---------- netwerk ----------
@@ -204,6 +197,9 @@ def resolve_token() -> str | None:
 
 
 def run_telegram() -> None:
+    from ..i18n import init_from_config
+
+    init_from_config()
     token = resolve_token()
     if not token:
         print(
