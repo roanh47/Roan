@@ -81,3 +81,36 @@ async def test_normal_message_goes_to_agent(tmp_roan):
         await pilot.pause()
         await pilot.pause()
         assert agent.sent == ["hi there"]
+
+
+@pytest.mark.asyncio
+async def test_theme_switch(tmp_roan):
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        await pilot.press(*"/theme latte", "enter")
+        await pilot.pause()
+        assert app.theme == "latte"
+
+
+@pytest.mark.asyncio
+async def test_model_picker_selects(tmp_roan):
+    from roan.tui import ModelPicker
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        app._open_picker(["model-a", "model-b"])
+        await pilot.pause()
+        assert isinstance(app.screen, ModelPicker)
+        await pilot.press("enter")
+        await pilot.pause()
+        assert config.load_config()["model"] == "model-a"
+
+
+@pytest.mark.asyncio
+async def test_unknown_command_reports(tmp_roan):
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        await pilot.press(*"/nope", "enter")
+        await pilot.pause()
+        statics = [str(w.render()) for w in app.query("Static")]
+        assert any("Onbekend" in s for s in statics)

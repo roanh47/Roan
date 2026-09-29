@@ -5,7 +5,9 @@ from textual import on, work
 from textual.app import App, ComposeResult
 from textual.containers import VerticalScroll
 from textual.events import Click
-from textual.widgets import Input, Markdown, Static
+from textual.screen import ModalScreen
+from textual.widgets import Input, Markdown, OptionList, Static
+from textual.widgets.option_list import Option
 
 try:
     from textual_image.widget import Image as _HDImage
@@ -18,11 +20,39 @@ except Exception:
 from . import commands
 from .agent import Agent
 from .config import PROVIDER_PRESETS, ROAN_DIR, load_config, save_config
-from .models import list_free, list_models
+from .models import fetch_provider_models, list_free, list_models
 from .photo import render_photo
 from .themes import ACCENT, THEMES
 
 BUNDLED_AVATAR = Path(__file__).parent / "assets" / "avatar.png"
+
+
+class ModelPicker(ModalScreen):
+    """Klikbare dropdown om een model te kiezen."""
+
+    CSS = """
+    ModelPicker {
+        align: center middle;
+    }
+    #picker {
+        width: 60%;
+        height: auto;
+        max-height: 70%;
+        border: thick $accent;
+        background: $panel;
+    }
+    """
+
+    def __init__(self, models: list[str]):
+        super().__init__()
+        self.models = models
+
+    def compose(self) -> ComposeResult:
+        options = [Option(m, id=m) for m in self.models]
+        yield OptionList(*options, id="picker")
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        self.dismiss(str(event.option.id))
 
 
 class RoanApp(App):
@@ -53,6 +83,9 @@ class RoanApp(App):
         super().__init__()
         self.agent = agent
         self.avatar_path = avatar_path
+        for theme in THEMES:
+            self.register_theme(theme)
+        self.theme = "mocha"
 
     # ---------- avatar ----------
     def _resolve_avatar(self):
@@ -216,10 +249,27 @@ class RoanApp(App):
         self._sysline(f"Model → {cfg['model']}")
 
     def _cmd_models(self) -> None:
+        self._sysline("Modellen ophalen ...")
+        self._fetch_models()
+
+    @work(thread=True, exclusive=True)
+    def _fetch_models(self) -> None:
         cfg = load_config()
-        self._sysline(f"Modellen ophalen van {cfg['provider']} ...")
-        resp = list_models(cfg["base_url"], cfg["api_key"])
-        self._write(Markdown(resp))
+        models = fetch_provider_models(cfg["base_url"], cfg["api_key"])
+        if not models:
+            self.call_from_thread(self._write, Markdown(list_models(cfg["base_url"], cfg["api_key"])))
+            return
+        self.call_from_thread(self._open_picker, models)
+
+    def _open_picker(self, models: list[str]) -> None:
+        def chosen(model: str | None) -> None:
+            if not model:
+                return
+            save_config({"model": model})
+            self.agent.reload()
+            self._sysline(f"Model → {model}")
+
+        self.push_screen(ModelPicker(models), chosen)
 
     def _cmd_setup(self) -> None:
         cfg = load_config()
@@ -276,7 +326,4 @@ class RoanApp(App):
 def run_tui(avatar_path=None):
     agent = Agent()
     app = RoanApp(agent, avatar_path)
-    for theme in THEMES:
-        app.register_theme(theme)
-    app.theme = "mocha"
     app.run()
