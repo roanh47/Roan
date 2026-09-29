@@ -7,11 +7,17 @@ from textual.containers import VerticalScroll
 from textual.events import Click
 from textual.widgets import Input, Markdown, Static
 
-from textual_image import renderable  # noqa: F401  (terminal-query moet vóór app-run)
-from textual_image.widget import Image
+try:
+    from textual_image.widget import Image as _HDImage
+
+    _HAS_HD = True
+except Exception:
+    _HDImage = None
+    _HAS_HD = False
 
 from .agent import Agent
 from .config import ROAN_DIR
+from .photo import render_photo
 from .themes import ACCENT, THEMES
 
 BUNDLED_AVATAR = Path(__file__).parent / "assets" / "avatar.png"
@@ -60,7 +66,10 @@ class RoanApp(App):
     def compose(self) -> ComposeResult:
         avatar = self._resolve_avatar()
         if avatar:
-            yield Image(avatar, width=26)
+            if _HAS_HD:
+                yield _HDImage(avatar, width=26)
+            else:
+                yield Static(render_photo(avatar))
         yield Static("Roan — je agent harness", classes="title")
         yield VerticalScroll(id="messages")
         yield Input(placeholder="Message Roan…", id="input")
