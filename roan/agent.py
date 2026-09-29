@@ -78,6 +78,12 @@ class Agent:
 
         self.messages = [{"role": "system", "content": system}]
 
+    def reload(self) -> None:
+        """Herlaad config (na /model of /setup) zonder de geschiedenis te verliezen."""
+        cfg = load_config()
+        self.model = cfg["model"]
+        self.client = OpenAI(base_url=cfg["base_url"], api_key=cfg["api_key"] or "sk-none")
+
     def send(self, user_text: str) -> str:
         self.messages.append({"role": "user", "content": user_text})
 

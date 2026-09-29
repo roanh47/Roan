@@ -13,10 +13,16 @@ PROVIDER_PRESETS = {
     "ollama": {"base_url": "http://localhost:11434/v1", "api_key": "ollama"},
     "groq": {"base_url": "https://api.groq.com/openai/v1", "api_key": ""},
     "openrouter": {"base_url": "https://openrouter.ai/api/v1", "api_key": ""},
+    "gemini": {"base_url": "https://generativelanguage.googleapis.com/v1beta/openai", "api_key": ""},
+    "deepseek": {"base_url": "https://api.deepseek.com/v1", "api_key": ""},
+    "cerebras": {"base_url": "https://api.cerebras.ai/v1", "api_key": ""},
+    "together": {"base_url": "https://api.together.xyz/v1", "api_key": ""},
+    "mistral": {"base_url": "https://api.mistral.ai/v1", "api_key": ""},
+    "custom": {"base_url": "", "api_key": ""},
 }
 
 DEFAULT_CONFIG = {
-    "provider": "lmstudio",  # of: ollama/groq/openrouter, of "custom" + eigen base_url
+    "provider": "lmstudio",  # zie PROVIDER_PRESETS, of "custom" + base_url
     "base_url": None,         # alleen bij provider == "custom"
     "api_key": None,          # overschrijft de preset-key indien ingesteld
     "model": "local-model",
@@ -52,3 +58,17 @@ def load_instructions() -> str:
     if INSTRUCTIONS_PATH.exists():
         return INSTRUCTIONS_PATH.read_text()
     return DEFAULT_INSTRUCTIONS
+
+
+def save_config(updates: dict) -> dict:
+    """Merge updates in ~/.roan/config.json en geef de nieuwe config terug."""
+    raw: dict = {}
+    if CONFIG_PATH.exists():
+        try:
+            raw = json.loads(CONFIG_PATH.read_text())
+        except (json.JSONDecodeError, OSError):
+            raw = {}
+    raw.update(updates)
+    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CONFIG_PATH.write_text(json.dumps(raw, indent=2))
+    return load_config()
