@@ -38,8 +38,9 @@ def tmp_roan(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.json")
     monkeypatch.setattr(config, "MEMORY_PATH", tmp_path / "memory.md")
     monkeypatch.setattr(config, "INSTRUCTIONS_PATH", tmp_path / "instructions.md")
-    # Standaard een config zodat het setup-scherm niet automatisch opent.
-    config.save_config({"provider": "lmstudio", "model": "test-model"})
+    # Standaard een config zodat het setup-scherm niet automatisch opent,
+    # en een expliciete renderer zodat de fullscreen-dialoog niet verschijnt.
+    config.save_config({"provider": "lmstudio", "model": "test-model", "tui": "default"})
     return tmp_path
 
 
@@ -212,10 +213,15 @@ async def test_setup_screen_saves(tmp_roan):
         app._open_setup()
         await pilot.pause()
         assert isinstance(app.screen, SetupScreen)
-        app.screen.query_one("#model", Input).value = "setup-model"
+        app.screen.provider = "groq"
+        app.screen.model = "setup-model"
+        app.screen.query_one("#api_key", Input).value = "key-123"
         app.screen.query_one("#save", Button).press()
         await pilot.pause()
-        assert config.load_config()["model"] == "setup-model"
+        cfg = config.load_config()
+        assert cfg["model"] == "setup-model"
+        assert cfg["provider"] == "groq"
+        assert cfg["api_key"] == "key-123"
 
 
 @pytest.mark.asyncio

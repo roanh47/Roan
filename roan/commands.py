@@ -31,6 +31,7 @@ COMMANDS: dict[str, Command] = {
     "sessions": Command("sessions", "cmd_sessions"),
     "compact": Command("compact", "cmd_compact"),
     "language": Command("language", "cmd_language", "/language <nl|en>"),
+    "tui": Command("tui", "cmd_tui", "/tui <fullscreen|default>"),
     "quit": Command("quit", "cmd_quit"),
 }
 

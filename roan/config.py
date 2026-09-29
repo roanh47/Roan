@@ -28,7 +28,15 @@ DEFAULT_CONFIG = {
     "api_key": None,          # overschrijft de preset-key indien ingesteld
     "model": "local-model",
     "language": "nl",         # "nl" of "en"
+    "tui": None,              # "fullscreen" | "default" | None (nog niet gekozen)
+    "tui_prompts": 0,         # hoe vaak de fullscreen-dialoog is getoond
+    "tui_declined": False,    # "niet nu" gekozen -> nooit meer vragen
+    "tui_fails": 0,           # mislukte fullscreen-starts
+    "scroll_speed": 1,        # muiswiel-vermenigvuldiger
+    "auto_follow": True,      # automatisch naar beneden scrollen
 }
+
+RENDERERS = ("fullscreen", "default")
 
 # De standaard-instructies staan per taal in roan/i18n.py (DEFAULT_INSTRUCTIONS).
 
@@ -48,6 +56,7 @@ def load_config() -> dict:
         ("api_key", "ROAN_API_KEY"),
         ("model", "ROAN_MODEL"),
         ("language", "ROAN_LANGUAGE"),
+        ("tui", "ROAN_TUI"),
         ("telegram_token", "ROAN_TELEGRAM_TOKEN"),
     ):
         if os.environ.get(env):
@@ -80,6 +89,45 @@ def migrate_legacy_dir() -> bool:
 def has_config() -> bool:
     """True als de gebruiker ooit iets geconfigureerd heeft."""
     return CONFIG_PATH.exists() or bool(os.environ.get("ROAN_API_KEY"))
+
+
+def resolve_renderer() -> str:
+    """Welke TUI-renderer we starten: 'fullscreen' of 'default'.
+
+    Env-vars winnen (net als CLAUDE_CODE_NO_FLICKER / ..._DISABLE_ALTERNATE_SCREEN).
+    """
+    if os.environ.get("ROAN_DISABLE_ALTERNATE_SCREEN"):
+        return "default"
+    if os.environ.get("ROAN_NO_FLICKER") == "1":
+        return "fullscreen"
+    tui = load_config().get("tui")
+    return tui if tui in RENDERERS else "default"
+
+
+def should_offer_fullscreen() -> bool:
+    """True als we de fullscreen-dialoog mogen tonen (max 3x, niet na 'niet nu')."""
+    if os.environ.get("ROAN_DISABLE_ALTERNATE_SCREEN") or os.environ.get("ROAN_NO_FLICKER"):
+        return False
+    cfg = load_config()
+    if cfg.get("tui") in RENDERERS or cfg.get("tui_declined"):
+        return False
+    return int(cfg.get("tui_prompts") or 0) < 3
+
+
+def note_fullscreen_failure() -> str:
+    """Registreer een mislukte fullscreen-start; val na 2x terug op classic."""
+    cfg = load_config()
+    fails = int(cfg.get("tui_fails") or 0) + 1
+    updates: dict = {"tui_fails": fails}
+    if fails >= 2:
+        updates["tui"] = "default"
+    return save_config(updates).get("tui") or "default"
+
+
+def note_fullscreen_success() -> None:
+    """Een geslaagde start reset de teller (zoals Claude Code)."""
+    if load_config().get("tui_fails"):
+        save_config({"tui_fails": 0})
 
 
 def load_instructions() -> str:

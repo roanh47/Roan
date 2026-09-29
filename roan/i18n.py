@@ -41,6 +41,40 @@ STRINGS: dict[str, dict[str, str]] = {
             "Model → {model}. Provider '{provider}' is niet bekend — "
             "stel base_url + api_key in via /setup."
         ),
+        # providers
+        "provider_title": "Provider",
+        "provider_category": "Categorie",
+        "provider_cat_free": "Gratis",
+        "provider_cat_paid": "Betaald",
+        "provider_cat_custom": "Custom",
+        "provider_label": "Provider",
+        "provider_base_url": "Base URL",
+        "provider_env": "Env-var",
+        "provider_doc": "Docs",
+        "provider_choose": "Kies",
+        "provider_back": "Terug",
+        "provider_all": "— kies een provider —",
+        "setup_choose_provider": "Kies provider…",
+        "setup_choose_model": "Kies model…",
+        "setup_none": "(nog niet gekozen)",
+        "models_for": "Modellen van {provider}",
+        # providers
+        "provider_title": "Provider",
+        "provider_category": "Category",
+        "provider_cat_free": "Free",
+        "provider_cat_paid": "Paid",
+        "provider_cat_custom": "Custom",
+        "provider_label": "Provider",
+        "provider_base_url": "Base URL",
+        "provider_env": "Env var",
+        "provider_doc": "Docs",
+        "provider_choose": "Choose",
+        "provider_back": "Back",
+        "provider_all": "— choose a provider —",
+        "setup_choose_provider": "Choose provider…",
+        "setup_choose_model": "Choose model…",
+        "setup_none": "(not chosen yet)",
+        "models_for": "Models from {provider}",
         # commands
         "cmd_help": "Toon alle commando's",
         "cmd_clear": "Leeg het gesprek",
@@ -55,6 +89,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "cmd_sessions": "Toon opgeslagen sessies",
         "cmd_compact": "Vat het gesprek samen om context vrij te maken",
         "cmd_language": "Wissel de taal (nl / en)",
+        "cmd_tui": "Wissel de renderer (fullscreen / default)",
         "cmd_quit": "Afsluiten",
         "help_title": "Commando's",
         "help_languages": "Talen: nl, en",
@@ -92,6 +127,30 @@ STRINGS: dict[str, dict[str, str]] = {
             "/memory — wat Roan onthouden heeft\n"
             "/status — huidige configuratie"
         ),
+        # tui
+        "tui_names": "fullscreen, default",
+        "tui_current": "Huidige renderer: {mode}",
+        "tui_set": "Renderer → {mode}",
+        "tui_fullscreen": "fullscreen (alternate screen, geen flicker, muis)",
+        "tui_default": "default (klassiek, in je terminal-scrollback)",
+        "tui_prompt_title": "Nieuwe TUI",
+        "tui_prompt_body": (
+            "Roan kan de nieuwe fullscreen-TUI gebruiken.\n\n"
+            "Die tekent op het alternate screen (zoals vim), heeft geen flicker, "
+            "houdt geheugen vlak in lange gesprekken en ondersteunt de muis.\n\n"
+            "Later te wisselen met /tui."
+        ),
+        "tui_yes": "Ja, gebruik fullscreen",
+        "tui_notnow": "Niet nu",
+        "transcript_title": "Transcript",
+        "transcript_hint": "/ zoeken · n/N volgende · g/G top/einde · q of Esc terug",
+        "transcript_search": "Zoek: ",
+        "transcript_no_match": "Geen match",
+        "transcript_matches": "{n} matches",
+        "jump_bottom": "↓ naar beneden",
+        "new_messages": "{n} nieuwe berichten",
+        "focus_on": "Focus-modus aan",
+        "focus_off": "Focus-modus uit",
         # tools
         "tool_devmagic": "",
         "cli_help": (
@@ -159,6 +218,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "cmd_sessions": "List saved sessions",
         "cmd_compact": "Summarise the conversation to free up context",
         "cmd_language": "Switch language (nl / en)",
+        "cmd_tui": "Switch the renderer (fullscreen / default)",
         "cmd_quit": "Exit",
         "help_title": "Commands",
         "help_languages": "Languages: nl, en",
@@ -196,6 +256,30 @@ STRINGS: dict[str, dict[str, str]] = {
             "/status — current configuration"
         ),
         "tool_devmagic": "",
+        # tui
+        "tui_names": "fullscreen, default",
+        "tui_current": "Current renderer: {mode}",
+        "tui_set": "Renderer → {mode}",
+        "tui_fullscreen": "fullscreen (alternate screen, no flicker, mouse)",
+        "tui_default": "default (classic, in your terminal scrollback)",
+        "tui_prompt_title": "New TUI",
+        "tui_prompt_body": (
+            "Roan can use the new fullscreen TUI.\n\n"
+            "It draws on the alternate screen (like vim), eliminates flicker, keeps "
+            "memory flat in long conversations and adds mouse support.\n\n"
+            "Switch later with /tui."
+        ),
+        "tui_yes": "Yes, use fullscreen",
+        "tui_notnow": "Not now",
+        "transcript_title": "Transcript",
+        "transcript_hint": "/ search · n/N next · g/G top/bottom · q or Esc back",
+        "transcript_search": "Search: ",
+        "transcript_no_match": "No match",
+        "transcript_matches": "{n} matches",
+        "jump_bottom": "↓ jump to bottom",
+        "new_messages": "{n} new messages",
+        "focus_on": "Focus mode on",
+        "focus_off": "Focus mode off",
         "cli_help": (
             "Roan — agent harness\n\n"
             "Usage: Roan [command]\n\n"

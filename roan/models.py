@@ -68,6 +68,64 @@ def list_dev(category: str = "free") -> list[tuple[str, str]]:
     return out
 
 
+def _dev_data() -> dict:
+    try:
+        return _get(MODELS_DEV_URL)
+    except Exception:
+        return {}
+
+
+def provider_has_free(pdata: dict) -> bool:
+    models = (pdata or {}).get("models") or {}
+    return any(is_free(m or {}) for m in models.values())
+
+
+def list_providers(category: str = "all") -> list[tuple[str, str]]:
+    """(id, naam) van providers uit models.dev, live.
+
+    category: 'free' = heeft 100% gratis modellen, 'paid' = de rest, 'all' = alles.
+    """
+    data = _dev_data()
+    out: list[tuple[str, str]] = []
+    for pid, pdata in data.items():
+        pdata = pdata or {}
+        free = provider_has_free(pdata)
+        if category == "free" and not free:
+            continue
+        if category == "paid" and free:
+            continue
+        out.append((pid, pdata.get("name") or pid))
+    return sorted(out, key=lambda x: x[0])
+
+
+def provider_meta(provider: str) -> dict:
+    """Naam, env-var en docs-url van een provider (uit models.dev)."""
+    pdata = (_dev_data().get(provider) or {})
+    env = pdata.get("env") or []
+    return {
+        "id": provider,
+        "name": pdata.get("name") or provider,
+        "env": env[0] if env else "",
+        "doc": pdata.get("doc") or "",
+        "models": list((pdata.get("models") or {}).keys()),
+    }
+
+
+def provider_models(provider: str, category: str = "all") -> list[str]:
+    """Alle model-ids van één provider, optioneel gefilterd op gratis."""
+    pdata = (_dev_data().get(provider) or {})
+    models = pdata.get("models") or {}
+    out = []
+    for mid, mdata in models.items():
+        free = is_free(mdata or {})
+        if category == "free" and not free:
+            continue
+        if category == "paid" and free:
+            continue
+        out.append(mid)
+    return sorted(out)
+
+
 def fetch_free_models() -> list[tuple[str, str]]:
     """(provider, model) van models.dev waar cost 0 is."""
     return list_dev("free")

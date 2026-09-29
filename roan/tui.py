@@ -29,12 +29,29 @@ except Exception:
 from . import commands
 from .agent import Agent
 from .config import PROVIDER_PRESETS, ROAN_DIR, load_config, save_config
-from .models import fetch_provider_models, list_dev, list_free, list_models
+from .models import (
+    fetch_provider_models,
+    list_dev,
+    list_free,
+    list_models,
+    list_providers,
+    provider_meta,
+)
 from .i18n import t
 from .photo import render_photo
 from .themes import ACCENT, THEMES
 
 BUNDLED_AVATAR = Path(__file__).parent / "assets" / "avatar.png"
+
+
+def gather_models() -> tuple[list, list, list]:
+    """(free, paid, custom) model-lijsten voor de browsers."""
+    cfg = load_config()
+    return (
+        list_dev("free"),
+        list_dev("paid"),
+        fetch_provider_models(cfg["base_url"], cfg["api_key"]),
+    )
 
 
 def tool_summary(name: str, args: dict) -> str:
@@ -111,49 +128,226 @@ class SetupScreen(ModalScreen):
     }
     """
 
-    def compose(self) -> ComposeResult:
+    def __init__(self, provider=None, model=None, base_url=None):
+        super().__init__()
         cfg = load_config()
-        provider = cfg.get("provider", "lmstudio")
+        self.provider = provider or cfg.get("provider") or ""
+        self.model = model or cfg.get("model") or ""
+        self.base_url = base_url or cfg.get("base_url") or ""
+
+    def _provider_line(self) -> str:
+        return self.provider or t("setup_none")
+
+    def _model_line(self) -> str:
+        return self.model or t("setup_none")
+
+    def compose(self) -> ComposeResult:
         with Vertical(id="setup-box"):
-            yield Static("Setup", classes="title")
+            yield Static(t("setup_title"), classes="title")
             yield Label(t("setup_provider"))
-            yield Select(
-                [(name, name) for name in sorted(PROVIDER_PRESETS)],
-                value=provider if provider in PROVIDER_PRESETS else "lmstudio",
-                id="provider",
-                allow_blank=False,
-            )
+            yield Static(self._provider_line(), id="cur-provider")
+            yield Button(t("setup_choose_provider"), id="choose-provider")
             yield Label(t("setup_api_key"))
             yield Input(value="", password=True, placeholder="sk-…", id="api_key")
             yield Label(t("setup_model"))
-            yield Input(value=cfg.get("model", ""), id="model")
+            yield Static(self._model_line(), id="cur-model")
+            yield Button(t("setup_choose_model"), id="choose-model")
             yield Label(t("setup_base_url"))
-            yield Input(value=cfg.get("base_url") or "", id="base_url")
+            yield Input(value=self.base_url, id="base_url")
             with Horizontal(id="setup-actions"):
                 yield Button(t("setup_cancel"), id="cancel")
                 yield Button(t("setup_save"), id="save", variant="primary")
 
+    # ---------- provider / model kiezen ----------
+    def _choose_provider(self) -> None:
+        def picked(result) -> None:
+            if not result:
+                return
+            provider, base_url = result
+            self.provider = provider
+            if base_url:
+                self.base_url = base_url
+                self.query_one("#base_url", Input).value = base_url
+            self.query_one("#cur-provider", Static).update(self._provider_line())
+
+        self.app.push_screen(ProviderScreen(), picked)
+
+    def _choose_model(self) -> None:
+        self._load_models()
+
+    @work(thread=True, exclusive=True)
+    def _load_models(self) -> None:
+        free, paid, custom = gather_models()
+        self.app.call_from_thread(self._open_models, free, paid, custom)
+
+    def _open_models(self, free, paid, custom) -> None:
+        def picked(result) -> None:
+            if not result:
+                return
+            provider, model = result
+            if provider and provider != "custom":
+                self.provider = provider
+            self.model = model
+            self.query_one("#cur-model", Static).update(self._model_line())
+            self.query_one("#cur-provider", Static).update(self._provider_line())
+
+        self.app.push_screen(
+            ModelsScreen(free, paid, custom, fixed_provider=self.provider or None), picked
+        )
+
     @on(Button.Pressed)
     def _on_button(self, event: Button.Pressed) -> None:
-        if event.button.id == "cancel":
+        bid = event.button.id
+        if bid == "cancel":
             self.dismiss(False)
             return
+        if bid == "choose-provider":
+            self._choose_provider()
+            return
+        if bid == "choose-model":
+            self._choose_model()
+            return
 
-        provider = self.query_one("#provider", Select).value
         api_key = self.query_one("#api_key", Input).value.strip()
-        model = self.query_one("#model", Input).value.strip()
         base_url = self.query_one("#base_url", Input).value.strip()
 
-        updates: dict = {"provider": provider}
+        updates: dict = {}
+        if self.provider:
+            updates["provider"] = self.provider
         if api_key:
             updates["api_key"] = api_key
-        if model:
-            updates["model"] = model
-        if provider == "custom" and base_url:
+        if self.model:
+            updates["model"] = self.model
+        if base_url:
             updates["base_url"] = base_url
 
         save_config(updates)
         self.dismiss(True)
+
+
+class ProviderScreen(ModalScreen):
+    """Provider kiezen: Gratis / Betaald / Custom — live uit models.dev."""
+
+    CSS = """
+    ProviderScreen {
+        align: center middle;
+    }
+    #provider-box {
+        width: 80%;
+        max-width: 110;
+        height: 80%;
+        border: thick $accent;
+        background: $panel;
+        padding: 1 2;
+    }
+    #provider-filters {
+        height: auto;
+        margin-bottom: 1;
+    }
+    #provider-filters Select {
+        width: 1fr;
+    }
+    #provider-list {
+        height: 1fr;
+    }
+    #provider-info {
+        height: auto;
+        color: $text-muted;
+    }
+    #provider-actions {
+        margin-top: 1;
+        height: auto;
+        align-horizontal: right;
+    }
+    #provider-actions Button {
+        margin-left: 2;
+    }
+    """
+
+    def __init__(self, category: str = "free"):
+        super().__init__()
+        self.providers = {"free": [], "paid": []}
+        self._chosen = ""
+        self._category = category
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="provider-box"):
+            yield Static(t("provider_title"), classes="title")
+            with Horizontal(id="provider-filters"):
+                yield Select(
+                    [
+                        (t("provider_cat_free"), "free"),
+                        (t("provider_cat_paid"), "paid"),
+                        (t("provider_cat_custom"), "custom"),
+                    ],
+                    value=self._category,
+                    id="pcat",
+                    allow_blank=False,
+                )
+            yield OptionList(id="provider-list")
+            yield Label(t("provider_base_url"))
+            yield Input(id="pbase", placeholder="https://api.example.com/v1")
+            yield Static(id="provider-info")
+            with Horizontal(id="provider-actions"):
+                yield Button(t("provider_back"), id="pback")
+                yield Button(t("provider_choose"), id="pchoose", variant="primary")
+
+    def on_mount(self) -> None:
+        self._rebuild()
+        self._load()
+
+    @work(thread=True, exclusive=True)
+    def _load(self) -> None:
+        free = list_providers("free")
+        paid = list_providers("paid")
+        self.app.call_from_thread(self._set_providers, free, paid)
+
+    def _set_providers(self, free, paid) -> None:
+        self.providers = {"free": free, "paid": paid}
+        self._rebuild()
+
+    def _cat(self) -> str:
+        return self.query_one("#pcat", Select).value
+
+    def _rebuild(self) -> None:
+        cat = self._cat()
+        custom = cat == "custom"
+        listing = self.query_one("#provider-list", OptionList)
+        listing.display = not custom
+        self.query_one("#pbase", Input).display = custom
+        if custom:
+            return
+        listing.clear_options()
+        for pid, name in self.providers.get(cat, []):
+            listing.add_option(Option(f"{name}  ·  {pid}", id=pid))
+
+    @on(Select.Changed)
+    def _on_cat(self, event: Select.Changed) -> None:
+        if event.select.id == "pcat":
+            self._chosen = ""
+            self.query_one("#provider-info", Static).update("")
+            self._rebuild()
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        self._chosen = str(event.option_id or "")
+        meta = provider_meta(self._chosen)
+        bits = []
+        if meta["env"]:
+            bits.append(f"{t('provider_env')}: {meta['env']}")
+        if meta["doc"]:
+            bits.append(f"{t('provider_doc')}: {meta['doc']}")
+        self.query_one("#provider-info", Static).update("  ·  ".join(bits))
+
+    @on(Button.Pressed)
+    def _on_button(self, event: Button.Pressed) -> None:
+        if event.button.id == "pback":
+            self.dismiss(None)
+            return
+        if self._cat() == "custom":
+            self.dismiss(("custom", self.query_one("#pbase", Input).value.strip()))
+            return
+        if self._chosen:
+            self.dismiss((self._chosen, ""))
 
 
 class ModelsScreen(ModalScreen):
@@ -184,13 +378,25 @@ class ModelsScreen(ModalScreen):
     }
     """
 
-    def __init__(self, free: list[tuple[str, str]], paid: list[tuple[str, str]], custom: list[str]):
+    def __init__(
+        self,
+        free: list[tuple[str, str]],
+        paid: list[tuple[str, str]],
+        custom: list[str],
+        fixed_provider: str | None = None,
+    ):
         super().__init__()
         self.data = {"free": free, "paid": paid, "custom": custom}
+        self.fixed_provider = fixed_provider
 
     def compose(self) -> ComposeResult:
         with Vertical(id="models-box"):
-            yield Static(t("models_title"), classes="title")
+            title = (
+                t("models_for", provider=self.fixed_provider)
+                if self.fixed_provider
+                else t("models_title")
+            )
+            yield Static(title, classes="title")
             with Horizontal(id="models-filters"):
                 yield Select(
                     [
@@ -208,14 +414,20 @@ class ModelsScreen(ModalScreen):
             yield OptionList(id="models-list")
 
     def on_mount(self) -> None:
+        if self.fixed_provider:
+            self.query_one("#prov", Select).display = False
         self._refresh_providers()
         self._rebuild()
 
     def _current(self) -> list[tuple[str, str]]:
         cat = self.query_one("#cat", Select).value
         if cat == "custom":
-            return [(load_config()["provider"], m) for m in self.data["custom"]]
-        return self.data.get(cat, [])
+            items = [(load_config()["provider"], m) for m in self.data["custom"]]
+        else:
+            items = list(self.data.get(cat, []))
+        if self.fixed_provider:
+            items = [(p, m) for p, m in items if p == self.fixed_provider]
+        return items
 
     def _refresh_providers(self) -> None:
         providers = sorted({p for p, _ in self._current()})
@@ -246,6 +458,218 @@ class ModelsScreen(ModalScreen):
         self.dismiss((provider, model))
 
 
+class Messages(VerticalScroll):
+    """Berichtenlijst. Muiswiel-snelheid volgt de `scroll_speed`-instelling."""
+
+    def _speed(self) -> float:
+        try:
+            return float(load_config().get("scroll_speed") or 1)
+        except (TypeError, ValueError):
+            return 1.0
+
+    def on_mouse_scroll_down(self, event) -> None:
+        speed = self._speed()
+        if speed != 1.0:
+            event.stop()
+            self.scroll_down(amount=max(1, int(3 * speed)), animate=False)
+
+    def on_mouse_scroll_up(self, event) -> None:
+        speed = self._speed()
+        if speed != 1.0:
+            event.stop()
+            self.scroll_up(amount=max(1, int(3 * speed)), animate=False)
+
+
+class ToolResult(Static):
+    """Tool-resultaat: één regel, klik om volledig uit te klappen (zoals Claude Code)."""
+
+    def __init__(self, tool_name: str, result: str, **kwargs) -> None:
+        self.tool_name = tool_name
+        self.result = result or ""
+        self.expanded = False
+        super().__init__(self._collapsed(), **kwargs)
+
+    def _collapsed(self) -> str:
+        lines = self.result.strip().splitlines()
+        first = lines[0][:120] if lines else ""
+        bad = first.lower().startswith("error")
+        marker = "✗" if bad else "↳"
+        extra = f"  (+{len(lines) - 1} regels)" if len(lines) > 1 else ""
+        return f"  [dim]{marker} {first}{extra}[/dim]"
+
+    def _full(self) -> str:
+        body = "\n".join(f"  [dim]{line}[/dim]" for line in self.result.strip().splitlines())
+        return f"  [{ACCENT}]↳ {self.tool_name}[/{ACCENT}]\n{body}"
+
+    def on_click(self) -> None:
+        self.expanded = not self.expanded
+        self.update(self._full() if self.expanded else self._collapsed())
+
+
+class TuiPromptScreen(ModalScreen):
+    """Startup-dialoog: nieuwe fullscreen-TUI gebruiken of niet."""
+
+    CSS = """
+    TuiPromptScreen {
+        align: center middle;
+    }
+    #tui-prompt {
+        width: 70%;
+        max-width: 90;
+        height: auto;
+        border: thick $accent;
+        background: $panel;
+        padding: 1 2;
+    }
+    #tui-actions {
+        margin-top: 2;
+        height: auto;
+        align-horizontal: right;
+    }
+    #tui-actions Button {
+        margin-left: 2;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="tui-prompt"):
+            yield Static(t("tui_prompt_title"), classes="title")
+            yield Static(t("tui_prompt_body"))
+            with Horizontal(id="tui-actions"):
+                yield Button(t("tui_notnow"), id="notnow")
+                yield Button(t("tui_yes"), id="yes", variant="primary")
+
+    @on(Button.Pressed)
+    def _on_button(self, event: Button.Pressed) -> None:
+        self.dismiss(event.button.id == "yes")
+
+
+class TranscriptScreen(ModalScreen):
+    """Ctrl+O: volledig transcript met less-achtige navigatie en zoeken."""
+
+    BINDINGS = [
+        ("escape", "close", "terug"),
+        ("q", "close", "terug"),
+        ("ctrl+o", "close", "terug"),
+        ("g", "top", "top"),
+        ("G", "bottom", "einde"),
+        ("n", "next_match", "volgende"),
+        ("N", "prev_match", "vorige"),
+        ("slash", "search", "zoek"),
+    ]
+
+    CSS = """
+    TranscriptScreen {
+        align: center middle;
+    }
+    #transcript-box {
+        width: 95%;
+        max-width: 140;
+        height: 95%;
+        border: thick $accent;
+        background: $panel;
+        padding: 0 1;
+    }
+    #tbody {
+        height: 1fr;
+        padding: 0 1;
+    }
+    #thint {
+        dock: bottom;
+        height: 1;
+        color: $text-muted;
+    }
+    #tsearch {
+        display: none;
+    }
+    """
+
+    def __init__(self, messages: list[dict]):
+        super().__init__()
+        self.entries = messages
+        self.matches: list[int] = []
+        self._pos = -1
+        self._widgets: list = []
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="transcript-box"):
+            yield Static(t("transcript_title"), classes="title")
+            yield Input(placeholder=t("transcript_search"), id="tsearch")
+            yield VerticalScroll(id="tbody")
+            yield Static(t("transcript_hint"), id="thint")
+
+    def on_mount(self) -> None:
+        body = self.query_one("#tbody", VerticalScroll)
+        self._widgets = []
+        for msg in self.entries:
+            role = msg.get("role")
+            content = msg.get("content") or ""
+            if role == "user":
+                widget = Static(f"[bold {ACCENT}]❯ {content}[/bold {ACCENT}]")
+            elif role == "assistant":
+                widget = Markdown(content)
+            elif role == "tool":
+                widget = Static(f"  [dim]↳ {content}[/dim]")
+            else:
+                continue
+            self._widgets.append(widget)
+            body.mount(widget)
+        body.scroll_end(animate=False)
+
+    # ---------- zoeken ----------
+    def action_search(self) -> None:
+        box = self.query_one("#tsearch", Input)
+        box.display = True
+        box.focus()
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        query = (event.value or "").strip().lower()
+        self.matches = []
+        self._pos = -1
+        if not query:
+            return
+        for i, widget in enumerate(self._widgets):
+            text = getattr(widget, "source", None) or str(widget.render())
+            if query in str(text).lower():
+                self.matches.append(i)
+        hint = self.query_one("#thint", Static)
+        if self.matches:
+            hint.update(t("transcript_matches", n=len(self.matches)) + "  ·  " + t("transcript_hint"))
+        else:
+            hint.update(t("transcript_no_match") + "  ·  " + t("transcript_hint"))
+
+    @on(Input.Submitted)
+    def _on_search_submit(self, event: Input.Submitted) -> None:
+        self.query_one("#tsearch", Input).display = False
+        self.query_one("#tbody", VerticalScroll).focus()
+        self.action_next_match()
+
+    def _goto(self, index: int) -> None:
+        if 0 <= index < len(self._widgets):
+            self._widgets[index].scroll_visible(animate=False)
+
+    def action_next_match(self) -> None:
+        if not self.matches:
+            return
+        self._pos = (self._pos + 1) % len(self.matches)
+        self._goto(self.matches[self._pos])
+
+    def action_prev_match(self) -> None:
+        if not self.matches:
+            return
+        self._pos = (self._pos - 1) % len(self.matches)
+        self._goto(self.matches[self._pos])
+
+    def action_top(self) -> None:
+        self.query_one("#tbody", VerticalScroll).scroll_home(animate=False)
+
+    def action_bottom(self) -> None:
+        self.query_one("#tbody", VerticalScroll).scroll_end(animate=False)
+
+    def action_close(self) -> None:
+        self.dismiss(None)
+
+
 class RoanApp(App):
     TITLE = "Roan"
     MIN_SIZE = (1, 1)
@@ -254,6 +678,11 @@ class RoanApp(App):
         ("ctrl+l", "clear_chat", "clear"),
         ("ctrl+n", "new_session", "nieuw"),
         ("f2", "setup", "setup"),
+        ("ctrl+o", "transcript", "transcript"),
+        ("ctrl+end", "scroll_bottom", "naar beneden"),
+        ("ctrl+home", "scroll_top", "naar boven"),
+        ("pageup", "page_up", "pagina op"),
+        ("pagedown", "page_down", "pagina neer"),
     ]
 
     CSS = """
@@ -272,6 +701,14 @@ class RoanApp(App):
         color: $text-muted;
         padding: 0 2;
     }
+    #jump {
+        dock: bottom;
+        height: 1;
+        background: $accent;
+        color: $background;
+        text-align: right;
+        padding: 0 2;
+    }
     #input {
         dock: bottom;
         margin: 1 2;
@@ -283,10 +720,12 @@ class RoanApp(App):
     }
     """
 
-    def __init__(self, agent: Agent, avatar_path=None):
+    def __init__(self, agent: Agent, avatar_path=None, renderer: str = "default"):
         super().__init__()
         self.agent = agent
         self.avatar_path = avatar_path
+        self.renderer = renderer
+        self._new_since_scroll = 0
         for theme in THEMES:
             self.register_theme(theme)
         self.theme = "mocha"
@@ -324,7 +763,8 @@ class RoanApp(App):
             else:
                 yield Static(render_photo(avatar, width=self._photo_width()))
         yield Static(f"Roan — {t('app_subtitle')}", classes="title")
-        yield VerticalScroll(id="messages")
+        yield Messages(id="messages")
+        yield Static(id="jump")
         yield Static(id="status")
         yield HistoryInput(placeholder=t("input_placeholder"), id="input")
 
@@ -340,6 +780,25 @@ class RoanApp(App):
             return
         cfg = load_config()
         self._sysline(f"model: {cfg['model']}  ·  provider: {cfg['provider']}")
+        self._maybe_offer_fullscreen()
+
+    def _maybe_offer_fullscreen(self) -> None:
+        """Bied de nieuwe fullscreen-TUI aan (max 3x, niet na 'niet nu')."""
+        from .config import should_offer_fullscreen
+
+        if self.renderer != "default" or not should_offer_fullscreen():
+            return
+        save_config({"tui_prompts": int(load_config().get("tui_prompts") or 0) + 1})
+
+        def answered(yes: bool | None) -> None:
+            if yes:
+                save_config({"tui": "fullscreen"})
+                self.exit({"relaunch": "fullscreen"})
+            else:
+                save_config({"tui_declined": True})
+                self._sysline(t("tui_current", mode="default"))
+
+        self.push_screen(TuiPromptScreen(), answered)
 
     def _render_history(self) -> None:
         """Toon het herstelde gesprek zodat de context zichtbaar is."""
@@ -352,6 +811,10 @@ class RoanApp(App):
                 self._write(Markdown(content))
         if len(getattr(self.agent, "messages", [])) > 1:
             self._sysline(t("msg_restored", n=len(self.agent.messages) - 1))
+        msgs = self._messages()
+        msgs.scroll_end(animate=False)
+        self._new_since_scroll = 0
+        self._update_jump()
 
     def _update_status(self) -> None:
         cfg = load_config()
@@ -368,9 +831,25 @@ class RoanApp(App):
         self._messages().mount(Static(f"[dim]{text}[/dim]"))
 
     def _write(self, renderable) -> None:
+        """Mount een widget en volg het einde, tenzij de gebruiker omhoog scrollde."""
         msgs = self._messages()
+        at_bottom = msgs.is_vertical_scroll_end
+        follow = load_config().get("auto_follow", True)
         msgs.mount(renderable)
-        msgs.scroll_end(animate=False)
+        if at_bottom and follow:
+            msgs.scroll_end(animate=False)
+            self._new_since_scroll = 0
+        else:
+            self._new_since_scroll += 1
+        self._update_jump()
+
+    def _update_jump(self) -> None:
+        jump = self.query_one("#jump", Static)
+        if self._new_since_scroll > 0:
+            jump.update(t("new_messages", n=self._new_since_scroll))
+            jump.display = True
+        else:
+            jump.display = False
 
     # ---------- commands ----------
     def _run_command(self, raw: str) -> bool:
@@ -424,6 +903,9 @@ class RoanApp(App):
         if name == "language":
             self._cmd_language(args)
             return True
+        if name == "tui":
+            self._cmd_tui(args)
+            return True
         if name == "setup":
             self._cmd_setup()
             return True
@@ -436,18 +918,35 @@ class RoanApp(App):
         self._write(Markdown(list_free()))
 
     def _cmd_provider(self, args) -> None:
-        cfg = load_config()
-        if not args:
-            self._sysline(t("msg_provider_current", provider=cfg["provider"]))
+        if args:
+            name = args[0].lower()
+            if name not in PROVIDER_PRESETS:
+                self._sysline(t("msg_providers", names=", ".join(sorted(PROVIDER_PRESETS))))
+                return
+            save_config({"provider": name})
+            self.agent.reload()
+            self._update_status()
+            self._sysline(t("msg_provider_set", name=name))
             return
-        name = args[0].lower()
-        if name not in PROVIDER_PRESETS:
-            self._sysline(t("msg_providers", names=", ".join(sorted(PROVIDER_PRESETS))))
-            return
-        save_config({"provider": name})
-        self.agent.reload()
-        self._sysline(t("msg_provider_set", name=name))
-        self._update_status()
+        self._open_provider_picker()
+
+    def _open_provider_picker(self) -> None:
+        """Provider kiezen (Gratis/Betaald/Custom) en daarna meteen een model."""
+
+        def picked(result) -> None:
+            if not result:
+                return
+            provider, base_url = result
+            updates: dict = {"provider": provider}
+            if base_url:
+                updates["base_url"] = base_url
+            save_config(updates)
+            self.agent.reload()
+            self._update_status()
+            self._sysline(t("msg_provider_set", name=provider))
+            self._fetch_models(fixed_provider=provider)
+
+        self.push_screen(ProviderScreen(), picked)
 
     def _cmd_memory(self) -> None:
         from .memory import load_memory
@@ -524,31 +1023,28 @@ class RoanApp(App):
         self._fetch_models()
 
     @work(thread=True, exclusive=True)
-    def _fetch_models(self) -> None:
-        cfg = load_config()
-        free = list_dev("free")
-        paid = list_dev("paid")
-        custom = fetch_provider_models(cfg["base_url"], cfg["api_key"])
-        self.call_from_thread(self._open_models, free, paid, custom)
+    def _fetch_models(self, fixed_provider: str | None = None) -> None:
+        free, paid, custom = gather_models()
+        self.call_from_thread(self._open_models, free, paid, custom, fixed_provider)
 
-    def _open_models(self, free, paid, custom) -> None:
+    def _open_models(self, free, paid, custom, fixed_provider: str | None = None) -> None:
         def chosen(result) -> None:
             if not result:
                 return
             provider, model = result
             updates: dict = {"model": model}
-            if provider in PROVIDER_PRESETS:
+            if provider and provider != "custom" and provider in PROVIDER_PRESETS:
                 updates["provider"] = provider
             save_config(updates)
             self.agent.reload()
             self._update_status()
             cfg = load_config()
-            if provider not in PROVIDER_PRESETS:
+            if provider and provider not in PROVIDER_PRESETS and provider != "custom":
                 self._sysline(t("models_unknown_provider", model=model, provider=provider))
             else:
                 self._sysline(t("msg_model_set", model=model) + f"  ·  provider → {cfg['provider']}")
 
-        self.push_screen(ModelsScreen(free, paid, custom), chosen)
+        self.push_screen(ModelsScreen(free, paid, custom, fixed_provider=fixed_provider), chosen)
 
     def _cmd_setup(self) -> None:
         self._open_setup()
@@ -565,7 +1061,45 @@ class RoanApp(App):
 
         self.push_screen(SetupScreen(), done)
 
+    def _cmd_tui(self, args) -> None:
+        """Wissel tussen de fullscreen- en de klassieke renderer (herstart de TUI)."""
+        from .config import RENDERERS
+
+        if not args:
+            self._sysline(t("tui_current", mode=self.renderer))
+            return
+        mode = args[0].lower()
+        if mode not in RENDERERS:
+            self._sysline(t("tui_names"))
+            return
+        save_config({"tui": mode})
+        self._sysline(t("tui_set", mode=mode))
+        self.exit({"relaunch": mode})
+
     # ---------- acties (sneltoetsen) ----------
+    def action_transcript(self) -> None:
+        self.push_screen(TranscriptScreen(list(getattr(self.agent, "messages", []))))
+
+    def action_scroll_bottom(self) -> None:
+        msgs = self._messages()
+        msgs.scroll_end(animate=False)
+        self._new_since_scroll = 0
+        self._update_jump()
+        self.query_one("#input", Input).focus()
+
+    def action_scroll_top(self) -> None:
+        self._messages().scroll_home(animate=False)
+
+    def action_page_up(self) -> None:
+        self._messages().scroll_page_up(animate=False)
+
+    def action_page_down(self) -> None:
+        self._messages().scroll_page_down(animate=False)
+
+    @on(Click, "#jump")
+    def _jump_clicked(self) -> None:
+        self.action_scroll_bottom()
+
     def action_clear_chat(self) -> None:
         self._messages().remove_children()
         self.agent.clear()
@@ -629,19 +1163,35 @@ class RoanApp(App):
             summary = tool_summary(ev.get("name", "?"), ev.get("arguments") or {})
             self._write(Static(f"[{ACCENT}]●[/{ACCENT}] [b]{ev.get('name')}[/b] [dim]{summary}[/dim]"))
             return
-        lines = (ev.get("result") or "").strip().splitlines()
-        first = lines[0][:120] if lines else ""
-        bad = first.lower().startswith("error") or first.startswith("Error")
-        marker = "✗" if bad else "↳"
-        self._write(Static(f"  [dim]{marker} {first}[/dim]"))
+        self._write(ToolResult(str(ev.get("name") or "?"), ev.get("result") or ""))
 
 
 def run_tui(avatar_path=None):
-    from .config import migrate_legacy_dir
+    """Start de TUI; herstart bij een renderer-wissel en val terug bij een crash."""
+    from .config import (
+        migrate_legacy_dir,
+        note_fullscreen_failure,
+        resolve_renderer,
+    )
     from .i18n import init_from_config
 
     migrate_legacy_dir()
     init_from_config()
     agent = Agent()
-    app = RoanApp(agent, avatar_path)
-    app.run()
+    try:
+        while True:
+            mode = resolve_renderer()
+            app = RoanApp(agent, avatar_path, renderer=mode)
+            try:
+                result = app.run(inline=(mode == "default"))
+            except Exception as exc:  # fullscreen start mislukt -> klassiek
+                if mode == "fullscreen":
+                    note_fullscreen_failure()
+                    print(f"Fullscreen renderer startte niet ({exc}); klassieke renderer.")
+                    continue
+                raise
+            if isinstance(result, dict) and result.get("relaunch"):
+                continue
+            break
+    finally:
+        agent.stop()
