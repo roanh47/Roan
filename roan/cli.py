@@ -11,9 +11,14 @@ def main() -> None:
         return
 
     if args and args[0] in ("--version", "-v", "version"):
-        from . import __version__
+        from importlib.metadata import version
 
-        print(f"roan {__version__}")
+        try:
+            print(f"roan {version('roan')}")
+        except Exception:
+            from . import __version__
+
+            print(f"roan {__version__}")
         return
 
     from .tui import run_tui
