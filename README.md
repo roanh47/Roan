@@ -6,6 +6,8 @@ tools; Roan provides the agentic loop, tool-calling, and durable memory.
 ## Install
 
 ```sh
+git clone https://github.com/roanh47/Roan.git
+cd Roan
 pip install -e --pre .
 ```
 
