@@ -25,6 +25,7 @@ BUNDLED_AVATAR = Path(__file__).parent / "assets" / "avatar.png"
 
 class RoanApp(App):
     TITLE = "Roan"
+    MIN_SIZE = (20, 8)
 
     CSS = """
     #messages {
@@ -67,9 +68,9 @@ class RoanApp(App):
         avatar = self._resolve_avatar()
         if avatar:
             if _HAS_HD:
-                yield _HDImage(avatar, width=26)
+                yield _HDImage(avatar, width=16)
             else:
-                yield Static(render_photo(avatar))
+                yield Static(render_photo(avatar, width=16))
         yield Static("Roan — je agent harness", classes="title")
         yield VerticalScroll(id="messages")
         yield Input(placeholder="Message Roan…", id="input")
