@@ -197,3 +197,48 @@ async def test_setup_cancel_leaves_config(tmp_roan):
         app.screen.query_one("#cancel", Button).press()
         await pilot.pause()
         assert config.load_config()["model"] == before
+
+
+def test_history_input_dedup_and_navigate():
+    from roan.tui import HistoryInput
+
+    inp = HistoryInput()
+    inp.add_history("een")
+    inp.add_history("twee")
+    inp.add_history("twee")  # duplicaat niet nog eens
+    assert inp._history == ["een", "twee"]
+
+
+@pytest.mark.asyncio
+async def test_input_history_arrow_up(tmp_roan):
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        await pilot.press(*"eerste", "enter")
+        await pilot.pause()
+        await pilot.pause()
+        inp = app.query_one("#input")
+        await pilot.press("up")
+        await pilot.pause()
+        assert inp.value == "eerste"
+
+
+@pytest.mark.asyncio
+async def test_action_new_session(tmp_roan):
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        old = app.agent.session_id
+        app.action_new_session()
+        await pilot.pause()
+        assert app.agent.session_id != old
+
+
+@pytest.mark.asyncio
+async def test_action_clear_chat(tmp_roan):
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        app._sysline("iets")
+        await pilot.pause()
+        assert len(app.query("#messages > *")) > 0
+        app.action_clear_chat()
+        await pilot.pause()
+        assert len(app.query("#messages > *")) == 0

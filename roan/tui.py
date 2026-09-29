@@ -48,6 +48,39 @@ def tool_summary(name: str, args: dict) -> str:
     return json.dumps(args, ensure_ascii=False)[:120] if args else ""
 
 
+class HistoryInput(Input):
+    """Input met geschiedenis: pijltje op/neer bladert door eerdere berichten."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._history: list[str] = []
+        self._idx = 0
+
+    def add_history(self, text: str) -> None:
+        text = text.strip()
+        if not text:
+            return
+        if not self._history or self._history[-1] != text:
+            self._history.append(text)
+        self._idx = len(self._history)
+
+    def on_key(self, event) -> None:
+        if event.key == "up":
+            if not self._history:
+                return
+            self._idx = max(0, self._idx - 1)
+            self.value = self._history[self._idx]
+            self.cursor_position = len(self.value)
+            event.stop()
+        elif event.key == "down":
+            if not self._history:
+                return
+            self._idx = min(len(self._history), self._idx + 1)
+            self.value = self._history[self._idx] if self._idx < len(self._history) else ""
+            self.cursor_position = len(self.value)
+            event.stop()
+
+
 class SetupScreen(ModalScreen):
     """Setup-scherm: provider, api_key, model. Automatisch bij de eerste start."""
 
@@ -154,6 +187,12 @@ class RoanApp(App):
     TITLE = "Roan"
     MIN_SIZE = (1, 1)
 
+    BINDINGS = [
+        ("ctrl+l", "clear_chat", "clear"),
+        ("ctrl+n", "new_session", "nieuw"),
+        ("f2", "setup", "setup"),
+    ]
+
     CSS = """
     #avatar {
         width: 25%;
@@ -224,7 +263,7 @@ class RoanApp(App):
         yield Static("Roan — je agent harness", classes="title")
         yield VerticalScroll(id="messages")
         yield Static(id="status")
-        yield Input(placeholder="Message Roan…  (/help)", id="input")
+        yield HistoryInput(placeholder="Message Roan…  (/help)", id="input")
 
     def on_mount(self) -> None:
         self.query_one("#input", Input).focus()
@@ -411,6 +450,23 @@ class RoanApp(App):
 
         self.push_screen(SetupScreen(), done)
 
+    # ---------- acties (sneltoetsen) ----------
+    def action_clear_chat(self) -> None:
+        self._messages().remove_children()
+        self.agent.clear()
+
+    def action_new_session(self) -> None:
+        import time
+
+        self.agent.session_id = time.strftime("%Y%m%d-%H%M%S")
+        self.agent.clear()
+        self._messages().remove_children()
+        self._update_status()
+        self._sysline(f"Nieuwe sessie: {self.agent.session_id}")
+
+    def action_setup(self) -> None:
+        self._open_setup()
+
     # ---------- input ----------
     @on(Click)
     def _focus_input(self) -> None:
@@ -422,6 +478,8 @@ class RoanApp(App):
         if not text:
             return
         event.input.value = ""
+        if isinstance(event.input, HistoryInput):
+            event.input.add_history(text)
 
         if text.startswith("/"):
             self._run_command(text)
