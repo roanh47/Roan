@@ -885,6 +885,9 @@ class RoanApp(App):
         if name == "memory":
             self._cmd_memory()
             return True
+        if name == "skills":
+            self._cmd_skills()
+            return True
         if name == "new":
             import time
 
@@ -953,6 +956,11 @@ class RoanApp(App):
 
         mem = load_memory().strip()
         self._write(Markdown(mem or t("msg_memory_empty")))
+
+    def _cmd_skills(self) -> None:
+        from .skills import skills_list_text
+
+        self._write(Markdown(skills_list_text()))
 
     def _cmd_language(self, args) -> None:
         from .i18n import LANGUAGES
@@ -1173,9 +1181,11 @@ def run_tui(avatar_path=None):
         note_fullscreen_failure,
         resolve_renderer,
     )
+    from .home import ensure_home
     from .i18n import init_from_config
 
     migrate_legacy_dir()
+    ensure_home()
     init_from_config()
     agent = Agent()
     try:

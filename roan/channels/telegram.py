@@ -197,8 +197,10 @@ def resolve_token() -> str | None:
 
 
 def run_telegram() -> None:
+    from ..home import ensure_home
     from ..i18n import init_from_config
 
+    ensure_home()
     init_from_config()
     token = resolve_token()
     if not token:

@@ -42,7 +42,14 @@ def _isolate(tmp_path, monkeypatch, cfg):
     monkeypatch.setattr(config, "ROAN_DIR", tmp_path)
     monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.json")
     monkeypatch.setattr(config, "MEMORY_PATH", tmp_path / "memory.md")
+    monkeypatch.setattr(config, "USER_PATH", tmp_path / "user.md")
     monkeypatch.setattr(config, "INSTRUCTIONS_PATH", tmp_path / "instructions.md")
+    monkeypatch.setattr(config, "SKILLS_DIR", tmp_path / "skills")
+    monkeypatch.setattr(config, "CRON_DIR", tmp_path / "cron")
+    monkeypatch.setattr(config, "PLUGINS_DIR", tmp_path / "plugins")
+    monkeypatch.setattr(config, "LOGS_DIR", tmp_path / "logs")
+    monkeypatch.setattr(config, "CACHE_DIR", tmp_path / "cache")
+    monkeypatch.setattr(config, "PLANS_DIR", tmp_path / "plans")
     config.save_config(cfg)
     return tmp_path
 
@@ -323,3 +330,38 @@ async def test_scroll_actions_do_not_crash(tmp_roan):
         app.action_page_up()
         app.action_page_down()
         await pilot.pause()
+
+
+@pytest.mark.asyncio
+async def test_skills_command_lists(tmp_roan):
+    from textual.widgets import Markdown
+
+    config.SKILLS_DIR.mkdir(parents=True, exist_ok=True)
+    (config.SKILLS_DIR / "demo.md").write_text("---\nname: demo\ndescription: doet demo\n---\nbody")
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press(*"/skills", "enter")
+        await pilot.pause()
+        sources = " ".join(str(w.source) for w in app.query(Markdown))
+        assert "demo" in sources
+
+
+@pytest.mark.asyncio
+async def test_skills_command_empty(tmp_roan):
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press(*"/skills", "enter")
+        await pilot.pause()
+        rendered = " ".join(str(w.render()) for w in app.query("Static"))
+        assert "skills" in rendered.lower()
+
+
+@pytest.mark.asyncio
+async def test_run_forever_is_not_called_in_tests(tmp_roan):
+    # /cron bestaat niet als TUI-commando; cron draait via `Roan cron`.
+    from roan import commands
+
+    assert "cron" not in commands.names()

@@ -6,6 +6,13 @@ ROAN_DIR = Path.home() / ".Roan"
 CONFIG_PATH = ROAN_DIR / "config.json"
 INSTRUCTIONS_PATH = ROAN_DIR / "instructions.md"
 MEMORY_PATH = ROAN_DIR / "memory.md"
+USER_PATH = ROAN_DIR / "user.md"
+SKILLS_DIR = ROAN_DIR / "skills"
+CRON_DIR = ROAN_DIR / "cron"
+PLUGINS_DIR = ROAN_DIR / "plugins"
+LOGS_DIR = ROAN_DIR / "logs"
+CACHE_DIR = ROAN_DIR / "cache"
+PLANS_DIR = ROAN_DIR / "plans"
 
 # Bekende OpenAI-compatibele providers. Alleen base_url + placeholder-key; je
 # vult de api_key en model in via config.json.

@@ -37,7 +37,9 @@ def tmp_roan(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "ROAN_DIR", tmp_path)
     monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.json")
     monkeypatch.setattr(config, "MEMORY_PATH", tmp_path / "memory.md")
+    monkeypatch.setattr(config, "USER_PATH", tmp_path / "user.md")
     monkeypatch.setattr(config, "INSTRUCTIONS_PATH", tmp_path / "instructions.md")
+    monkeypatch.setattr(config, "SKILLS_DIR", tmp_path / "skills")
     # Standaard een config zodat het setup-scherm niet automatisch opent,
     # en een expliciete renderer zodat de fullscreen-dialoog niet verschijnt.
     config.save_config({"provider": "lmstudio", "model": "test-model", "tui": "default"})
@@ -49,7 +51,9 @@ def tmp_roan_noconfig(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "ROAN_DIR", tmp_path)
     monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.json")
     monkeypatch.setattr(config, "MEMORY_PATH", tmp_path / "memory.md")
+    monkeypatch.setattr(config, "USER_PATH", tmp_path / "user.md")
     monkeypatch.setattr(config, "INSTRUCTIONS_PATH", tmp_path / "instructions.md")
+    monkeypatch.setattr(config, "SKILLS_DIR", tmp_path / "skills")
     return tmp_path
 
 

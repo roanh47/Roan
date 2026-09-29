@@ -119,12 +119,37 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "read_skill",
+            "description": (
+                "Haal de volledige inhoud van een skill op (zie de skills-lijst in de "
+                "system-prompt)."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {"name": {"type": "string"}},
+                "required": ["name"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "remember",
             "description": "Bewaar een duurzame notitie in het geheugen voor volgende sessies.",
             "parameters": {"type": "object", "properties": {"note": {"type": "string"}}, "required": ["note"]},
         },
     },
 ]
+
+def read_skill(name: str) -> str:
+    """Volledige inhoud van een skill uit ~/.Roan/skills."""
+    from .skills import get_skill
+
+    skill = get_skill(name)
+    if not skill:
+        return f"Onbekende skill: {name}"
+    return skill["body"]
+
 
 TOOL_FUNCS = {
     "run_shell": T.run_shell,
@@ -137,14 +162,26 @@ TOOL_FUNCS = {
     "web_search": T.web_search,
     "todo_write": T.todo_write,
     "remember": remember,
+    "read_skill": read_skill,
 }
 
 
 def _build_system_prompt() -> str:
+    from . import config as _config
+    from .home import read_profile
+    from .skills import skills_prompt
+
     system = load_instructions()
+
+    profile = read_profile(_config.USER_PATH)
+    if profile:
+        system += f"\n\n[Over de gebruiker]\n{profile}"
+
     memory = load_memory()
     if memory.strip():
         system += f"\n\n[Geheugen uit eerdere sessies]\n{memory}"
+
+    system += skills_prompt()
     return system
 
 

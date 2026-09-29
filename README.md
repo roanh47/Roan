@@ -79,6 +79,7 @@ Inside the TUI:
 - `/provider` — provider picker: **Free / Paid / Custom**, live from models.dev
 - `/theme <name>` — `mocha`, `macchiato`, `frappe`, `latte`
 - `/memory` — show what Roan remembered
+- `/skills` — list available skills
 - `/language <nl|en>` — switch the UI and agent language
 - `/tui <fullscreen|default>` — switch renderer (relaunches, keeps the conversation)
 - `/new` — start a fresh conversation (`Ctrl+N`)
@@ -155,14 +156,53 @@ Every tool from every server becomes available to the agent as
 ## Tools
 
 `run_shell`, `read_file`, `write_file`, `edit_file`, `list_files`, `glob_files`,
-`fetch_url`, `web_search`, `todo_write`, `remember`.
+`fetch_url`, `web_search`, `todo_write`, `remember`, `read_skill`.
 
 ## Files
 
-- `~/.Roan/config.json` — provider, model, api_key, telegram_token.
-- `~/.Roan/instructions.md` — system prompt (overrides the default).
-- `~/.Roan/memory.md` — durable memory (written by the `remember` tool).
-- `~/.Roan/sessions/` — one JSON file per conversation.
+Everything lives in `~/.Roan/`, laid out like Hermes' home directory:
+
+- `config.json` — provider, model, api_key, language, renderer, telegram_token
+- `instructions.md` — system prompt (overrides the built-in default)
+- `user.md` — who you are; injected into the system prompt
+- `memory.md` — durable memory (written by the `remember` tool)
+- `skills/` — `*.md` skills (see below)
+- `cron/` — `jobs.json`, scheduled prompts
+- `plugins/` — your own Python plugins
+- `sessions/` — one JSON file per conversation
+- `logs/`, `cache/`, `plans/`
+
+`Roan home` prints the layout.
+
+## Skills
+
+Drop a markdown file in `~/.Roan/skills/`:
+
+```markdown
+---
+name: deploy
+description: How to cut a release
+---
+Step 1 ...
+```
+
+Roan sees the name and description in its system prompt and pulls the full text
+with the `read_skill` tool when it needs it. `/skills` lists them.
+
+## Cron
+
+Run scheduled prompts with `Roan cron` (a long-running process):
+
+```json
+{
+  "jobs": [
+    { "id": "morning", "schedule": "daily 09:00", "prompt": "Summarise my open items", "enabled": true }
+  ]
+}
+```
+
+`schedule` accepts `30s`, `15m`, `2h`, `1d` or `daily HH:MM`. Each job runs in its
+own session (`cron-<id>`), so scheduled work never mixes with your chat.
 
 ## Status
 

@@ -85,6 +85,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "cmd_provider": "Zet of toon de provider",
         "cmd_setup": "Open het setup-scherm",
         "cmd_memory": "Toon wat Roan onthouden heeft",
+        "cmd_skills": "Toon beschikbare skills",
         "cmd_new": "Begin een nieuw gesprek",
         "cmd_sessions": "Toon opgeslagen sessies",
         "cmd_compact": "Vat het gesprek samen om context vrij te maken",
@@ -161,6 +162,8 @@ STRINGS: dict[str, dict[str, str]] = {
             "  init        Setup: provider, api_key, model, telegram-token\n"
             "  telegram    Draai de agent als Telegram-bot\n"
             "  chat        Plain-text chat (telefoon / smalle terminal)\n"
+            "  cron        Draai geplande prompts uit ~/.Roan/cron\n"
+            "  home        Toon de ~/.Roan-map\n"
             "  update      Update naar de nieuwste versie van dit kanaal\n"
             "  version     Toon de versie\n"
             "  help        Deze tekst\n\n"
@@ -214,6 +217,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "cmd_provider": "Set or show the provider",
         "cmd_setup": "Open the setup screen",
         "cmd_memory": "Show what Roan remembered",
+        "cmd_skills": "List available skills",
         "cmd_new": "Start a fresh conversation",
         "cmd_sessions": "List saved sessions",
         "cmd_compact": "Summarise the conversation to free up context",
@@ -288,6 +292,8 @@ STRINGS: dict[str, dict[str, str]] = {
             "  init        Setup: provider, api_key, model, telegram token\n"
             "  telegram    Run the agent as a Telegram bot\n"
             "  chat        Plain-text chat (phone / narrow terminal)\n"
+            "  cron        Run scheduled prompts from ~/.Roan/cron\n"
+            "  home        Show the ~/.Roan directory\n"
             "  update      Update to the latest version for this channel\n"
             "  version     Show the version\n"
             "  help        This message\n\n"

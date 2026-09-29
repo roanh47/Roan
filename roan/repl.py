@@ -16,6 +16,9 @@ def _print_help(agent: Agent) -> None:
 
 
 def run_repl(session_id: str | None = None) -> None:
+    from .home import ensure_home
+
+    ensure_home()
     init_from_config()
     if not has_config():
         print(t("repl_banner"))

@@ -27,6 +27,7 @@ COMMANDS: dict[str, Command] = {
     "provider": Command("provider", "cmd_provider", "/provider <naam>"),
     "setup": Command("setup", "cmd_setup"),
     "memory": Command("memory", "cmd_memory"),
+    "skills": Command("skills", "cmd_skills"),
     "new": Command("new", "cmd_new"),
     "sessions": Command("sessions", "cmd_sessions"),
     "compact": Command("compact", "cmd_compact"),
