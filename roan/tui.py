@@ -4,10 +4,18 @@ from pathlib import Path
 
 from textual import on, work
 from textual.app import App, ComposeResult
-from textual.containers import VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.events import Click
 from textual.screen import ModalScreen
-from textual.widgets import Input, Markdown, OptionList, Static
+from textual.widgets import (
+    Button,
+    Input,
+    Label,
+    Markdown,
+    OptionList,
+    Select,
+    Static,
+)
 from textual.widgets.option_list import Option
 
 try:
@@ -38,6 +46,80 @@ def tool_summary(name: str, args: dict) -> str:
     if name == "write_file":
         return str(args.get("path", ""))[:120]
     return json.dumps(args, ensure_ascii=False)[:120] if args else ""
+
+
+class SetupScreen(ModalScreen):
+    """Setup-scherm: provider, api_key, model. Automatisch bij de eerste start."""
+
+    CSS = """
+    SetupScreen {
+        align: center middle;
+    }
+    #setup-box {
+        width: 70%;
+        max-width: 90;
+        height: auto;
+        border: thick $accent;
+        background: $panel;
+        padding: 1 2;
+    }
+    #setup-box Label {
+        margin-top: 1;
+        color: $text-muted;
+    }
+    #setup-actions {
+        margin-top: 2;
+        height: auto;
+        align-horizontal: right;
+    }
+    #setup-actions Button {
+        margin-left: 2;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        cfg = load_config()
+        provider = cfg.get("provider", "lmstudio")
+        with Vertical(id="setup-box"):
+            yield Static("Setup", classes="title")
+            yield Label("Provider")
+            yield Select(
+                [(name, name) for name in sorted(PROVIDER_PRESETS)],
+                value=provider if provider in PROVIDER_PRESETS else "lmstudio",
+                id="provider",
+                allow_blank=False,
+            )
+            yield Label("API key (leeg = bestaande behouden)")
+            yield Input(value="", password=True, placeholder="sk-…", id="api_key")
+            yield Label("Model")
+            yield Input(value=cfg.get("model", ""), id="model")
+            yield Label("Base URL (alleen bij provider = custom)")
+            yield Input(value=cfg.get("base_url") or "", id="base_url")
+            with Horizontal(id="setup-actions"):
+                yield Button("Annuleren", id="cancel")
+                yield Button("Opslaan", id="save", variant="primary")
+
+    @on(Button.Pressed)
+    def _on_button(self, event: Button.Pressed) -> None:
+        if event.button.id == "cancel":
+            self.dismiss(False)
+            return
+
+        provider = self.query_one("#provider", Select).value
+        api_key = self.query_one("#api_key", Input).value.strip()
+        model = self.query_one("#model", Input).value.strip()
+        base_url = self.query_one("#base_url", Input).value.strip()
+
+        updates: dict = {"provider": provider}
+        if api_key:
+            updates["api_key"] = api_key
+        if model:
+            updates["model"] = model
+        if provider == "custom" and base_url:
+            updates["base_url"] = base_url
+
+        save_config(updates)
+        self.dismiss(True)
 
 
 class ModelPicker(ModalScreen):
@@ -153,10 +235,10 @@ class RoanApp(App):
             self._write(
                 Markdown(
                     "**Nog geen model geconfigureerd.**\n\n"
-                    "Draai `Roan init` in een terminal, of stel het hier in met "
-                    "`/provider <naam>` en `/model <naam>`."
+                    "Stel het hieronder in, of draai `Roan init` in een terminal."
                 )
             )
+            self._open_setup()
             return
         cfg = load_config()
         self._sysline(f"model: {cfg['model']}  ·  provider: {cfg['provider']}")
@@ -315,19 +397,19 @@ class RoanApp(App):
         self.push_screen(ModelPicker(models), chosen)
 
     def _cmd_setup(self) -> None:
-        cfg = load_config()
-        text = [
-            "**Setup**",
-            "",
-            f"- provider: `{cfg['provider']}`",
-            f"- base_url: `{cfg['base_url']}`",
-            f"- model: `{cfg['model']}`",
-            f"- api_key: {'ingesteld' if cfg.get('api_key') else 'leeg'}",
-            "",
-            f"Config: `{ROAN_DIR / 'config.json'}`",
-            "Aanpassen: `/model <naam>`, of bewerk het bestand.",
-        ]
-        self._write(Markdown("\n".join(text)))
+        self._open_setup()
+
+    def _open_setup(self) -> None:
+        def done(saved: bool | None) -> None:
+            if not saved:
+                return
+            self.agent.reload()
+            self._update_status()
+            self._messages().remove_children()
+            cfg = load_config()
+            self._sysline(f"Opgeslagen — model: {cfg['model']}  ·  provider: {cfg['provider']}")
+
+        self.push_screen(SetupScreen(), done)
 
     # ---------- input ----------
     @on(Click)

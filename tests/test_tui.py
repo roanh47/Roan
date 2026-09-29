@@ -3,7 +3,7 @@
 import pytest
 
 from roan import config
-from roan.tui import RoanApp
+from roan.tui import RoanApp, SetupScreen
 
 
 class FakeAgent:
@@ -34,6 +34,17 @@ class FakeAgent:
 
 @pytest.fixture
 def tmp_roan(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "ROAN_DIR", tmp_path)
+    monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.json")
+    monkeypatch.setattr(config, "MEMORY_PATH", tmp_path / "memory.md")
+    monkeypatch.setattr(config, "INSTRUCTIONS_PATH", tmp_path / "instructions.md")
+    # Standaard een config zodat het setup-scherm niet automatisch opent.
+    config.save_config({"provider": "lmstudio", "model": "test-model"})
+    return tmp_path
+
+
+@pytest.fixture
+def tmp_roan_noconfig(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "ROAN_DIR", tmp_path)
     monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.json")
     monkeypatch.setattr(config, "MEMORY_PATH", tmp_path / "memory.md")
@@ -149,3 +160,40 @@ async def test_tool_events_render(tmp_roan):
         assert len(after) == before + 2
         rendered = " ".join(str(w.render()) for w in after)
         assert "run_shell" in rendered and "file.py" in rendered
+
+
+@pytest.mark.asyncio
+async def test_setup_auto_opens_without_config(tmp_roan_noconfig):
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        assert isinstance(app.screen, SetupScreen)
+
+
+@pytest.mark.asyncio
+async def test_setup_screen_saves(tmp_roan):
+    from textual.widgets import Button, Input
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        app._open_setup()
+        await pilot.pause()
+        assert isinstance(app.screen, SetupScreen)
+        app.screen.query_one("#model", Input).value = "setup-model"
+        app.screen.query_one("#save", Button).press()
+        await pilot.pause()
+        assert config.load_config()["model"] == "setup-model"
+
+
+@pytest.mark.asyncio
+async def test_setup_cancel_leaves_config(tmp_roan):
+    from textual.widgets import Button
+
+    before = config.load_config()["model"]
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        app._open_setup()
+        await pilot.pause()
+        app.screen.query_one("#cancel", Button).press()
+        await pilot.pause()
+        assert config.load_config()["model"] == before
