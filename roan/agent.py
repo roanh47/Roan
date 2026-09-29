@@ -10,6 +10,7 @@ from openai import OpenAI
 
 from .config import ROAN_DIR, load_config, load_instructions
 from .memory import load_memory, remember
+from .mcp import MCPManager
 from . import tools as T
 
 MAX_TOOL_ROUNDS = 12
@@ -128,12 +129,22 @@ def _build_system_prompt() -> str:
 
 
 class Agent:
-    def __init__(self, session_id: str | None = None, restore: bool = True):
+    def __init__(self, session_id: str | None = None, restore: bool = True, use_mcp: bool = True):
         self.session_id = session_id or time.strftime("%Y%m%d-%H%M%S")
         self.reload()
         self.messages: list[dict] = [{"role": "system", "content": _build_system_prompt()}]
+        self.mcp = MCPManager()
+        if use_mcp:
+            try:
+                self.mcp.start_all()
+            except Exception:
+                pass
         if restore:
             self._restore()
+
+    @property
+    def tools(self) -> list[dict]:
+        return TOOLS + self.mcp.tool_schemas
 
     # ---------- config ----------
     def reload(self) -> None:
@@ -171,8 +182,9 @@ class Agent:
         self.save()
 
     # ---------- tools ----------
-    @staticmethod
-    def _run_tool(name: str, args: dict) -> str:
+    def _run_tool(self, name: str, args: dict) -> str:
+        if name in self.mcp.routes:
+            return self.mcp.handle(name, args)
         func = TOOL_FUNCS.get(name)
         if not func:
             return f"Onbekende tool: {name}"
@@ -180,6 +192,9 @@ class Agent:
             return str(func(**args))
         except Exception as e:
             return f"Error: {e}"
+
+    def stop(self) -> None:
+        self.mcp.stop_all()
 
     @staticmethod
     def _dump_tool_call(tc) -> dict:
@@ -205,7 +220,7 @@ class Agent:
         self.messages.append({"role": "user", "content": user_text})
         for _ in range(MAX_TOOL_ROUNDS):
             resp = self.client.chat.completions.create(
-                model=self.model, messages=self.messages, tools=TOOLS, tool_choice="auto"
+                model=self.model, messages=self.messages, tools=self.tools, tool_choice="auto"
             )
             msg = resp.choices[0].message
             if msg.tool_calls:
@@ -230,7 +245,7 @@ class Agent:
         self.messages.append({"role": "user", "content": user_text})
         for _ in range(MAX_TOOL_ROUNDS):
             stream = self.client.chat.completions.create(
-                model=self.model, messages=self.messages, tools=TOOLS, tool_choice="auto", stream=True
+                model=self.model, messages=self.messages, tools=self.tools, tool_choice="auto", stream=True
             )
             content_parts: list[str] = []
             tool_calls: dict[int, dict] = {}

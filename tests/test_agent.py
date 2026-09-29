@@ -47,7 +47,7 @@ class FakeClient:
 
 
 def make_agent(responses):
-    a = agent_mod.Agent(session_id="t", restore=False)
+    a = agent_mod.Agent(session_id="t", restore=False, use_mcp=False)
     a.client = FakeClient(responses)
     return a
 
@@ -80,7 +80,7 @@ def test_session_saved_and_restored(tmp_roan):
     path = tmp_roan / "sessions" / "t.json"
     assert path.exists()
 
-    b = agent_mod.Agent(session_id="t", restore=True)
+    b = agent_mod.Agent(session_id="t", restore=True, use_mcp=False)
     assert any(m.get("content") == "bewaard" for m in b.messages)
 
 
