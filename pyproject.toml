@@ -1,9 +1,9 @@
 [project]
 name = "roan"
-version = "0.1.0"
-description = "Roan — a personal terminal AI agent harness"
+version = "0.2.0"
+description = "Roan — a terminal-based agent harness"
 requires-python = ">=3.10"
-dependencies = ["openai>=1.40", "rich>=13.7"]
+dependencies = ["openai>=1.40", "rich>=13.7", "textual>=0.52", "pillow>=10.0"]
 
 [project.scripts]
 roan = "roan.cli:main"
@@ -14,3 +14,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["roan"]
+
+[tool.setuptools.package-data]
+roan = ["assets/*.jpg", "assets/*.png"]
