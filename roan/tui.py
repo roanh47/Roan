@@ -1,4 +1,5 @@
 import asyncio
+import json
 from pathlib import Path
 
 from textual import on, work
@@ -25,6 +26,18 @@ from .photo import render_photo
 from .themes import ACCENT, THEMES
 
 BUNDLED_AVATAR = Path(__file__).parent / "assets" / "avatar.png"
+
+
+def tool_summary(name: str, args: dict) -> str:
+    """Korte weergave van tool-argumenten voor in de TUI."""
+    if name == "run_shell":
+        return str(args.get("command", ""))[:120]
+    for key in ("path", "pattern", "url", "query", "note"):
+        if args.get(key):
+            return str(args[key])[:120]
+    if name == "write_file":
+        return str(args.get("path", ""))[:120]
+    return json.dumps(args, ensure_ascii=False)[:120] if args else ""
 
 
 class ModelPicker(ModalScreen):
@@ -67,6 +80,13 @@ class RoanApp(App):
     #messages {
         height: 1fr;
         padding: 1 2;
+    }
+    #status {
+        dock: bottom;
+        height: 1;
+        background: $panel;
+        color: $text-muted;
+        padding: 0 2;
     }
     #input {
         dock: bottom;
@@ -121,10 +141,12 @@ class RoanApp(App):
                 yield Static(render_photo(avatar, width=self._photo_width()))
         yield Static("Roan — je agent harness", classes="title")
         yield VerticalScroll(id="messages")
+        yield Static(id="status")
         yield Input(placeholder="Message Roan…  (/help)", id="input")
 
     def on_mount(self) -> None:
         self.query_one("#input", Input).focus()
+        self._update_status()
         from .config import has_config
 
         if not has_config():
@@ -138,6 +160,13 @@ class RoanApp(App):
             return
         cfg = load_config()
         self._sysline(f"model: {cfg['model']}  ·  provider: {cfg['provider']}")
+
+    def _update_status(self) -> None:
+        cfg = load_config()
+        key = "key set" if cfg.get("api_key") else "no key"
+        self.query_one("#status", Static).update(
+            f"{cfg['model']}  ·  {cfg['provider']}  ·  {key}  ·  sessie {self.agent.session_id}"
+        )
 
     # ---------- helpers ----------
     def _messages(self) -> VerticalScroll:
@@ -217,6 +246,7 @@ class RoanApp(App):
         save_config({"provider": name})
         self.agent.reload()
         self._sysline(f"Provider → {name}")
+        self._update_status()
 
     def _cmd_memory(self) -> None:
         from .memory import load_memory
@@ -258,6 +288,7 @@ class RoanApp(App):
         cfg = save_config({"model": args[0]})
         self.agent.reload()
         self._sysline(f"Model → {cfg['model']}")
+        self._update_status()
 
     def _cmd_models(self) -> None:
         self._sysline("Modellen ophalen ...")
@@ -279,6 +310,7 @@ class RoanApp(App):
             save_config({"model": model})
             self.agent.reload()
             self._sysline(f"Model → {model}")
+            self._update_status()
 
         self.push_screen(ModelPicker(models), chosen)
 
@@ -323,8 +355,12 @@ class RoanApp(App):
         md = Markdown("…")
         self.call_from_thread(self._write, md)
         buf: list[str] = []
+
+        def on_event(ev: dict) -> None:
+            self.call_from_thread(self._render_tool_event, ev)
+
         try:
-            for delta in self.agent.send_stream(text):
+            for delta in self.agent.send_stream(text, on_event=on_event):
                 buf.append(delta)
                 self.call_from_thread(md.update, "".join(buf))
         except Exception as e:
@@ -332,6 +368,17 @@ class RoanApp(App):
         finally:
             self.call_from_thread(setattr, inp, "disabled", False)
             self.call_from_thread(inp.focus)
+
+    def _render_tool_event(self, ev: dict) -> None:
+        if ev.get("type") == "tool_call":
+            summary = tool_summary(ev.get("name", "?"), ev.get("arguments") or {})
+            self._write(Static(f"[{ACCENT}]●[/{ACCENT}] [b]{ev.get('name')}[/b] [dim]{summary}[/dim]"))
+            return
+        lines = (ev.get("result") or "").strip().splitlines()
+        first = lines[0][:120] if lines else ""
+        bad = first.lower().startswith("error") or first.startswith("Error")
+        marker = "✗" if bad else "↳"
+        self._write(Static(f"  [dim]{marker} {first}[/dim]"))
 
 
 def run_tui(avatar_path=None):

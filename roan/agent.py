@@ -216,7 +216,7 @@ class Agent:
         return msg
 
     # ---------- chat ----------
-    def send(self, user_text: str) -> str:
+    def send(self, user_text: str, on_event=None) -> str:
         self.messages.append({"role": "user", "content": user_text})
         for _ in range(MAX_TOOL_ROUNDS):
             resp = self.client.chat.completions.create(
@@ -229,7 +229,11 @@ class Agent:
                 )
                 for tc in msg.tool_calls:
                     args = json.loads(tc.function.arguments or "{}")
+                    if on_event:
+                        on_event({"type": "tool_call", "name": tc.function.name, "arguments": args})
                     result = self._run_tool(tc.function.name, args)
+                    if on_event:
+                        on_event({"type": "tool_result", "name": tc.function.name, "result": result})
                     self.messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
                 continue
             content = msg.content or ""
@@ -240,7 +244,7 @@ class Agent:
         self.save()
         return "(maximale aantal tool-rondes bereikt)"
 
-    def send_stream(self, user_text: str):
+    def send_stream(self, user_text: str, on_event=None):
         """Yield content-deltas terwijl het model antwoordt. Voert tools uit tussendoor."""
         self.messages.append({"role": "user", "content": user_text})
         for _ in range(MAX_TOOL_ROUNDS):
@@ -288,7 +292,11 @@ class Agent:
                     args = json.loads(tc["function"]["arguments"] or "{}")
                 except json.JSONDecodeError:
                     args = {}
+                if on_event:
+                    on_event({"type": "tool_call", "name": tc["function"]["name"], "arguments": args})
                 result = self._run_tool(tc["function"]["name"], args)
+                if on_event:
+                    on_event({"type": "tool_result", "name": tc["function"]["name"], "result": result})
                 self.messages.append(
                     {"role": "tool", "tool_call_id": tc["id"], "content": result}
                 )

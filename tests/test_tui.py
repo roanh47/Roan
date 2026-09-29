@@ -27,7 +27,7 @@ class FakeAgent:
         self.sent.append(text)
         return f"echo: {text}"
 
-    def send_stream(self, text):
+    def send_stream(self, text, on_event=None):
         self.sent.append(text)
         yield f"echo: {text}"
 
@@ -114,3 +114,38 @@ async def test_unknown_command_reports(tmp_roan):
         await pilot.pause()
         statics = [str(w.render()) for w in app.query("Static")]
         assert any("Onbekend" in s for s in statics)
+
+
+@pytest.mark.asyncio
+async def test_status_bar_shows_model(tmp_roan):
+    config.save_config({"provider": "groq", "model": "my-model"})
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        status = str(app.query_one("#status").render())
+        assert "my-model" in status
+        assert "groq" in status
+
+
+def test_tool_summary_variants():
+    from roan.tui import tool_summary
+
+    assert tool_summary("run_shell", {"command": "ls -la"}) == "ls -la"
+    assert tool_summary("read_file", {"path": "/tmp/x"}) == "/tmp/x"
+    assert tool_summary("web_search", {"query": "python"}) == "python"
+    assert tool_summary("other", {}) == ""
+
+
+@pytest.mark.asyncio
+async def test_tool_events_render(tmp_roan):
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        before = len(app.query("#messages > *"))
+        app._render_tool_event({"type": "tool_call", "name": "run_shell", "arguments": {"command": "ls"}})
+        app._render_tool_event({"type": "tool_result", "name": "run_shell", "result": "file.py"})
+        await pilot.pause()
+        after = app.query("#messages > *")
+        assert len(after) == before + 2
+        rendered = " ".join(str(w.render()) for w in after)
+        assert "run_shell" in rendered and "file.py" in rendered

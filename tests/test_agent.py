@@ -116,3 +116,22 @@ def test_tools_registered():
     for name in ("run_shell", "read_file", "write_file", "edit_file", "glob_files",
                  "fetch_url", "web_search", "remember", "list_files"):
         assert name in agent_mod.TOOL_FUNCS
+
+
+def test_send_stream_emits_tool_events(tmp_roan):
+    tool = _tool_call(0, "run_shell", '{"command": "echo event-test"}')
+    a = make_agent([[_chunk(tool_calls=[tool])], [_chunk("klaar")]])
+    events: list[dict] = []
+    out = "".join(a.send_stream("doe", on_event=events.append))
+    assert "klaar" in out
+    assert [e["type"] for e in events] == ["tool_call", "tool_result"]
+    assert events[0]["name"] == "run_shell"
+    assert "event-test" in events[1]["result"]
+
+
+def test_send_emits_tool_events(tmp_roan):
+    tool = _tool_call(0, "write_file", '{"path": "/tmp/ev.txt", "content": "x"}')
+    a = make_agent([_resp(tool_calls=[tool]), _resp(content="ok")])
+    events: list[dict] = []
+    a.send("schrijf", on_event=events.append)
+    assert [e["type"] for e in events] == ["tool_call", "tool_result"]
