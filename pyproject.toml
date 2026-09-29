@@ -1,9 +1,15 @@
 [project]
 name = "roan"
-version = "0.2.0"
+version = "0.2.0rc1"
 description = "Roan — a terminal-based agent harness"
 requires-python = ">=3.10"
-dependencies = ["openai>=1.40", "rich>=13.7", "textual>=0.52", "pillow>=10.0"]
+dependencies = [
+    "openai>=1.40",
+    "rich>=13.7",
+    "textual>=0.52",
+    "pillow>=10.0",
+    "packaging>=23.0",
+]
 
 [project.scripts]
 roan = "roan.cli:main"
