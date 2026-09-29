@@ -85,6 +85,25 @@ The token comes from `telegram_token` in `~/.roan/config.json` or the
 `ROAN_TELEGRAM_TOKEN` environment variable. Each chat gets its own session, and
 the same `/help`, `/model`, `/new`, `/status` commands work over chat.
 
+## MCP servers
+
+Roan speaks the Model Context Protocol over stdio. Add servers to
+`~/.roan/mcp.json`:
+
+```json
+{
+  "servers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+    }
+  }
+}
+```
+
+Every tool from every server becomes available to the agent as
+`<server>__<tool>`. A server that fails to start is skipped, not fatal.
+
 ## Tools
 
 `run_shell`, `read_file`, `write_file`, `edit_file`, `list_files`, `glob_files`,

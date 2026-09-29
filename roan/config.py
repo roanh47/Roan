@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 
 ROAN_DIR = Path.home() / ".roan"
@@ -44,14 +45,32 @@ def load_config() -> dict:
         except (json.JSONDecodeError, OSError):
             pass
 
+    # Env-vars overschrijven het bestand (handig op servers/CI).
+    for key, env in (
+        ("provider", "ROAN_PROVIDER"),
+        ("base_url", "ROAN_BASE_URL"),
+        ("api_key", "ROAN_API_KEY"),
+        ("model", "ROAN_MODEL"),
+        ("telegram_token", "ROAN_TELEGRAM_TOKEN"),
+    ):
+        if os.environ.get(env):
+            cfg[key] = os.environ[env]
+
     provider = cfg["provider"]
     if provider in PROVIDER_PRESETS:
         preset = PROVIDER_PRESETS[provider]
-        cfg["base_url"] = preset["base_url"]
+        if not cfg.get("base_url") or provider != "custom":
+            if provider != "custom":
+                cfg["base_url"] = preset["base_url"]
         if cfg["api_key"] is None:
             cfg["api_key"] = preset["api_key"]
 
     return cfg
+
+
+def has_config() -> bool:
+    """True als de gebruiker ooit iets geconfigureerd heeft."""
+    return CONFIG_PATH.exists() or bool(os.environ.get("ROAN_API_KEY"))
 
 
 def load_instructions() -> str:

@@ -125,6 +125,17 @@ class RoanApp(App):
 
     def on_mount(self) -> None:
         self.query_one("#input", Input).focus()
+        from .config import has_config
+
+        if not has_config():
+            self._write(
+                Markdown(
+                    "**Nog geen model geconfigureerd.**\n\n"
+                    "Draai `roan init` in een terminal, of stel het hier in met "
+                    "`/provider <naam>` en `/model <naam>`."
+                )
+            )
+            return
         cfg = load_config()
         self._sysline(f"model: {cfg['model']}  ·  provider: {cfg['provider']}")
 
