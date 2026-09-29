@@ -131,7 +131,7 @@ class RoanApp(App):
             self._write(
                 Markdown(
                     "**Nog geen model geconfigureerd.**\n\n"
-                    "Draai `roan init` in een terminal, of stel het hier in met "
+                    "Draai `Roan init` in een terminal, of stel het hier in met "
                     "`/provider <naam>` en `/model <naam>`."
                 )
             )
@@ -335,6 +335,9 @@ class RoanApp(App):
 
 
 def run_tui(avatar_path=None):
+    from .config import migrate_legacy_dir
+
+    migrate_legacy_dir()
     agent = Agent()
     app = RoanApp(agent, avatar_path)
     app.run()

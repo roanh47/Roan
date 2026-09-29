@@ -2,16 +2,18 @@ import sys
 
 HELP = """Roan — agent harness
 
-Usage: roan [command]
+Usage: Roan [command]
 
 Commands:
-  (none)      Start the TUI (falls back to chat mode without a TTY)
-  chat        Plain-text chat mode (works on any terminal)
+  (none)      Start the TUI
   init        Interactive setup: provider, api_key, model, telegram token
   telegram    Run the agent as a Telegram bot
+  chat        Plain-text chat (handig op een telefoon / smalle terminal)
   update      Update to the latest version for this channel
   version     Show the version
   help        Show this message
+
+`roan` (lowercase) works too.
 """
 
 
@@ -50,20 +52,14 @@ def main() -> None:
         from importlib.metadata import version
 
         try:
-            print(f"roan {version('roan')}")
+            print(f"Roan {version('roan')}")
         except Exception:
             from . import __version__
 
-            print(f"roan {__version__}")
+            print(f"Roan {__version__}")
         return
 
-    # Geen/nooit TTY (ssh-zonder-tty, pipe, telefoon) -> plain chat.
-    if not sys.stdin.isatty() or not sys.stdout.isatty():
-        from .repl import run_repl
-
-        run_repl()
-        return
-
+    # Altijd de TUI.
     from .tui import run_tui
 
     run_tui()

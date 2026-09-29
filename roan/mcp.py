@@ -1,6 +1,6 @@
 """Minimale MCP-client (Model Context Protocol) over stdio.
 
-Leest servers uit ~/.roan/mcp.json:
+Leest servers uit ~/.Roan/mcp.json:
 
     {
       "servers": {

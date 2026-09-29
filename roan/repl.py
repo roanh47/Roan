@@ -12,7 +12,7 @@ BANNER = "Roan — agent harness.  /help voor commando's, /quit om te stoppen."
 
 ONBOARD = (
     "Nog geen model geconfigureerd.\n"
-    "Draai `roan init` om een provider + api_key + model in te stellen,\n"
+    "Draai `Roan init` om een provider + api_key + model in te stellen,\n"
     "of zet ROAN_API_KEY / ROAN_MODEL in je omgeving.\n"
     "Gratis opties: groq, openrouter (models met ':free')."
 )
@@ -65,7 +65,7 @@ def run_repl(session_id: str | None = None) -> None:
             if any(s in msg.lower() for s in ("connection", "connect", "refused", "timeout", "getaddrinfo")):
                 print(
                     f"\nKan geen verbinding maken met {cfg.get('base_url')}.\n"
-                    "Draai `roan init` of /provider + /model om dit te wijzigen."
+                    "Draai `Roan init` of /provider + /model om dit te wijzigen."
                 )
         print()
 

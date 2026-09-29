@@ -37,8 +37,8 @@ Requires Python 3.10+. Contributions welcome — tests run with
 
 ## Configure
 
-On first run Roan has no configuration. Run `roan init` (an interactive wizard
-that works over SSH), or edit `~/.roan/config.json`:
+On first run Roan has no configuration. Run `Roan init` (an interactive wizard
+that works over SSH), or edit `~/.Roan/config.json`:
 
 ```json
 { "provider": "lmstudio", "model": "local-model" }
@@ -61,11 +61,10 @@ own `base_url`. Add an `api_key` when the provider needs one:
 On a narrow terminal, a phone, or anywhere the full TUI doesn't fit:
 
 ```sh
-roan chat
+Roan chat
 ```
 
-Plain streaming text with the same slash commands. Roan falls back to this mode
-automatically when there is no TTY (pipes, `ssh -T`, CI).
+Plain streaming text with the same slash commands.
 
 ## Commands
 
@@ -93,17 +92,17 @@ Mouse clicks focus the input; scroll to read history.
 Run the same agent as a Telegram bot:
 
 ```sh
-roan telegram
+Roan telegram
 ```
 
-The token comes from `telegram_token` in `~/.roan/config.json` or the
+The token comes from `telegram_token` in `~/.Roan/config.json` or the
 `ROAN_TELEGRAM_TOKEN` environment variable. Each chat gets its own session, and
 the same `/help`, `/model`, `/new`, `/status` commands work over chat.
 
 ## MCP servers
 
 Roan speaks the Model Context Protocol over stdio. Add servers to
-`~/.roan/mcp.json`:
+`~/.Roan/mcp.json`:
 
 ```json
 {
@@ -126,10 +125,10 @@ Every tool from every server becomes available to the agent as
 
 ## Files
 
-- `~/.roan/config.json` — provider, model, api_key, telegram_token.
-- `~/.roan/instructions.md` — system prompt (overrides the default).
-- `~/.roan/memory.md` — durable memory (written by the `remember` tool).
-- `~/.roan/sessions/` — one JSON file per conversation.
+- `~/.Roan/config.json` — provider, model, api_key, telegram_token.
+- `~/.Roan/instructions.md` — system prompt (overrides the default).
+- `~/.Roan/memory.md` — durable memory (written by the `remember` tool).
+- `~/.Roan/sessions/` — one JSON file per conversation.
 
 ## Status
 

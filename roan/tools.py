@@ -1,11 +1,12 @@
 import html
 import json
-import os
 import re
 import subprocess
 import urllib.parse
 import urllib.request
 from pathlib import Path
+
+from . import config
 
 TIMEOUT = 120
 _MAX_OUTPUT = 20000
@@ -145,7 +146,7 @@ def todo_write(items_json: str) -> str:
         items = json.loads(items_json)
     except json.JSONDecodeError:
         return "Error: items_json moet geldige JSON zijn."
-    path = Path(os.path.expanduser("~/.roan/todo.md"))
+    path = config.ROAN_DIR / "todo.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = []
     for it in items:

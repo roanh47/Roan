@@ -1,6 +1,6 @@
 """Telegram-kanaal: praat met dezelfde Roan-agent via een Telegram-bot.
 
-Start met `roan telegram`. De bot-token komt uit ~/.roan/config.json
+Start met `Roan telegram`. De bot-token komt uit ~/.Roan/config.json
 (`telegram_token`) of de env-var ROAN_TELEGRAM_TOKEN.
 """
 
@@ -13,7 +13,7 @@ import time
 import urllib.parse
 import urllib.request
 
-from ..config import load_config, save_config
+from ..config import ROAN_DIR, load_config, save_config
 from .base import Channel
 
 API = "https://api.telegram.org/bot{token}/{method}"
@@ -208,7 +208,7 @@ def run_telegram() -> None:
     if not token:
         print(
             "Geen Telegram-token gevonden.\n"
-            "Zet `telegram_token` in ~/.roan/config.json of export ROAN_TELEGRAM_TOKEN."
+            "Zet `telegram_token` in ~/.Roan/config.json of export ROAN_TELEGRAM_TOKEN."
         )
         return
     TelegramChannel(token).run()

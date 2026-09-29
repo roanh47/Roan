@@ -2,7 +2,7 @@ import json
 import os
 from pathlib import Path
 
-ROAN_DIR = Path.home() / ".roan"
+ROAN_DIR = Path.home() / ".Roan"
 CONFIG_PATH = ROAN_DIR / "config.json"
 INSTRUCTIONS_PATH = ROAN_DIR / "instructions.md"
 MEMORY_PATH = ROAN_DIR / "memory.md"
@@ -68,6 +68,18 @@ def load_config() -> dict:
     return cfg
 
 
+def migrate_legacy_dir() -> bool:
+    """Verhuis een oude ~/.roan map naar ~/.Roan (eenmalig)."""
+    legacy = Path.home() / ".roan"
+    if ROAN_DIR.exists() or not legacy.exists():
+        return False
+    try:
+        legacy.rename(ROAN_DIR)
+        return True
+    except OSError:
+        return False
+
+
 def has_config() -> bool:
     """True als de gebruiker ooit iets geconfigureerd heeft."""
     return CONFIG_PATH.exists() or bool(os.environ.get("ROAN_API_KEY"))
@@ -80,7 +92,7 @@ def load_instructions() -> str:
 
 
 def save_config(updates: dict) -> dict:
-    """Merge updates in ~/.roan/config.json en geef de nieuwe config terug."""
+    """Merge updates in ~/.Roan/config.json en geef de nieuwe config terug."""
     raw: dict = {}
     if CONFIG_PATH.exists():
         try:

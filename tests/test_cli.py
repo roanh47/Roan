@@ -28,7 +28,7 @@ def test_help(capsys, monkeypatch):
 def test_version(capsys, monkeypatch):
     monkeypatch.setattr(sys, "argv", ["roan", "version"])
     cli.main()
-    assert "roan" in capsys.readouterr().out
+    assert "Roan" in capsys.readouterr().out
 
 
 def test_chat_dispatch(monkeypatch):
@@ -82,4 +82,4 @@ def test_repl_onboarding_without_config(tmp_roan, monkeypatch, capsys):
     monkeypatch.delenv("ROAN_API_KEY", raising=False)
     repl_mod.run_repl()
     out = capsys.readouterr().out
-    assert "roan init" in out
+    assert "Roan init" in out
