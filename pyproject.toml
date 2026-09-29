@@ -1,0 +1,16 @@
+[project]
+name = "roan"
+version = "0.1.0"
+description = "Roan — a personal terminal AI agent harness"
+requires-python = ">=3.10"
+dependencies = ["openai>=1.40", "rich>=13.7"]
+
+[project.scripts]
+roan = "roan.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["roan"]
