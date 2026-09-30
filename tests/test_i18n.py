@@ -1,9 +1,44 @@
 """Tests voor de taal-laag (NL/EN) van programma en agent."""
 
+import collections
+import re
+
 import pytest
 
 from roan import agent as agent_mod
 from roan import config, i18n
+
+
+def test_every_language_has_the_same_keys():
+    """Een sleutel die in één taal ontbreekt valt terug op de sleutelnaam zelf."""
+    nl = set(i18n.STRINGS["nl"])
+    en = set(i18n.STRINGS["en"])
+    assert nl == en, f"alleen nl: {sorted(nl - en)} | alleen en: {sorted(en - nl)}"
+
+
+def test_no_duplicate_keys_in_a_language_block():
+    """Duplicaten in één blok: de laatste wint, vaak per ongeluk de verkeerde taal."""
+    from pathlib import Path
+
+    src = Path(i18n.__file__).read_text().splitlines()
+    nl_i = next(i for i, l in enumerate(src) if l.strip() == '"nl": {')
+    en_i = next(i for i, l in enumerate(src) if l.strip() == '"en": {' and i > nl_i + 10)
+    end = next(i for i, l in enumerate(src) if i > en_i and l == "}")
+    for name, a, b in (("nl", nl_i, en_i), ("en", en_i, end)):
+        keys = [m.group(1) for l in src[a:b] if (m := re.match(r'\s{8}"([^"]+)":', l))]
+        dupes = {k: c for k, c in collections.Counter(keys).items() if c > 1}
+        assert not dupes, f"dubbele sleutels in {name}: {dupes}"
+
+
+def test_dutch_values_are_not_english():
+    """Steekproef: het NL-blok mag geen Engelse waarden bevatten."""
+    nl = i18n.STRINGS["nl"]
+    assert nl["provider_cat_free"] == "Gratis"
+    assert nl["provider_cat_local"] == "Lokaal"
+    assert nl["provider_name"] == "Naam"
+    assert nl["provider_desc_models"] == "{n} modellen"
+    assert i18n.STRINGS["en"]["provider_cat_free"] == "Free"
+
 
 
 @pytest.fixture(autouse=True)

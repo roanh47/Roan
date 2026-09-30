@@ -49,7 +49,7 @@ from .models import (
     provider_meta,
     LOCAL_IDS,
 )
-from .i18n import t
+from .i18n import provider_desc, t
 from .photo import render_photo
 from .themes import ACCENT, THEMES
 
@@ -62,6 +62,24 @@ def resolve_base_url(provider: str) -> str:
     if preset.get("base_url"):
         return str(preset["base_url"])
     return str(provider_meta(provider).get("api") or "")
+
+
+def provider_description(provider: str) -> str:
+    """Korte beschrijving van een provider voor in de lijst.
+
+    Leeg als we de provider niet kennen en er geen modellen van weten — dan
+    tonen we alleen de naam.
+    """
+    desc = provider_desc(provider)
+    if desc:
+        return desc
+    meta = provider_meta(provider)
+    count = len(meta.get("models") or [])
+    if meta.get("plan"):
+        return t("provider_desc_plan", n=count)
+    if not count:
+        return ""
+    return t("provider_desc_models", n=count)
 
 
 def gather_models() -> tuple[list, list, list]:
@@ -232,7 +250,15 @@ class SetupScreen(ModalScreen):
         if bid == "choose-model":
             self._choose_model()
             return
+        if bid == "save":
+            self._save()
 
+    @on(Input.Submitted)
+    def _on_submitted(self, event: Input.Submitted) -> None:
+        """Enter in een veld = opslaan (je hoeft niet naar de knop te tabben)."""
+        self._save()
+
+    def _save(self) -> None:
         api_key = self.query_one("#api_key", Input).value.strip()
         base_url = self.query_one("#base_url", Input).value.strip()
 
@@ -394,9 +420,8 @@ class ProviderScreen(ModalScreen):
             return
 
         for pid, name in self.providers.get(cat, []):
-            meta = provider_meta(pid)
-            suffix = f"  ·  {t('provider_plan')}" if meta["plan"] else ""
-            listing.add_option(Option(f"{name}  ·  {pid}{suffix}", id=pid))
+            desc = provider_description(pid)
+            listing.add_option(Option(f"{name}  ·  {desc}" if desc else name, id=pid))
 
     # ---------- selectie ----------
     @on(Select.Changed)
@@ -422,7 +447,7 @@ class ProviderScreen(ModalScreen):
             self.query_one("#pkey", Input).value = endpoint.get("api_key", "")
         else:
             meta = provider_meta(self._chosen)
-            bits = []
+            bits = [f"{t('provider_id')}: {self._chosen}"]
             if meta["plan"]:
                 bits.append("! " + t("provider_plan_note", provider=meta["name"]))
             if meta["env"]:
@@ -471,6 +496,20 @@ class ProviderScreen(ModalScreen):
             return
         if bid == "pchoose":
             self._choose()
+
+    @on(Input.Submitted)
+    def _on_submitted(self, event: Input.Submitted) -> None:
+        """Enter in een veld: endpoint toevoegen als het ingevuld is, anders kiezen."""
+        cat = self._cat()
+        if cat == "custom":
+            name = self.query_one("#pname", Input).value.strip()
+            base = self.query_one("#pbase", Input).value.strip()
+            if name and base:
+                self._add_endpoint()
+            elif self._chosen:
+                self._choose()
+            return
+        self._choose()
 
     def _choose(self) -> None:
         cat = self._cat()

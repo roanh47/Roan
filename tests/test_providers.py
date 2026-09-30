@@ -39,6 +39,9 @@ def roan_cfg(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "CACHE_DIR", tmp_path / "cache")
     monkeypatch.setattr(config, "PLANS_DIR", tmp_path / "plans")
     config.save_config({"provider": "lmstudio", "model": "m", "tui": "default"})
+    from roan import i18n
+
+    i18n.set_language("nl")
     # geen netwerk in tests
     monkeypatch.setattr(
         tui_mod,
@@ -259,3 +262,106 @@ async def test_app_picker_saves_local_provider(roan_cfg):
         cfg = config.load_config()
         assert cfg["provider"] == "ollama"
         assert cfg["base_url"] == "http://localhost:11434/v1"
+
+
+# ---------- Enter in een veld ----------
+@pytest.mark.asyncio
+async def test_enter_in_api_key_saves(roan_cfg):
+    """Enter in het api-key-veld moet opslaan, niet alleen de knop."""
+    from roan.tui import SetupScreen
+
+    app = RoanApp(FakeAgent())
+    results = []
+    async with app.run_test() as pilot:
+        screen = SetupScreen(provider="groq", model="llama-3")
+        app.push_screen(screen, results.append)
+        await pilot.pause()
+        screen.query_one("#api_key").focus()
+        screen.query_one("#api_key").value = "sk-test-123"
+        await pilot.press("enter")
+        await pilot.pause()
+    assert results == [True]
+    assert config.load_config()["api_key"] == "sk-test-123"
+
+
+@pytest.mark.asyncio
+async def test_enter_in_base_url_saves(roan_cfg):
+    from roan.tui import SetupScreen
+
+    app = RoanApp(FakeAgent())
+    results = []
+    async with app.run_test() as pilot:
+        screen = SetupScreen(provider="custom", model="m")
+        app.push_screen(screen, results.append)
+        await pilot.pause()
+        screen.query_one("#base_url").focus()
+        screen.query_one("#base_url").value = "http://192.168.1.9:8000/v1"
+        await pilot.press("enter")
+        await pilot.pause()
+    assert results == [True]
+    assert config.load_config()["base_url"] == "http://192.168.1.9:8000/v1"
+
+
+@pytest.mark.asyncio
+async def test_enter_in_local_picks_provider(roan_cfg):
+    app = RoanApp(FakeAgent())
+    results = []
+    async with app.run_test() as pilot:
+        screen = ProviderScreen(category="local")
+        app.push_screen(screen, results.append)
+        await pilot.pause()
+        screen._chosen = "lmstudio"
+        screen.query_one("#pbase").focus()
+        await pilot.press("enter")
+        await pilot.pause()
+    assert results[0]["provider"] == "lmstudio"
+
+
+@pytest.mark.asyncio
+async def test_enter_in_custom_adds_endpoint(roan_cfg):
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        screen = ProviderScreen(category="custom")
+        app.push_screen(screen)
+        await pilot.pause()
+        screen.query_one("#pname").value = "thuis"
+        screen.query_one("#pbase").value = "http://192.168.1.9:1234/v1"
+        screen.query_one("#pbase").focus()
+        await pilot.press("enter")
+        await pilot.pause()
+    assert config.get_endpoint("thuis")["base_url"] == "http://192.168.1.9:1234/v1"
+
+
+# ---------- beschrijving i.p.v. de id ----------
+@pytest.mark.asyncio
+async def test_provider_list_shows_description(roan_cfg, monkeypatch):
+    from textual.widgets import OptionList
+
+    monkeypatch.setattr(tui_mod, "provider_desc", lambda pid: f"beschrijving van {pid}")
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        screen = ProviderScreen(category="free")
+        app.push_screen(screen)
+        await pilot.pause()
+        listing = screen.query_one("#provider-list", OptionList)
+        labels = [str(listing.get_option_at_index(i).prompt) for i in range(listing.option_count)]
+        assert labels[0] == "Groq  ·  beschrijving van groq"
+        assert not any("· groq" in lb for lb in labels)
+
+
+@pytest.mark.asyncio
+async def test_description_falls_back_to_model_count(roan_cfg, monkeypatch):
+    monkeypatch.setattr(tui_mod, "provider_desc", lambda pid: "")
+    monkeypatch.setattr(
+        tui_mod, "provider_meta", lambda pid: {"plan": False, "name": pid, "models": ["a", "b", "c"]}
+    )
+    assert tui_mod.provider_description("onbekend") == "3 modellen"
+
+
+@pytest.mark.asyncio
+async def test_description_marks_subscription(roan_cfg, monkeypatch):
+    monkeypatch.setattr(tui_mod, "provider_desc", lambda pid: "")
+    monkeypatch.setattr(
+        tui_mod, "provider_meta", lambda pid: {"plan": True, "name": pid, "models": ["a", "b"]}
+    )
+    assert tui_mod.provider_description("alibaba-coding-plan") == "abonnement · 2 modellen"
