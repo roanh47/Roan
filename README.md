@@ -160,6 +160,10 @@ starts on a machine, Roan falls back to the classic renderer by itself.
 
 While the TUI is running:
 
+- `Ctrl+C` or `Ctrl+Q` — quit
+- The **✕** in the top-right of the title bar — quit (click it). Every popup
+  (setup, provider picker, model browser, the fullscreen prompt, the transcript)
+  has the same ✕ in its top-right corner.
 - `Ctrl+O` — transcript mode: `/` to search, `n`/`N` next/previous match, `g`/`G`
   top/bottom, `q` or `Esc` to go back
 - `PgUp`/`PgDn`, `Ctrl+Home`/`Ctrl+End` — scroll the conversation
@@ -167,6 +171,8 @@ While the TUI is running:
   it (or `Ctrl+End`) jumps back to the latest message
 - Mouse: click to focus the prompt, click list options, scroll lists and menus,
   click a tool result to expand it
+- `Enter` in any input in a popup confirms it — you never have to tab to a button
+  (in the setup screen, typing your API key and pressing `Enter` saves)
 
 Set `scroll_speed` in the config to multiply mouse-wheel distance.
 

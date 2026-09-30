@@ -6,6 +6,7 @@ from textual import on, work
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.events import Click
+from textual.binding import Binding
 from textual.screen import ModalScreen
 from textual.widgets import (
     Button,
@@ -54,6 +55,15 @@ from .photo import render_photo
 from .themes import ACCENT, THEMES
 
 BUNDLED_AVATAR = Path(__file__).parent / "assets" / "avatar.png"
+
+CLOSE_GLYPH = "✕"
+
+
+def _titlebar(title: str, close_id: str = "close"):
+    """Titel links, sluitknop (✕) rechtsboven."""
+    with Horizontal(classes="titlebar"):
+        yield Static(title, classes="title")
+        yield Button(CLOSE_GLYPH, id=close_id, classes="close")
 
 
 def resolve_base_url(provider: str) -> str:
@@ -181,7 +191,7 @@ class SetupScreen(ModalScreen):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="setup-box"):
-            yield Static(t("setup_title"), classes="title")
+            yield from _titlebar(t("setup_title"))
             yield Label(t("setup_provider"))
             yield Static(self._provider_line(), id="cur-provider")
             yield Button(t("setup_choose_provider"), id="choose-provider")
@@ -241,6 +251,9 @@ class SetupScreen(ModalScreen):
     @on(Button.Pressed)
     def _on_button(self, event: Button.Pressed) -> None:
         bid = event.button.id
+        if bid == "close":
+            self.dismiss(False)
+            return
         if bid == "cancel":
             self.dismiss(False)
             return
@@ -335,7 +348,7 @@ class ProviderScreen(ModalScreen):
     # ---------- opbouw ----------
     def compose(self) -> ComposeResult:
         with Vertical(id="provider-box"):
-            yield Static(t("provider_title"), classes="title")
+            yield from _titlebar(t("provider_title"))
             with Horizontal(id="provider-filters"):
                 yield Select(
                     [
@@ -485,6 +498,9 @@ class ProviderScreen(ModalScreen):
     @on(Button.Pressed)
     def _on_button(self, event: Button.Pressed) -> None:
         bid = event.button.id
+        if bid == "close":
+            self.dismiss(None)
+            return
         if bid == "pback":
             self.dismiss(None)
             return
@@ -584,7 +600,7 @@ class ModelsScreen(ModalScreen):
                 if self.fixed_provider
                 else t("models_title")
             )
-            yield Static(title, classes="title")
+            yield from _titlebar(title)
             with Horizontal(id="models-filters"):
                 yield Select(
                     [
@@ -644,6 +660,11 @@ class ModelsScreen(ModalScreen):
             return
         provider, model = event.option_id.split("|", 1)
         self.dismiss((provider, model))
+
+    @on(Button.Pressed)
+    def _on_button(self, event: Button.Pressed) -> None:
+        if event.button.id == "close":
+            self.dismiss(None)
 
 
 class Messages(VerticalScroll):
@@ -721,7 +742,7 @@ class TuiPromptScreen(ModalScreen):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="tui-prompt"):
-            yield Static(t("tui_prompt_title"), classes="title")
+            yield from _titlebar(t("tui_prompt_title"))
             yield Static(t("tui_prompt_body"))
             with Horizontal(id="tui-actions"):
                 yield Button(t("tui_notnow"), id="notnow")
@@ -781,7 +802,7 @@ class TranscriptScreen(ModalScreen):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="transcript-box"):
-            yield Static(t("transcript_title"), classes="title")
+            yield from _titlebar(t("transcript_title"))
             yield Input(placeholder=t("transcript_search"), id="tsearch")
             yield VerticalScroll(id="tbody")
             yield Static(t("transcript_hint"), id="thint")
@@ -857,12 +878,19 @@ class TranscriptScreen(ModalScreen):
     def action_close(self) -> None:
         self.dismiss(None)
 
+    @on(Button.Pressed)
+    def _on_close_button(self, event: Button.Pressed) -> None:
+        if event.button.id == "close":
+            self.dismiss(None)
+
 
 class RoanApp(App):
     TITLE = "Roan"
     MIN_SIZE = (1, 1)
 
     BINDINGS = [
+        Binding("ctrl+c", "quit_app", "quit", priority=True),
+        Binding("ctrl+q", "quit_app", "quit"),
         ("ctrl+l", "clear_chat", "clear"),
         ("ctrl+n", "new_session", "nieuw"),
         ("f2", "setup", "setup"),
@@ -905,6 +933,27 @@ class RoanApp(App):
         color: $accent;
         text-style: bold;
         padding: 0 2;
+    }
+    .titlebar {
+        height: auto;
+    }
+    .titlebar .title {
+        width: 1fr;
+    }
+    .close {
+        width: 5;
+        min-width: 5;
+        height: 1;
+        border: none;
+        background: $panel;
+        color: $text-muted;
+        content-align: center middle;
+        padding: 0;
+    }
+    .close:hover,
+    .close:focus {
+        background: $error;
+        color: $background;
     }
     """
 
@@ -950,7 +999,9 @@ class RoanApp(App):
                 yield _HDImage(avatar, id="avatar")
             else:
                 yield Static(render_photo(avatar, width=self._photo_width()))
-        yield Static(f"Roan — {t('app_subtitle')}", classes="title")
+        with Horizontal(classes="titlebar"):
+            yield Static(f"Roan — {t('app_subtitle')}", classes="title")
+            yield Button(CLOSE_GLYPH, id="app-close", classes="close")
         yield Messages(id="messages")
         yield Static(id="jump")
         yield Static(id="status")
@@ -1307,6 +1358,14 @@ class RoanApp(App):
     @on(Click, "#jump")
     def _jump_clicked(self) -> None:
         self.action_scroll_bottom()
+
+    def action_quit_app(self) -> None:
+        """Ctrl+C, Ctrl+Q of de ✕ rechtsboven."""
+        self.exit()
+
+    @on(Button.Pressed, "#app-close")
+    def _close_app(self, event: Button.Pressed) -> None:
+        self.exit()
 
     def action_clear_chat(self) -> None:
         self._messages().remove_children()
