@@ -54,7 +54,7 @@ sources:
 | `tests/test_integration.py` | 170 |
 | `tests/test_mcp.py` | 71 |
 | `tests/test_models_free.py` | 224 |
-| `tests/test_okf_bundle.py` | 92 |
+| `tests/test_okf_bundle.py` | 108 |
 | `tests/test_providers.py` | 367 |
 | `tests/test_roan.py` | 168 |
 | `tests/test_search.py` | 313 |
@@ -87,5 +87,5 @@ the biggest file by far and holds every screen; that is deliberate - see
 [one shared style](../decisions/shared-popup-style.md) - but it is the file to
 split first if it gets unwieldy.
 
-Regenerate this page with `python3 okf/references/generate_file_map.py` after a
+Regenerate this page with `python3 knowledge/references/generate_file_map.py` after a
 structural change, so the counts do not drift.

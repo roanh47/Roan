@@ -14,7 +14,7 @@ Two scripts live here rather than in the bundle body, because they are tooling
 rather than knowledge:
 
 * `validate_okf.py` - checks the three conformance rules of OKF v0.2 and reports
-  broken cross-links. Run it after editing anything in `okf/`.
+  broken cross-links. Run it after editing anything in `knowledge/`.
 * `generate_file_map.py` - regenerates [the file map](file-map.md) from the real
   repository, so the line counts cannot drift.
 

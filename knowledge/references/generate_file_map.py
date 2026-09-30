@@ -1,4 +1,4 @@
-"""Genereer okf/references/file-map.md opnieuw uit de echte repo.
+"""Genereer knowledge/references/file-map.md opnieuw uit de echte repo.
 
 Los script zodat de bestandslijst en de regelnummers altijd kloppen met de code.
 """
@@ -8,7 +8,8 @@ import pathlib
 TS = "2026-09-30T08:12:52Z"
 GEN = "{ by: hermes-agent/deepseek-v4.1-flash, at: " + TS + " }"
 
-root_dir = pathlib.Path(__file__).resolve().parent.parent.parent
+here = pathlib.Path(__file__).resolve().parent          # knowledge/references
+root_dir = here.parent.parent                            # de repo
 
 pkg = [(str(p.relative_to(root_dir)), sum(1 for _ in p.open()))
        for p in sorted((root_dir / "roan").rglob("*.py"))]
@@ -64,7 +65,7 @@ closing = (
     "the biggest file by far and holds every screen; that is deliberate - see\n"
     "[one shared style](../decisions/shared-popup-style.md) - but it is the file to\n"
     "split first if it gets unwieldy.\n\n"
-    "Regenerate this page with `python3 okf/references/generate_file_map.py` after a\n"
+    "Regenerate this page with `python3 knowledge/references/generate_file_map.py` after a\n"
     "structural change, so the counts do not drift.\n"
 )
 
@@ -78,6 +79,6 @@ body = (
     + closing
 )
 
-target = root_dir / "okf" / "references" / "file-map.md"
+target = here / "file-map.md"
 target.write_text(FRONT + body, encoding="utf-8")
 print("file-map.md opnieuw gegenereerd:", len(pkg), "package-bestanden,", total, "regels")

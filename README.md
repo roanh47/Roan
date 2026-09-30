@@ -285,14 +285,14 @@ so scheduled work never mixes with your chat.
 ## Knowledge bundle for agents
 
 The whole project — architecture, concepts, recipes, decisions and the bugs
-already hit — is written down in [`okf/`](okf/index.md) in Open Knowledge Format:
+already hit — is written down in [`knowledge/`](knowledge/index.md) in Open Knowledge Format:
 plain markdown with YAML frontmatter, so OpenCode, Claude Code, Cursor or any
 other agent can read it without adapters.
 
-Start at [`okf/index.md`](okf/index.md). Check it after editing:
+Start at [`knowledge/index.md`](knowledge/index.md). Check it after editing:
 
 ```
-python3 okf/references/validate_okf.py
+python3 knowledge/references/validate_okf.py
 ```
 
 `tests/test_okf_bundle.py` runs the same check, so the bundle cannot quietly

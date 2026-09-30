@@ -11,11 +11,11 @@ any other agent can consume it as-is.
 Source of truth is the code in this repository. Where a statement is enforced by
 the test suite, the concept says so. Check the bundle after editing it:
 
-    python3 okf/references/validate_okf.py
+    python3 knowledge/references/validate_okf.py
 
 and regenerate the file map after a structural change:
 
-    python3 okf/references/generate_file_map.py
+    python3 knowledge/references/generate_file_map.py
 
 ## Start here
 

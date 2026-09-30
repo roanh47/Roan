@@ -66,4 +66,4 @@ onboarding text.
     pyproject.toml     packaging and the two console scripts
     README.md          the front door, in English
     tests/             one file per concern
-    okf/               this knowledge bundle
+    knowledge/         this knowledge bundle

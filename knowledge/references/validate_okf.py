@@ -11,7 +11,7 @@ bundle naar een bestaand bestand wijzen.
 
 Gebruik:
 
-    python3 okf/references/validate_okf.py [bundelmap]
+    python3 knowledge/references/validate_okf.py [bundelmap]
 
 Zonder argument wordt de map gebruikt waarin dit script staat, één niveau omhoog.
 Exitcode 0 = conform, 1 = er is iets mis.
