@@ -901,44 +901,6 @@ class ToolResult(Static):
         self.update(self._full() if self.expanded else self._collapsed())
 
 
-class TuiPromptScreen(ModalScreen):
-    """Startup-dialoog: nieuwe fullscreen-TUI gebruiken of niet."""
-
-    CSS = """
-    TuiPromptScreen {
-        align: center middle;
-    }
-    #tui-prompt {
-        width: 70%;
-        max-width: 90;
-        height: auto;
-        border: round $border;
-        background: $surface;
-        padding: 1 2;
-    }
-    #tui-actions {
-        margin-top: 2;
-        height: auto;
-        align-horizontal: right;
-    }
-    #tui-actions Button {
-        margin-left: 2;
-    }
-    """
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id="tui-prompt"):
-            yield from _titlebar(t("tui_prompt_title"))
-            yield Static(t("tui_prompt_body"))
-            with Horizontal(id="tui-actions"):
-                yield Button(t("tui_notnow"), id="notnow")
-                yield Button(t("tui_yes"), id="yes", variant="primary")
-
-    @on(Button.Pressed)
-    def _on_button(self, event: Button.Pressed) -> None:
-        self.dismiss(event.button.id == "yes")
-
-
 class TranscriptScreen(ModalScreen):
     """Ctrl+O: volledig transcript met less-achtige navigatie en zoeken."""
 
@@ -1275,25 +1237,6 @@ class RoanApp(App):
             return
         cfg = load_config()
         self._sysline(f"model: {cfg['model']}  ·  provider: {cfg['provider']}")
-        self._maybe_offer_fullscreen()
-
-    def _maybe_offer_fullscreen(self) -> None:
-        """Bied de nieuwe fullscreen-TUI aan (max 3x, niet na 'niet nu')."""
-        from .config import should_offer_fullscreen
-
-        if self.renderer != "default" or not should_offer_fullscreen():
-            return
-        save_config({"tui_prompts": int(load_config().get("tui_prompts") or 0) + 1})
-
-        def answered(yes: bool | None) -> None:
-            if yes:
-                save_config({"tui": "fullscreen"})
-                self.exit({"relaunch": "fullscreen"})
-            else:
-                save_config({"tui_declined": True})
-                self._sysline(t("tui_current", mode="default"))
-
-        self.push_screen(TuiPromptScreen(), answered)
 
     def _render_history(self) -> None:
         """Toon het herstelde gesprek zodat de context zichtbaar is."""

@@ -119,24 +119,15 @@ def is_configured() -> bool:
 def resolve_renderer() -> str:
     """Welke TUI-renderer we starten: 'fullscreen' of 'default'.
 
-    Env-vars winnen (net als CLAUDE_CODE_NO_FLICKER / ..._DISABLE_ALTERNATE_SCREEN).
+    Fullscreen is de standaard (net als de nieuwe Claude Code-TUI): de app neemt
+    het hele scherm over via de alternate screen. Env-vars winnen.
     """
     if os.environ.get("ROAN_DISABLE_ALTERNATE_SCREEN"):
         return "default"
     if os.environ.get("ROAN_NO_FLICKER") == "1":
         return "fullscreen"
     tui = load_config().get("tui")
-    return tui if tui in RENDERERS else "default"
-
-
-def should_offer_fullscreen() -> bool:
-    """True als we de fullscreen-dialoog mogen tonen (max 3x, niet na 'niet nu')."""
-    if os.environ.get("ROAN_DISABLE_ALTERNATE_SCREEN") or os.environ.get("ROAN_NO_FLICKER"):
-        return False
-    cfg = load_config()
-    if cfg.get("tui") in RENDERERS or cfg.get("tui_declined"):
-        return False
-    return int(cfg.get("tui_prompts") or 0) < 3
+    return tui if tui in RENDERERS else "fullscreen"
 
 
 def note_fullscreen_failure() -> str:

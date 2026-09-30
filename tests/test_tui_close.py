@@ -10,7 +10,7 @@ from roan.tui import (
     RoanApp,
     SetupScreen,
     TranscriptScreen,
-    TuiPromptScreen,
+    ThemeScreen,
 )
 
 
@@ -149,15 +149,15 @@ async def test_models_close_button(roan_cfg):
 
 
 @pytest.mark.asyncio
-async def test_tui_prompt_close_button(roan_cfg):
+async def test_theme_picker_close_button(roan_cfg):
     app = RoanApp(FakeAgent())
     results = []
     async with app.run_test() as pilot:
-        app.push_screen(TuiPromptScreen(), results.append)
+        app.push_screen(ThemeScreen(), results.append)
         await pilot.pause()
         await pilot.click("#close")
         await pilot.pause()
-    assert results == [False]
+    assert results == [None]
 
 
 @pytest.mark.asyncio
@@ -180,7 +180,7 @@ async def test_transcript_close_button(roan_cfg):
         lambda: SetupScreen(provider="groq", model="m"),
         lambda: ProviderScreen(),
         lambda: ModelsScreen([("groq", "m")], [], []),
-        TuiPromptScreen,
+        ThemeScreen,
         lambda: TranscriptScreen([]),
     ],
 )

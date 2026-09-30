@@ -147,11 +147,12 @@ providers you usually only need to paste a key.
 
 ## Renderers
 
-Like Claude Code, Roan asks once whether you want the new fullscreen TUI, and
-remembers your answer.
+**fullscreen** is the default, like the new Claude Code TUI: it draws on the
+terminal's alternate screen (like `vim`), so the app takes over the whole
+window, never flickers and has mouse support on. There is no startup question —
+the default is already the new one.
 
-- **fullscreen** — draws on the terminal's alternate screen (like `vim`), so it
-  never flickers and mouse support is on. `/tui fullscreen`.
+- **fullscreen** — takes over the full terminal via the alternate screen.
 - **default** — the classic renderer: everything stays in your terminal's native
   scrollback, so `Cmd+F` and tmux copy mode work as usual.
 
@@ -165,7 +166,7 @@ While the TUI is running:
 
 - `Ctrl+C` or `Ctrl+Q` — quit
 - The **✕** in the top-right of the title bar — quit (click it). Every popup
-  (setup, provider picker, model browser, the fullscreen prompt, the transcript)
+  (setup, provider picker, model browser, theme picker, the transcript)
   has the same ✕ in its top-right corner.
 - `Ctrl+O` — transcript mode: `/` to search, `n`/`N` next/previous match, `g`/`G`
   top/bottom, `q` or `Esc` to go back

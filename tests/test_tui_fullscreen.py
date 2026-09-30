@@ -8,7 +8,6 @@ from roan.tui import (
     RoanApp,
     ToolResult,
     TranscriptScreen,
-    TuiPromptScreen,
 )
 
 
@@ -66,7 +65,13 @@ def tmp_no_tui(tmp_path, monkeypatch):
 
 # ---------- renderer-resolutie ----------
 def test_renderer_default(tmp_roan):
+    """Expliciet gekozen klassieke renderer blijft klassiek."""
     assert config.resolve_renderer() == "default"
+
+
+def test_renderer_defaults_to_fullscreen(tmp_no_tui):
+    """Zonder keuze: fullscreen, zodat de app het hele scherm overneemt."""
+    assert config.resolve_renderer() == "fullscreen"
 
 
 def test_renderer_from_config(tmp_roan):
@@ -83,21 +88,6 @@ def test_renderer_env_wins(tmp_roan, monkeypatch):
 def test_env_no_flicker(tmp_roan, monkeypatch):
     monkeypatch.setenv("ROAN_NO_FLICKER", "1")
     assert config.resolve_renderer() == "fullscreen"
-
-
-def test_should_offer_fullscreen(tmp_no_tui):
-    assert config.should_offer_fullscreen() is True
-    config.save_config({"tui_prompts": 3})
-    assert config.should_offer_fullscreen() is False
-
-
-def test_should_not_offer_when_declined(tmp_no_tui):
-    config.save_config({"tui_declined": True})
-    assert config.should_offer_fullscreen() is False
-
-
-def test_should_not_offer_when_saved(tmp_roan):
-    assert config.should_offer_fullscreen() is False
 
 
 def test_failure_falls_back_after_two(tmp_roan):
@@ -148,50 +138,14 @@ async def test_cmd_tui_invalid(tmp_roan):
         assert config.load_config()["tui"] == "default"
 
 
-# ---------- startup-dialoog ----------
+# ---------- geen startup-dialoog meer ----------
 @pytest.mark.asyncio
-async def test_fullscreen_prompt_appears(tmp_no_tui):
+async def test_no_startup_dialog(tmp_no_tui):
+    """Fullscreen is de standaard, dus er valt niets meer te vragen."""
     app = RoanApp(FakeAgent())
     async with app.run_test() as pilot:
         await pilot.pause()
-        assert isinstance(app.screen, TuiPromptScreen)
-        assert config.load_config()["tui_prompts"] == 1
-
-
-@pytest.mark.asyncio
-async def test_fullscreen_prompt_declined(tmp_no_tui):
-    from textual.widgets import Button
-
-    app = RoanApp(FakeAgent())
-    async with app.run_test() as pilot:
-        await pilot.pause()
-        app.screen.query_one("#notnow", Button).press()
-        await pilot.pause()
-        assert config.load_config()["tui_declined"] is True
-        assert config.load_config().get("tui") is None
-
-
-@pytest.mark.asyncio
-async def test_fullscreen_prompt_accepted(tmp_no_tui):
-    from textual.widgets import Button
-
-    app = RoanApp(FakeAgent())
-    exits = []
-    async with app.run_test() as pilot:
-        await pilot.pause()
-        app.exit = lambda result=None: exits.append(result)
-        app.screen.query_one("#yes", Button).press()
-        await pilot.pause()
-        assert config.load_config()["tui"] == "fullscreen"
-        assert exits == [{"relaunch": "fullscreen"}]
-
-
-@pytest.mark.asyncio
-async def test_no_prompt_when_tui_set(tmp_roan):
-    app = RoanApp(FakeAgent())
-    async with app.run_test() as pilot:
-        await pilot.pause()
-        assert not isinstance(app.screen, TuiPromptScreen)
+        assert len(app.screen_stack) == 1
 
 
 # ---------- transcript ----------
@@ -365,3 +319,31 @@ async def test_run_forever_is_not_called_in_tests(tmp_roan):
     from roan import commands
 
     assert "cron" not in commands.names()
+
+
+# ---------- schermvulling ----------
+@pytest.mark.asyncio
+async def test_app_fills_the_whole_screen_height(tmp_roan):
+    """De app moet het hele terminalvenster vullen, niet een deel."""
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(62, 24)) as pilot:
+        await pilot.pause()
+        assert (app.screen.size.width, app.screen.size.height) == (62, 24)
+        status = app.query_one("#status")
+        assert status.region.y + status.region.height == 24, "statusbalk hoort op de laatste regel"
+        assert app.query_one("#input").region.y < 24
+        # het berichtenblok vult de ruimte tussen avatar en invoerveld
+        assert app.query_one("#messages").region.height >= app.screen.size.height * 0.4
+
+
+@pytest.mark.asyncio
+async def test_app_fills_a_tall_screen(tmp_roan):
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(100, 50)) as pilot:
+        await pilot.pause()
+        status = app.query_one("#status")
+        assert status.region.y + status.region.height == 50
+        assert app.query_one("#messages").region.height >= app.screen.size.height * 0.4
+        # samen vullen ze het hele scherm
+        area = app.query_one("#messages").region.height + app.query_one("#avatar").region.height
+        assert area >= app.screen.size.height - 4

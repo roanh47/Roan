@@ -141,15 +141,6 @@ STRINGS: dict[str, dict[str, str]] = {
         "tui_set": "Renderer → {mode}",
         "tui_fullscreen": "fullscreen (alternate screen, geen flicker, muis)",
         "tui_default": "default (klassiek, in je terminal-scrollback)",
-        "tui_prompt_title": "Nieuwe TUI",
-        "tui_prompt_body": (
-            "Roan kan de nieuwe fullscreen-TUI gebruiken.\n\n"
-            "Die tekent op het alternate screen (zoals vim), heeft geen flicker, "
-            "houdt geheugen vlak in lange gesprekken en ondersteunt de muis.\n\n"
-            "Later te wisselen met /tui."
-        ),
-        "tui_yes": "Ja, gebruik fullscreen",
-        "tui_notnow": "Niet nu",
         "transcript_title": "Transcript",
         "transcript_hint": "/ zoeken · n/N volgende · g/G top/einde · q of Esc terug",
         "transcript_search": "Zoek: ",
@@ -314,15 +305,6 @@ STRINGS: dict[str, dict[str, str]] = {
         "tui_set": "Renderer → {mode}",
         "tui_fullscreen": "fullscreen (alternate screen, no flicker, mouse)",
         "tui_default": "default (classic, in your terminal scrollback)",
-        "tui_prompt_title": "New TUI",
-        "tui_prompt_body": (
-            "Roan can use the new fullscreen TUI.\n\n"
-            "It draws on the alternate screen (like vim), eliminates flicker, keeps "
-            "memory flat in long conversations and adds mouse support.\n\n"
-            "Switch later with /tui."
-        ),
-        "tui_yes": "Yes, use fullscreen",
-        "tui_notnow": "Not now",
         "transcript_title": "Transcript",
         "transcript_hint": "/ search · n/N next · g/G top/bottom · q or Esc back",
         "transcript_search": "Search: ",
