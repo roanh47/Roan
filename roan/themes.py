@@ -1,62 +1,93 @@
-from textual.theme import Theme
+"""Catppuccin-thema's voor Roan.
 
-# Accentkleur is vast: fel roze. Alle Catppuccin-thema's gebruiken deze.
-ACCENT = "#FF2E88"
+De vier smaken van de officiële Catppuccin-palette (https://catppuccin.com/palette).
+Textual levert ze zelf al compleet (met alle afgeleide kleuren goed ingesteld);
+wij nemen die als basis en zetten per smaak **de Catppuccin-pink** als accent.
 
-MOCHA = Theme(
-    name="mocha",
-    primary=ACCENT,
-    accent=ACCENT,
-    secondary="#CBA6F7",
-    background="#1E1E2E",
-    surface="#313244",
-    panel="#181825",
-    foreground="#CDD6F4",
-    warning="#F9E2AF",
-    error="#F38BA8",
-    success="#A6E3A1",
-)
+Pink per smaak:
+    latte      #EA76CB
+    frappe     #F4B8E4
+    macchiato  #F5BDE6
+    mocha      #F5C2E7
 
-MACCHIATO = Theme(
-    name="macchiato",
-    primary=ACCENT,
-    accent=ACCENT,
-    secondary="#C6A0F6",
-    background="#24273A",
-    surface="#363A4F",
-    panel="#1E2030",
-    foreground="#CAD3F5",
-    warning="#F5A97F",
-    error="#ED8796",
-    success="#A6DA95",
-)
+De rest van de palette komt ongewijzigd uit de ingebouwde thema's, dus er kan
+nooit per ongeluk een groen of blauw accent opduiken.
+"""
 
-FRAPPE = Theme(
-    name="frappe",
-    primary=ACCENT,
-    accent=ACCENT,
-    secondary="#CA9EE6",
-    background="#303446",
-    surface="#414559",
-    panel="#292C3C",
-    foreground="#C6D0F5",
-    warning="#E5C890",
-    error="#E78284",
-    success="#A6D189",
-)
+from textual.theme import BUILTIN_THEMES, Theme
 
-LATTE = Theme(
-    name="latte",
-    primary=ACCENT,
-    accent=ACCENT,
-    secondary="#8839EF",
-    background="#EFF1F5",
-    surface="#CCD0DA",
-    panel="#E6E9EF",
-    foreground="#4C4F69",
-    warning="#DF8E1D",
-    error="#D20F39",
-    success="#40A02B",
-)
+# De pink van elke Catppuccin-smaak.
+PINK = {
+    "latte": "#EA76CB",
+    "frappe": "#F4B8E4",
+    "macchiato": "#F5BDE6",
+    "mocha": "#F5C2E7",
+}
 
-THEMES = [MOCHA, MACCHIATO, FRAPPE, LATTE]
+# Catppuccin gebruikt lavender voor randen; per smaak, zodat alle vier smaken
+# dezelfde opbouw hebben (de ingebouwde latte had er geen).
+LAVENDER = {
+    "latte": "#7287FD",
+    "frappe": "#BABBF1",
+    "macchiato": "#B7BDF8",
+    "mocha": "#B4BEFE",
+}
+
+THEME_NAMES = ("latte", "frappe", "macchiato", "mocha")
+DEFAULT_THEME = "mocha"
+
+
+def _build(flavor: str) -> Theme:
+    """Een Catppuccin-smaak met de eigen pink als accent."""
+    builtin = BUILTIN_THEMES[f"catppuccin-{flavor}"]
+    pink = PINK[flavor]
+    # De randen en de footer komen uit het ingebouwde thema; alleen accent en
+    # primary worden pink, plus de knoptekst die op dat vlak leesbaar moet zijn.
+    variables = dict(builtin.variables)
+    variables["button-color-foreground"] = builtin.background
+    variables["border"] = LAVENDER[flavor]
+    variables["border-blurred"] = builtin.panel
+    return Theme(
+        name=flavor,
+        primary=pink,
+        accent=pink,
+        secondary=builtin.secondary,
+        warning=builtin.warning,
+        error=builtin.error,
+        success=builtin.success,
+        foreground=builtin.foreground,
+        background=builtin.background,
+        surface=builtin.surface,
+        panel=builtin.panel,
+        dark=builtin.dark,
+        luminosity_spread=builtin.luminosity_spread,
+        text_alpha=builtin.text_alpha,
+        variables=variables,
+    )
+
+
+THEMES = [_build(name) for name in THEME_NAMES]
+THEME_BY_NAME = {theme.name: theme for theme in THEMES}
+
+# Vaste pink voor de paar plekken die een letterlijke kleur nodig hebben
+# (Markdown/Static-opmaak kan geen $accent gebruiken).
+ACCENT = PINK[DEFAULT_THEME]
+
+_current = DEFAULT_THEME
+
+
+def set_current(name: str) -> str:
+    """Onthoud welke smaak actief is, voor letterlijke kleurgebruik."""
+    global _current
+    if name in PINK:
+        _current = name
+    return _current
+
+
+def accent_color() -> str:
+    """De pink van de nu actieve smaak."""
+    return PINK.get(_current, ACCENT)
+
+
+def is_valid(name: str) -> bool:
+    return name in PINK

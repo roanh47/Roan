@@ -28,6 +28,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "setup_base_url": "Base URL (alleen bij provider = custom)",
         "setup_save": "Opslaan",
         "setup_cancel": "Annuleren",
+        "setup_required": "Nog niets ingesteld — kies provider + model en vul je key in.",
+        "setup_required_nudge": "Eerst instellen — sluit pas na opslaan.",
         "setup_saved": "Opgeslagen — model: {model}  ·  provider: {provider}",
         # models
         "models_title": "Modellen",
@@ -96,6 +98,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "help_languages": "Talen: nl, en",
         # messages
         "msg_unknown_cmd": "Onbekend commando: /{name}  (probeer /help)",
+        "theme_title": "Thema",
         "msg_theme_set": "Thema → {name}",
         "msg_themes": "Thema's: {names}",
         "msg_model_current": "Huidig model: {model}",
@@ -196,6 +199,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "setup_base_url": "Base URL (only when provider = custom)",
         "setup_save": "Save",
         "setup_cancel": "Cancel",
+        "setup_required": "Nothing set up yet — pick a provider + model and enter your key.",
+        "setup_required_nudge": "Set it up first — closes only after saving.",
         "setup_saved": "Saved — model: {model}  ·  provider: {provider}",
         "models_title": "Models",
         "models_free": "Free",
@@ -227,6 +232,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "help_title": "Commands",
         "help_languages": "Languages: nl, en",
         "msg_unknown_cmd": "Unknown command: /{name}  (try /help)",
+        "theme_title": "Theme",
         "msg_theme_set": "Theme → {name}",
         "msg_themes": "Themes: {names}",
         "msg_model_current": "Current model: {model}",

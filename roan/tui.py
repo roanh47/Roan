@@ -35,6 +35,7 @@ from .config import (
     add_endpoint,
     get_endpoint,
     get_endpoints,
+    is_configured,
     load_config,
     remove_endpoint,
     save_config,
@@ -52,18 +53,27 @@ from .models import (
 )
 from .i18n import provider_desc, t
 from .photo import render_photo
-from .themes import ACCENT, THEMES
+from .themes import (
+    DEFAULT_THEME,
+    THEME_BY_NAME,
+    THEME_NAMES,
+    THEMES,
+    accent_color,
+    is_valid,
+    set_current,
+)
 
 BUNDLED_AVATAR = Path(__file__).parent / "assets" / "avatar.png"
 
 CLOSE_GLYPH = "✕"
 
 
-def _titlebar(title: str, close_id: str = "close"):
-    """Titel links, sluitknop (✕) rechtsboven."""
+def _titlebar(title: str, close_id: str | None = "close"):
+    """Titel links, sluitknop (✕) rechtsboven (weglaten met close_id=None)."""
     with Horizontal(classes="titlebar"):
         yield Static(title, classes="title")
-        yield Button(CLOSE_GLYPH, id=close_id, classes="close")
+        if close_id:
+            yield Button(CLOSE_GLYPH, id=close_id, classes="close")
 
 
 def resolve_base_url(provider: str) -> str:
@@ -155,11 +165,11 @@ class SetupScreen(ModalScreen):
         align: center middle;
     }
     #setup-box {
-        width: 70%;
-        max-width: 90;
+        width: 90%;
+        max-width: 82;
         height: auto;
         max-height: 100%;
-        border: none;
+        border: round $border;
         background: $surface;
         padding: 0 2;
     }
@@ -176,14 +186,29 @@ class SetupScreen(ModalScreen):
     #setup-actions Button {
         margin-left: 2;
     }
+    #required-hint {
+        width: 1fr;
+        height: 1;
+        color: $text-muted;
+    }
     """
 
-    def __init__(self, provider=None, model=None, base_url=None):
+    def __init__(self, provider=None, model=None, base_url=None, required: bool = False):
         super().__init__()
         cfg = load_config()
         self.provider = provider or cfg.get("provider") or ""
         self.model = model or cfg.get("model") or ""
         self.base_url = base_url or cfg.get("base_url") or ""
+        # Verplicht = er is nog niets ingesteld; dan kun je dit scherm niet wegklikken.
+        self.required = required
+
+    BINDINGS = [("escape", "cancel", "terug")]
+
+    def action_cancel(self) -> None:
+        if self.required:
+            self.query_one("#required-hint", Static).update(t("setup_required_nudge"))
+            return
+        self.dismiss(False)
 
     def _provider_line(self) -> str:
         return self.provider or t("setup_none")
@@ -197,7 +222,7 @@ class SetupScreen(ModalScreen):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="setup-box"):
-            yield from _titlebar(t("setup_title"))
+            yield from _titlebar(t("setup_title"), close_id=None if self.required else "close")
             yield Label(t("setup_provider"))
             yield Static(self._provider_line(), id="cur-provider")
             yield Button(t("setup_choose_provider"), id="choose-provider")
@@ -208,8 +233,11 @@ class SetupScreen(ModalScreen):
             yield Button(t("setup_choose_model"), id="choose-model")
             yield Label(t("setup_base_url"))
             yield Input(value=self.base_url, id="base_url")
+            if self.required:
+                yield Static(t("setup_required"), id="required-hint")
             with Horizontal(id="setup-actions"):
-                yield Button(t("setup_cancel"), id="cancel")
+                if not self.required:
+                    yield Button(t("setup_cancel"), id="cancel")
                 yield Button(t("setup_save"), id="save", variant="primary")
 
     # ---------- provider / model kiezen ----------
@@ -310,7 +338,7 @@ class ProviderScreen(ModalScreen):
         width: 85%;
         max-width: 120;
         height: 85%;
-        border: none;
+        border: round $border;
         background: $surface;
         padding: 1 2;
     }
@@ -572,7 +600,7 @@ class ModelsScreen(ModalScreen):
         width: 80%;
         max-width: 110;
         height: 80%;
-        border: none;
+        border: round $border;
         background: $surface;
         padding: 1 2;
     }
@@ -675,6 +703,51 @@ class ModelsScreen(ModalScreen):
             self.dismiss(None)
 
 
+class ThemeScreen(ModalScreen):
+    """Thema kiezen: latte / frappe / macchiato / mocha (allemaal Catppuccin)."""
+
+    CSS = """
+    ThemeScreen {
+        align: center middle;
+    }
+    #theme-box {
+        width: 56%;
+        max-width: 64;
+        height: auto;
+        max-height: 100%;
+        border: round $border;
+        background: $surface;
+        padding: 0 2;
+    }
+    #theme-list {
+        height: auto;
+        border: none;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="theme-box"):
+            yield from _titlebar(t("theme_title"))
+            yield OptionList(id="theme-list")
+
+    def on_mount(self) -> None:
+        listing = self.query_one("#theme-list", OptionList)
+        current = getattr(self.app, "theme", DEFAULT_THEME)
+        for name in THEME_NAMES:
+            marker = "●" if name == current else " "
+            listing.add_option(Option(f"{marker} {name}", id=name))
+        listing.focus()
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        if event.option_id:
+            self.dismiss(str(event.option_id))
+
+    @on(Button.Pressed)
+    def _on_button(self, event: Button.Pressed) -> None:
+        if event.button.id == "close":
+            self.dismiss(None)
+
+
 class Messages(VerticalScroll):
     """Berichtenlijst. Muiswiel-snelheid volgt de `scroll_speed`-instelling."""
 
@@ -716,7 +789,7 @@ class ToolResult(Static):
 
     def _full(self) -> str:
         body = "\n".join(f"  [dim]{line}[/dim]" for line in self.result.strip().splitlines())
-        return f"  [{ACCENT}]↳ {self.tool_name}[/{ACCENT}]\n{body}"
+        return f"  [{accent_color()}]↳ {self.tool_name}[/{accent_color()}]\n{body}"
 
     def on_click(self) -> None:
         self.expanded = not self.expanded
@@ -734,7 +807,7 @@ class TuiPromptScreen(ModalScreen):
         width: 70%;
         max-width: 90;
         height: auto;
-        border: none;
+        border: round $border;
         background: $surface;
         padding: 1 2;
     }
@@ -783,7 +856,7 @@ class TranscriptScreen(ModalScreen):
         width: 95%;
         max-width: 140;
         height: 95%;
-        border: none;
+        border: round $border;
         background: $surface;
         padding: 0 1;
     }
@@ -822,7 +895,7 @@ class TranscriptScreen(ModalScreen):
             role = msg.get("role")
             content = msg.get("content") or ""
             if role == "user":
-                widget = Static(f"[bold {ACCENT}]❯ {content}[/bold {ACCENT}]")
+                widget = Static(f"[bold {accent_color()}]❯ {content}[/bold {accent_color()}]")
             elif role == "assistant":
                 widget = Markdown(content)
             elif role == "tool":
@@ -963,9 +1036,12 @@ class RoanApp(App):
         background: $error;
         color: $background;
     }
-    /* ---------- plat: geen lijntjes ---------- */
+    /* ---------- Catppuccin-vlakken in plaats van kaders ---------- */
     Screen {
         background: $background;
+    }
+    ModalScreen {
+        background: $background 70%;
     }
     Input,
     Select,
@@ -973,25 +1049,28 @@ class RoanApp(App):
     Button {
         border: none;
     }
+    /* velden en knoppen één trede lichter dan het popup-vlak, zodat je ze ziet */
     Input {
         height: 1;
-        background: $surface;
+        background: $panel;
+        color: $foreground;
         padding: 0 1;
     }
     Input:focus {
-        background: $accent 25%;
+        background: $accent 30%;
     }
     Select {
         height: 1;
-        background: $surface;
+        background: $panel;
     }
     Select > SelectCurrent {
         border: none;
-        background: $surface;
+        background: $panel;
+        color: $foreground;
         padding: 0 1;
     }
     Select:focus > SelectCurrent {
-        background: $accent 25%;
+        background: $accent 30%;
     }
     Select > SelectOverlay {
         border: none;
@@ -1008,18 +1087,24 @@ class RoanApp(App):
     OptionList > .option-list--option-highlighted {
         background: $accent;
         color: $background;
+        text-style: bold;
     }
     Button {
         height: 1;
         min-width: 6;
-        background: $surface;
+        background: $panel;
         color: $foreground;
         padding: 0 1;
+    }
+    Button.-primary {
+        background: $accent;
+        color: $background;
     }
     Button:hover,
     Button:focus {
         background: $accent;
         color: $background;
+        text-style: bold;
     }
     """
 
@@ -1031,7 +1116,9 @@ class RoanApp(App):
         self._new_since_scroll = 0
         for theme in THEMES:
             self.register_theme(theme)
-        self.theme = "mocha"
+        cfg_theme = load_config().get("theme") or DEFAULT_THEME
+        self.theme = cfg_theme if is_valid(cfg_theme) else DEFAULT_THEME
+        set_current(self.theme)
 
     # ---------- avatar ----------
     def _resolve_avatar(self):
@@ -1077,9 +1164,7 @@ class RoanApp(App):
         self.query_one("#input", Input).focus()
         self._update_status()
         self._render_history()
-        from .config import has_config
-
-        if not has_config():
+        if not is_configured():
             self._write(Markdown(t("onboarding")))
             self._open_setup()
             return
@@ -1111,7 +1196,7 @@ class RoanApp(App):
             role = msg.get("role")
             content = msg.get("content")
             if role == "user" and content:
-                self._write(Static(f"[bold {ACCENT}]❯ {content}[/bold {ACCENT}]"))
+                self._write(Static(f"[bold {accent_color()}]❯ {content}[/bold {accent_color()}]"))
             elif role == "assistant" and content:
                 self._write(Markdown(content))
         if len(getattr(self.agent, "messages", [])) > 1:
@@ -1323,14 +1408,23 @@ class RoanApp(App):
         self._write(Markdown("\n".join(lines)))
 
     def _cmd_theme(self, args) -> None:
-        if not args:
-            self._write(Markdown(commands.help_text()))
+        if args:
+            self._set_theme(args[0].lower())
             return
-        name = args[0].lower()
-        if name not in [t_.name for t_ in THEMES]:
-            self._sysline(t("msg_themes", names=", ".join(t_.name for t_ in THEMES)))
+
+        def picked(result) -> None:
+            if result:
+                self._set_theme(str(result))
+
+        self.push_screen(ThemeScreen(), picked)
+
+    def _set_theme(self, name: str) -> None:
+        if not is_valid(name):
+            self._sysline(t("msg_themes", names=", ".join(THEME_NAMES)))
             return
         self.theme = name
+        set_current(name)
+        save_config({"theme": name})
         self._sysline(t("msg_theme_set", name=name))
 
     def _cmd_model(self, args) -> None:
@@ -1375,8 +1469,14 @@ class RoanApp(App):
         self._open_setup()
 
     def _open_setup(self) -> None:
+        # Verplicht zolang er niets werkt: dan kun je dit scherm niet wegklikken.
+        required = not is_configured()
+
         def done(saved: bool | None) -> None:
             if not saved:
+                if required and not is_configured() and self.is_running:
+                    self._sysline(t("setup_required_nudge"))
+                    self.call_after_refresh(self._open_setup)
                 return
             self.agent.reload()
             self._update_status()
@@ -1384,7 +1484,7 @@ class RoanApp(App):
             cfg = load_config()
             self._sysline(t("setup_saved", model=cfg["model"], provider=cfg["provider"]))
 
-        self.push_screen(SetupScreen(), done)
+        self.push_screen(SetupScreen(required=required), done)
 
     def _cmd_tui(self, args) -> None:
         """Wissel tussen de fullscreen- en de klassieke renderer (herstart de TUI)."""
@@ -1467,7 +1567,7 @@ class RoanApp(App):
             self._run_command(text)
             return
 
-        self._write(Static(f"[bold {ACCENT}]❯ {text}[/bold {ACCENT}]"))
+        self._write(Static(f"[bold {accent_color()}]❯ {text}[/bold {accent_color()}]"))
         self._stream_response(text)
 
     @work(thread=True, exclusive=True)
@@ -1494,7 +1594,7 @@ class RoanApp(App):
     def _render_tool_event(self, ev: dict) -> None:
         if ev.get("type") == "tool_call":
             summary = tool_summary(ev.get("name", "?"), ev.get("arguments") or {})
-            self._write(Static(f"[{ACCENT}]●[/{ACCENT}] [b]{ev.get('name')}[/b] [dim]{summary}[/dim]"))
+            self._write(Static(f"[{accent_color()}]●[/{accent_color()}] [b]{ev.get('name')}[/b] [dim]{summary}[/dim]"))
             return
         self._write(ToolResult(str(ev.get("name") or "?"), ev.get("result") or ""))
 

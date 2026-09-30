@@ -35,6 +35,7 @@ DEFAULT_CONFIG = {
     "api_key": None,          # overschrijft de preset-key indien ingesteld
     "model": "local-model",
     "language": "nl",         # "nl" of "en"
+    "theme": "mocha",         # latte | frappe | macchiato | mocha
     "endpoints": [],          # eigen OpenAI-compatibele endpoints (Custom)
     "tui": None,              # "fullscreen" | "default" | None (nog niet gekozen)
     "tui_prompts": 0,         # hoe vaak de fullscreen-dialoog is getoond
@@ -95,8 +96,24 @@ def migrate_legacy_dir() -> bool:
 
 
 def has_config() -> bool:
-    """True als de gebruiker ooit iets geconfigureerd heeft."""
+    """True als er een config-bestand is (of een key in de omgeving)."""
     return CONFIG_PATH.exists() or bool(os.environ.get("ROAN_API_KEY"))
+
+
+def is_configured() -> bool:
+    """Genoeg om mee te kunnen chatten: een echt model plus een key of lokale server.
+
+    Let op: het config-bestand bestaat ook als je alleen een thema of taal hebt
+    gezet — dat is nog geen werkende setup.
+    """
+    cfg = load_config()
+    model = (cfg.get("model") or "").strip()
+    if not model or model == DEFAULT_CONFIG["model"]:
+        return False
+    base = str(cfg.get("base_url") or "")
+    if base.startswith(("http://localhost", "http://127.0.0.1", "http://0.0.0.0")):
+        return True  # lokale server, geen key nodig
+    return bool(cfg.get("api_key") or os.environ.get("ROAN_API_KEY"))
 
 
 def resolve_renderer() -> str:
