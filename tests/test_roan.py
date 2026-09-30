@@ -83,7 +83,7 @@ def test_provider_models_survives_error(monkeypatch):
 def test_free_models_filters_zero_cost(monkeypatch):
     def fake_get(url, api_key=None):
         return {
-            "acme": {
+            "groq": {
                 "models": {
                     "free-one": {"cost": {"input": 0, "output": 0}},
                     "paid-one": {"cost": {"input": 1, "output": 2}},
@@ -93,14 +93,32 @@ def test_free_models_filters_zero_cost(monkeypatch):
         }
 
     monkeypatch.setattr(models, "_get", fake_get)
+    models.clear_cache()
     free = models.fetch_free_models()
-    assert free == [("acme", "free-one")]
+    assert free == [("groq", "free-one")]
+
+
+def test_free_models_ignores_plans_and_unknown_providers(monkeypatch):
+    """cost 0 bij een abonnement of onbekende provider is niet gratis."""
+
+    def fake_get(url, api_key=None):
+        return {
+            "alibaba-coding-plan": {"models": {"qwen3-max": {"cost": {"input": 0, "output": 0}}}},
+            "onbekend": {"models": {"wat": {"cost": {"input": 0, "output": 0}}}},
+            "openrouter": {"models": {"x/y:free": {"cost": {"input": 0, "output": 0}}}},
+        }
+
+    monkeypatch.setattr(models, "_get", fake_get)
+    models.clear_cache()
+    free = dict(models.fetch_free_models())
+    assert free == {"openrouter": "x/y:free"}
 
 
 def test_free_models_survives_error(monkeypatch):
     def boom(url, api_key=None):
         raise OSError("offline")
 
+    models.clear_cache()
     monkeypatch.setattr(models, "_get", boom)
     assert models.fetch_free_models() == []
 

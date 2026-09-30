@@ -44,6 +44,14 @@ from .themes import ACCENT, THEMES
 BUNDLED_AVATAR = Path(__file__).parent / "assets" / "avatar.png"
 
 
+def resolve_base_url(provider: str) -> str:
+    """Base URL voor een provider: eerst onze presets, anders uit models.dev."""
+    preset = PROVIDER_PRESETS.get(provider) or {}
+    if preset.get("base_url"):
+        return str(preset["base_url"])
+    return str(provider_meta(provider).get("api") or "")
+
+
 def gather_models() -> tuple[list, list, list]:
     """(free, paid, custom) model-lijsten voor de browsers."""
     cfg = load_config()
@@ -165,9 +173,10 @@ class SetupScreen(ModalScreen):
                 return
             provider, base_url = result
             self.provider = provider
-            if base_url:
-                self.base_url = base_url
-                self.query_one("#base_url", Input).value = base_url
+            resolved = base_url or resolve_base_url(provider)
+            if resolved:
+                self.base_url = resolved
+                self.query_one("#base_url", Input).value = resolved
             self.query_one("#cur-provider", Static).update(self._provider_line())
 
         self.app.push_screen(ProviderScreen(), picked)
@@ -319,7 +328,9 @@ class ProviderScreen(ModalScreen):
             return
         listing.clear_options()
         for pid, name in self.providers.get(cat, []):
-            listing.add_option(Option(f"{name}  ·  {pid}", id=pid))
+            meta = provider_meta(pid)
+            suffix = f"  ·  {t('provider_plan')}" if meta["plan"] else ""
+            listing.add_option(Option(f"{name}  ·  {pid}{suffix}", id=pid))
 
     @on(Select.Changed)
     def _on_cat(self, event: Select.Changed) -> None:
@@ -332,11 +343,13 @@ class ProviderScreen(ModalScreen):
         self._chosen = str(event.option_id or "")
         meta = provider_meta(self._chosen)
         bits = []
+        if meta["plan"]:
+            bits.append("⚠ " + t("provider_plan_note", provider=meta["name"]))
         if meta["env"]:
             bits.append(f"{t('provider_env')}: {meta['env']}")
         if meta["doc"]:
             bits.append(f"{t('provider_doc')}: {meta['doc']}")
-        self.query_one("#provider-info", Static).update("  ·  ".join(bits))
+        self.query_one("#provider-info", Static).update("\n".join(bits))
 
     @on(Button.Pressed)
     def _on_button(self, event: Button.Pressed) -> None:
@@ -347,7 +360,7 @@ class ProviderScreen(ModalScreen):
             self.dismiss(("custom", self.query_one("#pbase", Input).value.strip()))
             return
         if self._chosen:
-            self.dismiss((self._chosen, ""))
+            self.dismiss((self._chosen, resolve_base_url(self._chosen)))
 
 
 class ModelsScreen(ModalScreen):
@@ -941,8 +954,9 @@ class RoanApp(App):
                 return
             provider, base_url = result
             updates: dict = {"provider": provider}
-            if base_url:
-                updates["base_url"] = base_url
+            resolved = base_url or resolve_base_url(provider)
+            if resolved:
+                updates["base_url"] = resolved
             save_config(updates)
             self.agent.reload()
             self._update_status()

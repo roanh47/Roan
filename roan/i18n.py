@@ -53,7 +53,11 @@ STRINGS: dict[str, dict[str, str]] = {
         "provider_doc": "Docs",
         "provider_choose": "Kies",
         "provider_back": "Terug",
-        "provider_all": "— kies een provider —",
+        "provider_plan": "abonnement",
+        "provider_plan_note": (
+            "{provider} is een abonnement (vast bedrag per maand), geen gratis provider. "
+            "Je api_key uit dat plan werkt hier wel gewoon."
+        ),
         "setup_choose_provider": "Kies provider…",
         "setup_choose_model": "Kies model…",
         "setup_none": "(nog niet gekozen)",
@@ -70,7 +74,11 @@ STRINGS: dict[str, dict[str, str]] = {
         "provider_doc": "Docs",
         "provider_choose": "Choose",
         "provider_back": "Back",
-        "provider_all": "— choose a provider —",
+        "provider_plan": "subscription",
+        "provider_plan_note": (
+            "{provider} is a subscription (flat monthly fee), not a free provider. "
+            "Your api_key from that plan still works here."
+        ),
         "setup_choose_provider": "Choose provider…",
         "setup_choose_model": "Choose model…",
         "setup_none": "(not chosen yet)",

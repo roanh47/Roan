@@ -94,6 +94,31 @@ with a `↳` result line you can **click to expand**. The status bar shows the
 active model, provider and session. Up/Down arrows walk your input history; mouse
 clicks focus the prompt.
 
+## Free vs paid
+
+models.dev has no "free" flag: it reports a price of `0` for subscription
+providers too, because their pricing is per plan rather than per token. Alibaba's
+Coding Plan, Z.AI's plan and the Kimi/MiniMax/Xiaomi token plans would all show
+up as "free" without extra care.
+
+Roan therefore treats a model as free only when one of these holds:
+
+- the model id ends in `:free` (the OpenRouter convention), or
+- it runs on your own machine (`lmstudio`, `ollama`, `llama.cpp`, `vllm`, …)
+
+and, for hosted providers, the provider is a known free-tier one (`google`,
+`groq`, `cerebras`, `mistral`, `nvidia`, `huggingface`, `chutes`, `modelscope`,
+`cloudflare-workers-ai`, `opencode`, `z.ai`, `openrouter`, …) with a price of `0`.
+
+Providers whose name or id contains *coding plan*, *token plan* or *subscription*
+are counted as paid, and the provider picker labels them `subscription` so you
+know it's a flat monthly fee and not a per-token price. The free-tier list lives
+in `FREE_TIER_PROVIDERS` in `roan/models.py` — extend it when a provider starts
+offering free usage.
+
+Picking a provider fills in its `base_url` automatically, from `PROVIDER_PRESETS`
+or else the `api` field in models.dev, so you usually only need to paste a key.
+
 ## Renderers
 
 Like Claude Code, Roan asks once whether you want the new fullscreen TUI, and
