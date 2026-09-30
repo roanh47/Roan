@@ -278,10 +278,28 @@ Run scheduled prompts with `Roan cron` (a long-running process):
 }
 ```
 
-`schedule` accepts `30s`, `15m`, `2h`, `1d` or `daily HH:MM`. Each job runs in its
-own session (`cron-<id>`), so scheduled work never mixes with your chat.
+`schedule` accepts `30s`, `15m`, `2h`, `1d` or `daily HH:MM`. `enabled: false`
+parks a job without deleting it. Each job runs in its own session (`cron-<id>`),
+so scheduled work never mixes with your chat.
+
+## Knowledge bundle for agents
+
+The whole project — architecture, concepts, recipes, decisions and the bugs
+already hit — is written down in [`okf/`](okf/index.md) in Open Knowledge Format:
+plain markdown with YAML frontmatter, so OpenCode, Claude Code, Cursor or any
+other agent can read it without adapters.
+
+Start at [`okf/index.md`](okf/index.md). Check it after editing:
+
+```
+python3 okf/references/validate_okf.py
+```
+
+`tests/test_okf_bundle.py` runs the same check, so the bundle cannot quietly
+break.
 
 ## Status
 
-Working: agentic loop with tools, streaming, sessions, memory, TUI with skin
-rendering, Telegram channel. Next: MCP client, more channels, web UI.
+Working: the agentic loop with tools, streaming, sessions, memory, skills, cron,
+the MCP client, the Telegram channel and the fullscreen Catppuccin TUI. Next:
+more channels, a web UI.
