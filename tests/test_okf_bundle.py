@@ -115,3 +115,31 @@ def test_file_map_lists_every_module(okf):
         if str(p.relative_to(REPO)) not in text
     ]
     assert missing == [], f"niet in de file map: {missing}"
+
+
+def test_board_items_match_the_backlog():
+    """Elk item op het board moet een kop in ideas.md hebben.
+
+    ideas.md houdt het waarom bij, het board de status. Als ze uit elkaar lopen
+    klopt een van de twee niet meer, dus dat mag niet stil gebeuren.
+    """
+    spec = importlib.util.spec_from_file_location("project_board", REPO / "tests" / "project_board.py")
+    assert spec is not None and spec.loader is not None
+    board = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(board)
+
+    body = re.sub(r"[^a-z0-9]", "", (REPO / "ideas.md").read_text(encoding="utf-8").lower())
+    missing = [
+        title
+        for title, _ in board.ITEMS
+        if re.sub(r"[^a-z0-9]", "", title.lower()) not in body
+    ]
+    assert missing == [], f"wel op het board, niet in ideas.md: {missing}"
+    assert board.COLUMNS == ["To Do", "Doing", "Done"]
+
+
+def test_project_board_script_reports_a_missing_scope():
+    """Zonder de project-scope moet het script dat zeggen, niet stuklopen."""
+    text = (REPO / "tests" / "project_board.py").read_text(encoding="utf-8")
+    assert "gh auth refresh" in text
+    assert "-s project" in text

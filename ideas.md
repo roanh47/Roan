@@ -78,7 +78,7 @@ output of a job would all help. The 30-second poll is fine; the visibility is no
 Attractive in theory. In practice it needs honest per-model quality data, which
 nobody has, so it will probably stay a manual `/model` choice.
 
-**Plugins** — `~/.Roan/plugins/` exists in the layout and nothing loads from it.
+**Plugins: wire up or delete** — `~/.Roan/plugins/` exists in the layout and nothing loads from it.
 Either wire it up (a plugin can register tools and slash commands) or delete the
 directory, because an empty promise in a documented layout is worse than no
 plugin system.
@@ -90,7 +90,7 @@ amount of work and it breaks the one hard constraint (nothing to host), unless i
 runs locally only, which mostly means it duplicates the TUI with a worse input
 model. Worth doing only if there is a use case the TUI cannot serve.
 
-**Publishing under the name `roan`** — the name is not taken on npm or PyPI in
+**Publishing under the name roan** — the name is not taken on npm or PyPI in
 the sense that matters; it is taken in the sense that someone else owns it, so
 this is the PEP 541 process, which takes months and can be refused. Until then
 installs are from the repository, which is fine for the only user.

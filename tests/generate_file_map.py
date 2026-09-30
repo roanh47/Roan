@@ -63,9 +63,9 @@ def table(rows):
 closing = (
     "The package is " + str(total) + " lines of Python in total. `roan/tui.py` is\n"
     "the biggest file by far and holds every screen; that is deliberate - see\n"
-    "[one shared style](../decisions/shared-popup-style.md) - but it is the file to\n"
+    "[one shared popup style](roan/shared-popup-style.md) - but it is the file to\n"
     "split first if it gets unwieldy.\n\n"
-    "Regenerate this page with `python3 knowledge/references/generate_file_map.py` after a\n"
+    "Regenerate this page with `python3 tests/generate_file_map.py` after a\n"
     "structural change, so the counts do not drift.\n"
 )
 

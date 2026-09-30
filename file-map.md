@@ -45,9 +45,10 @@ sources:
 | File | Lines |
 |---|---|
 | `pyproject.toml` | 34 |
-| `README.md` | 314 |
+| `README.md` | 320 |
 | `tests/fake_mcp_server.py` | 57 |
 | `tests/generate_file_map.py` | 84 |
+| `tests/project_board.py` | 204 |
 | `tests/test_agent.py` | 170 |
 | `tests/test_cli.py` | 85 |
 | `tests/test_home.py` | 247 |
@@ -55,7 +56,7 @@ sources:
 | `tests/test_integration.py` | 170 |
 | `tests/test_mcp.py` | 71 |
 | `tests/test_models_free.py` | 224 |
-| `tests/test_okf_bundle.py` | 110 |
+| `tests/test_okf_bundle.py` | 145 |
 | `tests/test_providers.py` | 367 |
 | `tests/test_roan.py` | 168 |
 | `tests/test_search.py` | 313 |
@@ -84,8 +85,8 @@ sources:
 | MCP | `roan/mcp.py` |
 | Entry points and subcommands | `roan/cli.py` |
 
-The package is 4657 lines of Python in total. `roan/tui.py` is the biggest file
-by far and holds every screen; that is deliberate - see
+The package is 4657 lines of Python in total. `roan/tui.py` is
+the biggest file by far and holds every screen; that is deliberate - see
 [one shared popup style](roan/shared-popup-style.md) - but it is the file to
 split first if it gets unwieldy.
 
