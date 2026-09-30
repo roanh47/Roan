@@ -83,10 +83,10 @@ def test_provider_models_survives_error(monkeypatch):
 def test_free_models_filters_zero_cost(monkeypatch):
     def fake_get(url, api_key=None):
         return {
-            "groq": {
+            "openrouter": {
                 "models": {
-                    "free-one": {"cost": {"input": 0, "output": 0}},
-                    "paid-one": {"cost": {"input": 1, "output": 2}},
+                    "x/free-one:free": {"cost": {"input": 0, "output": 0}},
+                    "x/paid-one": {"cost": {"input": 1, "output": 2}},
                     "no-cost": {},
                 }
             }
@@ -95,7 +95,7 @@ def test_free_models_filters_zero_cost(monkeypatch):
     monkeypatch.setattr(models, "_get", fake_get)
     models.clear_cache()
     free = models.fetch_free_models()
-    assert free == [("groq", "free-one")]
+    assert free == [("openrouter", "x/free-one:free")]
 
 
 def test_free_models_ignores_plans_and_unknown_providers(monkeypatch):

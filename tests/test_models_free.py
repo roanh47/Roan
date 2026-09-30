@@ -53,13 +53,14 @@ def test_plan_detected_from_name():
 
 
 # ---------- gratis modellen ----------
-def test_free_model_requires_zero_cost():
-    assert models.is_free_model("groq", "llama-3", {"cost": {"input": 0.1, "output": 0.2}}) is False
-    assert models.is_free_model("groq", "llama-3", {"cost": {"input": 0, "output": 0}}) is True
+def test_free_tier_provider_covers_whole_catalog():
+    """Bij een gratis-laag provider is de hele catalogus gratis (rate-limited)."""
+    assert models.is_free_model("groq", "llama-3", {"cost": {"input": 0.1, "output": 0.2}}) is True
+    assert models.is_free_model("cerebras", "iets", {}) is True
 
 
-def test_free_model_needs_free_tier_provider():
-    # kosten 0, maar geen bekende gratis provider en geen abonnement
+def test_free_model_needs_known_provider():
+    # onbekende provider: cost 0 is niet genoeg
     assert models.is_free_model("onbekend-provider", "m", {"cost": {"input": 0, "output": 0}}) is False
 
 
@@ -71,9 +72,23 @@ def test_plan_provider_models_are_never_free():
     )
 
 
-def test_openrouter_free_suffix_always_free():
+def test_unknown_gateway_free_suffix_is_not_trusted():
+    """Gateways die zelf ':free' plakken (bothub, kenari, unorouter) tellen niet."""
+    assert models.is_free_model("bothub", "gemma-4-31b-it:free", {}) is False
+    assert models.is_free_model("kenari", "kimi-k2-6:free", {}) is False
+    assert models.is_free_model("kilo", "x/y:free", {}) is False
+
+
+def test_known_per_model_free_suffixes():
     assert models.is_free_model("openrouter", "deepseek/deepseek-r1:free", {}) is True
-    assert models.is_free_model("iets-raars", "model-x:free", {}) is True
+    assert models.is_free_model("openrouter", "deepseek/deepseek-r1", {}) is False
+    assert models.is_free_model("opencode", "qwen3.6-plus-free", {}) is True
+    assert models.is_free_model("opencode", "qwen3.6-plus", {}) is False
+
+
+def test_zai_uses_cost_zero():
+    assert models.is_free_model("zai", "glm-4.5-flash", {"cost": {"input": 0, "output": 0}}) is True
+    assert models.is_free_model("zai", "glm-4.6", {"cost": {"input": 1, "output": 2}}) is False
 
 
 def test_local_servers_have_their_own_category():
@@ -165,8 +180,11 @@ def test_list_dev_free_excludes_plan_models(fake_dev):
 
 
 def test_provider_models_filtering(fake_dev):
-    assert models.provider_models("groq", "free") == ["llama-3"]
+    # groq is een gratis-laag provider: hele catalogus
+    assert models.provider_models("groq", "free") == ["llama-3", "mixtral"]
     assert models.provider_models("groq", "all") == ["llama-3", "mixtral"]
+    # openai is betaald, geen gratis modellen
+    assert models.provider_models("openai", "free") == []
 
 
 def test_provider_meta_includes_api_and_plan(fake_dev):

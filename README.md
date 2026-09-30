@@ -96,27 +96,31 @@ clicks focus the prompt.
 
 ## Free vs paid
 
-models.dev has no "free" flag: it reports a price of `0` for subscription
-providers too, because their pricing is per plan rather than per token. Alibaba's
-Coding Plan, Z.AI's plan and the Kimi/MiniMax/Xiaomi token plans would all show
-up as "free" without extra care.
+models.dev has no "free" flag, so `cost: 0` alone is not trustworthy — and that
+is how a lot of non-free things ended up under Free:
 
-Roan therefore treats a model as free only when one of these holds:
+- subscription providers report `0`, because their price is per plan (Alibaba
+  Coding Plan, Z.AI's plan, the Kimi/MiniMax/Xiaomi token plans);
+- some gateways just put `:free` in a model id without it meaning anything;
+- a provider can have one odd zero-priced preview model and end up in the list.
 
-- the model id ends in `:free` (the OpenRouter convention), or
-- it runs on your own machine (`lmstudio`, `ollama`, `llama.cpp`, `vllm`, …)
+Roan therefore only calls something free in two cases:
 
-and, for hosted providers, the provider is a known free-tier one (`google`,
-`groq`, `cerebras`, `mistral`, `nvidia`, `huggingface`, `chutes`, `modelscope`,
-`cloudflare-workers-ai`, `opencode`, `z.ai`, `openrouter`, …) with a price of `0`.
+1. **The provider has a real free tier** covering its whole catalogue (with rate
+   limits): `google` (AI Studio), `groq`, `cerebras`, `mistral`, `nvidia`,
+   `huggingface`, `chutes`, `modelscope`, `cloudflare-workers-ai`. Every model
+   from these is usable for free.
+2. **The model id says so, at a party where that is reliable**: OpenRouter
+   (`:free`) and OpenCode Zen / Go (`-free`).
+
+Z.AI is the one exception where `cost: 0` is accurate — its `*-flash` models are
+genuinely free and the rest of its catalogue is paid.
+
+Everything else — subscriptions, unknown gateways, providers with a single
+zero-priced preview — counts as **paid**. The picker labels subscription
+providers `subscription`, so you can tell a flat monthly fee from a token price.
 
 Local servers are **not** in Free: they have their own category.
-
-Providers whose name or id contains *coding plan*, *token plan* or *subscription*
-are counted as paid, and the provider picker labels them `subscription` so you
-know it's a flat monthly fee and not a per-token price. The free-tier list lives
-in `FREE_TIER_PROVIDERS` in `roan/models.py` — extend it when a provider starts
-offering free usage.
 
 ## Providers
 

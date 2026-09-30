@@ -84,30 +84,30 @@ def local_endpoint(endpoint_id: str) -> dict | None:
             return dict(entry)
     return None
 
-# Providers met een echte gratis laag — géén abonnement. models.dev heeft geen
-# 'gratis'-veld, dus dit is een bewust korte, onderhouden lijst die we met de live
-# models.dev-lijst doorsnijden.
+# Providers waarvan de gratis laag de hele catalogus dekt (met rate limits).
 FREE_TIER_PROVIDERS = {
-    "openrouter",  # alleen modellen met ':free' in de id
-    "google",
-    "google-vertex",
-    "google-vertex-anthropic",
-    "groq",
-    "cerebras",
-    "mistral",
-    "cohere",
-    "nvidia",
-    "huggingface",
-    "chutes",
-    "modelscope",
-    "cloudflare-workers-ai",
-    "github-models",
-    "github-copilot",
-    "opencode",
-    "opencode-go",
-    "zai",
-    "z-ai",
+    "google",  # Google AI Studio — gratis tier
+    "groq",  # gratis tier, rate-limited
+    "cerebras",  # gratis tier
+    "mistral",  # Experiment-plan is gratis
+    "nvidia",  # NIM — gratis tegoed
+    "huggingface",  # gratis maandtegoed
+    "chutes",  # gratis tier
+    "modelscope",  # gratis inferentie-quotum
+    "cloudflare-workers-ai",  # gratis dag-quotum
 }
+
+# Providers waar alléén bepaalde modellen gratis zijn; het model-id zegt het zelf.
+PER_MODEL_FREE_PROVIDERS = {
+    "openrouter",  # modellen met ':free'
+    "opencode",  # modellen met '-free'
+    "opencode-go",
+}
+FREE_MODEL_SUFFIXES = (":free", "-free")
+
+# Providers waar `cost: 0` wél klopt: hun gratis modellen staan echt op 0.
+# (Z.AI's flash-modellen zijn gratis; de rest van hun catalogus is betaald.)
+COST_ZERO_FREE_PROVIDERS = {"zai", "z-ai"}
 
 # Abonnementen: models.dev zet cost op 0 omdat de prijs per plan gaat (bijv.
 # Alibaba Coding Plan). Die zijn dus níet gratis.
@@ -131,20 +131,25 @@ def is_plan_provider(provider: str, pdata: dict | None = None) -> bool:
 
 
 def is_free_model(provider: str, model_id: str, model: dict | None = None) -> bool:
-    """Alleen modellen waarvan we zeker weten dat ze gratis te gebruiken zijn.
+    """Gratis te gebruiken? Twee gevallen:
 
-    Lokale servers horen hier niet bij: die hebben hun eigen categorie.
+    1. de provider heeft een gratis laag die de hele catalogus dekt, of
+    2. het model-id zegt zelf dat het gratis is, bij een partij waar dat
+       betrouwbaar is (OpenRouter ':free', OpenCode/Z.AI '-free').
+
+    Alleen `cost == 0` is niet genoeg: models.dev zet dat ook op 0 bij
+    abonnementen en bij gateways die een gratis label plakken.
     """
-    if str(model_id).endswith(":free"):
-        return True
-    if not is_free(model or {}):
-        return False
     pid = (provider or "").lower()
     if pid in LOCAL_IDS:
-        return False
-    if is_plan_provider(provider):
-        return False  # abonnement: cost 0 betekent 'plan', niet 'gratis'
-    return pid in FREE_TIER_PROVIDERS
+        return False  # lokale servers hebben hun eigen categorie
+    if pid in FREE_TIER_PROVIDERS:
+        return True
+    if pid in PER_MODEL_FREE_PROVIDERS:
+        return str(model_id).lower().endswith(FREE_MODEL_SUFFIXES)
+    if pid in COST_ZERO_FREE_PROVIDERS:
+        return is_free(model or {})
+    return False
 
 
 def is_free_provider(provider: str, pdata: dict | None = None) -> bool:
@@ -238,7 +243,7 @@ def provider_models(provider: str, category: str = "all") -> list[str]:
     models = pdata.get("models") or {}
     out = []
     for mid, mdata in models.items():
-        free = is_free(mdata or {})
+        free = is_free_model(provider, mid, mdata)
         if category == "free" and not free:
             continue
         if category == "paid" and free:
