@@ -158,16 +158,18 @@ class SetupScreen(ModalScreen):
         width: 70%;
         max-width: 90;
         height: auto;
-        border: thick $accent;
-        background: $panel;
-        padding: 1 2;
+        max-height: 100%;
+        border: none;
+        background: $surface;
+        padding: 0 2;
     }
     #setup-box Label {
-        margin-top: 1;
+        margin-top: 0;
+        height: 1;
         color: $text-muted;
     }
     #setup-actions {
-        margin-top: 2;
+        margin-top: 1;
         height: auto;
         align-horizontal: right;
     }
@@ -185,6 +187,10 @@ class SetupScreen(ModalScreen):
 
     def _provider_line(self) -> str:
         return self.provider or t("setup_none")
+
+    def on_mount(self) -> None:
+        """Focus meteen op het api-key-veld, zodat je kunt typen."""
+        self.query_one("#api_key", Input).focus()
 
     def _model_line(self) -> str:
         return self.model or t("setup_none")
@@ -304,8 +310,8 @@ class ProviderScreen(ModalScreen):
         width: 85%;
         max-width: 120;
         height: 85%;
-        border: thick $accent;
-        background: $panel;
+        border: none;
+        background: $surface;
         padding: 1 2;
     }
     #provider-filters {
@@ -378,6 +384,7 @@ class ProviderScreen(ModalScreen):
 
     def on_mount(self) -> None:
         self._rebuild()
+        self.query_one("#provider-list", OptionList).focus()
         self._load()
 
     @work(thread=True, exclusive=True)
@@ -565,8 +572,8 @@ class ModelsScreen(ModalScreen):
         width: 80%;
         max-width: 110;
         height: 80%;
-        border: thick $accent;
-        background: $panel;
+        border: none;
+        background: $surface;
         padding: 1 2;
     }
     #models-filters {
@@ -622,6 +629,7 @@ class ModelsScreen(ModalScreen):
             self.query_one("#prov", Select).display = False
         self._refresh_providers()
         self._rebuild()
+        self.query_one("#models-list", OptionList).focus()
 
     def _current(self) -> list[tuple[str, str]]:
         cat = self.query_one("#cat", Select).value
@@ -726,8 +734,8 @@ class TuiPromptScreen(ModalScreen):
         width: 70%;
         max-width: 90;
         height: auto;
-        border: thick $accent;
-        background: $panel;
+        border: none;
+        background: $surface;
         padding: 1 2;
     }
     #tui-actions {
@@ -775,8 +783,8 @@ class TranscriptScreen(ModalScreen):
         width: 95%;
         max-width: 140;
         height: 95%;
-        border: thick $accent;
-        background: $panel;
+        border: none;
+        background: $surface;
         padding: 0 1;
     }
     #tbody {
@@ -953,6 +961,64 @@ class RoanApp(App):
     .close:hover,
     .close:focus {
         background: $error;
+        color: $background;
+    }
+    /* ---------- plat: geen lijntjes ---------- */
+    Screen {
+        background: $background;
+    }
+    Input,
+    Select,
+    OptionList,
+    Button {
+        border: none;
+    }
+    Input {
+        height: 1;
+        background: $surface;
+        padding: 0 1;
+    }
+    Input:focus {
+        background: $accent 25%;
+    }
+    Select {
+        height: 1;
+        background: $surface;
+    }
+    Select > SelectCurrent {
+        border: none;
+        background: $surface;
+        padding: 0 1;
+    }
+    Select:focus > SelectCurrent {
+        background: $accent 25%;
+    }
+    Select > SelectOverlay {
+        border: none;
+        background: $surface;
+    }
+    Select > SelectOverlay > .option-list--option-highlighted {
+        background: $accent;
+        color: $background;
+    }
+    OptionList {
+        background: $surface;
+        padding: 0 1;
+    }
+    OptionList > .option-list--option-highlighted {
+        background: $accent;
+        color: $background;
+    }
+    Button {
+        height: 1;
+        min-width: 6;
+        background: $surface;
+        color: $foreground;
+        padding: 0 1;
+    }
+    Button:hover,
+    Button:focus {
+        background: $accent;
         color: $background;
     }
     """
