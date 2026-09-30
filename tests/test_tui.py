@@ -32,6 +32,12 @@ class FakeAgent:
         yield f"echo: {text}"
 
 
+def avatar_path():
+    from pathlib import Path
+
+    return str(Path(__file__).resolve().parents[1] / "roan" / "assets" / "avatar.png")
+
+
 @pytest.fixture
 def tmp_roan(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "ROAN_DIR", tmp_path)
@@ -44,6 +50,12 @@ def tmp_roan(tmp_path, monkeypatch):
     # en een expliciete renderer zodat de fullscreen-dialoog niet verschijnt.
     config.save_config({"provider": "lmstudio", "model": "test-model", "tui": "default"})
     return tmp_path
+
+
+def avatar_path():
+    from pathlib import Path
+
+    return str(Path(__file__).resolve().parents[1] / "roan" / "assets" / "avatar.png")
 
 
 @pytest.fixture
@@ -305,3 +317,108 @@ async def test_restored_history_is_rendered(tmp_roan):
         assert "hersteld" in rendered
         sources = " ".join(str(w.source) for w in app.query("Markdown"))
         assert "oud antwoord" in sources
+
+
+# ---------- slash-suggesties, zoals opencode / claude code ----------
+@pytest.mark.asyncio
+async def test_typing_slash_shows_command_suggestions(tmp_roan):
+    from textual.widgets import OptionList
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        listing = app.query_one("#slash", OptionList)
+        assert not listing.has_class("visible")
+
+        await pilot.press(*"/cl")
+        await pilot.pause()
+        assert listing.has_class("visible")
+        assert listing.option_count == 1
+        assert listing.get_option_at_index(0).id == "clear"
+
+        # Een spatie betekent: commando gekozen, niet meer aanvullen.
+        await pilot.press("space")
+        await pilot.pause()
+        assert not listing.has_class("visible")
+
+
+@pytest.mark.asyncio
+async def test_tab_completes_the_command_without_losing_focus(tmp_roan):
+    from textual.widgets import OptionList
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press(*"/cl")
+        await pilot.pause()
+        await pilot.press("tab")
+        await pilot.pause()
+        assert app.query_one("#input").value == "/clear"
+        assert app.focused.id == "input", "tab mag de focus niet weggeven"
+
+
+@pytest.mark.asyncio
+async def test_enter_runs_a_fully_typed_command(tmp_roan):
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press(*"/clear", "enter")
+        await pilot.pause()
+        # /clear is uitgevoerd, niet alleen aangevuld.
+        assert app.query_one("#input").value == ""
+        from textual.widgets import OptionList
+
+        assert not app.query_one("#slash", OptionList).has_class("visible")
+
+
+@pytest.mark.asyncio
+async def test_close_button_sits_top_right(tmp_roan):
+    """De ✕ hoort rechtsboven; `position: absolute` haalt hem uit de flow."""
+    from textual.widgets import Button
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(90, 30)) as pilot:
+        await pilot.pause()
+        btn = app.query_one("#app-close", Button)
+        assert btn.region.y == 0
+        assert btn.region.x + btn.region.width >= 90 - 6
+
+
+@pytest.mark.asyncio
+async def test_avatar_uses_our_renderer_when_not_a_graphics_protocol(tmp_roan):
+    """Zonder sixel/TGP tekenen wij de avatar zelf.
+
+    De halfcell-renderable van textual_image zet doorzichtige pixels op wit, dus
+    dan zou de avatar als een witte vlak in het chatvenster staan.
+    """
+    from textual.widgets import Static
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(90, 30)) as pilot:
+        await pilot.pause()
+        avatar = app.query_one("#avatar")
+        assert isinstance(avatar, Static), type(avatar).__name__
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("size", [(60, 26), (100, 50), (80, 24)])
+async def test_avatar_rows_do_not_wrap(tmp_roan, size):
+    """Regression: de avatar stond te klein en elke regel liep door.
+
+    #avatar had horizontale padding, terwijl _size_avatar de breedte op het
+    aantal kolommen van de tekst zet. De bruikbare breedte was daardoor vier
+    tekenen kleiner dan de tekst en Rich wrapte elke regel in 12 + 4, wat
+    eruitzag als losse streepjes tussen de regels door.
+    """
+    from roan.photo import fitted_cells
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=size) as pilot:
+        await pilot.pause()
+        avatar = app.query_one("#avatar")
+        cols, rows = fitted_cells(avatar_path(), 26, max_rows=app._avatar_rows())
+        # Als de tekst niet past in de widget, breekt Rich elke regel af.
+        assert avatar.content_size.width >= cols, (
+            f"avatar {avatar.content_size} past {cols} kolommen niet"
+        )
+        assert avatar.content_size.height >= rows

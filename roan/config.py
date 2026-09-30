@@ -35,7 +35,7 @@ DEFAULT_CONFIG = {
     "api_key": None,          # overschrijft de preset-key indien ingesteld
     "model": "local-model",
     "language": "nl",         # "nl" of "en"
-    "theme": "mocha",         # latte | frappe | macchiato | mocha
+    "theme": "mocha",         # zie roan/themes.py (THEME_NAMES)
     "endpoints": [],          # eigen OpenAI-compatibele endpoints (Custom)
     "tui": None,              # "fullscreen" | "default" | None (nog niet gekozen)
     "tui_prompts": 0,         # hoe vaak de fullscreen-dialoog is getoond
@@ -43,7 +43,38 @@ DEFAULT_CONFIG = {
     "tui_fails": 0,           # mislukte fullscreen-starts
     "scroll_speed": 1,        # muiswiel-vermenigvuldiger
     "auto_follow": True,      # automatisch naar beneden scrollen
+    "headers": {},            # extra HTTP-headers voor elke aanvraag
 }
+
+# Providers die een sessie-header eisen. OpenCode Go en Zen routen op een
+# stabiele sessie-id; zonder die header geeft een deel van de modellen een
+# 400 "Model is unavailable". models.dev kent geen headers-veld, dus dit is
+# kennis die hier hoort en niet daar.
+SESSION_HEADER_PROVIDERS = {
+    "opencode": "x-opencode-session",
+    "opencode-go": "x-opencode-session",
+    "opencode-zen": "x-opencode-session",
+}
+
+
+def request_headers(provider: str, session_id: str = "", config: dict | None = None) -> dict:
+    """Headers voor een aanvraag: sessie-header plus wat de gebruiker zette.
+
+    De sessie-header gaat er eerst in, daarna overschrijft de configuratie hem
+    — wie het expliciet instelt, wint.
+    """
+    cfg = config if config is not None else load_config()
+    headers: dict[str, str] = {}
+    field = SESSION_HEADER_PROVIDERS.get(str(provider or "").lower())
+    if field and session_id:
+        headers[field] = str(session_id)
+        headers["x-opencode-client"] = "roan"
+    for key, value in (cfg.get("headers") or {}).items():
+        if value is None:
+            headers.pop(str(key), None)
+        else:
+            headers[str(key)] = str(value)
+    return headers
 
 RENDERERS = ("fullscreen", "default")
 

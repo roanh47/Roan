@@ -1,9 +1,25 @@
+import os
 import sys
 
 HELP_COMMANDS = ("help", "--help", "-h")
 
 
+def _force_truecolor() -> None:
+    """Zet truecolor aan vóór Textual geladen wordt.
+
+    Catppuccin bestaat uit heel donkere, heel precieze kleuren. terminals die
+    geen COLORTERM zetten (Termius onder meer) laten Textual terugvallen op de
+    256-kleurenpalet, en dan quantiseert hij #181825 naar #000000 en #313244
+    naar #5F5F5F — dus geen Catppuccin meer. Wij zetten het daarom zelf,
+    tenzij de gebruiker het expliciet heeft ingesteld.
+    """
+    os.environ.setdefault("COLORTERM", "truecolor")
+    os.environ.setdefault("TEXTUAL_COLOR_SYSTEM", "truecolor")
+
+
 def main() -> None:
+    _force_truecolor()
+
     from .home import ensure_home
     from .i18n import init_from_config, t
 

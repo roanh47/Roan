@@ -2,7 +2,9 @@
 okf_version: "0.2"
 ---
 
-# Roan — knowledge bundle
+# Roan
+
+Project board: https://github.com/users/roanh47/projects/4 — knowledge bundle
 
 The repository **is** the bundle. This file is its table of contents, and the
 concepts live next to the code they describe: the harness in [`roan/`](roan/index.md),

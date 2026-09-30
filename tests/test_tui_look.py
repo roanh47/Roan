@@ -335,3 +335,31 @@ def test_theme_bullets_use_each_flavour_pink(roan_cfg):
     for name, pink in PINK.items():
         label = Text.from_markup(f"[{pink}]●[/] {name}")
         assert str(label.spans[0].style).lower() == pink.lower()
+
+
+@pytest.mark.asyncio
+async def test_typed_input_text_is_actually_rendered(roan_cfg):
+    """Regression: het rand van #input vond de generieke `Input { height: 1 }`.
+
+    Daardoor was de content-hoogte 0 en getypte tekst verscheen nooit, hoe goed
+    de `color` ook was. De rand (2) + 1 tekstregel moet op height 3 uitkomen.
+    """
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        inp = app.query_one("#input")
+        inp.focus()
+        await pilot.pause()
+        await pilot.press(*"hello")
+        await pilot.pause()
+
+        assert inp.value == "hello"
+        # Er moet minimaal een regel tekstruimte overblijven binnen de rand.
+        assert inp.content_region.height >= 1, (
+            f"content-hoogte is {inp.content_region.height}; "
+            "getypte tekst kan dan niet getekend worden"
+        )
+        # En de tekst moet daadwerkelijk in de buffer staan.
+        strips = app.screen._compositor.render_strips()
+        row = "".join(seg.text for seg in strips[inp.content_region.y])
+        assert "hello" in row, f"tekst niet gerenderd, rij was: {row!r}"

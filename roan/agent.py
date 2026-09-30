@@ -9,6 +9,7 @@ from pathlib import Path
 from openai import OpenAI
 
 from .config import ROAN_DIR, load_config, load_instructions
+from .config import request_headers
 from .memory import load_memory, remember
 from .mcp import MCPManager
 from . import tools as T
@@ -208,7 +209,11 @@ class Agent:
         cfg = load_config()
         self.model = cfg["model"]
         self.provider = cfg["provider"]
-        self.client = OpenAI(base_url=cfg["base_url"], api_key=cfg["api_key"] or "sk-none")
+        self.client = OpenAI(
+            base_url=cfg["base_url"],
+            api_key=cfg["api_key"] or "sk-none",
+            default_headers=request_headers(self.provider, self.session_id, cfg),
+        )
 
     # ---------- sessies ----------
     @property

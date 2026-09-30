@@ -1,5 +1,6 @@
 """Tests voor de CLI-dispatch en de plain-text chat-modus."""
 
+import os
 import sys
 
 import pytest
@@ -83,3 +84,24 @@ def test_repl_onboarding_without_config(tmp_roan, monkeypatch, capsys):
     repl_mod.run_repl()
     out = capsys.readouterr().out
     assert "Roan init" in out
+
+
+def test_truecolor_is_forced_before_textual_loads(monkeypatch):
+    """Regression: zonder dit vielen de Catppuccin-kleuren terug op 256 kleuren.
+
+    Termius zet geen COLORTERM, waardoor Textual #181825 naar #000000 en
+    #313244 naar #5F5F5F kwantiseerde. _force_truecolor draait vóór de eerste
+    `import textual`, dus dit moet in cli.py bij het begin van main().
+    """
+    from roan.cli import _force_truecolor
+
+    monkeypatch.delenv("COLORTERM", raising=False)
+    monkeypatch.delenv("TEXTUAL_COLOR_SYSTEM", raising=False)
+    _force_truecolor()
+    assert os.environ["COLORTERM"] == "truecolor"
+    assert os.environ["TEXTUAL_COLOR_SYSTEM"] == "truecolor"
+
+    # Een expliciete keuze van de gebruiker mag niet overschreven worden.
+    monkeypatch.setenv("TEXTUAL_COLOR_SYSTEM", "256")
+    _force_truecolor()
+    assert os.environ["TEXTUAL_COLOR_SYSTEM"] == "256"

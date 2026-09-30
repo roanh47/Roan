@@ -14,6 +14,8 @@ sources:
     title: .github/workflows/publish.yml
 ---
 
+Project board: https://github.com/users/roanh47/projects/4
+
 # Branches
 
 Two branches, and only two:

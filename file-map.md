@@ -18,26 +18,26 @@ sources:
 |---|---|
 | `roan/__init__.py` | 1 |
 | `roan/__main__.py` | 3 |
-| `roan/agent.py` | 422 |
+| `roan/agent.py` | 427 |
 | `roan/channels/__init__.py` | 5 |
 | `roan/channels/base.py` | 28 |
 | `roan/channels/telegram.py` | 212 |
 | `roan/cli.py` | 77 |
-| `roan/commands.py` | 55 |
-| `roan/config.py` | 199 |
+| `roan/commands.py` | 61 |
+| `roan/config.py` | 230 |
 | `roan/cron.py` | 149 |
 | `roan/home.py` | 95 |
-| `roan/i18n.py` | 543 |
+| `roan/i18n.py` | 551 |
 | `roan/init_cmd.py` | 46 |
 | `roan/mcp.py` | 202 |
 | `roan/memory.py` | 27 |
 | `roan/models.py` | 277 |
-| `roan/photo.py` | 48 |
+| `roan/photo.py` | 89 |
 | `roan/repl.py` | 66 |
 | `roan/skills.py` | 101 |
-| `roan/themes.py` | 132 |
+| `roan/themes.py` | 119 |
 | `roan/tools.py` | 156 |
-| `roan/tui.py` | 1750 |
+| `roan/tui.py` | 1966 |
 | `roan/update.py` | 63 |
 
 # Root and tests
@@ -45,7 +45,7 @@ sources:
 | File | Lines |
 |---|---|
 | `pyproject.toml` | 34 |
-| `README.md` | 320 |
+| `README.md` | 324 |
 | `tests/fake_mcp_server.py` | 57 |
 | `tests/generate_file_map.py` | 84 |
 | `tests/project_board.py` | 204 |
@@ -57,16 +57,17 @@ sources:
 | `tests/test_mcp.py` | 71 |
 | `tests/test_models_free.py` | 224 |
 | `tests/test_okf_bundle.py` | 145 |
+| `tests/test_photo.py` | 71 |
 | `tests/test_providers.py` | 367 |
 | `tests/test_roan.py` | 168 |
 | `tests/test_search.py` | 313 |
 | `tests/test_setup_required.py` | 183 |
 | `tests/test_telegram.py` | 158 |
-| `tests/test_themes.py` | 216 |
+| `tests/test_themes.py` | 218 |
 | `tests/test_tui.py` | 307 |
 | `tests/test_tui_close.py` | 201 |
 | `tests/test_tui_fullscreen.py` | 349 |
-| `tests/test_tui_look.py` | 337 |
+| `tests/test_tui_look.py` | 365 |
 | `tests/validate_okf.py` | 166 |
 
 # Where to look for what
@@ -85,7 +86,7 @@ sources:
 | MCP | `roan/mcp.py` |
 | Entry points and subcommands | `roan/cli.py` |
 
-The package is 4657 lines of Python in total. `roan/tui.py` is
+The package is 4951 lines of Python in total. `roan/tui.py` is
 the biggest file by far and holds every screen; that is deliberate - see
 [one shared popup style](roan/shared-popup-style.md) - but it is the file to
 split first if it gets unwieldy.

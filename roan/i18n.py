@@ -16,6 +16,7 @@ STRINGS: dict[str, dict[str, str]] = {
         # app
         "app_subtitle": "je agent harness",
         "input_placeholder": "Bericht aan Roan…  (/help)",
+        "hint_commands": "ctrl+p commands",
         "ready": "Klaar — {model} via {provider}",
         "status_session": "sessie",
         "status_key_set": "key ingesteld",
@@ -37,7 +38,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "models_title": "Modellen",
         "models_free": "Gratis",
         "models_paid": "Betaald",
-        "models_custom": "Deze provider",
+        "models_custom": "Deze provider ({provider})",
         "models_all_providers": "alle providers",
         "search_hint": "Zoeken…",
         "search_no_results": "Geen resultaten",
@@ -75,6 +76,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "btn_choose": "Kies",
         "btn_back": "Terug",
         "models_hint": "{n} modellen  ·  Enter = kiezen  ·  Esc = terug",
+        "commands_title": "Commando's",
+        "commands_hint": "{n} commando's  ·  Enter = uitvoeren  ·  ↑↓ = kiezen  ·  Esc = terug",
+        "cmd_commands": "Alle commando's",
         "provider_plan": "abonnement",
         "provider_plan_note": (
             "{provider} is een abonnement (vast bedrag per maand), geen gratis provider. "
@@ -89,7 +93,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "cmd_clear": "Leeg het gesprek",
         "cmd_theme": "Wissel thema",
         "cmd_model": "Zet of toon het actieve model",
-        "cmd_models": "Model-browser: gratis / betaald / deze provider",
+        "cmd_models": "Model-browser: gratis / betaald / {provider}",
         "cmd_free": "Lijst 100% gratis modellen",
         "cmd_provider": "Zet of toon de provider",
         "cmd_setup": "Open het setup-scherm",
@@ -131,7 +135,7 @@ STRINGS: dict[str, dict[str, str]] = {
             "/new — nieuw gesprek\n"
             "/clear — zelfde als /new\n"
             "/model <naam> — model kiezen\n"
-            "/models — modellen van de provider\n"
+            "/models — model-browser en provideroverzicht\n"
             "/free — 100% gratis modellen\n"
             "/provider <naam> — provider kiezen\n"
             "/language <nl|en> — taal wisselen\n"
@@ -186,6 +190,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "en": {
         "app_subtitle": "your agent harness",
         "input_placeholder": "Message Roan…  (/help)",
+        "hint_commands": "ctrl+p commands",
         "ready": "Ready — {model} via {provider}",
         "status_session": "session",
         "status_key_set": "key set",
@@ -205,7 +210,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "models_title": "Models",
         "models_free": "Free",
         "models_paid": "Paid",
-        "models_custom": "This provider",
+        "models_custom": "This provider ({provider})",
         "models_all_providers": "all providers",
         "search_hint": "Search…",
         "search_no_results": "No results",
@@ -221,7 +226,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "cmd_clear": "Clear the conversation",
         "cmd_theme": "Switch theme",
         "cmd_model": "Set or show the active model",
-        "cmd_models": "Model browser: free / paid / this provider",
+        "cmd_models": "Model browser: free / paid / {provider}",
         "cmd_free": "List 100% free models",
         "cmd_provider": "Set or show the provider",
         "cmd_setup": "Open the setup screen",
@@ -296,6 +301,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "btn_choose": "Choose",
         "btn_back": "Back",
         "models_hint": "{n} models  ·  Enter = pick  ·  Esc = back",
+        "commands_title": "Commands",
+        "commands_hint": "{n} commands  ·  Enter = run  ·  ↑↓ = select  ·  Esc = back",
+        "cmd_commands": "All commands",
         "provider_plan": "subscription",
         "provider_plan_note": (
             "{provider} is a subscription (flat monthly fee), not a free provider. "

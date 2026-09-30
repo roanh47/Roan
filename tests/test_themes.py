@@ -38,6 +38,8 @@ def roan_cfg(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "LOGS_DIR", tmp_path / "logs")
     monkeypatch.setattr(config, "CACHE_DIR", tmp_path / "cache")
     monkeypatch.setattr(config, "PLANS_DIR", tmp_path / "plans")
+    if config.CONFIG_PATH.exists():
+        config.CONFIG_PATH.unlink()
     config.save_config({"provider": "lmstudio", "model": "m", "tui": "default"})
     from roan import i18n
 

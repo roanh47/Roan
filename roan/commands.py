@@ -19,8 +19,9 @@ class Command:
 
 COMMANDS: dict[str, Command] = {
     "help": Command("help", "cmd_help"),
+    "commands": Command("commands", "cmd_commands"),
     "clear": Command("clear", "cmd_clear"),
-    "theme": Command("theme", "cmd_theme", "/theme <mocha|macchiato|frappe|latte>"),
+    "theme": Command("theme", "cmd_theme", "/theme <naam>"),
     "model": Command("model", "cmd_model", "/model <naam>"),
     "models": Command("models", "cmd_models"),
     "free": Command("free", "cmd_free"),
@@ -46,10 +47,15 @@ def names() -> list[str]:
 
 
 def help_text() -> str:
+    # De providernaam meesturen, zodat een beschrijving als "{provider}" de
+    # echte naam laat zien in plaats van een vaag "deze provider".
+    from .config import load_config
+
+    provider = str(load_config().get("provider") or "")
     lines = [f"**{t('help_title')}**", ""]
     for name in names():
         cmd = COMMANDS[name]
         usage = f" `{cmd.usage}`" if cmd.usage else ""
-        lines.append(f"- **/{name}**{usage} — {t(cmd.description)}")
+        lines.append(f"- **/{name}**{usage} — {t(cmd.description, provider=provider)}")
     lines += ["", f"_{t('help_languages')}_"]
     return "\n".join(lines)

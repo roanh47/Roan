@@ -14,6 +14,8 @@ sources:
     title: architecture.md
 ---
 
+Project board: https://github.com/users/roanh47/projects/4
+
 # How to read this
 
 This file is the **why**: what the idea is, what problem it solves, and what it

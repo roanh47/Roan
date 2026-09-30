@@ -318,3 +318,7 @@ break.
 Working: the agentic loop with tools, streaming, sessions, memory, skills, cron,
 the MCP client, the Telegram channel and the fullscreen Catppuccin TUI. Next:
 more channels, a web UI.
+
+## Project board
+
+Track what is being worked on: https://github.com/users/roanh47/projects/4

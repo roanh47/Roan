@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 from pathlib import Path
 
 from textual import on, work
@@ -20,11 +21,11 @@ from textual.widgets import (
 from textual.widgets.option_list import Option
 
 try:
-    from textual_image.widget import Image as _HDImage
+    from textual_image import widget as _image_widget
 
     _HAS_HD = True
 except Exception:
-    _HDImage = None
+    _image_widget = None
     _HAS_HD = False
 
 from . import commands
@@ -52,14 +53,15 @@ from .models import (
     LOCAL_IDS,
 )
 from .i18n import provider_desc, t
-from .photo import render_photo
+from .photo import fitted_cells, render_photo
 from .themes import (
     DEFAULT_THEME,
-    PINK,
+    LABELS,
     THEME_BY_NAME,
     THEME_NAMES,
     THEMES,
     accent_color,
+    accent_of,
     is_valid,
     set_current,
 )
@@ -67,6 +69,54 @@ from .themes import (
 BUNDLED_AVATAR = Path(__file__).parent / "assets" / "avatar.png"
 
 CLOSE_GLYPH = "✕"
+
+
+IMAGE_MODES = ("auto", "sixel", "tgp", "halfcell", "unicode")
+
+
+def _image_widget_class(mode: str | None = None):
+    """Kies de renderroutine voor de avatar.
+
+    textual_image kiest zelf op basis van een probe: die stelt een vraag naar
+    sixel/TGP en *vertrouwt* het antwoord van de terminal. Een terminal die het
+    protocol wél tekent maar het niet aankondigt (Termius doet dat) valt daardoor
+    terug op halve blokjes in plaats van een echt beeld. Daarom kun je het zelf
+    overstemmen met ROAN_IMAGE=sixel/tgp/halfcell of de configkey `image`.
+    """
+    if _image_widget is None:
+        return None
+    mode = (mode or os.environ.get("ROAN_IMAGE") or "").strip().lower()
+    if not mode:
+        try:
+            mode = str(load_config().get("image") or "auto").strip().lower()
+        except Exception:
+            mode = "auto"
+    if mode == "sixel":
+        return _image_widget.SixelImage
+    if mode == "tgp":
+        return getattr(_image_widget, "TGPImage", None) or _image_widget.Image
+    if mode == "halfcell":
+        return _image_widget.HalfcellImage
+    if mode == "unicode":
+        return _image_widget.UnicodeImage
+    return _image_widget.Image
+
+
+def _image_is_graphical(mode: str | None = None) -> bool:
+    """Tekent de gekozen route echt een beeld (sixel/TGP), of valt hij terug?
+
+    Dit onderscheid is belangrijk: de halfcell-renderable van textual_image
+    negeert het alfakanaal en tekent doorzichtige pixels als wit. Op die
+    manier staat je avatar dan als een witte vlak in het chatvenster. Bij die
+    valback tekenen we het zelf, op de thema-achtergrond, zodat de marge
+    wegvalt in de terminal.
+    """
+    widget = _image_widget_class(mode)
+    if widget is None:
+        return False
+    renderable = getattr(widget, "_Renderable", None)
+    module = getattr(renderable, "__module__", "")
+    return module.endswith("sixel") or module.endswith("tgp")
 
 
 def _titlebar(title: str, close_id: str | None = "close"):
@@ -77,8 +127,9 @@ def _titlebar(title: str, close_id: str | None = "close"):
             yield Button(CLOSE_GLYPH, id=close_id, classes="close")
 
 
-# Opmaak die alle popups delen, zodat setup/provider/modellen/thema er hetzelfde
-# uitzien: één Catppuccin-rand, vlakken in drie treden, pink als enige accent.
+# Opmaak die alle popups delen, zodat setup/provider/modellen/thema/commando's
+# er hetzelfde uitzien: één rand uit het thema, vlakken in drie treden en het
+# accent van het thema.
 # De buitenste Vertical van een popup krijgt de class "popup".
 POPUP_CSS = """
     .popup {
@@ -236,6 +287,14 @@ class HistoryInput(Input):
         self._idx = len(self._history)
 
     def on_key(self, event) -> None:
+        if event.key in ("tab", "shift+tab"):
+            # Tab moet hier het commando aanvullen en niet de focus verplaatsen,
+            # anders springt de focus naar de suggestielijst en doet Enter niets.
+            accept = getattr(self.app, "_accept_slash", None)
+            if accept is not None and accept(-1 if event.key == "shift+tab" else 0):
+                event.stop()
+                event.prevent_default()
+                return
         if event.key == "up":
             if not self._history:
                 return
@@ -774,7 +833,7 @@ class ModelsScreen(ModalScreen):
                     [
                         (t("models_free"), "free"),
                         (t("models_paid"), "paid"),
-                        (t("models_custom"), "custom"),
+                        (t("models_custom", provider=self._own_provider()), "custom"),
                     ],
                     value="free",
                     id="cat",
@@ -799,6 +858,10 @@ class ModelsScreen(ModalScreen):
         self._refresh_providers()
         self._rebuild()
         self.query_one("#models-list", OptionList).focus()
+
+    def _own_provider(self) -> str:
+        """De provider waar de derde categorie over gaat."""
+        return str(self.fixed_provider or load_config().get("provider") or "")
 
     def _current(self) -> list[tuple[str, str]]:
         cat = self.query_one("#cat", Select).value
@@ -881,7 +944,7 @@ class ModelsScreen(ModalScreen):
 
 
 class ThemeScreen(ModalScreen):
-    """Thema kiezen: latte / frappe / macchiato / mocha (allemaal Catppuccin)."""
+    """Thema kiezen: een lijst losse thema's, zoals opencode."""
 
     CSS = POPUP_CSS + """
     #theme-box {
@@ -907,9 +970,122 @@ class ThemeScreen(ModalScreen):
         current = getattr(self.app, "theme", DEFAULT_THEME)
         for name in THEME_NAMES:
             bullet = "●" if name == current else "○"
-            label = Text.from_markup(f"[{PINK[name]}]{bullet}[/] {name}")
+            # De stip in de eigen accentkleur, zodat je de thema's uit elkaar houdt.
+            label = Text.from_markup(
+                f"[{accent_of(name)}]{bullet}[/] {name}  [dim]{LABELS.get(name, '')}[/]"
+            )
             listing.add_option(Option(label, id=name))
         listing.focus()
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        if event.option_id:
+            self.dismiss(str(event.option_id))
+
+    @on(Button.Pressed)
+    def _on_button(self, event: Button.Pressed) -> None:
+        if event.button.id == "close":
+            self.dismiss(None)
+
+
+class CommandScreen(ModalScreen):
+    """Commandopalette: alles wat met / kan, doorzoekbaar. Zoals opencode's ctrl+p."""
+
+    CSS = POPUP_CSS + """
+    #commands-box {
+        width: 84%;
+        max-width: 84;
+        height: 72%;
+    }
+    #csearch {
+        margin-top: 1;
+    }
+    #command-list {
+        height: 1fr;
+        margin-top: 1;
+    }
+    """
+
+    # Boven/onder verplaatsen de selectie in de lijst in plaats van de cursor:
+    # dit is een palette, je typt om te zoeken en Enter voert uit.
+    BINDINGS = [
+        ("escape", "escape_pressed", "terug"),
+        ("down", "move(1)", ""),
+        ("up", "move(-1)", ""),
+    ]
+
+    def action_escape_pressed(self) -> None:
+        search = self.query_one("#csearch", Input)
+        if search.value:
+            search.value = ""
+            return
+        self.dismiss(None)
+
+    def action_move(self, delta: int) -> None:
+        listing = self.query_one("#command-list", OptionList)
+        count = listing.option_count
+        if not count:
+            return
+        current = listing.highlighted if listing.highlighted is not None else -1
+        listing.highlighted = max(0, min(count - 1, current + delta))
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._query = ""
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="commands-box", classes="popup"):
+            yield from _titlebar(t("commands_title"))
+            yield Input(placeholder=t("search_hint"), id="csearch")
+            yield OptionList(id="command-list")
+            yield Static(id="commands-hint", classes="hint")
+
+    def on_mount(self) -> None:
+        self._rebuild()
+        self.query_one("#csearch", Input).focus()
+
+    def _visible(self) -> list[tuple[str, commands.Command]]:
+        items = [(name, commands.COMMANDS[name]) for name in commands.names()]
+        if self._query:
+            q = self._query.casefold().lstrip("/")
+            items = [
+                (name, cmd)
+                for name, cmd in items
+                if q in name.casefold() or q in t(cmd.description).casefold()
+            ]
+        return items
+
+    def _rebuild(self) -> None:
+        listing = self.query_one("#command-list", OptionList)
+        listing.clear_options()
+        items = self._visible()
+        if not items:
+            listing.add_option(Option(t("search_no_results"), id=None, disabled=True))
+        else:
+            for name, cmd in items:
+                usage = f"  {cmd.usage}" if cmd.usage else ""
+                listing.add_option(Option(f"/{name}{usage}  ·  {t(cmd.description)}", id=name))
+            listing.highlighted = 0
+        self.query_one("#commands-hint", Static).update(t("commands_hint", n=len(items)))
+
+    def _pick_highlighted(self) -> None:
+        listing = self.query_one("#command-list", OptionList)
+        if listing.highlighted is not None and listing.option_count:
+            option = listing.get_option_at_index(listing.highlighted)
+            if option.id:
+                self.dismiss(str(option.id))
+                return
+        items = self._visible()
+        if items:
+            self.dismiss(items[0][0])
+
+    @on(Input.Changed, "#csearch")
+    def _on_search(self, event: Input.Changed) -> None:
+        self._query = event.value.strip()
+        self._rebuild()
+
+    @on(Input.Submitted, "#csearch")
+    def _on_submitted(self) -> None:
+        self._pick_highlighted()
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if event.option_id:
@@ -1102,6 +1278,7 @@ class RoanApp(App):
     BINDINGS = [
         Binding("ctrl+c", "quit_app", "quit", priority=True),
         Binding("ctrl+q", "quit_app", "quit"),
+        ("ctrl+p", "commands", "commando's"),
         ("ctrl+l", "clear_chat", "clear"),
         ("ctrl+n", "new_session", "nieuw"),
         ("f2", "setup", "setup"),
@@ -1113,33 +1290,16 @@ class RoanApp(App):
     ]
 
     CSS = """
+    /*GEEN horizontale padding: _size_avatar zet de breedte gelijk aan het aantal
+       kolommen van de tekst, dus padding zou de bruikbare breedte verkleinen en
+       elke regel op de volgende regel laten doorlopen (Rich wrapt dan).*/
     #avatar {
-        width: 25%;
+        width: 28;
         height: auto;
+        padding: 0;
     }
-    #messages {
-        height: 1fr;
-        padding: 1 2;
-    }
-    #status {
-        dock: bottom;
-        height: 1;
-        background: $panel;
-        color: $text-muted;
-        padding: 0 2;
-    }
-    #jump {
-        dock: bottom;
-        height: 1;
-        background: $accent;
-        color: $background;
-        text-align: right;
-        padding: 0 2;
-    }
-    #input {
-        dock: bottom;
-        margin: 1 2;
-    }
+    /* De titelbalk en de ✕ gelden voor álle schermen in de app, ook voor de
+       popups: die leunen op deze regels, dus niet per scherm herhalen. */
     .title {
         color: $accent;
         text-style: bold;
@@ -1161,16 +1321,113 @@ class RoanApp(App):
         content-align: center middle;
         padding: 0;
     }
+    /* Rechtsboven zweven boven het chatvlak: `position: absolute` haalt de
+       knop uit de flow, zodat hij geen rij kost. De offset zet 'm op de
+       rechterrand (zie _place_close). */
+    #app-close {
+        position: absolute;
+        layer: overlay;
+        background: transparent;
+    }
     .close:hover,
     .close:focus {
         background: $error;
         color: $background;
     }
-    /* ---------- Catppuccin-vlakken in plaats van kaders ---------- */
+    /* indicator dat er nieuwe berichten onderaan staan */
+    #jump {
+        height: 1;
+        margin: 0 2;
+        background: $accent;
+        color: $background;
+        text-align: right;
+        padding: 0 2;
+    }
+    /* slash-suggesties boven de input, alleen zichtbaar tijdens het typen */
+    #slash {
+        display: none;
+        height: auto;
+        max-height: 10;
+        margin: 0 2;
+        border: round $border;
+        background: $panel;
+    }
+    #slash.visible {
+        display: block;
+    }
+    #slash > .option-list--option {
+        padding: 0 1;
+    }
+    #slash > .option-list--option-highlighted {
+        background: $accent;
+        color: $background;
+        text-style: bold;
+    }
+    #footer {
+        dock: bottom;
+        height: auto;
+    }
+    #messages {
+        height: 1fr;
+        padding: 0 2;
+    }
+    #status-bar {
+        height: 1;
+        background: transparent;
+        padding: 0 2;
+    }
+    /* Kader om de input, met de ╹ als linkerbovenhoek — zoals opencode.
+       Hoogte 3 = 2 randen + 1 tekstregel; bij height 1 blijft de content-hoogte
+       0 en is getypte tekst onzichtbaar. */
+    #prompt-row {
+        height: 3;
+        margin: 0 2;
+        border: round $border;
+        background: transparent;
+    }
+    #prompt-row:focus-within {
+        border: round $accent;
+        background: transparent;
+    }
+    #prompt-mark {
+        width: 1;
+        height: 1;
+        color: $accent;
+        text-style: bold;
+    }
+    #input {
+        width: 1fr;
+        height: 1;
+        background: transparent;
+        border: none;
+        padding: 0 1;
+    }
+    #status {
+        width: 1fr;
+        height: 1;
+        color: $text-muted;
+    }
+    #status-hints {
+        width: auto;
+        height: 1;
+        color: $text-muted;
+    }
+    Input#input {
+        color: $foreground;
+        background: $surface;
+    }
+    Input#input:focus {
+        color: $foreground;
+        background: $surface;
+    }
+    Input#input .input--placeholder {
+        color: $text-muted;
+    }
     Screen {
         background: $background;
     }
     ModalScreen {
+        align: center middle;
         background: $background 70%;
     }
     Input,
@@ -1179,7 +1436,6 @@ class RoanApp(App):
     Button {
         border: none;
     }
-    /* velden en knoppen één trede lichter dan het popup-vlak, zodat je ze ziet */
     Input {
         height: 1;
         background: $panel;
@@ -1268,30 +1524,94 @@ class RoanApp(App):
             return str(BUNDLED_AVATAR)
         return None
 
-    def _photo_width(self) -> int:
-        width = self.size.width or 80
-        if width < 40:
-            return max(6, width - 6)
-        return max(12, width // 4)
-
     # ---------- layout ----------
     def compose(self) -> ComposeResult:
         avatar = self._resolve_avatar()
         if avatar:
-            if _HAS_HD:
-                yield _HDImage(avatar, id="avatar")
+            # Alleen bij een echt beeldprotocol (sixel/TGP) nemen we de widget
+            # van textual_image; die zet doorzichtige pixels anders op wit.
+            if _HAS_HD and _image_is_graphical():
+                yield _image_widget_class()(avatar, id="avatar")
             else:
-                yield Static(render_photo(avatar, width=self._photo_width()))
-        with Horizontal(classes="titlebar"):
-            yield Static(f"Roan — {t('app_subtitle')}", classes="title")
-            yield Button(CLOSE_GLYPH, id="app-close", classes="close")
+                yield Static(
+                    render_photo(
+                        avatar,
+                        width=26,
+                        max_height=self._avatar_rows(),
+                        bg=self._theme_bg(),
+                    ),
+                    id="avatar",
+                )
         yield Messages(id="messages")
-        yield Static(id="jump")
-        yield Static(id="status")
-        yield HistoryInput(placeholder=t("input_placeholder"), id="input")
+        # Vastgezet aan de onderkant als één blok, anders landen de status en
+        # het invoerveld allebei op dezelfde rij en schrijven ze over elkaar.
+        with Vertical(id="footer"):
+            yield Static(id="jump")
+            # Slash-suggesties, verscholen tot je "/" typt (zoals opencode).
+            yield OptionList(id="slash")
+            # Input als kader met een ╹ links, zoals opencode.
+            with Horizontal(id="prompt-row"):
+                yield Static("╹", id="prompt-mark")
+                yield HistoryInput(placeholder=t("input_placeholder"), id="input")
+            # Onderste balk: model links, toetsen rechts.
+            with Horizontal(id="status-bar"):
+                yield Static(id="status")
+                yield Static(t("hint_commands"), id="status-hints")
+        # Rechtsboven, zwevend boven het chatvlak: kost geen extra rij en de
+        # ✕ staat waar je verwacht, linksbovenin een terminal.
+        yield Button(CLOSE_GLYPH, id="app-close", classes="close")
+
+    def _theme_bg(self) -> tuple[int, int, int]:
+        """RGB van de thema-achtergrond, om de avatar-op en tekenen.
+
+        Zonder dit blijft een doorzichtige PNG op een eigen donkere kleur
+        staan en zie je een rechthoek waar de terminal doorheen schijnt.
+        """
+        theme = THEME_BY_NAME.get(getattr(self, "theme", DEFAULT_THEME), THEME_BY_NAME[DEFAULT_THEME])
+        value = str(getattr(theme, "background", "") or "").lstrip("#")
+        if len(value) == 6:
+            try:
+                return (int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16))
+            except ValueError:
+                pass
+        return (24, 24, 37)
+
+    def _avatar_rows(self) -> int:
+        """Hoeveel rijen de avatar mag krijgen, afhankelijk van het scherm."""
+        return max(6, min(18, (self.size.height or 24) // 3))
+
+    def _size_avatar(self) -> None:
+        """Zet de avatar op het aantal cellen dat zijn verhouding respecteert.
+
+        Een portret dat in een te korte widget wordt gezet, wordt uitgerekt; het
+        widget krijgt daarom expliciet de cellen die bij de afbeelding horen.
+        fitted_cells rekent met dezelfde verhouding als render_photo, anders
+        snappen we het plaatje af.
+        """
+        nodes = self.query("#avatar")
+        if not nodes:
+            return
+        path = self._resolve_avatar()
+        if not path:
+            return
+        cols, rows = fitted_cells(path, 26, max_rows=self._avatar_rows())
+        node = nodes.first()
+        node.styles.width = cols
+        node.styles.height = rows
+
+    def _place_close(self) -> None:
+        """Zet de ✕ op de rechterrand; `position: absolute` kent geen 'right'."""
+        for node in self.query("#app-close"):
+            node.styles.offset = (max(0, (self.size.width or 80) - 7), 0)
+
+    def on_resize(self) -> None:
+        self._place_close()
+        self._size_avatar()
 
     def on_mount(self) -> None:
         self.query_one("#input", Input).focus()
+        self._size_avatar()
+        self._place_close()
         self._update_status()
         self._render_history()
         if not is_configured():
@@ -1359,6 +1679,10 @@ class RoanApp(App):
         else:
             jump.display = False
 
+    @on(Click, "#jump")
+    def _jump_clicked(self) -> None:
+        self.action_scroll_bottom()
+
     # ---------- commands ----------
     def _run_command(self, raw: str) -> bool:
         parts = raw[1:].split()
@@ -1420,9 +1744,24 @@ class RoanApp(App):
         if name == "setup":
             self._cmd_setup()
             return True
+        if name == "commands":
+            self._cmd_commands()
+            return True
 
         self._sysline(t("msg_unknown_cmd", name=name))
         return True
+
+    def action_commands(self) -> None:
+        self._cmd_commands()
+
+    def _cmd_commands(self) -> None:
+        """Commandopalette; het gekozen commando gaat gewoon door _run_command."""
+
+        def picked(name) -> None:
+            if name:
+                self._run_command(f"/{name}")
+
+        self.push_screen(CommandScreen(), picked)
 
     def _cmd_free(self) -> None:
         self._sysline(t("models_fetching"))
@@ -1639,10 +1978,6 @@ class RoanApp(App):
     def action_page_down(self) -> None:
         self._messages().scroll_page_down(animate=False)
 
-    @on(Click, "#jump")
-    def _jump_clicked(self) -> None:
-        self.action_scroll_bottom()
-
     def action_quit_app(self) -> None:
         """Ctrl+C, Ctrl+Q of de ✕ rechtsboven."""
         self.exit()
@@ -1672,12 +2007,94 @@ class RoanApp(App):
     def _focus_input(self) -> None:
         self.query_one("#input", Input).focus()
 
+    # ---------- slash-suggesties (zoals opencode / claude code) ----------
+    def _slash_matches(self, text: str) -> list[str]:
+        """Commando's die bij een half getypte `/` horen.
+
+        Alleen zolang er nog geen spatie is: zodra er argumenten volgen is het
+        commando al gekozen en vullen we niets meer aan.
+        """
+        if not text.startswith("/") or " " in text:
+            return []
+        prefix = text[1:].casefold()
+        exact = [n for n in commands.names() if n == prefix]
+        if exact:
+            return exact
+        return [n for n in commands.names() if n.startswith(prefix)]
+
+    def _update_slash(self) -> None:
+        listing = self.query_one("#slash", OptionList)
+        matches = self._slash_matches(self.query_one("#input", Input).value)
+        listing.clear_options()
+        if not matches:
+            listing.remove_class("visible")
+            return
+        for name in matches:
+            cmd = commands.COMMANDS[name]
+            usage = f" {cmd.usage}" if cmd.usage else ""
+            listing.add_option(
+                Option(f"/{name}{usage}  ·  {t(cmd.description)}", id=name)
+            )
+        listing.highlighted = 0
+        listing.add_class("visible")
+
+    def _accept_slash(self, delta: int = 0) -> bool:
+        """Beweeg in de suggestielijst en vul het commando aan. True als er iets te doen was."""
+        listing = self.query_one("#slash", OptionList)
+        if not listing.has_class("visible") or not listing.option_count:
+            return False
+        if delta:
+            current = listing.highlighted if listing.highlighted is not None else 0
+            listing.highlighted = max(0, min(listing.option_count - 1, current + delta))
+        option = listing.get_option_at_index(listing.highlighted or 0)
+        if option is None or not option.id:
+            return False
+        return self._accept_name(str(option.id))
+
+    def _accept_name(self, name: str) -> bool:
+        """Zet de tekst in het veld op het gekozen commando."""
+        cmd = commands.COMMANDS.get(name)
+        if cmd is None:
+            return False
+        # Met een spatie erin, want het commando heeft vaak een argument nodig.
+        text = f"/{name} " if cmd.usage else f"/{name}"
+        box = self.query_one("#input", Input)
+        box.value = text
+        box.cursor_position = len(text)
+        self._update_slash()
+        return True
+
+    def _slash_incomplete(self, text: str) -> bool:
+        """Of de tekst nog een half getyped commando is.
+
+        Een volledig uitgetypt commando moet op Enter gewoon draaien; alleen een
+        afkorting zoals `/cl` vullen we aan.
+        """
+        stripped = text.strip()
+        if not stripped.startswith("/") or " " in stripped:
+            return False
+        return stripped[1:].casefold() not in commands.COMMANDS
+
+    @on(Input.Changed, "#input")
+    def _on_input_changed(self, event: Input.Changed) -> None:
+        self._update_slash()
+
+    @on(OptionList.OptionSelected, "#slash")
+    def _on_slash_picked(self, event: OptionList.OptionSelected) -> None:
+        """Een commando met de muis kiezen werkt hetzelfde als tab."""
+        if event.option_id:
+            self._accept_name(str(event.option_id))
+
     @on(Input.Submitted)
     def handle_submit(self, event: Input.Submitted) -> None:
         text = event.value.strip()
         if not text:
             return
+        # Een afkorting accepteren we; een heel commando laten we gewoon draaien.
+        if self._slash_incomplete(text) and self._accept_slash():
+            return
         event.input.value = ""
+        self.query_one("#slash", OptionList).remove_class("visible")
         if isinstance(event.input, HistoryInput):
             event.input.add_history(text)
 
