@@ -76,14 +76,28 @@ def test_openrouter_free_suffix_always_free():
     assert models.is_free_model("iets-raars", "model-x:free", {}) is True
 
 
-def test_local_providers_are_free():
-    assert models.is_free_model("lmstudio", "local-model", {"cost": {"input": 0, "output": 0}}) is True
-    assert models.is_free_model("ollama", "llama3", {"cost": {"input": 0, "output": 0}}) is True
+def test_local_servers_have_their_own_category():
+    """Lokale servers horen niet onder 'gratis' maar onder 'Lokaal'."""
+    assert models.is_free_model("lmstudio", "local-model", {"cost": {"input": 0, "output": 0}}) is False
+    assert models.is_free_model("ollama", "llama3", {"cost": {"input": 0, "output": 0}}) is False
+
+
+def test_list_local_has_default_ports():
+    local = {pid: base for pid, _name, base in models.list_local()}
+    assert local["lmstudio"] == "http://localhost:1234/v1"
+    assert local["ollama"] == "http://localhost:11434/v1"
+    assert local["vllm"] == "http://localhost:8000/v1"
+    assert local["koboldcpp"] == "http://localhost:5001/v1"
+
+
+def test_local_endpoint_lookup():
+    assert models.local_endpoint("lmstudio")["base_url"].endswith(":1234/v1")
+    assert models.local_endpoint("bestaat-niet") is None
 
 
 def test_llama_hosted_is_not_local():
     # 'llama' is Meta's hosted API, niet lokaal
-    assert "llama" not in models.LOCAL_PROVIDERS
+    assert "llama" not in models.LOCAL_IDS
 
 
 # ---------- provider-lijsten ----------
@@ -123,6 +137,17 @@ def test_list_providers_free_excludes_plans(fake_dev):
     assert "groq" in free
     assert "alibaba-coding-plan" not in free
     assert "openai" not in free
+
+
+def test_local_never_appears_in_free_or_paid(fake_dev, monkeypatch):
+    data = _fake_data()
+    data["lmstudio"] = {
+        "name": "LMStudio",
+        "models": {"lokaal": {"cost": {"input": 0, "output": 0}}},
+    }
+    monkeypatch.setattr(models, "_dev_data", lambda force=False: data)
+    assert "lmstudio" not in dict(models.list_providers("free"))
+    assert "lmstudio" not in dict(models.list_providers("paid"))
 
 
 def test_list_providers_paid_contains_plans(fake_dev):

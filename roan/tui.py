@@ -28,14 +28,26 @@ except Exception:
 
 from . import commands
 from .agent import Agent
-from .config import PROVIDER_PRESETS, ROAN_DIR, load_config, save_config
+from .config import (
+    PROVIDER_PRESETS,
+    ROAN_DIR,
+    add_endpoint,
+    get_endpoint,
+    get_endpoints,
+    load_config,
+    remove_endpoint,
+    save_config,
+)
 from .models import (
     fetch_provider_models,
     list_dev,
     list_free,
+    list_local,
     list_models,
     list_providers,
+    local_endpoint,
     provider_meta,
+    LOCAL_IDS,
 )
 from .i18n import t
 from .photo import render_photo
@@ -171,12 +183,16 @@ class SetupScreen(ModalScreen):
         def picked(result) -> None:
             if not result:
                 return
-            provider, base_url = result
+            provider = result.get("provider") or ""
+            base_url = result.get("base_url") or ""
+            api_key = result.get("api_key") or ""
             self.provider = provider
             resolved = base_url or resolve_base_url(provider)
             if resolved:
                 self.base_url = resolved
                 self.query_one("#base_url", Input).value = resolved
+            if api_key:
+                self.query_one("#api_key", Input).value = api_key
             self.query_one("#cur-provider", Static).update(self._provider_line())
 
         self.app.push_screen(ProviderScreen(), picked)
@@ -235,16 +251,20 @@ class SetupScreen(ModalScreen):
 
 
 class ProviderScreen(ModalScreen):
-    """Provider kiezen: Gratis / Betaald / Custom — live uit models.dev."""
+    """Provider kiezen: Gratis / Betaald / Lokaal / Custom.
+
+    Lokaal = servers op je eigen machine (standaard localhost-poorten).
+    Custom = je eigen OpenAI-compatibele endpoints; je kunt er meerdere bewaren.
+    """
 
     CSS = """
     ProviderScreen {
         align: center middle;
     }
     #provider-box {
-        width: 80%;
-        max-width: 110;
-        height: 80%;
+        width: 85%;
+        max-width: 120;
+        height: 85%;
         border: thick $accent;
         background: $panel;
         padding: 1 2;
@@ -258,6 +278,13 @@ class ProviderScreen(ModalScreen):
     }
     #provider-list {
         height: 1fr;
+    }
+    #provider-forms {
+        height: auto;
+    }
+    #provider-forms Label {
+        height: auto;
+        color: $text-muted;
     }
     #provider-info {
         height: auto;
@@ -279,6 +306,7 @@ class ProviderScreen(ModalScreen):
         self._chosen = ""
         self._category = category
 
+    # ---------- opbouw ----------
     def compose(self) -> ComposeResult:
         with Vertical(id="provider-box"):
             yield Static(t("provider_title"), classes="title")
@@ -287,6 +315,7 @@ class ProviderScreen(ModalScreen):
                     [
                         (t("provider_cat_free"), "free"),
                         (t("provider_cat_paid"), "paid"),
+                        (t("provider_cat_local"), "local"),
                         (t("provider_cat_custom"), "custom"),
                     ],
                     value=self._category,
@@ -294,10 +323,17 @@ class ProviderScreen(ModalScreen):
                     allow_blank=False,
                 )
             yield OptionList(id="provider-list")
-            yield Label(t("provider_base_url"))
-            yield Input(id="pbase", placeholder="https://api.example.com/v1")
+            with Vertical(id="provider-forms"):
+                yield Label(t("provider_name"), id="lbl-name")
+                yield Input(id="pname", placeholder="thuis")
+                yield Label(t("provider_base_url"), id="lbl-base")
+                yield Input(id="pbase", placeholder="https://api.example.com/v1")
+                yield Label(t("provider_key"), id="lbl-key")
+                yield Input(id="pkey", password=True, placeholder="sk-...")
             yield Static(id="provider-info")
             with Horizontal(id="provider-actions"):
+                yield Button(t("provider_add"), id="padd")
+                yield Button(t("provider_delete"), id="pdel")
                 yield Button(t("provider_back"), id="pback")
                 yield Button(t("provider_choose"), id="pchoose", variant="primary")
 
@@ -318,20 +354,51 @@ class ProviderScreen(ModalScreen):
     def _cat(self) -> str:
         return self.query_one("#pcat", Select).value
 
+    def _show(self, widget_id: str, visible: bool) -> None:
+        self.query_one(widget_id).display = visible
+
+    def _apply_visibility(self, cat: str) -> None:
+        """Per categorie andere invoervelden."""
+        custom = cat == "custom"
+        hosted = cat in ("free", "paid")
+        for widget_id in ("#lbl-name", "#pname", "#lbl-key", "#pkey"):
+            self._show(widget_id, custom)
+        for widget_id in ("#lbl-base", "#pbase"):
+            self._show(widget_id, not hosted)
+        self._show("#padd", custom)
+        self._show("#pdel", custom and bool(self._chosen))
+
     def _rebuild(self) -> None:
         cat = self._cat()
-        custom = cat == "custom"
         listing = self.query_one("#provider-list", OptionList)
-        listing.display = not custom
-        self.query_one("#pbase", Input).display = custom
-        if custom:
-            return
         listing.clear_options()
+        self._apply_visibility(cat)
+
+        if cat == "local":
+            for pid, name, base in list_local():
+                listing.add_option(Option(f"{name}  ·  {base}", id=pid))
+            return
+
+        if cat == "custom":
+            endpoints = get_endpoints()
+            if not endpoints:
+                listing.add_option(Option(t("provider_no_endpoints"), id=None, disabled=True))
+                return
+            for endpoint in endpoints:
+                listing.add_option(
+                    Option(
+                        f"{endpoint.get('name')}  ·  {endpoint.get('base_url', '')}",
+                        id=endpoint.get("name"),
+                    )
+                )
+            return
+
         for pid, name in self.providers.get(cat, []):
             meta = provider_meta(pid)
             suffix = f"  ·  {t('provider_plan')}" if meta["plan"] else ""
             listing.add_option(Option(f"{name}  ·  {pid}{suffix}", id=pid))
 
+    # ---------- selectie ----------
     @on(Select.Changed)
     def _on_cat(self, event: Select.Changed) -> None:
         if event.select.id == "pcat":
@@ -341,26 +408,95 @@ class ProviderScreen(ModalScreen):
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         self._chosen = str(event.option_id or "")
-        meta = provider_meta(self._chosen)
-        bits = []
-        if meta["plan"]:
-            bits.append("⚠ " + t("provider_plan_note", provider=meta["name"]))
-        if meta["env"]:
-            bits.append(f"{t('provider_env')}: {meta['env']}")
-        if meta["doc"]:
-            bits.append(f"{t('provider_doc')}: {meta['doc']}")
-        self.query_one("#provider-info", Static).update("\n".join(bits))
+        cat = self._cat()
+        self._show("#pdel", cat == "custom" and bool(self._chosen))
+        info = ""
+
+        if cat == "local":
+            endpoint = local_endpoint(self._chosen) or {}
+            self.query_one("#pbase", Input).value = endpoint.get("base_url", "")
+            info = t("provider_local_hint")
+        elif cat == "custom":
+            endpoint = get_endpoint(self._chosen) or {}
+            self.query_one("#pbase", Input).value = endpoint.get("base_url", "")
+            self.query_one("#pkey", Input).value = endpoint.get("api_key", "")
+        else:
+            meta = provider_meta(self._chosen)
+            bits = []
+            if meta["plan"]:
+                bits.append("! " + t("provider_plan_note", provider=meta["name"]))
+            if meta["env"]:
+                bits.append(f"{t('provider_env')}: {meta['env']}")
+            if meta["doc"]:
+                bits.append(f"{t('provider_doc')}: {meta['doc']}")
+            info = "\n".join(bits)
+
+        self.query_one("#provider-info", Static).update(info)
+
+    # ---------- eigen endpoints ----------
+    def _add_endpoint(self) -> None:
+        name = self.query_one("#pname", Input).value.strip()
+        base = self.query_one("#pbase", Input).value.strip()
+        key = self.query_one("#pkey", Input).value.strip()
+        if not name or not base:
+            self.query_one("#provider-info", Static).update(t("provider_add_hint"))
+            return
+        add_endpoint(name, base, key)
+        self._chosen = name
+        for widget_id in ("#pname", "#pbase", "#pkey"):
+            self.query_one(widget_id, Input).value = ""
+        self.query_one("#provider-info", Static).update(t("msg_endpoint_added", name=name))
+        self._rebuild()
+
+    def _delete_endpoint(self) -> None:
+        if not self._chosen:
+            return
+        removed = self._chosen
+        remove_endpoint(removed)
+        self._chosen = ""
+        self.query_one("#provider-info", Static).update(t("msg_endpoint_removed", name=removed))
+        self._rebuild()
 
     @on(Button.Pressed)
     def _on_button(self, event: Button.Pressed) -> None:
-        if event.button.id == "pback":
+        bid = event.button.id
+        if bid == "pback":
             self.dismiss(None)
             return
-        if self._cat() == "custom":
-            self.dismiss(("custom", self.query_one("#pbase", Input).value.strip()))
+        if bid == "padd":
+            self._add_endpoint()
+            return
+        if bid == "pdel":
+            self._delete_endpoint()
+            return
+        if bid == "pchoose":
+            self._choose()
+
+    def _choose(self) -> None:
+        cat = self._cat()
+        if cat == "local" and self._chosen:
+            endpoint = local_endpoint(self._chosen) or {}
+            base = self.query_one("#pbase", Input).value.strip() or endpoint.get("base_url", "")
+            self.dismiss({"provider": self._chosen, "base_url": base, "api_key": ""})
+            return
+        if cat == "custom" and self._chosen:
+            endpoint = get_endpoint(self._chosen) or {}
+            self.dismiss(
+                {
+                    "provider": "custom",
+                    "base_url": endpoint.get("base_url", ""),
+                    "api_key": endpoint.get("api_key", ""),
+                }
+            )
             return
         if self._chosen:
-            self.dismiss((self._chosen, resolve_base_url(self._chosen)))
+            self.dismiss(
+                {
+                    "provider": self._chosen,
+                    "base_url": resolve_base_url(self._chosen),
+                    "api_key": "",
+                }
+            )
 
 
 class ModelsScreen(ModalScreen):
@@ -936,10 +1072,17 @@ class RoanApp(App):
     def _cmd_provider(self, args) -> None:
         if args:
             name = args[0].lower()
-            if name not in PROVIDER_PRESETS:
-                self._sysline(t("msg_providers", names=", ".join(sorted(PROVIDER_PRESETS))))
+            known = name in PROVIDER_PRESETS or name in LOCAL_IDS
+            if not known:
+                names = sorted(set(PROVIDER_PRESETS) | LOCAL_IDS)
+                self._sysline(t("msg_providers", names=", ".join(names)))
                 return
-            save_config({"provider": name})
+            updates: dict = {"provider": name}
+            endpoint = local_endpoint(name) if name in LOCAL_IDS else None
+            base = (endpoint or {}).get("base_url") or resolve_base_url(name)
+            if base:
+                updates["base_url"] = base
+            save_config(updates)
             self.agent.reload()
             self._update_status()
             self._sysline(t("msg_provider_set", name=name))
@@ -952,11 +1095,15 @@ class RoanApp(App):
         def picked(result) -> None:
             if not result:
                 return
-            provider, base_url = result
+            provider = result.get("provider") or ""
+            base_url = result.get("base_url") or ""
+            api_key = result.get("api_key") or ""
             updates: dict = {"provider": provider}
             resolved = base_url or resolve_base_url(provider)
             if resolved:
                 updates["base_url"] = resolved
+            if api_key:
+                updates["api_key"] = api_key
             save_config(updates)
             self.agent.reload()
             self._update_status()

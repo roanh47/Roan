@@ -53,19 +53,36 @@ def is_free(model: dict) -> bool:
     return not cost.get("input") and not cost.get("output")
 
 
-# Providers die op je eigen machine draaien.
-LOCAL_PROVIDERS = {
-    "lmstudio",
-    "ollama",
-    "llamacpp",
-    "llama-cpp",
-    "local",
-    "vllm",
-    "jan",
-    "gpt4all",
-    "koboldcpp",
-    "text-generation-webui",
-}
+# Lokale servers: eigen categorie. Standaard localhost-poorten.
+LOCAL_ENDPOINTS = (
+    {"id": "lmstudio", "name": "LM Studio", "base_url": "http://localhost:1234/v1"},
+    {"id": "ollama", "name": "Ollama", "base_url": "http://localhost:11434/v1"},
+    {"id": "llamacpp", "name": "llama.cpp", "base_url": "http://localhost:8080/v1"},
+    {"id": "vllm", "name": "vLLM", "base_url": "http://localhost:8000/v1"},
+    {"id": "localai", "name": "LocalAI", "base_url": "http://localhost:8080/v1"},
+    {"id": "jan", "name": "Jan", "base_url": "http://localhost:1337/v1"},
+    {"id": "koboldcpp", "name": "KoboldCpp", "base_url": "http://localhost:5001/v1"},
+    {
+        "id": "text-generation-webui",
+        "name": "text-generation-webui",
+        "base_url": "http://localhost:5000/v1",
+    },
+    {"id": "gpt4all", "name": "GPT4All", "base_url": "http://localhost:4891/v1"},
+)
+
+LOCAL_IDS = {entry["id"] for entry in LOCAL_ENDPOINTS}
+
+
+def list_local() -> list[tuple[str, str, str]]:
+    """(id, naam, base_url) van de lokale servers."""
+    return [(e["id"], e["name"], e["base_url"]) for e in LOCAL_ENDPOINTS]
+
+
+def local_endpoint(endpoint_id: str) -> dict | None:
+    for entry in LOCAL_ENDPOINTS:
+        if entry["id"] == endpoint_id:
+            return dict(entry)
+    return None
 
 # Providers met een echte gratis laag — géén abonnement. models.dev heeft geen
 # 'gratis'-veld, dus dit is een bewust korte, onderhouden lijst die we met de live
@@ -114,14 +131,17 @@ def is_plan_provider(provider: str, pdata: dict | None = None) -> bool:
 
 
 def is_free_model(provider: str, model_id: str, model: dict | None = None) -> bool:
-    """Alleen modellen waarvan we zeker weten dat ze gratis te gebruiken zijn."""
+    """Alleen modellen waarvan we zeker weten dat ze gratis te gebruiken zijn.
+
+    Lokale servers horen hier niet bij: die hebben hun eigen categorie.
+    """
     if str(model_id).endswith(":free"):
         return True
     if not is_free(model or {}):
         return False
     pid = (provider or "").lower()
-    if pid in LOCAL_PROVIDERS:
-        return True
+    if pid in LOCAL_IDS:
+        return False
     if is_plan_provider(provider):
         return False  # abonnement: cost 0 betekent 'plan', niet 'gratis'
     return pid in FREE_TIER_PROVIDERS
@@ -180,11 +200,14 @@ def list_providers(category: str = "all") -> list[tuple[str, str]]:
     """(id, naam) van providers uit models.dev, live.
 
     category: 'free' = heeft écht gratis modellen, 'paid' = de rest, 'all' = alles.
+    Lokale servers hebben hun eigen categorie en staan hier nooit in.
     """
     data = _dev_data()
     out: list[tuple[str, str]] = []
     for pid, pdata in data.items():
         pdata = pdata or {}
+        if pid in LOCAL_IDS:
+            continue
         free = is_free_provider(pid, pdata)
         if category == "free" and not free:
             continue

@@ -35,6 +35,7 @@ DEFAULT_CONFIG = {
     "api_key": None,          # overschrijft de preset-key indien ingesteld
     "model": "local-model",
     "language": "nl",         # "nl" of "en"
+    "endpoints": [],          # eigen OpenAI-compatibele endpoints (Custom)
     "tui": None,              # "fullscreen" | "default" | None (nog niet gekozen)
     "tui_prompts": 0,         # hoe vaak de fullscreen-dialoog is getoond
     "tui_declined": False,    # "niet nu" gekozen -> nooit meer vragen
@@ -143,6 +144,37 @@ def load_instructions() -> str:
     from . import i18n
 
     return i18n.DEFAULT_INSTRUCTIONS.get(i18n.current_language(), i18n.DEFAULT_INSTRUCTIONS["en"])
+
+
+# ---------- eigen endpoints (Custom) ----------
+def get_endpoints() -> list[dict]:
+    """Opgeslagen eigen OpenAI-compatibele endpoints."""
+    return list(load_config().get("endpoints") or [])
+
+
+def get_endpoint(name: str) -> dict | None:
+    for endpoint in get_endpoints():
+        if endpoint.get("name") == name:
+            return endpoint
+    return None
+
+
+def add_endpoint(name: str, base_url: str, api_key: str = "") -> dict:
+    """Voeg een endpoint toe (of vervang er een met dezelfde naam)."""
+    endpoints = [e for e in get_endpoints() if e.get("name") != name]
+    endpoint = {"name": name, "base_url": base_url, "api_key": api_key}
+    endpoints.append(endpoint)
+    save_config({"endpoints": endpoints})
+    return endpoint
+
+
+def remove_endpoint(name: str) -> bool:
+    endpoints = get_endpoints()
+    remaining = [e for e in endpoints if e.get("name") != name]
+    if len(remaining) == len(endpoints):
+        return False
+    save_config({"endpoints": remaining})
+    return True
 
 
 def save_config(updates: dict) -> dict:

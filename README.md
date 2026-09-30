@@ -76,7 +76,7 @@ Inside the TUI:
 - `/models` — model browser: **Free / Paid / This provider**, live from
   models.dev, filterable per provider. Click a model to select it.
 - `/free` — 100% free models (via models.dev)
-- `/provider` — provider picker: **Free / Paid / Custom**, live from models.dev
+- `/provider` — provider picker: **Free / Paid / Local / Custom**, live from models.dev
 - `/theme <name>` — `mocha`, `macchiato`, `frappe`, `latte`
 - `/memory` — show what Roan remembered
 - `/skills` — list available skills
@@ -110,14 +110,33 @@ and, for hosted providers, the provider is a known free-tier one (`google`,
 `groq`, `cerebras`, `mistral`, `nvidia`, `huggingface`, `chutes`, `modelscope`,
 `cloudflare-workers-ai`, `opencode`, `z.ai`, `openrouter`, …) with a price of `0`.
 
+Local servers are **not** in Free: they have their own category.
+
 Providers whose name or id contains *coding plan*, *token plan* or *subscription*
 are counted as paid, and the provider picker labels them `subscription` so you
 know it's a flat monthly fee and not a per-token price. The free-tier list lives
 in `FREE_TIER_PROVIDERS` in `roan/models.py` — extend it when a provider starts
 offering free usage.
 
-Picking a provider fills in its `base_url` automatically, from `PROVIDER_PRESETS`
-or else the `api` field in models.dev, so you usually only need to paste a key.
+## Providers
+
+`/provider` opens a picker with four categories:
+
+1. **Free** — hosted providers with a real free tier.
+2. **Paid** — everything else, including subscriptions (labelled `subscription`).
+3. **Local** — servers on your own machine, with the default localhost ports:
+   LM Studio `:1234`, Ollama `:11434`, llama.cpp `:8080`, vLLM `:8000`,
+   LocalAI `:8080`, Jan `:1337`, KoboldCpp `:5001`,
+   text-generation-webui `:5000`, GPT4All `:4891`. The port is editable before
+   you confirm, so a server on another port (or another machine) still works.
+4. **Custom** — your own OpenAI-compatible endpoints. Fill in a name, base URL
+   and key and press **Add endpoint**; you can store as many as you like and
+   pick between them later. Delete one with **Delete**. They live in the
+   `endpoints` list in `config.json`.
+
+Picking any provider fills in its `base_url` automatically — from
+`PROVIDER_PRESETS` or else the `api` field in models.dev — so for hosted
+providers you usually only need to paste a key.
 
 ## Renderers
 
