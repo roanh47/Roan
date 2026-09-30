@@ -349,6 +349,9 @@ class ProviderScreen(ModalScreen):
     #provider-filters Select {
         width: 1fr;
     }
+    #psearch {
+        margin-bottom: 1;
+    }
     #provider-list {
         height: 1fr;
     }
@@ -373,11 +376,23 @@ class ProviderScreen(ModalScreen):
     }
     """
 
+    BINDINGS = [("escape", "escape_pressed", "terug")]
+
+    def action_escape_pressed(self) -> None:
+        """Escape wist eerst de zoekopdracht, en sluit daarna pas."""
+        search = self.query_one("#psearch", Input)
+        if search.has_focus and search.value:
+            search.value = ""
+            return
+        self.dismiss(None)
+
     def __init__(self, category: str = "free"):
         super().__init__()
         self.providers = {"free": [], "paid": []}
         self._chosen = ""
         self._category = category
+        self._query = ""
+        self._cache: dict[str, list] = {}
 
     # ---------- opbouw ----------
     def compose(self) -> ComposeResult:
@@ -395,6 +410,7 @@ class ProviderScreen(ModalScreen):
                     id="pcat",
                     allow_blank=False,
                 )
+            yield Input(placeholder=t("search_hint"), id="psearch")
             yield OptionList(id="provider-list")
             with Vertical(id="provider-forms"):
                 yield Label(t("provider_name"), id="lbl-name")
@@ -423,6 +439,8 @@ class ProviderScreen(ModalScreen):
 
     def _set_providers(self, free, paid) -> None:
         self.providers = {"free": free, "paid": paid}
+        self._cache.pop("free", None)
+        self._cache.pop("paid", None)
         self._rebuild()
 
     def _cat(self) -> str:
@@ -442,34 +460,80 @@ class ProviderScreen(ModalScreen):
         self._show("#padd", custom)
         self._show("#pdel", custom and bool(self._chosen))
 
-    def _rebuild(self) -> None:
-        cat = self._cat()
-        listing = self.query_one("#provider-list", OptionList)
-        listing.clear_options()
-        self._apply_visibility(cat)
+    def _rows_for(self, cat: str) -> list[tuple[str, str]]:
+        """De (id, label)-regels van een categorie.
+
+        Alleen gratis/betaald worden gecacht — dat zijn er honderden en het
+        opbouwen kost een provider-lookup per stuk. Lokaal en custom zijn klein
+        en moeten direct meelopen als je een endpoint toevoegt of weghaalt.
+        """
+        if cat in self._cache:
+            return self._cache[cat]
 
         if cat == "local":
-            for pid, name, base in list_local():
-                listing.add_option(Option(f"{name}  ·  {base}", id=pid))
+            rows = [(pid, f"{name}  ·  {base}") for pid, name, base in list_local()]
+        elif cat == "custom":
+            rows = [
+                (e.get("name"), f"{e.get('name')}  ·  {e.get('base_url', '')}")
+                for e in get_endpoints()
+            ]
+        else:
+            rows = []
+            for pid, name in self.providers.get(cat, []):
+                desc = provider_description(pid)
+                rows.append((pid, f"{name}  ·  {desc}" if desc else name))
+
+        if cat in ("free", "paid"):
+            self._cache[cat] = rows
+        return rows
+
+    def _matches(self, pid, label: str) -> bool:
+        if not self._query:
+            return True
+        q = self._query.casefold()
+        return q in str(pid).casefold() or q in label.casefold()
+
+    def _fill(self) -> None:
+        """De lijst vullen met de regels die op de zoekopdracht passen."""
+        listing = self.query_one("#provider-list", OptionList)
+        listing.clear_options()
+        cat = self._cat()
+        rows = [row for row in self._rows_for(cat) if self._matches(*row)]
+
+        if not rows:
+            if self._query:
+                empty = t("search_no_results")
+            elif cat == "custom":
+                empty = t("provider_no_endpoints")
+            else:
+                empty = t("loading")
+            listing.add_option(Option(empty, id=None, disabled=True))
             return
 
-        if cat == "custom":
-            endpoints = get_endpoints()
-            if not endpoints:
-                listing.add_option(Option(t("provider_no_endpoints"), id=None, disabled=True))
-                return
-            for endpoint in endpoints:
-                listing.add_option(
-                    Option(
-                        f"{endpoint.get('name')}  ·  {endpoint.get('base_url', '')}",
-                        id=endpoint.get("name"),
-                    )
-                )
-            return
+        for pid, label in rows:
+            listing.add_option(Option(label, id=pid))
+        listing.highlighted = 0
 
-        for pid, name in self.providers.get(cat, []):
-            desc = provider_description(pid)
-            listing.add_option(Option(f"{name}  ·  {desc}" if desc else name, id=pid))
+    def _rebuild(self) -> None:
+        self._apply_visibility(self._cat())
+        self._fill()
+
+    @on(Input.Changed, "#psearch")
+    def _on_search(self, event: Input.Changed) -> None:
+        self._query = event.value.strip()
+        self._fill()
+
+    @on(Input.Submitted, "#psearch")
+    def _on_search_submit(self, event: Input.Submitted) -> None:
+        """Enter in het zoekveld = de bovenste treffer kiezen."""
+        listing = self.query_one("#provider-list", OptionList)
+        if not listing.option_count:
+            return
+        option = listing.get_option_at_index(0)
+        if option.id is None:
+            return
+        self._chosen = str(option.id)
+        self._choose()
 
     # ---------- selectie ----------
     @on(Select.Changed)
@@ -551,6 +615,8 @@ class ProviderScreen(ModalScreen):
     @on(Input.Submitted)
     def _on_submitted(self, event: Input.Submitted) -> None:
         """Enter in een veld: endpoint toevoegen als het ingevuld is, anders kiezen."""
+        if event.input.id == "psearch":
+            return  # apart afgehandeld
         cat = self._cat()
         if cat == "custom":
             name = self.query_one("#pname", Input).value.strip()
@@ -615,7 +681,19 @@ class ModelsScreen(ModalScreen):
     #models-list {
         height: 1fr;
     }
+    #msearch {
+        margin-bottom: 1;
+    }
     """
+
+    BINDINGS = [("escape", "escape_pressed", "terug")]
+
+    def action_escape_pressed(self) -> None:
+        search = self.query_one("#msearch", Input)
+        if search.has_focus and search.value:
+            search.value = ""
+            return
+        self.dismiss(None)
 
     def __init__(
         self,
@@ -627,6 +705,7 @@ class ModelsScreen(ModalScreen):
         super().__init__()
         self.data = {"free": free, "paid": paid, "custom": custom}
         self.fixed_provider = fixed_provider
+        self._query = ""
 
     def compose(self) -> ComposeResult:
         with Vertical(id="models-box"):
@@ -650,6 +729,7 @@ class ModelsScreen(ModalScreen):
                 yield Select(
                     [(t("models_all_providers"), "__all__")], value="__all__", id="prov", allow_blank=False
                 )
+            yield Input(placeholder=t("search_hint"), id="msearch")
             yield OptionList(id="models-list")
 
     def on_mount(self) -> None:
@@ -677,13 +757,38 @@ class ModelsScreen(ModalScreen):
     def _rebuild(self) -> None:
         prov = self.query_one("#prov", Select).value
         items = [(p, m) for p, m in self._current() if prov in (None, "__all__", p)]
+        if self._query:
+            q = self._query.casefold()
+            items = [(p, m) for p, m in items if q in m.casefold() or q in str(p).casefold()]
         listing = self.query_one("#models-list", OptionList)
         listing.clear_options()
+        if not items:
+            empty = t("search_no_results") if self._query else t("models_none")
+            listing.add_option(Option(empty, id=None, disabled=True))
+            return
         cap = 400
         for p, m in items[:cap]:
             listing.add_option(Option(f"{m}  ·  {p}", id=f"{p}|{m}"))
         if len(items) > cap:
             listing.add_option(Option(t("models_more", n=len(items) - cap), id=None))
+        listing.highlighted = 0
+
+    @on(Input.Changed, "#msearch")
+    def _on_search(self, event: Input.Changed) -> None:
+        self._query = event.value.strip()
+        self._rebuild()
+
+    @on(Input.Submitted, "#msearch")
+    def _on_search_submit(self, event: Input.Submitted) -> None:
+        """Enter in het zoekveld = de bovenste treffer kiezen."""
+        listing = self.query_one("#models-list", OptionList)
+        if not listing.option_count:
+            return
+        option = listing.get_option_at_index(0)
+        if not option.id or "|" not in str(option.id):
+            return
+        provider, model = str(option.id).split("|", 1)
+        self.dismiss((provider, model))
 
     @on(Select.Changed)
     def _on_select(self, event: Select.Changed) -> None:

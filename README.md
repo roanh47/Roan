@@ -76,8 +76,11 @@ Inside the TUI:
 - `/models` — model browser: **Free / Paid / This provider**, live from
   models.dev, filterable per provider. Click a model to select it.
 - `/free` — 100% free models (via models.dev)
-- `/provider` — provider picker: **Free / Paid / Local / Custom**, live from models.dev
-- `/theme <name>` — `mocha`, `macchiato`, `frappe`, `latte`
+- `/provider` — provider picker: **Free / Paid / Local / Custom**, live from models.dev.
+  Type in the search box to filter the list; **Enter** picks the top hit and
+  **Esc** clears the search before it closes the dialog.
+- `/theme` — Catppuccin flavour picker: **latte / frappe / macchiato / mocha**,
+  or `/theme <name>` to set it directly
 - `/memory` — show what Roan remembered
 - `/skills` — list available skills
 - `/language <nl|en>` — switch the UI and agent language

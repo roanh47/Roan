@@ -37,6 +37,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "models_paid": "Betaald",
         "models_custom": "Deze provider",
         "models_all_providers": "alle providers",
+        "search_hint": "Zoeken…",
+        "search_no_results": "Geen resultaten",
+        "loading": "Laden…",
+        "models_none": "Geen modellen",
         "models_more": "… en nog {n} modellen (filter op provider)",
         "models_fetching": "Modellen ophalen (models.dev + provider) ...",
         "models_unknown_provider": (
@@ -207,6 +211,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "models_paid": "Paid",
         "models_custom": "This provider",
         "models_all_providers": "all providers",
+        "search_hint": "Search…",
+        "search_no_results": "No results",
+        "loading": "Loading…",
+        "models_none": "No models",
         "models_more": "… and {n} more models (filter by provider)",
         "models_fetching": "Fetching models (models.dev + provider) ...",
         "models_unknown_provider": (
