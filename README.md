@@ -1,3 +1,12 @@
+---
+type: Documentation
+title: Roan
+description: A terminal-based agent harness that runs against any OpenAI-compatible model, local or hosted.
+tags: [roan, readme]
+status: stable
+generated: { by: hermes-agent/deepseek-v4.1-flash, at: 2026-09-30T09:20:00Z }
+---
+
 # Roan
 
 A terminal-based agent harness. Bring your own OpenAI-compatible model — local or
@@ -285,14 +294,20 @@ so scheduled work never mixes with your chat.
 ## Knowledge bundle for agents
 
 The whole project — architecture, concepts, recipes, decisions and the bugs
-already hit — is written down in [`knowledge/`](knowledge/index.md) in Open Knowledge Format:
-plain markdown with YAML frontmatter, so OpenCode, Claude Code, Cursor or any
-other agent can read it without adapters.
+already hit — is written down in [Open Knowledge Format](https://okf.md): plain
+markdown with YAML frontmatter, so OpenCode, Claude Code, Cursor or any other
+agent can read it without adapters.
 
-Start at [`knowledge/index.md`](knowledge/index.md). Check it after editing:
+There is no separate documentation tree. **The repository is the bundle**: the
+harness is described next to the code in [`roan/`](roan/index.md), the suite in
+[`tests/`](tests/index.md), and the project as a whole at the root. The table of
+contents is [`index.md`](index.md); [`log.md`](log.md) is the change history.
+
+Check it after editing, and regenerate the file map after a structural change:
 
 ```
-python3 knowledge/references/validate_okf.py
+python3 tests/validate_okf.py
+python3 tests/generate_file_map.py
 ```
 
 `tests/test_okf_bundle.py` runs the same check, so the bundle cannot quietly

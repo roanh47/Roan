@@ -1,18 +1,20 @@
-"""De OKF-bundle moet conform blijven: elke regel, elke keer.
+"""De kennisbundel moet conform blijven: elke regel, elke keer.
 
-De drie regels uit de spec (v0.2, §11) worden gecontroleerd door het script dat
-in de bundle zelf staat, zodat er één implementatie is en niet twee.
+De bundel is deze repository. De drie regels uit de OKF-spec (v0.2, §11) worden
+gecontroleerd door het script dat in tests/ staat, zodat er één implementatie is
+en niet twee.
 """
 
 import importlib.util
+import re
 from pathlib import Path
 
 import pytest
 
 REPO = Path(__file__).resolve().parent.parent
-VALIDATOR = REPO / "knowledge" / "references" / "validate_okf.py"
-# Eén plek die weet waar de bundel staat; de rest leidt het daarvan af.
-BUNDLE = VALIDATOR.parent.parent
+VALIDATOR = REPO / "tests" / "validate_okf.py"
+# De repo is de bundel; de validator staat er zelf in.
+BUNDLE = REPO
 
 
 def _load_validator():
@@ -29,12 +31,12 @@ def okf():
 
 
 def test_validator_script_exists():
-    assert VALIDATOR.exists(), "de validator hoort in knowledge/references/ te staan"
+    assert VALIDATOR.exists(), "de validator hoort in tests/ te staan"
 
 
 def test_bundle_is_conformant(okf):
     problems = okf.check(BUNDLE)
-    assert problems == [], "OKF-bundle niet conform:\n  " + "\n  ".join(problems)
+    assert problems == [], "OKF-bundel niet conform:\n  " + "\n  ".join(problems)
 
 
 def test_root_index_declares_the_version(okf):
@@ -45,38 +47,42 @@ def test_root_index_declares_the_version(okf):
 
 
 def test_every_concept_has_a_type(okf):
-    bundle = BUNDLE
     missing = []
-    for path in sorted(bundle.rglob("*.md")):
+    for path in okf.markdown_files(BUNDLE):
         if path.name in okf.RESERVED:
             continue
         front, _ = okf.split_frontmatter(path.read_text(encoding="utf-8"))
         if front is None or not okf.parse_yaml(front).get("type"):
-            missing.append(str(path.relative_to(bundle)))
+            missing.append(str(path.relative_to(BUNDLE)))
     assert missing == [], f"zonder 'type': {missing}"
 
 
 def test_no_orphan_pages(okf):
     """Elke pagina moet ergens vandaan gelinkt worden, anders vindt niemand hem."""
-    import re
-
-    bundle = BUNDLE
     linked = set()
-    for path in bundle.rglob("*.md"):
+    for path in okf.markdown_files(BUNDLE):
         for target in re.findall(r"\]\(([^)#\s]+)\)", path.read_text(encoding="utf-8")):
             if target.startswith(("http://", "https://", "mailto:")):
                 continue
             linked.add((path.parent / target).resolve())
     orphans = [
-        str(p.relative_to(bundle))
-        for p in sorted(bundle.rglob("*.md"))
+        str(p.relative_to(BUNDLE))
+        for p in okf.markdown_files(BUNDLE)
         if p.name not in okf.RESERVED and p.resolve() not in linked
     ]
     assert orphans == [], f"niet gelinkt vanaf een index: {orphans}"
 
 
+def test_the_bundle_is_the_repository(okf):
+    """Geen aparte documentatiemap: de concepten wonen naast de code."""
+    stray = [d for d in ("knowledge", "okf", "docs") if (BUNDLE / d).exists()]
+    assert stray == [], f"de bundel hoort geen eigen map te hebben, gevonden: {stray}"
+    for expected in ("index.md", "log.md", "roan/index.md", "tests/index.md"):
+        assert (BUNDLE / expected).exists(), f"{expected} ontbreekt"
+
+
 def test_agents_md_points_at_the_bundle():
-    """OpenCode leest AGENTS.md; die moet naar de bundle verwijzen.
+    """OpenCode leest AGENTS.md; die moet naar de bundel verwijzen.
 
     Het bestand staat niet in de repo (het is een beschermd agent-bestand dat de
     gebruiker zelf toevoegt), dus als het ontbreekt is dat geen fout.
@@ -85,22 +91,23 @@ def test_agents_md_points_at_the_bundle():
     if not path.exists():
         pytest.skip("AGENTS.md is nog niet toegevoegd")
     text = path.read_text(encoding="utf-8")
-    assert "knowledge/index.md" in text
+    assert "index.md" in text
     assert "validate_okf.py" in text
 
 
 def test_readme_points_at_the_bundle():
     text = (REPO / "README.md").read_text(encoding="utf-8")
-    assert "knowledge/" in text, "de README hoort de knowledge bundle te noemen"
+    assert "index.md" in text, "de README hoort de kennisbundel te noemen"
+    assert "validate_okf.py" in text
 
 
-def test_file_map_lists_every_module():
+def test_file_map_lists_every_module(okf):
     """Een nieuw bestand moet in de file map staan, anders vindt niemand het.
 
     Regelnummers worden bewust niet vergeleken - die lopen bij elke wijziging, en
     daarvoor is generate_file_map.py.
     """
-    text = (BUNDLE / "references" / "file-map.md").read_text(encoding="utf-8")
+    text = (BUNDLE / "file-map.md").read_text(encoding="utf-8")
     missing = [
         str(p.relative_to(REPO))
         for pattern in ("roan/**/*.py", "tests/*.py")
