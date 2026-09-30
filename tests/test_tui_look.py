@@ -5,6 +5,7 @@ import pytest
 from roan import config
 from roan import tui as tui_mod
 from roan.themes import DEFAULT_THEME, PINK, THEME_NAMES
+from roan.i18n import t
 from roan.tui import ModelsScreen, ProviderScreen, RoanApp, SetupScreen
 
 
@@ -191,3 +192,146 @@ async def test_provider_list_is_focused(roan_cfg):
         await pilot.pause()
         assert app.focused is not None
         assert app.focused.id == "provider-list"
+
+
+# ---------- nette, gedeelde opmaak ----------
+POPUPS = [
+    (lambda: SetupScreen(provider="groq", model="m"), "#setup-box"),
+    (lambda: ProviderScreen(), "#provider-box"),
+    (lambda: ModelsScreen([("groq", "llama-3")], [], []), "#models-box"),
+    (lambda: tui_mod.ThemeScreen(), "#theme-box"),
+    (lambda: tui_mod.TranscriptScreen([{"role": "user", "content": "hoi"}]), "#transcript-box"),
+]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("factory,box", POPUPS)
+async def test_every_popup_uses_the_shared_popup_class(roan_cfg, factory, box):
+    """Eén plek waar de popup-opmaak staat, anders lopen ze uit elkaar."""
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(64, 26)) as pilot:
+        await pilot.pause()
+        screen = factory()
+        app.push_screen(screen)
+        await pilot.pause()
+        assert "popup" in screen.query_one(box).classes, box
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("factory,box", POPUPS)
+async def test_popup_sits_on_a_lighter_surface_than_the_screen(roan_cfg, factory, box):
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(64, 26)) as pilot:
+        await pilot.pause()
+        screen = factory()
+        app.push_screen(screen)
+        await pilot.pause()
+        theme = tui_mod.THEME_BY_NAME[app.theme]
+        assert screen.query_one(box).styles.background.hex.lower() != theme.background.lower()
+
+
+@pytest.mark.asyncio
+async def test_title_lines_up_with_the_field_labels(roan_cfg):
+    """De titel hoort boven de velden te staan, niet 2 kolommen ernaast."""
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(64, 26)) as pilot:
+        await pilot.pause()
+        scr = SetupScreen(provider="groq", model="m")
+        app.push_screen(scr)
+        await pilot.pause()
+        title_x = scr.query_one(".titlebar .title").region.x
+        label_x = scr.query_one("#setup-box Label").region.x
+        assert title_x == label_x
+
+
+@pytest.mark.asyncio
+async def test_setup_hint_is_fully_visible(roan_cfg):
+    """De hint mag niet afgekapt worden — daar is hij te kort voor."""
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(64, 26)) as pilot:
+        await pilot.pause()
+        scr = SetupScreen(provider="groq", model="m")
+        app.push_screen(scr)
+        await pilot.pause()
+        rendered = "\n".join(
+            "".join(seg.text for seg in strip) for strip in scr._compositor.render_strips()
+        )
+        assert t("setup_hint") in rendered
+        assert t("setup_required") not in rendered  # niet verplicht hier
+
+
+@pytest.mark.asyncio
+async def test_setup_hides_base_url_for_a_known_provider(roan_cfg):
+    """Bij groq/lmstudio weet Roan de base URL al; dat veld is dan ruis."""
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(64, 26)) as pilot:
+        await pilot.pause()
+        scr = SetupScreen(provider="groq", model="m")
+        app.push_screen(scr)
+        await pilot.pause()
+        assert scr.query_one("#base_url").display is False
+        assert scr.query_one("#lbl-base-url").display is False
+
+
+@pytest.mark.asyncio
+async def test_setup_shows_base_url_for_custom(roan_cfg):
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(64, 26)) as pilot:
+        await pilot.pause()
+        scr = SetupScreen(provider="custom", model="m", base_url="https://thuis/v1")
+        app.push_screen(scr)
+        await pilot.pause()
+        assert scr.query_one("#base_url").display is True
+        assert scr.query_one("#lbl-base-url").display is True
+
+
+@pytest.mark.asyncio
+async def test_setup_has_a_save_and_cancel_button(roan_cfg):
+    from textual.widgets import Button
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(64, 26)) as pilot:
+        await pilot.pause()
+        scr = SetupScreen(provider="groq", model="m")
+        app.push_screen(scr)
+        await pilot.pause()
+        assert str(scr.query_one("#save", Button).label) == t("setup_save")
+        assert str(scr.query_one("#cancel", Button).label) == t("setup_cancel")
+
+
+@pytest.mark.asyncio
+async def test_models_shows_the_count_in_the_hint(roan_cfg):
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(64, 26)) as pilot:
+        await pilot.pause()
+        scr = ModelsScreen([("groq", "llama-3"), ("groq", "mixtral")], [], [])
+        app.push_screen(scr)
+        await pilot.pause()
+        hint = str(scr.query_one("#models-hint").render())
+        assert "2" in hint
+
+
+@pytest.mark.asyncio
+async def test_models_rows_and_buttons(roan_cfg):
+    from textual.widgets import Button
+
+    app = RoanApp(FakeAgent())
+    results = []
+    async with app.run_test(size=(64, 26)) as pilot:
+        await pilot.pause()
+        scr = ModelsScreen([("groq", "llama-3")], [], [])
+        app.push_screen(scr, results.append)
+        await pilot.pause()
+        assert str(scr.query_one("#mback", Button).label) == t("btn_back")
+        scr.query_one("#mchoose", Button).press()
+        await pilot.pause()
+    assert results == [("groq", "llama-3")]
+
+
+def test_theme_bullets_use_each_flavour_pink(roan_cfg):
+    """De kleurstip in het thema-menu is de pink van die smaak."""
+    from rich.text import Text
+
+    for name, pink in PINK.items():
+        label = Text.from_markup(f"[{pink}]●[/] {name}")
+        assert str(label.spans[0].style).lower() == pink.lower()

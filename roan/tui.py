@@ -55,6 +55,7 @@ from .i18n import provider_desc, t
 from .photo import render_photo
 from .themes import (
     DEFAULT_THEME,
+    PINK,
     THEME_BY_NAME,
     THEME_NAMES,
     THEMES,
@@ -74,6 +75,100 @@ def _titlebar(title: str, close_id: str | None = "close"):
         yield Static(title, classes="title")
         if close_id:
             yield Button(CLOSE_GLYPH, id=close_id, classes="close")
+
+
+# Opmaak die alle popups delen, zodat setup/provider/modellen/thema er hetzelfde
+# uitzien: één Catppuccin-rand, vlakken in drie treden, pink als enige accent.
+# De buitenste Vertical van een popup krijgt de class "popup".
+POPUP_CSS = """
+    .popup {
+        height: auto;
+        max-height: 100%;
+        border: round $border;
+        background: $surface;
+        padding: 1 2;
+    }
+    .popup .titlebar {
+        height: 1;
+        margin-bottom: 1;
+    }
+    /* titel netjes boven de velden, niet er 2 kolommen naast */
+    .popup .titlebar .title {
+        padding: 0;
+    }
+    /* kopje van een veld */
+    .popup .section {
+        height: 1;
+        color: $text-muted;
+    }
+    /* de huidige waarde naast een kies-knop */
+    .popup .value {
+        width: 1fr;
+        height: 1;
+        color: $foreground;
+        text-overflow: ellipsis;
+    }
+    .popup .hint {
+        height: 1;
+        margin-top: 1;
+        color: $text-muted;
+        text-overflow: ellipsis;
+    }
+    .popup .row {
+        height: 1;
+    }
+    .popup Input {
+        height: 1;
+        background: $panel;
+        color: $foreground;
+        padding: 0 1;
+    }
+    .popup Input:focus {
+        background: $accent 30%;
+    }
+    .popup Select {
+        height: 1;
+        background: $panel;
+    }
+    /* waarde netjes links uitlijnen met de lijst eronder */
+    .popup Select > SelectCurrent {
+        padding: 0;
+    }
+    .popup OptionList {
+        background: transparent;
+        border: none;
+        padding: 0;
+    }
+    .popup OptionList > .option-list--option {
+        padding: 0;
+    }
+    .popup Button {
+        height: 1;
+        min-width: 6;
+        background: $panel;
+        color: $foreground;
+        padding: 0 1;
+    }
+    .popup Button.-primary {
+        background: $accent;
+        color: $background;
+        text-style: bold;
+    }
+    .popup Button:hover,
+    .popup Button:focus {
+        background: $accent;
+        color: $background;
+        text-style: bold;
+    }
+    .popup .actions {
+        height: 1;
+        margin-top: 1;
+        align-horizontal: right;
+    }
+    .popup .actions Button {
+        margin-left: 1;
+    }
+"""
 
 
 def resolve_base_url(provider: str) -> str:
@@ -158,38 +253,12 @@ class HistoryInput(Input):
 
 
 class SetupScreen(ModalScreen):
-    """Setup-scherm: provider, api_key, model. Automatisch bij de eerste start."""
+    """Setup-scherm: provider, api-sleutel, model. Automatisch bij de eerste start."""
 
-    CSS = """
-    SetupScreen {
-        align: center middle;
-    }
+    CSS = POPUP_CSS + """
     #setup-box {
-        width: 90%;
-        max-width: 82;
-        height: auto;
-        max-height: 100%;
-        border: round $border;
-        background: $surface;
-        padding: 0 2;
-    }
-    #setup-box Label {
-        margin-top: 0;
-        height: 1;
-        color: $text-muted;
-    }
-    #setup-actions {
-        margin-top: 1;
-        height: auto;
-        align-horizontal: right;
-    }
-    #setup-actions Button {
-        margin-left: 2;
-    }
-    #required-hint {
-        width: 1fr;
-        height: 1;
-        color: $text-muted;
+        width: 92%;
+        max-width: 74;
     }
     """
 
@@ -213,29 +282,38 @@ class SetupScreen(ModalScreen):
     def _provider_line(self) -> str:
         return self.provider or t("setup_none")
 
-    def on_mount(self) -> None:
-        """Focus meteen op het api-key-veld, zodat je kunt typen."""
-        self.query_one("#api_key", Input).focus()
-
     def _model_line(self) -> str:
         return self.model or t("setup_none")
 
+    def on_mount(self) -> None:
+        """Focus meteen op het api-key-veld, en verberg wat niet nodig is."""
+        self.query_one("#api_key", Input).focus()
+        custom = self.provider in ("", "custom")
+        self.query_one("#lbl-base-url").display = custom
+        self.query_one("#base_url").display = custom
+
     def compose(self) -> ComposeResult:
-        with Vertical(id="setup-box"):
+        with Vertical(id="setup-box", classes="popup"):
             yield from _titlebar(t("setup_title"), close_id=None if self.required else "close")
-            yield Label(t("setup_provider"))
-            yield Static(self._provider_line(), id="cur-provider")
-            yield Button(t("setup_choose_provider"), id="choose-provider")
-            yield Label(t("setup_api_key"))
+            yield Label(t("setup_provider"), classes="section")
+            with Horizontal(classes="row"):
+                yield Static(self._provider_line(), id="cur-provider", classes="value")
+                yield Button(t("setup_choose"), id="choose-provider")
+            yield Label(t("setup_api_key"), classes="section")
             yield Input(value="", password=True, placeholder="sk-…", id="api_key")
-            yield Label(t("setup_model"))
-            yield Static(self._model_line(), id="cur-model")
-            yield Button(t("setup_choose_model"), id="choose-model")
-            yield Label(t("setup_base_url"))
+            yield Label(t("setup_model"), classes="section")
+            with Horizontal(classes="row"):
+                yield Static(self._model_line(), id="cur-model", classes="value")
+                yield Button(t("setup_choose"), id="choose-model")
+            # De base URL is alleen nodig als je er zelf een intikt; bij een
+            # bekende provider weet Roan hem al (zie on_mount).
+            yield Label(t("setup_base_url"), id="lbl-base-url", classes="section")
             yield Input(value=self.base_url, id="base_url")
             if self.required:
-                yield Static(t("setup_required"), id="required-hint")
-            with Horizontal(id="setup-actions"):
+                yield Static(t("setup_required"), id="required-hint", classes="hint")
+            else:
+                yield Static(t("setup_hint"), classes="hint")
+            with Horizontal(classes="actions"):
                 if not self.required:
                     yield Button(t("setup_cancel"), id="cancel")
                 yield Button(t("setup_save"), id="save", variant="primary")
@@ -285,10 +363,7 @@ class SetupScreen(ModalScreen):
     @on(Button.Pressed)
     def _on_button(self, event: Button.Pressed) -> None:
         bid = event.button.id
-        if bid == "close":
-            self.dismiss(False)
-            return
-        if bid == "cancel":
+        if bid in ("close", "cancel"):
             self.dismiss(False)
             return
         if bid == "choose-provider":
@@ -330,49 +405,33 @@ class ProviderScreen(ModalScreen):
     Custom = je eigen OpenAI-compatibele endpoints; je kunt er meerdere bewaren.
     """
 
-    CSS = """
-    ProviderScreen {
-        align: center middle;
-    }
+    CSS = POPUP_CSS + """
     #provider-box {
-        width: 85%;
-        max-width: 120;
-        height: 85%;
-        border: round $border;
-        background: $surface;
-        padding: 1 2;
+        width: 92%;
+        max-width: 104;
+        height: 86%;
     }
     #provider-filters {
-        height: auto;
-        margin-bottom: 1;
+        height: 1;
+        margin-top: 1;
     }
     #provider-filters Select {
         width: 1fr;
     }
     #psearch {
-        margin-bottom: 1;
+        margin-top: 1;
     }
     #provider-list {
         height: 1fr;
+        margin-top: 1;
     }
     #provider-forms {
         height: auto;
     }
-    #provider-forms Label {
-        height: auto;
-        color: $text-muted;
-    }
     #provider-info {
         height: auto;
+        max-height: 3;
         color: $text-muted;
-    }
-    #provider-actions {
-        margin-top: 1;
-        height: auto;
-        align-horizontal: right;
-    }
-    #provider-actions Button {
-        margin-left: 2;
     }
     """
 
@@ -396,7 +455,7 @@ class ProviderScreen(ModalScreen):
 
     # ---------- opbouw ----------
     def compose(self) -> ComposeResult:
-        with Vertical(id="provider-box"):
+        with Vertical(id="provider-box", classes="popup"):
             yield from _titlebar(t("provider_title"))
             with Horizontal(id="provider-filters"):
                 yield Select(
@@ -413,18 +472,18 @@ class ProviderScreen(ModalScreen):
             yield Input(placeholder=t("search_hint"), id="psearch")
             yield OptionList(id="provider-list")
             with Vertical(id="provider-forms"):
-                yield Label(t("provider_name"), id="lbl-name")
+                yield Label(t("provider_name"), id="lbl-name", classes="section")
                 yield Input(id="pname", placeholder="thuis")
-                yield Label(t("provider_base_url"), id="lbl-base")
+                yield Label(t("provider_base_url"), id="lbl-base", classes="section")
                 yield Input(id="pbase", placeholder="https://api.example.com/v1")
-                yield Label(t("provider_key"), id="lbl-key")
+                yield Label(t("provider_key"), id="lbl-key", classes="section")
                 yield Input(id="pkey", password=True, placeholder="sk-...")
-            yield Static(id="provider-info")
-            with Horizontal(id="provider-actions"):
+            yield Static(id="provider-info", classes="hint")
+            with Horizontal(id="provider-actions", classes="actions"):
                 yield Button(t("provider_add"), id="padd")
                 yield Button(t("provider_delete"), id="pdel")
-                yield Button(t("provider_back"), id="pback")
-                yield Button(t("provider_choose"), id="pchoose", variant="primary")
+                yield Button(t("btn_back"), id="pback")
+                yield Button(t("btn_choose"), id="pchoose", variant="primary")
 
     def on_mount(self) -> None:
         self._rebuild()
@@ -656,33 +715,28 @@ class ProviderScreen(ModalScreen):
 
 
 class ModelsScreen(ModalScreen):
-    """Model-browser: Free / Paid / Custom, gefilterd per provider."""
+    """Model-browser: Gratis / Betaald / Deze provider, met zoeken."""
 
-    CSS = """
-    ModelsScreen {
-        align: center middle;
-    }
+    CSS = POPUP_CSS + """
     #models-box {
-        width: 80%;
-        max-width: 110;
-        height: 80%;
-        border: round $border;
-        background: $surface;
-        padding: 1 2;
+        width: 92%;
+        max-width: 96;
+        height: 88%;
     }
     #models-filters {
-        height: auto;
-        margin-bottom: 1;
+        height: 1;
+        margin-top: 1;
     }
     #models-filters Select {
         width: 1fr;
         margin-right: 1;
     }
+    #msearch {
+        margin-top: 1;
+    }
     #models-list {
         height: 1fr;
-    }
-    #msearch {
-        margin-bottom: 1;
+        margin-top: 1;
     }
     """
 
@@ -708,7 +762,7 @@ class ModelsScreen(ModalScreen):
         self._query = ""
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="models-box"):
+        with Vertical(id="models-box", classes="popup"):
             title = (
                 t("models_for", provider=self.fixed_provider)
                 if self.fixed_provider
@@ -727,10 +781,17 @@ class ModelsScreen(ModalScreen):
                     allow_blank=False,
                 )
                 yield Select(
-                    [(t("models_all_providers"), "__all__")], value="__all__", id="prov", allow_blank=False
+                    [(t("models_all_providers"), "__all__")],
+                    value="__all__",
+                    id="prov",
+                    allow_blank=False,
                 )
             yield Input(placeholder=t("search_hint"), id="msearch")
             yield OptionList(id="models-list")
+            yield Static(id="models-hint", classes="hint")
+            with Horizontal(classes="actions"):
+                yield Button(t("btn_back"), id="mback")
+                yield Button(t("btn_choose"), id="mchoose", variant="primary")
 
     def on_mount(self) -> None:
         if self.fixed_provider:
@@ -754,24 +815,29 @@ class ModelsScreen(ModalScreen):
         sel = self.query_one("#prov", Select)
         sel.set_options([(t("models_all_providers"), "__all__")] + [(p, p) for p in providers])
 
-    def _rebuild(self) -> None:
+    def _visible(self) -> list[tuple[str, str]]:
         prov = self.query_one("#prov", Select).value
         items = [(p, m) for p, m in self._current() if prov in (None, "__all__", p)]
         if self._query:
             q = self._query.casefold()
             items = [(p, m) for p, m in items if q in m.casefold() or q in str(p).casefold()]
+        return items
+
+    def _rebuild(self) -> None:
+        items = self._visible()
         listing = self.query_one("#models-list", OptionList)
         listing.clear_options()
         if not items:
             empty = t("search_no_results") if self._query else t("models_none")
             listing.add_option(Option(empty, id=None, disabled=True))
-            return
-        cap = 400
-        for p, m in items[:cap]:
-            listing.add_option(Option(f"{m}  ·  {p}", id=f"{p}|{m}"))
-        if len(items) > cap:
-            listing.add_option(Option(t("models_more", n=len(items) - cap), id=None))
-        listing.highlighted = 0
+        else:
+            cap = 400
+            for p, m in items[:cap]:
+                listing.add_option(Option(f"{m}  ·  {p}", id=f"{p}|{m}"))
+            if len(items) > cap:
+                listing.add_option(Option(t("models_more", n=len(items) - cap), id=None))
+            listing.highlighted = 0
+        self.query_one("#models-hint", Static).update(t("models_hint", n=len(items)))
 
     @on(Input.Changed, "#msearch")
     def _on_search(self, event: Input.Changed) -> None:
@@ -781,14 +847,7 @@ class ModelsScreen(ModalScreen):
     @on(Input.Submitted, "#msearch")
     def _on_search_submit(self, event: Input.Submitted) -> None:
         """Enter in het zoekveld = de bovenste treffer kiezen."""
-        listing = self.query_one("#models-list", OptionList)
-        if not listing.option_count:
-            return
-        option = listing.get_option_at_index(0)
-        if not option.id or "|" not in str(option.id):
-            return
-        provider, model = str(option.id).split("|", 1)
-        self.dismiss((provider, model))
+        self._choose_highlighted()
 
     @on(Select.Changed)
     def _on_select(self, event: Select.Changed) -> None:
@@ -797,50 +856,59 @@ class ModelsScreen(ModalScreen):
         self._rebuild()
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        if not event.option_id or "|" not in event.option_id:
+        self._pick(event.option_id)
+
+    def _choose_highlighted(self) -> None:
+        listing = self.query_one("#models-list", OptionList)
+        if not listing.option_count:
             return
-        provider, model = event.option_id.split("|", 1)
+        self._pick(listing.get_option_at_index(listing.highlighted or 0).id)
+
+    def _pick(self, option_id) -> None:
+        if not option_id or "|" not in str(option_id):
+            return
+        provider, model = str(option_id).split("|", 1)
         self.dismiss((provider, model))
 
     @on(Button.Pressed)
     def _on_button(self, event: Button.Pressed) -> None:
-        if event.button.id == "close":
+        bid = event.button.id
+        if bid in ("close", "mback"):
             self.dismiss(None)
+            return
+        if bid == "mchoose":
+            self._choose_highlighted()
 
 
 class ThemeScreen(ModalScreen):
     """Thema kiezen: latte / frappe / macchiato / mocha (allemaal Catppuccin)."""
 
-    CSS = """
-    ThemeScreen {
-        align: center middle;
-    }
+    CSS = POPUP_CSS + """
     #theme-box {
-        width: 56%;
-        max-width: 64;
-        height: auto;
-        max-height: 100%;
-        border: round $border;
-        background: $surface;
-        padding: 0 2;
+        width: 62%;
+        max-width: 46;
     }
     #theme-list {
         height: auto;
-        border: none;
+        max-height: 100%;
+        margin-top: 1;
     }
     """
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="theme-box"):
+        with Vertical(id="theme-box", classes="popup"):
             yield from _titlebar(t("theme_title"))
             yield OptionList(id="theme-list")
 
     def on_mount(self) -> None:
+        from rich.text import Text
+
         listing = self.query_one("#theme-list", OptionList)
         current = getattr(self.app, "theme", DEFAULT_THEME)
         for name in THEME_NAMES:
-            marker = "●" if name == current else " "
-            listing.add_option(Option(f"{marker} {name}", id=name))
+            bullet = "●" if name == current else "○"
+            label = Text.from_markup(f"[{PINK[name]}]{bullet}[/] {name}")
+            listing.add_option(Option(label, id=name))
         listing.focus()
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
@@ -915,16 +983,11 @@ class TranscriptScreen(ModalScreen):
         ("slash", "search", "zoek"),
     ]
 
-    CSS = """
-    TranscriptScreen {
-        align: center middle;
-    }
+    CSS = POPUP_CSS + """
     #transcript-box {
         width: 95%;
         max-width: 140;
         height: 95%;
-        border: round $border;
-        background: $surface;
         padding: 0 1;
     }
     #tbody {
@@ -932,12 +995,12 @@ class TranscriptScreen(ModalScreen):
         padding: 0 1;
     }
     #thint {
-        dock: bottom;
         height: 1;
         color: $text-muted;
     }
     #tsearch {
         display: none;
+        margin-top: 1;
     }
     """
 
@@ -949,7 +1012,7 @@ class TranscriptScreen(ModalScreen):
         self._widgets: list = []
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="transcript-box"):
+        with Vertical(id="transcript-box", classes="popup"):
             yield from _titlebar(t("transcript_title"))
             yield Input(placeholder=t("transcript_search"), id="tsearch")
             yield VerticalScroll(id="tbody")
@@ -1236,7 +1299,7 @@ class RoanApp(App):
             self._open_setup()
             return
         cfg = load_config()
-        self._sysline(f"model: {cfg['model']}  ·  provider: {cfg['provider']}")
+        self._sysline(t("ready", model=cfg["model"], provider=cfg["provider"]))
 
     def _render_history(self) -> None:
         """Toon het herstelde gesprek zodat de context zichtbaar is."""
@@ -1256,9 +1319,16 @@ class RoanApp(App):
 
     def _update_status(self) -> None:
         cfg = load_config()
-        key = t("status_key_set") if cfg.get("api_key") else t("status_no_key")
+        base = str(cfg.get("base_url") or "")
+        if base.startswith(("http://localhost", "http://127.0.0.1")):
+            key = t("status_local")
+        elif cfg.get("api_key"):
+            key = t("status_key_set")
+        else:
+            key = t("status_no_key")
+        accent = accent_color()
         self.query_one("#status", Static).update(
-            f"{cfg['model']}  ·  {cfg['provider']}  ·  {key}  ·  {t('status_session')} {self.agent.session_id}"
+            f"[b {accent}]◆[/] {cfg['model'] or '?'}  ·  {cfg['provider'] or '?'}  ·  {key}"
         )
 
     # ---------- helpers ----------

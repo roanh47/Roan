@@ -145,6 +145,25 @@ Picking any provider fills in its `base_url` automatically — from
 `PROVIDER_PRESETS` or else the `api` field in models.dev — so for hosted
 providers you usually only need to paste a key.
 
+## Look
+
+Everything is Catppuccin — the four official flavours, each with **that
+flavour's pink** as the only accent (`#EA76CB` latte, `#F4B8E4` frappe,
+`#F5BDE6` macchiato, `#F5C2E7` mocha). There is no second accent colour, so
+nothing ever falls back to a default blue or green.
+
+Depth comes from three surface levels instead of borders everywhere:
+
+- the screen sits on `$background`
+- a popup sits one step lighter on `$surface`, with a single round lavender frame
+- fields and buttons sit one step lighter again on `$panel`, and turn pink on focus
+
+Selection in every list is a pink bar with dark text. Every popup (setup,
+provider picker, model browser, theme picker, transcript) shares one CSS block,
+so they line up with each other: title and field labels start at the same
+column, and the action buttons sit bottom-right with a key hint on the line
+above them.
+
 ## Renderers
 
 **fullscreen** is the default, like the new Claude Code TUI: it draws on the
