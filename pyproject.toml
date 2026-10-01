@@ -27,7 +27,7 @@ build-backend = "setuptools.build_meta"
 packages = ["roan", "roan.channels"]
 
 [tool.setuptools.package-data]
-roan = ["assets/*.png"]
+roan = ["assets/*.png", "assets/*.ans"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

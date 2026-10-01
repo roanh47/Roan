@@ -57,7 +57,7 @@ from .models import (
     LOCAL_IDS,
 )
 from .i18n import provider_desc, t
-from .photo import fitted_cells, render_photo
+from .photo import ANS_AVATAR, ANS_CELLS, avatar_cells, render_avatar
 from .themes import (
     DEFAULT_THEME,
     LABELS,
@@ -71,6 +71,18 @@ from .themes import (
 )
 
 BUNDLED_AVATAR = Path(__file__).parent / "assets" / "avatar.png"
+
+# Kolommen waarin het portret past. De meegeleverde tekening is 24 kolommen
+# breed en heeft die breedte niet uit zichzelf; de 26 is de grens waarin een
+# raster uit de PNG mag schalen.
+AVATAR_COLS = 26
+
+# Pad waar nooit een vooraf gerenderde tekening staat. `render_avatar` en
+# `avatar_cells` zoeken eerst het .ans-bestand en vallen anders terug op de
+# PNG; wijst je hen hierheen, dan lezen ze een leeg apparaat, krijgen ze geen
+# tekening en blijft dus alleen het PNG-pad over. Dat is nodig als wij de
+# valback bewust kiezen: een te kort scherm of een eigen foto.
+NO_AVATAR_ANS = Path(os.devnull)
 
 CLOSE_GLYPH = "✕"
 
@@ -1418,8 +1430,10 @@ class RoanApp(App):
     /*GEEN horizontale padding: _size_avatar zet de breedte gelijk aan het aantal
        kolommen van de tekst, dus padding zou de bruikbare breedte verkleinen en
        elke regel op de volgende regel laten doorlopen (Rich wrapt dan).*/
+    /* Breedte volgt de tekst (24 kolommen voor de meegeleverde tekening);
+       _size_avatar zet daarna het precieze aantal cellen. */
     #avatar {
-        width: 28;
+        width: auto;
         height: auto;
         padding: 0;
     }
@@ -1671,6 +1685,12 @@ class RoanApp(App):
 
     # ---------- avatar ----------
     def _resolve_avatar(self):
+        """Het pad van de afbeelding: eigen foto, uit de config, of de meegeleverde.
+
+        Blijft altijd een afbeelding. De vooraf gerenderde tekening staat er
+        los van, want dat is geen foto maar een tekening van bloktekens (zie
+        `_avatar_paths`).
+        """
         if self.avatar_path and Path(self.avatar_path).expanduser().exists():
             return str(Path(self.avatar_path).expanduser())
         cfg_path = ROAN_DIR / "config.json"
@@ -1687,6 +1707,48 @@ class RoanApp(App):
             return str(BUNDLED_AVATAR)
         return None
 
+    def _avatar_uses_ansi(self, png: str) -> bool:
+        """Teken de vooraf gerenderde tekening, of raster de PNG?
+
+        De tekening in `assets/avatar.ans` is met chafa geschilderd en daardoor
+        scherper dan een raster dat wij zelf uit de PNG maken. Zij is echter
+        een vast raster van ANS_CELLS: krimpen zou de cellen 2:1-verhouding
+        doorbreken. Past die niet, dan nemen we het PNG-pad, dat wél schaalt.
+
+        `png` is het al opgeloste pad (uit `_resolve_avatar`): de tekening hoort
+        bij de meegeleverde avatar, niet bij een foto van de gebruiker.
+        """
+        return (
+            ANS_AVATAR.exists()
+            and Path(png) == BUNDLED_AVATAR
+            and not (_HAS_HD and _image_is_graphical())
+            and self._avatar_rows() >= ANS_CELLS[1]
+        )
+
+    def _avatar_paths(self) -> tuple[str, str]:
+        """(ansi, png) voor `render_avatar` en `avatar_cells`.
+
+        De eerste is de vooraf gerenderde tekening als wij die willen gebruiken
+        en anders NO_AVATAR_ANS, zodat alleen het PNG-pad overblijft. De twee
+        functies in photo.py kiezen zelf eerst het .ans-bestand en vallen pas
+        dan terug; wij moeten dus hetzelfde pad aan beide geven, anders rekent
+        de widget met een andere verhouding dan de tekst die er staat.
+        """
+        png = self._resolve_avatar() or str(BUNDLED_AVATAR)
+        ans = ANS_AVATAR if self._avatar_uses_ansi(png) else NO_AVATAR_ANS
+        return str(ans), png
+
+    def _avatar_text(self):
+        """De avatar als tekst, precies in het formaat dat `_size_avatar` meet."""
+        ans, png = self._avatar_paths()
+        return render_avatar(
+            ans_path=ans,
+            png_path=png,
+            width=AVATAR_COLS,
+            max_height=self._avatar_rows(),
+            bg=self._theme_bg(),
+        )
+
     # ---------- layout ----------
     def compose(self) -> ComposeResult:
         avatar = self._resolve_avatar()
@@ -1696,15 +1758,7 @@ class RoanApp(App):
             if _HAS_HD and _image_is_graphical():
                 yield _image_widget_class()(avatar, id="avatar")
             else:
-                yield Static(
-                    render_photo(
-                        avatar,
-                        width=26,
-                        max_height=self._avatar_rows(),
-                        bg=self._theme_bg(),
-                    ),
-                    id="avatar",
-                )
+                yield Static(self._avatar_text(), id="avatar")
         yield Messages(id="messages")
         # Vastgezet aan de onderkant als één blok, anders landen de status en
         # het invoerveld allebei op dezelfde rij en schrijven ze over elkaar.
@@ -1745,25 +1799,64 @@ class RoanApp(App):
         return (24, 24, 37)
 
     def _avatar_rows(self) -> int:
-        """Hoeveel rijen de avatar mag krijgen, afhankelijk van het scherm."""
-        return max(6, min(18, (self.size.height or 24) // 3))
+        """Hoeveel rijen de avatar mag krijgen, afhankelijk van het scherm.
+
+        De vooraf gerenderde tekening is een vast raster van ANS_CELLS: 24
+        kolommen breed en 12 rijen hoog. Krimpen zou de cellen 2:1-verhouding
+        doorbreken, dus hij gaat alleen als een helft van het scherm of meer
+        overblijft voor het gesprek en het invoerveld. Op een kleiner scherm
+        nemen we het PNG-pad, dat wél schaalt; op een normaal scherm is het
+        dus gewoon de eigen maat van de tekening.
+        """
+        height = self.size.height or 24
+        if ANS_CELLS[1] * 2 < height:
+            return ANS_CELLS[1]
+        return max(6, min(18, height // 3))
 
     def _size_avatar(self) -> None:
         """Zet de avatar op het aantal cellen dat zijn verhouding respecteert.
 
-        Een portret dat in een te korte widget wordt gezet, wordt uitgerekt; het
-        widget krijgt daarom expliciet de cellen die bij de afbeelding horen.
-        fitted_cells rekent met dezelfde verhouding als render_photo, anders
-        snappen we het plaatje af.
+        `self.size` in `on_resize` is nog de OUDE maat (zie `_place_close`),
+        dus de maat wordt pas na de volgende refresh gezet; anders rekent hij
+        met het scherm van vóór de resize.
         """
+        self.call_after_refresh(self._size_avatar_now)
+
+    def _size_avatar_now(self) -> None:
+        """Meet de tekst van de avatar en geef de widget precies die maat.
+
+        Een portret dat in een te korte widget wordt gezet, wordt uitgerekt; het
+        widget krijgt daarom expliciet de cellen die bij de tekst horen.
+        `avatar_cells` meet hetzelfde als `render_avatar` tekent, dus de twee
+        lopen nooit uit de pas.
+
+        Past de tekst er niet meer bij — het scherm is veranderd sinds compose,
+        dus de keuze tussen tekening en PNG is om — dan tekenen we opnieuw;
+        anders zou een 12-rijen tekening in een 6-rijen widget staan.
+        """
+        from rich.text import Text
+
         nodes = self.query("#avatar")
         if not nodes:
             return
-        path = self._resolve_avatar()
-        if not path:
-            return
-        cols, rows = fitted_cells(path, 26, max_rows=self._avatar_rows())
         node = nodes.first()
+        ans, png = self._avatar_paths()
+        cols, rows = avatar_cells(
+            ans_path=ans,
+            png_path=png,
+            max_cols=AVATAR_COLS,
+            max_rows=self._avatar_rows(),
+        )
+        if isinstance(node, Static):
+            # Wat er nu in de widget staat; wij meten het zelf, want de keuze
+            # tussen de tekening en het PNG-pad hangt aan de schermhoogte.
+            huidig = (0, 0)
+            vorige = getattr(node, "content", None)
+            if isinstance(vorige, Text):
+                regels = vorige.split("\n")
+                huidig = (max((r.cell_len for r in regels), default=0), len(regels))
+            if huidig != (cols, rows):
+                node.update(self._avatar_text())
         node.styles.width = cols
         node.styles.height = rows
 
@@ -1772,7 +1865,16 @@ class RoanApp(App):
 
         De knop is 5 kolommen breed (zie `.close`), dus 5 kolomen van de rand
         af is de rechterrand precies.
+
+        `self.size` in `on_resize` is nog de OUDE maat: App._on_resize zet pas
+        later de nieuwe grootte en stuurt de Resize naar het scherm. Zonder de
+        call_after_refresh bleef de ✕ dus één resize achter en stond hij
+        scheef, of buiten beeld als het venster kleiner werd. Daarom rekenen we
+        pas na de volgende refresh, als de nieuwe maat binnen is.
         """
+        self.call_after_refresh(self._place_close_now)
+
+    def _place_close_now(self) -> None:
         for node in self.query("#app-close"):
             node.styles.offset = (max(0, (self.size.width or 80) - 5), 0)
 

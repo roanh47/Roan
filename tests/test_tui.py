@@ -959,3 +959,166 @@ async def test_hidden_status_chips_stay_quiet_and_model_stays_clickable(tmp_roan
         await pilot.click("#status")
         assert await _wait_for_models_screen(app, pilot), app.screen
         assert isinstance(app.screen, ModelsScreen)
+
+
+# ---------- de ✕ volgt de rechterrand als het venster van maat verandert ----------
+@pytest.mark.asyncio
+async def test_close_button_follows_the_right_edge_after_a_resize(tmp_roan):
+    """Na een resize staat de ✕ weer precies tegen de nieuwe rechterrand.
+
+    `App._on_resize` stuurt de Resize naar het scherm en zet de nieuwe maat
+    pas daarna; wie in `on_resize` meteen `self.size` gebruikt, rekent nog met
+    de OUDE vensterbreedte en laat de knop één resize achter (of buiten beeld
+    als het venster kleiner werd). Daarom loopt het plaatsen via
+    `call_after_refresh`.
+    """
+    from textual.widgets import Button
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(90, 30)) as pilot:
+        await pilot.pause()
+        btn = app.query_one("#app-close", Button)
+        assert btn.region.width == 5, btn.region
+        assert btn.region.right == 90, btn.region
+
+        for size in [(46, 20), (120, 40), (60, 24), (33, 12)]:
+            await pilot.resize_terminal(*size)
+            await pilot.pause()
+            width = app.size.width
+            assert btn.region.width == 5, (size, btn.region)
+            assert btn.region.right == width, (size, btn.region, width)
+            # het teken blijft in het midden van zijn 5 kolommen
+            row = _row_text(app.screen, btn.region.y)
+            assert row[btn.region.x : btn.region.right] == "  ✕  ", (size, row)
+
+
+# ---------- de avatar is de vooraf gerenderde tekening ----------
+# assets/avatar.ans is met chafa gemaakt (24x12, echte truecolor) en staat als
+# tekst in de repo; de PNG is alleen de terugvalroute.
+
+
+@pytest.mark.asyncio
+async def test_avatar_draws_the_pre_rendered_ansi_at_its_own_size(tmp_roan):
+    """De widget krijgt precies de cellen van het bestand: 24 breed, 12 hoog.
+
+    Hij mag dus niet groter of kleiner worden: een te smalle widget laat Rich
+    elke regel op de volgende doorlopen, en dat breekt de kleur-escapes van
+    die regel.
+    """
+    from rich.cells import cell_len
+    from rich.color import ColorType
+    from roan.photo import ANS_CELLS
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(90, 30)) as pilot:
+        await pilot.pause()
+        avatar = app.query_one("#avatar")
+        regels = avatar.content.plain.split("\n")
+        assert len(regels) == ANS_CELLS[1], f"{len(regels)} rijen, geen {ANS_CELLS[1]}"
+        assert {cell_len(r) for r in regels} == {ANS_CELLS[0]}, "rij niet 24 kolommen"
+        assert (avatar.region.width, avatar.region.height) == ANS_CELLS, avatar.region
+        assert avatar.content_size == ANS_CELLS, avatar.content_size
+        # echte kleuren, geen 256 of 16 kleuren
+        assert any(
+            span.style is not None
+            and span.style.color is not None
+            and span.style.color.type is ColorType.TRUECOLOR
+            for span in avatar.content.spans
+        ), "geen truecolor in de stijlen"
+        # chafa zet de cursor uit en weer aan; dat hoort niet in een widget
+        assert "\x1b" not in avatar.content.plain
+
+
+@pytest.mark.asyncio
+async def test_every_avatar_screen_row_is_a_whole_row(tmp_roan):
+    """Geen afgebroken regels: elke schermrij is even breed en niet leeg.
+
+    Dit is de directe variant van de vorige bug: toen stond `padding: 0 2` op
+    #avatar, zodat de 24 kolommen in een 20 kolommen brede doos pasten en Rich
+    elke regel in 12 + 4 afbrak. Die losse streepjes van 4 tekenden tussen de
+    regels door, en de kleur liep weg.
+    """
+    from rich.cells import cell_len
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(90, 30)) as pilot:
+        await pilot.pause()
+        avatar = app.query_one("#avatar")
+        strips = app.screen._compositor.render_strips()
+        rijen = [
+            "".join(seg.text for seg in strips[y])
+            for y in range(avatar.region.y, avatar.region.y + avatar.region.height)
+        ]
+        assert len(rijen) == avatar.region.height == 12
+        assert {cell_len(rij) for rij in rijen} == {90}, "schermrijen zijn niet even breed"
+        # de tekening staat op elke rij; een afgebroken regel is een paar tekens
+        for rij in rijen:
+            zichtbaar = len(rij.strip())
+            assert zichtbaar >= 8, f"rij valt weg (een afgebroken regel?): {rij!r}"
+
+
+@pytest.mark.asyncio
+async def test_avatar_widget_has_no_horizontal_padding(tmp_roan):
+    """`padding: 0 2` op #avatar kost vier kolommen van de inhoudsbreedte."""
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(90, 30)) as pilot:
+        await pilot.pause()
+        avatar = app.query_one("#avatar")
+        assert (avatar.styles.padding.left, avatar.styles.padding.right) == (0, 0)
+
+
+@pytest.mark.asyncio
+async def test_avatar_paths_prefers_the_ans_and_points_away_when_it_may_not(tmp_roan):
+    """Op een normaal scherm de tekening; te kort → alleen het PNG-pad."""
+    from pathlib import Path
+    from roan.tui import AVATAR_COLS, BUNDLED_AVATAR, NO_AVATAR_ANS
+    from roan.photo import ANS_AVATAR, ANS_CELLS
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(90, 30)) as pilot:
+        await pilot.pause()
+        ans, png = app._avatar_paths()
+        assert Path(ans) == ANS_AVATAR
+        assert Path(png) == BUNDLED_AVATAR
+        assert app._avatar_rows() == ANS_CELLS[1]
+
+        await pilot.resize_terminal(90, 20)
+        await pilot.pause()
+        ans, png = app._avatar_paths()
+        assert Path(ans) == NO_AVATAR_ANS, "te kort scherm: geen tekening"
+        assert app._avatar_rows() < ANS_CELLS[1]
+        assert AVATAR_COLS > 0
+
+
+@pytest.mark.asyncio
+async def test_a_short_screen_scales_the_png_instead_of_squashing_the_drawing(tmp_roan):
+    """Past 12 rijen er niet in, dan het raster uit de PNG, dat wél schaalt."""
+    from rich.cells import cell_len
+    from roan.photo import ANS_CELLS, fitted_cells
+    from roan.tui import AVATAR_COLS
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(90, 20)) as pilot:
+        await pilot.pause()
+        avatar = app.query_one("#avatar")
+        cols, rows = fitted_cells(avatar_path(), AVATAR_COLS, max_rows=app._avatar_rows())
+        assert rows < ANS_CELLS[1], app._avatar_rows()
+        assert (avatar.region.width, avatar.region.height) == (cols, rows)
+        regels = avatar.content.plain.split("\n")
+        assert len(regels) == rows
+        assert {cell_len(r) for r in regels} == {cols}
+
+
+@pytest.mark.asyncio
+async def test_a_missing_ans_still_draws_the_png_in_the_same_cells(tmp_roan, tmp_path, monkeypatch):
+    """Het .ans is een optimalisatie; zonder het bestand blijft de avatar."""
+    from roan import tui as tui_mod
+    from roan.photo import ANS_CELLS
+
+    monkeypatch.setattr(tui_mod, "ANS_AVATAR", tmp_path / "niet-meegeleverd.ans")
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(90, 30)) as pilot:
+        await pilot.pause()
+        avatar = app.query_one("#avatar")
+        assert (avatar.region.width, avatar.region.height) == ANS_CELLS, avatar.region
+        assert set(avatar.content.plain) <= {"▀", "\n"}, "geen halfblokjes uit de PNG"
