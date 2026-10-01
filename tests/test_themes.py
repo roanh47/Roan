@@ -1,4 +1,4 @@
-"""Tests voor de thema's: losse thema's zoals opencode, geen Catppuccin-familie."""
+"""Tests voor de thema's: vier Catppuccin-smaken, altijd pink als accent."""
 
 import pytest
 
@@ -6,7 +6,7 @@ from roan import config
 from roan import tui as tui_mod
 from textual.color import Color
 
-from roan.themes import ACCENTS, DEFAULT_THEME, LABELS, ROAN, THEME_NAMES
+from roan.themes import LAVENDER, PINK, THEME_NAMES
 from roan.tui import RoanApp, ThemeScreen
 
 
@@ -38,8 +38,6 @@ def roan_cfg(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "LOGS_DIR", tmp_path / "logs")
     monkeypatch.setattr(config, "CACHE_DIR", tmp_path / "cache")
     monkeypatch.setattr(config, "PLANS_DIR", tmp_path / "plans")
-    if config.CONFIG_PATH.exists():
-        config.CONFIG_PATH.unlink()
     config.save_config({"provider": "lmstudio", "model": "m", "tui": "default"})
     from roan import i18n
 
@@ -59,102 +57,60 @@ def rgb(color):
     return (color.r, color.g, color.b)
 
 
-# ---------- de lijst thema's ----------
-def test_catppuccin_is_gone():
-    """De vier Catppuccin-smaken zijn eruit; dat was één familie, geen keuzemenu."""
-    assert not [n for n in THEME_NAMES if "catppuccin" in n or n in ("latte", "frappe", "macchiato", "mocha")]
+# ---------- de vier smaken ----------
+def test_theme_names():
+    assert THEME_NAMES == ("latte", "frappe", "macchiato", "mocha")
     assert [t.name for t in tui_mod.THEMES] == list(THEME_NAMES)
 
 
-def test_theme_list_matches_the_families_opencode_offers():
-    for expected in ("tokyo-night", "gruvbox", "nord", "dracula", "monokai"):
-        assert expected in THEME_NAMES, expected
-    assert "ansi-dark" in THEME_NAMES and "ansi-light" in THEME_NAMES
-
-
-def test_default_is_our_own_theme():
-    assert DEFAULT_THEME == "roan"
-    assert THEME_NAMES[0] == "roan"
-
-
-def test_every_theme_has_a_label():
-    for name in THEME_NAMES:
-        assert LABELS.get(name), name
-
-
-@pytest.mark.parametrize("name", THEME_NAMES)
-def test_every_theme_is_registered_and_activatable(roan_cfg, name):
-    config.save_config({"theme": name})
+@pytest.mark.parametrize("flavour", THEME_NAMES)
+def test_every_theme_is_registered_and_activatable(roan_cfg, flavour):
+    config.save_config({"theme": flavour})
     app = RoanApp(FakeAgent())
-    assert app.theme == name
+    assert app.theme == flavour
 
 
-def test_invalid_theme_falls_back_to_the_default(roan_cfg):
+def test_invalid_theme_falls_back_to_mocha(roan_cfg):
     config.save_config({"theme": "paars"})
     app = RoanApp(FakeAgent())
-    assert app.theme == DEFAULT_THEME
-
-
-# ---------- ons eigen thema ----------
-def test_roan_theme_is_grey_with_a_loud_pink_accent():
-    assert ROAN["background"] == "#14161c"
-    assert ROAN["accent"] == "#ff2e88"
-    theme = tui_mod.THEME_BY_NAME["roan"]
-    assert theme.primary == "#ff2e88"
-    assert theme.accent == "#ff2e88"
-
-
-def test_roan_accent_is_a_real_pink_not_a_purple():
-    r, g, b = rgb(ROAN["accent"])
-    assert r > 200, "het rood hoort hoog te zijn voor fel roze"
-    assert b > 100 and g < 100, "groen laag en blauw hoog maakt het roze"
+    assert app.theme == "mocha"
 
 
 @pytest.mark.asyncio
-async def test_background_is_opaque_and_grey(roan_cfg):
+@pytest.mark.parametrize(
+    "flavour,screen_bg",
+    [
+        ("latte", (239, 241, 245)),  # #EFF1F5
+        ("frappe", (48, 52, 70)),  # #303446
+        ("macchiato", (36, 39, 58)),  # #24273A
+        ("mocha", (24, 24, 37)),  # #181825
+    ],
+)
+async def test_background_is_catppuccin_and_opaque(roan_cfg, flavour, screen_bg):
+    config.save_config({"theme": flavour})
     app = RoanApp(FakeAgent())
     async with app.run_test(size=(60, 24)) as pilot:
         await pilot.pause()
         bg = app.screen.styles.background
         assert bg.a == 1.0, "achtergrond moet dekkend zijn, anders lijkt hij zwart"
-        assert rgb(bg) == rgb(ROAN["background"])
+        assert rgb(bg) == screen_bg, flavour
 
 
-# ---------- accent per thema ----------
-@pytest.mark.parametrize("name", THEME_NAMES)
-def test_accent_and_primary_agree(name):
-    theme = tui_mod.THEME_BY_NAME[name]
-    assert theme.primary == ACCENTS[name]
-    assert theme.accent == theme.primary
+@pytest.mark.parametrize("flavour", THEME_NAMES)
+def test_accent_is_the_flavour_pink(flavour):
+    theme = tui_mod.THEME_BY_NAME[flavour]
+    assert theme.primary == PINK[flavour]
+    assert theme.accent == PINK[flavour]
 
 
-@pytest.mark.parametrize("name", THEME_NAMES)
-def test_every_theme_defines_the_variables_our_css_needs(name):
-    """Zonder deze variabelen valt de CSS terug op Textual's blauw/groen."""
-    variables = tui_mod.THEME_BY_NAME[name].variables
-    for key in (
-        "border",
-        "text-muted",
-        "block-cursor-background",
-        "block-cursor-foreground",
-        "input-selection-background",
-        "input-cursor-background",
-        "scrollbar",
-        "scrollbar-hover",
-        "scrollbar-active",
-    ):
-        assert variables.get(key), f"{name} mist {key}"
-
-
-@pytest.mark.parametrize("name", THEME_NAMES)
-def test_selection_uses_the_theme_accent(name):
-    variables = tui_mod.THEME_BY_NAME[name].variables
-    assert variables["block-cursor-background"] == ACCENTS[name]
+@pytest.mark.parametrize("flavour", THEME_NAMES)
+def test_border_is_the_flavour_lavender(flavour):
+    assert tui_mod.THEME_BY_NAME[flavour].variables["border"] == LAVENDER[flavour]
 
 
 # ---------- thema kiezen ----------
 @pytest.mark.asyncio
-async def test_theme_screen_lists_every_theme(roan_cfg):
+async def test_theme_screen_lists_the_four_flavours(roan_cfg):
     from textual.widgets import OptionList
 
     app = RoanApp(FakeAgent())
@@ -163,8 +119,8 @@ async def test_theme_screen_lists_every_theme(roan_cfg):
         app.push_screen(screen)
         await pilot.pause()
         listing = screen.query_one("#theme-list", OptionList)
-        assert listing.option_count == len(THEME_NAMES)
-        labels = [str(listing.get_option_at_index(i).prompt) for i in range(len(THEME_NAMES))]
+        assert listing.option_count == 4
+        labels = [str(listing.get_option_at_index(i).prompt) for i in range(4)]
         for name in THEME_NAMES:
             assert any(name in lb for lb in labels)
 
@@ -179,9 +135,9 @@ async def test_theme_screen_marks_the_active_one(roan_cfg):
         app.push_screen(screen)
         await pilot.pause()
         listing = screen.query_one("#theme-list", OptionList)
-        labels = [str(listing.get_option_at_index(i).prompt) for i in range(len(THEME_NAMES))]
-        assert labels[0].startswith("●")  # roan is actief
-        assert not labels[1].startswith("●")
+        labels = [str(listing.get_option_at_index(i).prompt) for i in range(4)]
+        assert labels[3].startswith("●")  # mocha is actief
+        assert not labels[0].startswith("●")
 
 
 @pytest.mark.asyncio
@@ -194,11 +150,11 @@ async def test_theme_screen_picks(roan_cfg):
         await pilot.pause()
         listing = screen.query_one("#theme-list")
         listing.focus()
-        listing.highlighted = 1
+        listing.highlighted = 1  # frappe
         await pilot.pause()
         await pilot.press("enter")
         await pilot.pause()
-    assert results == [THEME_NAMES[1]]
+    assert results == ["frappe"]
 
 
 @pytest.mark.asyncio
@@ -206,10 +162,10 @@ async def test_cmd_theme_switches_and_saves(roan_cfg):
     app = RoanApp(FakeAgent())
     async with app.run_test(size=(60, 24)) as pilot:
         await pilot.pause()
-        app._cmd_theme(["dracula"])
+        app._cmd_theme(["latte"])
         await pilot.pause()
-        assert app.theme == "dracula"
-        assert config.load_config()["theme"] == "dracula"
+        assert app.theme == "latte"
+        assert config.load_config()["theme"] == "latte"
 
 
 @pytest.mark.asyncio
@@ -219,8 +175,8 @@ async def test_cmd_theme_rejects_unknown(roan_cfg):
         await pilot.pause()
         app._cmd_theme(["groen"])
         await pilot.pause()
-        assert app.theme == DEFAULT_THEME
-        assert config.load_config().get("theme") in (None, DEFAULT_THEME)
+        assert app.theme == "mocha"
+        assert config.load_config().get("theme") in (None, "mocha")
 
 
 @pytest.mark.asyncio
@@ -238,14 +194,14 @@ async def test_theme_persists_over_restart(roan_cfg):
     app = RoanApp(FakeAgent())
     async with app.run_test(size=(60, 24)) as pilot:
         await pilot.pause()
-        app._cmd_theme(["nord"])
+        app._cmd_theme(["macchiato"])
         await pilot.pause()
     app2 = RoanApp(FakeAgent())
-    assert app2.theme == "nord"
+    assert app2.theme == "macchiato"
 
 
 @pytest.mark.asyncio
-async def test_popups_use_surface_over_base(roan_cfg):
+async def test_popus_use_surface_over_base(roan_cfg):
     """Popup één trede lichter dan het scherm, anders zie je hem niet."""
     app = RoanApp(FakeAgent())
     async with app.run_test(size=(60, 24)) as pilot:

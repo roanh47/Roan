@@ -115,9 +115,9 @@ async def test_normal_message_goes_to_agent(tmp_roan):
 async def test_theme_switch(tmp_roan):
     app = RoanApp(FakeAgent())
     async with app.run_test() as pilot:
-        await pilot.press(*"/theme nord", "enter")
+        await pilot.press(*"/theme frappe", "enter")
         await pilot.pause()
-        assert app.theme == "nord"
+        assert app.theme == "frappe"
 
 
 @pytest.mark.asyncio

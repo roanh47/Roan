@@ -35,7 +35,7 @@ DEFAULT_CONFIG = {
     "api_key": None,          # overschrijft de preset-key indien ingesteld
     "model": "local-model",
     "language": "nl",         # "nl" of "en"
-    "theme": "roan",          # zie roan/themes.py (THEME_NAMES)
+    "theme": "mocha",         # zie roan/themes.py (THEME_NAMES)
     "endpoints": [],          # eigen OpenAI-compatibele endpoints (Custom)
     "tui": None,              # "fullscreen" | "default" | None (nog niet gekozen)
     "tui_prompts": 0,         # hoe vaak de fullscreen-dialoog is getoond

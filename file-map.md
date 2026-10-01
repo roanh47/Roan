@@ -35,9 +35,9 @@ sources:
 | `roan/photo.py` | 335 |
 | `roan/repl.py` | 66 |
 | `roan/skills.py` | 101 |
-| `roan/themes.py` | 226 |
+| `roan/themes.py` | 132 |
 | `roan/tools.py` | 156 |
-| `roan/tui.py` | 2561 |
+| `roan/tui.py` | 2558 |
 | `roan/update.py` | 63 |
 
 # Root and tests
@@ -63,11 +63,11 @@ sources:
 | `tests/test_search.py` | 313 |
 | `tests/test_setup_required.py` | 183 |
 | `tests/test_telegram.py` | 158 |
-| `tests/test_themes.py` | 260 |
+| `tests/test_themes.py` | 216 |
 | `tests/test_tui.py` | 1124 |
 | `tests/test_tui_close.py` | 201 |
 | `tests/test_tui_fullscreen.py` | 349 |
-| `tests/test_tui_look.py` | 376 |
+| `tests/test_tui_look.py` | 367 |
 | `tests/validate_okf.py` | 166 |
 
 # Where to look for what
@@ -86,7 +86,7 @@ sources:
 | MCP | `roan/mcp.py` |
 | Entry points and subcommands | `roan/cli.py` |
 
-The package is 6001 lines of Python in total. `roan/tui.py` is
+The package is 5904 lines of Python in total. `roan/tui.py` is
 the biggest file by far and holds every screen; that is deliberate - see
 [one shared popup style](roan/shared-popup-style.md) - but it is the file to
 split first if it gets unwieldy.

@@ -4,7 +4,7 @@ import pytest
 
 from roan import config
 from roan import tui as tui_mod
-from roan.themes import ACCENTS, DEFAULT_THEME, PINK_DARK, PINK_LIGHT, THEME_NAMES
+from roan.themes import DEFAULT_THEME, PINK, THEME_NAMES
 from roan.i18n import t
 from roan.tui import ModelsScreen, ProviderScreen, RoanApp, SetupScreen
 
@@ -49,30 +49,30 @@ def roan_cfg(tmp_path, monkeypatch):
 
 # ---------- thema ----------
 @pytest.mark.asyncio
-async def test_screen_background_is_opaque_theme_colour(roan_cfg):
-    """Niet zwart: het vlak moet dekkend zijn, anders ziet het er zwart uit."""
+async def test_screen_background_is_opaque_catppuccin(roan_cfg):
+    """Niet zwart: het mocha-vlak moet dekkend zijn, anders ziet het er zwart uit."""
     app = RoanApp(FakeAgent())
     async with app.run_test(size=(60, 24)) as pilot:
         await pilot.pause()
         bg = app.screen.styles.background
         assert app.theme == DEFAULT_THEME
         assert bg.a == 1.0, f"achtergrond is niet dekkend (alpha={bg.a})"
-        # De achtergrond is de kleuraflezing van het thema dat ook echt actief is.
-        expected = tui_mod.THEME_BY_NAME[app.theme].background.lstrip("#")
-        want = tuple(int(expected[i : i + 2], 16) for i in (0, 2, 4))
-        assert (bg.r, bg.g, bg.b) == want, (app.theme, (bg.r, bg.g, bg.b), want)
+        assert (bg.r, bg.g, bg.b) == (24, 24, 37)  # #181825 (Catppuccin mocha)
 
 
-def test_every_theme_builds_and_is_registered():
+def test_four_catppuccin_flavours():
+    """De vier Catppuccin-smaken blijven, dat is de hele point."""
+    assert THEME_NAMES == ("latte", "frappe", "macchiato", "mocha")
+    assert [t.name for t in tui_mod.THEMES] == list(THEME_NAMES)
+
+
+def test_every_catppuccin_colour_is_present():
     """Regression: het programma startte niet meer.
 
-    Een aantal Textual-thema's laat een kleur leeg omdat ze die van de
-    terminal overnemen (`textual-dark` heeft geen `background`,
-    `textual-light` geen `foreground`). `str(None)` is de string "None" en
-    `Color.parse("None")` gooit een ColorParseError, waardoor THEMES niet
-    opgebouwd werd en `import roan.themes` klapte.
+    Een thema met een lege kleur liet `str(None)` de string "None" worden,
+    waarop `Color.parse` een ColorParseError gooide en THEMES niet gebouwd
+    werd. Elk kleurveld moet nu een echte kleur zijn.
     """
-    assert [t.name for t in tui_mod.THEMES] == list(THEME_NAMES)
     for theme in tui_mod.THEMES:
         for field in ("primary", "accent", "secondary", "foreground",
                       "background", "surface", "panel", "success",
@@ -82,28 +82,19 @@ def test_every_theme_builds_and_is_registered():
             assert str(value).lower() != "none", f"{theme.name}.{field} is 'None'"
 
 
-def test_default_theme_is_actually_a_theme():
-    """`theme: "mocha"` in de default-config terwijl mocha niet bestaat."""
-    from roan import config as config_mod
-    from roan.themes import is_valid
-
-    assert DEFAULT_THEME in THEME_NAMES
-    assert is_valid(config_mod.DEFAULT_CONFIG["theme"]), (
-        config_mod.DEFAULT_CONFIG["theme"]
-    )
-
-
-def test_accent_is_always_pink():
+def test_accent_is_the_catppuccin_pink():
     """Altijd pink als accent, nooit groen of blauw."""
-    assert set(ACCENTS) == set(THEME_NAMES)
-    for name, pink in ACCENTS.items():
-        assert pink.lower() in (PINK_DARK.lower(), PINK_LIGHT.lower()), (name, pink)
+    for theme in tui_mod.THEMES:
+        assert theme.primary == PINK[theme.name], theme.name
+        assert theme.accent == PINK[theme.name], theme.name
 
 
-def test_pinks_are_the_two_catppuccin_pinks():
+def test_pinks_match_the_official_palette():
     # https://catppuccin.com/palette
-    assert PINK_DARK.lower() == "#ff2e88"
-    assert PINK_LIGHT.lower() == "#c2006b"
+    assert PINK["latte"] == "#EA76CB"
+    assert PINK["frappe"] == "#F4B8E4"
+    assert PINK["macchiato"] == "#F5BDE6"
+    assert PINK["mocha"] == "#F5C2E7"
 
 
 # ---------- geen lijntjes ----------
@@ -339,11 +330,11 @@ async def test_models_rows_and_buttons(roan_cfg):
     assert results == [("groq", "llama-3")]
 
 
-def test_theme_bullets_use_each_theme_pink(roan_cfg):
-    """De kleurstip in het thema-menu is de pink van dat thema."""
+def test_theme_bullets_use_each_flavour_pink(roan_cfg):
+    """De kleurstip in het thema-menu is de pink van die smaak."""
     from rich.text import Text
 
-    for name, pink in ACCENTS.items():
+    for name, pink in PINK.items():
         label = Text.from_markup(f"[{pink}]●[/] {name}")
         assert str(label.spans[0].style).lower() == pink.lower()
 

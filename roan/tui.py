@@ -60,12 +60,11 @@ from .i18n import provider_desc, t
 from .photo import ANS_AVATAR, ANS_CELLS, avatar_cells, render_avatar
 from .themes import (
     DEFAULT_THEME,
-    LABELS,
+    PINK,
     THEME_BY_NAME,
     THEME_NAMES,
     THEMES,
     accent_color,
-    accent_of,
     is_valid,
     set_current,
 )
@@ -1106,10 +1105,8 @@ class ThemeScreen(ModalScreen):
         current = getattr(self.app, "theme", DEFAULT_THEME)
         for name in THEME_NAMES:
             bullet = "●" if name == current else "○"
-            # De stip in de eigen accentkleur, zodat je de thema's uit elkaar houdt.
-            label = Text.from_markup(
-                f"[{accent_of(name)}]{bullet}[/] {name}  [dim]{LABELS.get(name, '')}[/]"
-            )
+            # De stip in de eigen pink van die smaak.
+            label = Text.from_markup(f"[{PINK[name]}]{bullet}[/] {name}")
             listing.add_option(Option(label, id=name))
         listing.focus()
 
