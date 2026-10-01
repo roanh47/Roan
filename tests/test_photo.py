@@ -165,3 +165,127 @@ def test_transparent_margins_render_as_the_background_not_white():
     }
     assert (255, 255, 255) not in triplets, "de marge mag niet wit zijn"
     assert theme_bg in triplets, f"de marge moet de thema-achtergrond zijn, kreeg {triplets}"
+
+
+# ---------- de vooraf gerenderde ANSI-avatar ----------
+# avatar.ans is eenmalig met chafa gegenereerd en staat als tekst in de repo:
+#     chafa -f symbols -s 24x12 --stretch --colors full avatar.png > avatar.ans
+
+ASSETS = Path(__file__).resolve().parents[1] / "roan" / "assets"
+AVATAR_ANS = ASSETS / "avatar.ans"
+
+
+@pytest.fixture
+def ans_path() -> str:
+    if not AVATAR_ANS.exists():
+        pytest.skip("geen avatar.ans")
+    return str(AVATAR_ANS)
+
+
+def _render_ansi(text) -> str:
+    """Teken `text` in een echte terminal en geef de ruwe uitvoer terug."""
+    from rich.console import Console
+
+    console = Console(force_terminal=True, color_system="truecolor", width=200)
+    with console.capture() as cap:
+        console.print(text)
+    return cap.get()
+
+
+def test_the_ans_avatar_has_twelve_rows(ans_path):
+    """Het bestand is met -s 24x12 gemaakt: 24 kolommen, 12 rijen."""
+    text = photo.load_ans(ans_path)
+    assert text is not None
+    assert len(text.plain.split("\n")) == 12
+    assert photo.ANS_CELLS == (24, 12)
+
+
+def test_ans_keeps_no_cursor_control(ans_path):
+    """chafa zet de cursor uit en weer aan; dat hoort niet in een widget.
+
+    Zo'n escape is geen teken. Blijft hij in de tekst staan, dan telt hij mee
+    voor de celbreedte en stuurt Textual hem alsnog naar de terminal toe.
+    """
+    text = photo.load_ans(ans_path)
+    assert text is not None
+    for escape in ("\x1b[?25l", "\x1b[?25h", "\x1b[?1049h", "\x1b[?1049l", "\x1b[2J", "\x1b[H"):
+        assert escape not in text.plain
+        assert escape not in str(text), f"{escape!r} lekte de stijlen in"
+    assert "\x1b" not in text.plain
+    assert not [c for c in text.plain if ord(c) < 32 and c != "\n"]
+
+
+def test_ans_cells_measures_the_characters_not_the_escapes(ans_path):
+    """De escapes tellen niet mee; anders krijgt de widget een maat van 499."""
+    assert photo.ans_cells(ans_path) == (24, 12)
+    raw = Path(ans_path).read_text(encoding="utf-8")
+    assert photo.ans_cells(ans_path) != (len(max(raw.split("\n"), key=len)), 12)
+
+
+def test_the_ansi_text_keeps_its_truecolor(ans_path):
+    """Het hele idee van het bestand: echte kleuren, geen 256 of 16 kleuren."""
+    import re
+
+    out = _render_ansi(photo.load_ans(ans_path))
+    assert "\x1b[38;2;" in out, "geen truecolor voorgrond in de uitvoer"
+    # chafa zet voor- en achtergrond in één SGR, dus niet op \x1b[48 beginnen.
+    assert "48;2;" in out, "geen truecolor achtergrond in de uitvoer"
+    assert "\x1b[?25l" not in out
+
+    # Dezelfde kleuren als in het bestand, dus er is niets platgeslagen.
+    src = re.findall(r"(?:38|48);2;(\d+;\d+;\d+)", Path(ans_path).read_text(encoding="utf-8"))
+    assert set(re.findall(r"(?:38|48);2;(\d+;\d+;\d+)", out)) == set(src)
+
+
+def test_ans_colours_survive_as_rich_styles(ans_path):
+    """Niet alleen de uitvoer, maar de Text zelf moet kleurtripels dragen."""
+    from rich.color import ColorType
+
+    text = photo.load_ans(ans_path)
+    kinds = {
+        span.style.color.type
+        for span in text.spans
+        if span.style is not None and span.style.color is not None
+    }
+    assert ColorType.TRUECOLOR in kinds
+
+
+def test_a_missing_ans_falls_back_to_none(tmp_path: Path):
+    """None betekent "gebruik het PNG-pad"; het bestand mag ontbreken."""
+    assert photo.load_ans(str(tmp_path / "nope.ans")) is None
+    assert photo.ans_cells(str(tmp_path / "nope.ans")) is None
+    # Ook als de caller meteen doorvalt moet dat een bruikbaar beeld geven.
+    assert photo.render_avatar(
+        ans_path=str(tmp_path / "nope.ans"), png_path=str(photo.PNG_AVATAR), width=24
+    ).plain
+
+
+def test_ans_strips_control_but_keeps_colour(tmp_path: Path):
+    """Alleen cursorbesturing gaat eruit; \x1b[38;2;r;g;bm is het hele punt."""
+    p = tmp_path / "a.ans"
+    p.write_text(
+        "\x1b[?25l\x1b[?1049h\x1b[2J\x1b[H\x1b[38;2;255;46;136m█\x1b[0m\x1b[?25h",
+        encoding="utf-8",
+    )
+    text = photo.load_ans(str(p))
+    assert text is not None
+    assert text.plain == "█"
+    assert "\x1b[38;2;255;46;136m" in _render_ansi(text)
+    assert photo.ans_cells(str(p)) == (1, 1)
+
+
+def test_an_empty_ans_falls_back_instead_of_drawing_nothing(tmp_path: Path):
+    p = tmp_path / "leeg.ans"
+    p.write_text("\x1b[?25l\x1b[2J\x1b[H\x1b[?25h", encoding="utf-8")
+    assert photo.load_ans(str(p)) is None
+    assert photo.ans_cells(str(p)) is None
+
+
+def test_avatar_cells_prefers_the_ans_and_falls_back_to_the_png(tmp_path: Path):
+    """De widgetgrootte moet bij de tekst passen die ook echt getekend wordt."""
+    assert photo.avatar_cells() == photo.ANS_CELLS == photo.ans_cells(str(photo.ANS_AVATAR))
+
+    alleen_png = photo.avatar_cells(
+        ans_path=str(tmp_path / "nope.ans"), png_path=str(photo.PNG_AVATAR), max_cols=26, max_rows=16
+    )
+    assert alleen_png == photo.fitted_cells(str(photo.PNG_AVATAR), 26, 16)

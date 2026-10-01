@@ -35,7 +35,7 @@ DEFAULT_CONFIG = {
     "api_key": None,          # overschrijft de preset-key indien ingesteld
     "model": "local-model",
     "language": "nl",         # "nl" of "en"
-    "theme": "mocha",         # zie roan/themes.py (THEME_NAMES)
+    "theme": "roan",          # zie roan/themes.py (THEME_NAMES)
     "endpoints": [],          # eigen OpenAI-compatibele endpoints (Custom)
     "tui": None,              # "fullscreen" | "default" | None (nog niet gekozen)
     "tui_prompts": 0,         # hoe vaak de fullscreen-dialoog is getoond
@@ -43,8 +43,22 @@ DEFAULT_CONFIG = {
     "tui_fails": 0,           # mislukte fullscreen-starts
     "scroll_speed": 1,        # muiswiel-vermenigvuldiger
     "auto_follow": True,      # automatisch naar beneden scrollen
+    "mode": "chat",           # "chat" | "plan" | "build" (zie MODES)
+    "permissions": "auto",    # "auto" (automatisch goedkeuren) | "user"
+    "thinking": "off",        # "off" | "low" | "medium" | "high"
     "headers": {},            # extra HTTP-headers voor elke aanvraag
 }
+
+# De drie werkmodi, zoals opencode: chat praat, plan denkt eerst na, build
+# wijzigt meteen. Kort genoeg voor de statusbalk.
+MODES = ("chat", "plan", "build")
+
+# Toestemming voor toolgebruik: "auto" keurt automatisch goed, "user" vraagt
+# het eerst. De statusbalk toont "auto" of "user".
+PERMISSIONS = ("auto", "user")
+
+# Denkniveau, doorgegeven als reasoning-effort als de provider het kan.
+THINKING_LEVELS = ("off", "low", "medium", "high")
 
 # Providers die een sessie-header eisen. OpenCode Go en Zen routen op een
 # stabiele sessie-id; zonder die header geeft een deel van de modellen een

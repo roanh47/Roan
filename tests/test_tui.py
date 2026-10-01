@@ -115,9 +115,9 @@ async def test_normal_message_goes_to_agent(tmp_roan):
 async def test_theme_switch(tmp_roan):
     app = RoanApp(FakeAgent())
     async with app.run_test() as pilot:
-        await pilot.press(*"/theme latte", "enter")
+        await pilot.press(*"/theme nord", "enter")
         await pilot.pause()
-        assert app.theme == "latte"
+        assert app.theme == "nord"
 
 
 @pytest.mark.asyncio
@@ -422,3 +422,319 @@ async def test_avatar_rows_do_not_wrap(tmp_roan, size):
             f"avatar {avatar.content_size} past {cols} kolommen niet"
         )
         assert avatar.content_size.height >= rows
+
+
+# ---------- statusbalk ----------
+@pytest.mark.asyncio
+async def test_status_bar_has_no_api_key_status(tmp_roan):
+    """"key ingesteld" was nutteloos: de setup vertelt het al."""
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(110, 26)) as pilot:
+        await pilot.pause()
+        text = "".join(
+            seg.text for seg in app.screen._compositor.render_strips()[25]
+        ).lower()
+        assert "key" not in text
+        assert "ingesteld" not in text
+
+
+@pytest.mark.asyncio
+async def test_typing_model_still_offers_models(tmp_roan):
+    """Regression: bij `/model` verdween `/models` uit de lijst.
+
+    De exacte treffer sluit de langere varianten niet meer uit, anders is
+    /models onbereikbaar zodra je het eerste commando volledig hebt getypt.
+    """
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press(*"/model")
+        await pilot.pause()
+        listing = app.query_one("#slash")
+        ids = [listing.get_option_at_index(i).id for i in range(listing.option_count)]
+        assert "model" in ids
+        assert "models" in ids, ids
+
+
+@pytest.mark.asyncio
+async def test_ctrl_p_hint_is_clickable(tmp_roan):
+    from roan.tui import CommandScreen
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(110, 26)) as pilot:
+        await pilot.pause()
+        await pilot.click("#status-hints")
+        await pilot.pause()
+        assert isinstance(app.screen, CommandScreen)
+
+
+@pytest.mark.asyncio
+async def test_mode_permission_and_thinking_are_persisted(tmp_roan):
+    from roan import config
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(110, 26)) as pilot:
+        await pilot.pause()
+        for text, key, value in (
+            ("/mode plan", "mode", "plan"),
+            ("/permissions user", "permissions", "user"),
+            ("/thinking high", "thinking", "high"),
+        ):
+            await pilot.press(*text, "enter")
+            await pilot.pause()
+            assert config.load_config()[key] == value
+
+
+@pytest.mark.asyncio
+async def test_status_bar_hides_chips_on_a_narrow_window(tmp_roan):
+    """Op een smal venster moet de provider niet weggeknipt worden."""
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(60, 26)) as pilot:
+        await pilot.pause()
+        assert app.query_one("#status-thinking").display is False
+        assert app.query_one("#status-perm").display is False
+        # ctrl+p blijft altijd klikbaar.
+        assert app.query_one("#status-hints").display is True
+
+
+# ---------- de ✕ is 5 kolommen, met het teken in het midden ----------
+def _row_text(screen, y: int) -> str:
+    return "".join(seg.text for seg in screen._compositor.render_strips()[y])
+
+
+@pytest.mark.asyncio
+async def test_close_button_is_five_columns_with_the_glyph_centred(tmp_roan):
+    """5 kolommen breed en 2 kolommen lucht aan weerszijden van het teken.
+
+    In een popup won de generieke `.popup Button` (min-width 6, padding 0 1)
+    van `.close`, waardoor de knop daar 6 kolommen breed werd.
+    """
+    from textual.widgets import Button
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(90, 30)) as pilot:
+        await pilot.pause()
+        app_close = app.query_one("#app-close", Button)
+        assert app_close.region.width == 5, app_close.region
+        row = _row_text(app.screen, app_close.region.y)
+        assert row[app_close.region.x : app_close.region.x + 5] == "  ✕  "
+
+        scr = SetupScreen(provider="groq", model="m")
+        app.push_screen(scr)
+        await pilot.pause()
+        popup_close = scr.query_one("#close", Button)
+        assert popup_close.region.width == 5, popup_close.region
+        row = _row_text(scr, popup_close.region.y)
+        assert row[popup_close.region.x : popup_close.region.x + 5] == "  ✕  "
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("size", [(90, 30), (60, 24), (120, 40)])
+async def test_close_button_keeps_its_width_on_any_window(tmp_roan, size):
+    from textual.widgets import Button
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=size) as pilot:
+        await pilot.pause()
+        assert app.query_one("#app-close", Button).region.width == 5
+
+
+# ---------- twee kolomen lucht tussen twee knoppen ----------
+def _blank_columns_between(left, right) -> int:
+    """Lege kolommen tussen twee knoppen.
+
+    Textual tekent de achtergrond van een widget over zijn hele region, dus de
+    marge telt mee in het vak van de knop en het gat ertussen is precies
+    `right.region.x - (left.region.x + left.region.width)`.
+    """
+    return right.region.x - (left.region.x + left.region.width)
+
+
+@pytest.mark.asyncio
+async def test_two_blank_columns_between_the_setup_buttons(tmp_roan):
+    """Tussen Annuleren en Opslaan staan twee lege kolommen."""
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(90, 30)) as pilot:
+        app.push_screen(SetupScreen(provider="groq", model="m"))
+        await pilot.pause()
+        scr = app.screen
+        assert _blank_columns_between(scr.query_one("#cancel"), scr.query_one("#save")) == 2
+        # de rij staat nog steeds rechts, met de laatste knop tegen de rand
+        box = scr.query_one("#setup-box")
+        assert scr.query_one("#save").region.right == box.content_region.right
+
+
+@pytest.mark.asyncio
+async def test_two_blank_columns_between_the_models_buttons_and_filters(tmp_roan):
+    from roan.tui import ModelsScreen, ProviderScreen
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(90, 30)) as pilot:
+        await pilot.pause()
+
+        models = ModelsScreen([("groq", "llama-3")], [], [])
+        app.push_screen(models)
+        await pilot.pause()
+        assert _blank_columns_between(models.query_one("#mback"), models.query_one("#mchoose")) == 2
+        # de categorie- en de providerkiezer
+        assert _blank_columns_between(models.query_one("#cat"), models.query_one("#prov")) == 2
+        app.pop_screen()
+        await pilot.pause()
+
+        provider = ProviderScreen()
+        app.push_screen(provider)
+        await pilot.pause()
+        assert _blank_columns_between(provider.query_one("#pback"), provider.query_one("#pchoose")) == 2
+        app.pop_screen()
+        await pilot.pause()
+
+
+# ---------- de setup heeft vorm en scheiding ----------
+@pytest.mark.asyncio
+async def test_provider_label_is_bold(tmp_roan):
+    from roan.i18n import t
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(64, 26)) as pilot:
+        app.push_screen(SetupScreen(provider="groq", model="m"))
+        await pilot.pause()
+        label = app.screen.query_one(".section.strong")
+        assert str(label.render()) == t("setup_provider")
+        segments = app.screen._compositor.render_strips()[label.region.y]
+        assert any(seg.style.bold and t("setup_provider") in seg.text for seg in segments), (
+            "het woord Provider moet vet zijn"
+        )
+
+
+@pytest.mark.asyncio
+async def test_a_line_separates_provider_from_api_key(tmp_roan):
+    from textual.widgets import Rule
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(64, 26)) as pilot:
+        app.push_screen(SetupScreen(provider="groq", model="m"))
+        await pilot.pause()
+        scr = app.screen
+        rule = scr.query_one("#sep-api-key", Rule)
+        # tussen het providerblok en het api-keyblok in
+        assert scr.query_one("#cur-provider").region.y < rule.region.y
+        assert rule.region.y < scr.query_one("#api_key").region.y
+        # en hij tekent echt een horizontale lijn over de hele breedte
+        row = _row_text(scr, rule.region.y)
+        assert row.count("─") == rule.content_size.width >= 8
+        assert row.count("─") >= 8, row
+
+
+@pytest.mark.asyncio
+async def test_the_other_groups_are_separated_too(tmp_roan):
+    """Model en base url krijgen dezelfde scheiding; base url alleen als je hem nodig hebt."""
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(64, 26)) as pilot:
+        app.push_screen(SetupScreen(provider="groq", model="m"))
+        await pilot.pause()
+        scr = app.screen
+        assert scr.query_one("#sep-model").region.y < scr.query_one("#cur-model").region.y
+        # groq kent zijn eigen base url: geen extra groep, dus geen lijn
+        assert scr.query_one("#sep-base-url").display is False
+
+        app.pop_screen()
+        await pilot.pause()
+        custom = SetupScreen(provider="custom", model="m", base_url="https://thuis/v1")
+        app.push_screen(custom)
+        await pilot.pause()
+        assert custom.query_one("#sep-base-url").display is True
+        assert custom.query_one("#sep-base-url").region.y < custom.query_one("#base_url").region.y
+
+
+# ---------- de api key: gemaskeerd, klikken onthult hem ----------
+@pytest.mark.asyncio
+async def test_api_key_is_shown_masked_and_revealed_on_click(tmp_roan):
+    from textual.widgets import Input
+
+    config.save_config({"api_key": "sk-bewaarde-sleutel"})
+    app = RoanApp(FakeAgent())
+    results = []
+    async with app.run_test(size=(64, 26)) as pilot:
+        app.push_screen(SetupScreen(provider="groq", model="m"), results.append)
+        await pilot.pause()
+        box = app.screen.query_one("#api_key", Input)
+        # gemaskeerd, niet de echte sleutel
+        assert box.value == "sk-…", box.value
+        assert box.password is False
+        assert "sk-bewaarde-sleutel" not in _row_text(app.screen, box.region.y)
+        # '(leeg = behouden)' is weg
+        assert "behouden" not in "\n".join(
+            _row_text(app.screen, y) for y in range(app.screen.query_one("#setup-box").region.y,
+                                                     app.screen.query_one("#setup-box").region.bottom)
+        )
+        # één klik en de echte sleutel staat er
+        await pilot.click("#api_key")
+        await pilot.pause()
+        assert box.value == "sk-bewaarde-sleutel", box.value
+        # en die is zichtbaar
+        assert "sk-bewaarde-sleutel" in _row_text(app.screen, box.region.y)
+        # zonder te typen blijft de bewaarde sleutel zoals hij is
+        await pilot.press("enter")
+        await pilot.pause()
+    assert results == [True]
+    assert config.load_config()["api_key"] == "sk-bewaarde-sleutel"
+
+
+@pytest.mark.asyncio
+async def test_api_key_starts_masked_again_on_every_open(tmp_roan):
+    """Het onthullen duurt één scherm-opening; de volgende keer staat het mas weer."""
+    from textual.widgets import Input
+
+    config.save_config({"api_key": "sk-bewaarde-sleutel"})
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(64, 26)) as pilot:
+        await pilot.pause()
+        app.push_screen(SetupScreen(provider="groq", model="m"))
+        await pilot.pause()
+        await pilot.click("#api_key")
+        await pilot.pause()
+        assert app.screen.query_one("#api_key", Input).value == "sk-bewaarde-sleutel"
+        app.pop_screen()
+        await pilot.pause()
+
+        app.push_screen(SetupScreen(provider="groq", model="m"))
+        await pilot.pause()
+        assert app.screen.query_one("#api_key", Input).value == "sk-…"
+
+
+@pytest.mark.asyncio
+async def test_typing_replaces_the_mask_instead_of_adding_to_it(tmp_roan):
+    """Regression: de eerste letter van een nieuwe sleutel mocht niet wegvallen.
+
+    De maskering begint met 's', dus een handler die 's' als een stukje van de
+    maskering herkende, vrat de eerste toets op.
+    """
+    from textual.widgets import Input
+
+    config.save_config({"api_key": "sk-oude-sleutel"})
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(64, 26)) as pilot:
+        app.push_screen(SetupScreen(provider="groq", model="m"))
+        await pilot.pause()
+        box = app.screen.query_one("#api_key", Input)
+        assert box.value == "sk-…"
+        await pilot.press(*"sk-nieuw")
+        await pilot.pause()
+        assert box.value == "sk-nieuw", box.value
+        await pilot.press("enter")
+        await pilot.pause()
+    assert config.load_config()["api_key"] == "sk-nieuw"
+
+
+@pytest.mark.asyncio
+async def test_saving_without_touching_the_key_keeps_the_stored_one(tmp_roan):
+    config.save_config({"api_key": "sk-bewaarde-sleutel"})
+    app = RoanApp(FakeAgent())
+    results = []
+    async with app.run_test(size=(64, 26)) as pilot:
+        app.push_screen(SetupScreen(provider="groq", model="m"), results.append)
+        await pilot.pause()
+        await pilot.press("enter")  # alleen Enter, geen klik en geen typen
+        await pilot.pause()
+    assert results == [True]
+    assert config.load_config()["api_key"] == "sk-bewaarde-sleutel"
