@@ -1526,34 +1526,27 @@ class RoanApp(App):
     ]
 
     CSS = """
-    /* De bovenste rij: de lijn links, het portret rechts. `width: auto` op
-       #avatar volgt de tekst (24 kolommen voor de meegeleverde tekening) en
-       _size_avatar zet daarna het precieze aantal cellen. In een horizontale
-       rij gaat de kortste widget naar links en neemt de langste de rest, dus
-       het portret staat vanzelf tegen de rechterrand.
+    /* Het portret zweeft in de rechterbovenhoek, over het gesprek heen.
+       `position: absolute` haalt hem uit de flow: de widget neemt geen rijen
+       in, dus #messages begint op rij 0 en vult de hele hoogte tot de footer.
+       `layer: overlay` tekent hem boven het gesprek in plaats van eronder.
+       De `offset` zet hem tegen de rechterrand; `position: absolute` kent geen
+       'right', dus dat rekent `_place_avatar` uit (schermbreedte min de
+       buitenbreedte van het portret). Zonder die berekening zou hij na een
+       resize één terminal achterlopen, want `on_resize` ziet nog de oude maat.
        GEEN horizontale padding: dat zou de bruikbare breedte verkleinen, zodat
        de 24 kolommen niet passen en Rich elke regel op de volgende regel laat
        doorlopen (losse streepjes tussen de regels door). */
-    #avatar-row {
-        height: auto;
-        width: 1fr;
-        layout: horizontal;
-    }
-    /* De lijn waar het portret aan vastzit. Zelfde kleur als het kader van het
-       invoerveld, zodat het één familie lijkt. `margin: 0` haalt de marge van
-       `Rule.-horizontal` uit de DEFAULT_CSS van Rule weg: die kost drie rijen
-       (1 boven, 1 onder) en de regel moet er één zijn. */
-    #avatar-rule {
-        height: 1;
-        width: 1fr;
-        margin: 0;
-        padding: 0;
-        color: $border;
-    }
+    /* Kader om het portret, zelfde tekenvorm als het invoerveld. Textual rekent
+       met border-box, dus de breedte/hoogte hieronder zijn de buitenste; de 2
+       cells van de rand gaan eraan af en de 24x12-tekening past erin. */
     #avatar {
+        position: absolute;
+        layer: overlay;
         width: auto;
         height: auto;
         padding: 0;
+        border: round $border;
     }
     /* De titelbalk en de ✕ gelden voor álle schermen in de app, ook voor de
        popups: die leunen op deze regels, dus niet per scherm herhalen. */
@@ -1643,35 +1636,27 @@ class RoanApp(App):
     /* Denkniveau, modus en toestemming zijn alle drie hetzelfde soort chip:
        één kleur (het accent), één hover. Anders las `chat` wel als actief en
        `auto` als uitlegtekst, terwijl ze allebei even klikbaar zijn. */
+    /* Alles in de onderbalk is grijs, ook de roze. De helft roze en de helft
+       grijs zag er onlogisch uit; en een vlak oplichten is juist wat de gebruiker
+       niet wil. */
     #status-thinking,
     #status-mode,
-    #status-perm {
-        width: auto;
-        height: 1;
-        color: $accent;
-        padding: 0 1;
-    }
+    #status-perm,
     #status-hints {
         width: auto;
         height: 1;
         color: $text-muted;
         padding: 0 1;
     }
-    #status-hints:hover {
-        background: $accent 30%;
-    }
-    /* Model, denkniveau, modus en toestemming zijn net zo knopjes; ze zeggen
-       het met een hover, maar zacht: de linkerkant is 1fr en licht dus niet op
-       als blok. */
-    #status:hover {
-        color: $accent;
-        text-style: bold;
-    }
+    /* Bij hover gaat alleen de tekst roze: geen achtergrond, geen vlak. */
+    #status:hover,
     #status-thinking:hover,
     #status-mode:hover,
-    #status-perm:hover {
-        background: $accent 30%;
+    #status-perm:hover,
+    #status-hints:hover {
+        color: $accent;
         text-style: bold;
+        background: transparent;
     }
     /* Kader om de input, met de ╹ als linkerbovenhoek — zoals opencode.
        Hoogte 3 = 2 randen + 1 tekstregel; bij height 1 blijft de content-hoogte
@@ -1685,12 +1670,6 @@ class RoanApp(App):
     #prompt-row:focus-within {
         border: round $accent;
         background: transparent;
-    }
-    #prompt-mark {
-        width: 1;
-        height: 1;
-        color: $accent;
-        text-style: bold;
     }
     #input {
         width: 1fr;
@@ -1717,6 +1696,11 @@ class RoanApp(App):
     }
     Screen {
         background: $background;
+        /* Het zwevende portret moet boven het gesprek getekend worden. Een
+           `layer` telt pas mee als de laag ook bestaat; zonder deze regel
+           valt `layer: overlay` op #avatar terug op de laag `default`, en
+           #messages (dat later in compose komt) tekent dan over het portret heen. */
+        layers: default overlay;
     }
     ModalScreen {
         align: center middle;
@@ -1867,21 +1851,19 @@ class RoanApp(App):
     # ---------- layout ----------
     def compose(self) -> ComposeResult:
         avatar = self._resolve_avatar()
-        # Bovenkant: één rij met het portret rechts tegen de rand en een
-        # ╰──────-lijn die van de linkerrand naar het portret loopt. De rij
-        # staat boven het gesprek, niet eronder: anders schoof het gesprek omlaag
-        # en leek het portret bij de input te horen. De chat loopt er gewoon
-        # onderdoor, precies zoals het bij een zwevend portret hoort.
+        # Het portret zweeft: een DIRECT kind van de App, dus van het scherm.
+        # In een rij of container zou het rijen uit de flow nemen en het gesprek
+        # eronder beginnen; met `position: absolute` (zie de CSS) neemt het niets
+        # in, zodat #messages op rij 0 begint en de chat onder het portret
+        # doorloopt — precies zoals bij een zwevend portret hoort.
         if avatar:
-            with Horizontal(id="avatar-row"):
-                yield Rule(id="avatar-rule")
-                # Alleen bij een echt beeldprotocol (sixel/TGP) nemen we de
-                # widget van textual_image; die zet doorzichtige pixels anders
-                # op wit.
-                if _HAS_HD and _image_is_graphical():
-                    yield _image_widget_class()(avatar, id="avatar")
-                else:
-                    yield Static(self._avatar_text(), id="avatar")
+            # Alleen bij een echt beeldprotocol (sixel/TGP) nemen we de
+            # widget van textual_image; die zet doorzichtige pixels anders
+            # op wit.
+            if _HAS_HD and _image_is_graphical():
+                yield _image_widget_class()(avatar, id="avatar")
+            else:
+                yield Static(self._avatar_text(), id="avatar")
         yield Messages(id="messages")
         # Vastgezet aan de onderkant als één blok, anders landen de status en
         # het invoerveld allebei op dezelfde rij en schrijven ze over elkaar.
@@ -1889,9 +1871,8 @@ class RoanApp(App):
             yield Static(id="jump")
             # Slash-suggesties, verscholen tot je "/" typt (zoals opencode).
             yield OptionList(id="slash")
-            # Input als kader met een ╹ links, zoals opencode.
+            # Input als kader; geen ╹ ernaast, die oogde als een los teken.
             with Horizontal(id="prompt-row"):
-                yield Static("╹", id="prompt-mark")
                 yield HistoryInput(placeholder=t("input_placeholder"), id="input")
             # Onderste balk, zoals opencode: model links, rechts de status.
             with Horizontal(id="status-bar"):
@@ -1933,6 +1914,28 @@ class RoanApp(App):
             return ANS_CELLS[1]
         return max(6, min(18, height // 3))
 
+    def _avatar_outer(self) -> tuple[int, int]:
+        """(breedte, hoogte) van het portret INclusief de rand.
+
+        Eén meting voor twee doeleinden: de maat van de widget én de offset
+        waarmee hij tegen de rechterrand staat. Zijn die twee uit verschillende
+        berekeningen afkomstig, dan wijkt de doos één cel van de rand af of
+        overlapt de rand; daarom delen ze deze ene.
+        """
+        ans, png = self._avatar_paths()
+        cols, rows = avatar_cells(
+            ans_path=ans,
+            png_path=png,
+            max_cols=AVATAR_COLS,
+            max_rows=self._avatar_rows(),
+        )
+        # `styles.width/height` is bij Textual de buitenste maat (border-box).
+        # Een tekencel is twee keer zo hoog als breed, dus de rand is links en
+        # rechts 1 cel maar boven en onder 1 rij = 2 cellen. Voor een vierkante
+        # doos moet de breedte daarom met 4 toenemen, niet met 2: anders is de
+        # doos 2 breed maar 4 hoog en dus niet vierkant.
+        return cols + 4, rows + 2
+
     def _size_avatar(self) -> None:
         """Zet de avatar op het aantal cellen dat zijn verhouding respecteert.
 
@@ -1942,6 +1945,31 @@ class RoanApp(App):
         van vóór de resize.
         """
         self.call_after_refresh(self._size_avatar_now)
+
+    def _place_avatar(self) -> None:
+        """Zet het zwevende portret tegen de rechterrand van het scherm.
+
+        Ook uitgesteld tot na de volgende refresh, om dezelfde reden als
+        `_size_avatar`: in `on_resize` is `self.size` nog de oude maat, dus een
+        directe berekening zou het portret één resize achterlopen.
+        """
+        self.call_after_refresh(self._place_avatar_now)
+
+    def _place_avatar_now(self) -> None:
+        """De offset van het portret: schermbreedte min zijn buitenbreedte.
+
+        `position: absolute` kent geen `right`, dus de rand berekenen wij
+        zelf. De breedte komt uit `_avatar_outer`, dezelfde meting als waarmee
+        de widget op maat wordt gezet, dus de doos en de offset kunnen niet
+        uit elkaar lopen.
+        """
+        nodes = self.query("#avatar")
+        if not nodes:
+            return
+        breedte, _ = self._avatar_outer()
+        # `max(0, ...)`: op een terminal die smaller is dan het portret zou een
+        # negatieve offset het portret buiten beeld duwen.
+        nodes.first().styles.offset = (max(0, self.size.width - breedte), 0)
 
     def _size_avatar_now(self) -> None:
         """Meet de tekst van de avatar en geef de widget precies die maat.
@@ -1978,11 +2006,13 @@ class RoanApp(App):
                 huidig = (max((r.cell_len for r in regels), default=0), len(regels))
             if huidig != (cols, rows):
                 node.update(self._avatar_text())
-        node.styles.width = cols
-        node.styles.height = rows
+        # Dezelfde meting als voor de offset, zodat maat en plaats altijd
+        # bij elkaar passen.
+        node.styles.width, node.styles.height = self._avatar_outer()
 
     def on_resize(self) -> None:
         self._size_avatar()
+        self._place_avatar()
         if self.is_running:
             # In `on_resize` staat `self.size` nog op de OUDE maat; pas na de
             # volgende refresh is de nieuwe breedte binnen. Zonder die uitstap
@@ -1992,6 +2022,7 @@ class RoanApp(App):
     def on_mount(self) -> None:
         self.query_one("#input", Input).focus()
         self._size_avatar()
+        self._place_avatar()
         self._update_status()
         self._render_history()
         if not is_configured():
@@ -2028,9 +2059,10 @@ class RoanApp(App):
         `_fit_status_bar`, want hun bullets hangen aan de vensterbreedte.
         """
         cfg = load_config()
-        accent = accent_color()
+        # géén accent in de markup: de kleur komt uit de CSS, anders blijft de
+        # balk roze en kan `:hover` hem niet grijs->roze sturen.
         self.query_one("#status", Static).update(
-            f"[b {accent}]◆[/] {cfg.get('model') or '?'}  ·  {cfg.get('provider') or '?'}"
+            f"[b]◆[/] {cfg.get('model') or '?'}  ·  {cfg.get('provider') or '?'}"
         )
 
         self.query_one("#status-tokens", Static).update(self._tokens_text())
@@ -2059,7 +2091,6 @@ class RoanApp(App):
         width = self.size.width or 80
         tokens = self._tokens_text()
         cfg = load_config()
-        accent = accent_color()
         shown = {
             selector
             for selector, minimum in STATUS_FITS
@@ -2079,7 +2110,7 @@ class RoanApp(App):
             ("#status-perm", f"Approvals: {cfg.get('permissions') or PERMISSIONS[0]}"),
         ):
             bullet = "" if first or selector not in shown else "[dim]·  [/dim]"
-            self.query_one(selector, Static).update(f"{bullet}[b {accent}]{text}[/]")
+            self.query_one(selector, Static).update(f"{bullet}{text}")
             first = first and selector not in shown
 
     def _tokens_text(self) -> str:

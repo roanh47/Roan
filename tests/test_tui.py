@@ -946,11 +946,12 @@ async def test_hidden_status_chips_stay_quiet_and_model_stays_clickable(tmp_roan
 
 @pytest.mark.asyncio
 async def test_avatar_draws_the_pre_rendered_ansi_at_its_own_size(tmp_roan):
-    """De widget krijgt precies de cellen van het bestand: 24 breed, 12 hoog.
+    """De inhoud krijgt precies de cellen van het bestand: 24 breed, 12 hoog.
 
     Hij mag dus niet groter of kleiner worden: een te smalle widget laat Rich
     elke regel op de volgende doorlopen, en dat breekt de kleur-escapes van
-    die regel.
+    die regel. De widget zelf is twee cells groter in beide richtingen, want de
+    `round` rand zit eromheen en Textual rekent met border-box.
     """
     from rich.cells import cell_len
     from rich.color import ColorType
@@ -963,8 +964,12 @@ async def test_avatar_draws_the_pre_rendered_ansi_at_its_own_size(tmp_roan):
         regels = avatar.content.plain.split("\n")
         assert len(regels) == ANS_CELLS[1], f"{len(regels)} rijen, geen {ANS_CELLS[1]}"
         assert {cell_len(r) for r in regels} == {ANS_CELLS[0]}, "rij niet 24 kolommen"
-        assert (avatar.region.width, avatar.region.height) == ANS_CELLS, avatar.region
-        assert avatar.content_size == ANS_CELLS, avatar.content_size
+        # de buitenste maat is de inhoud plus de twee cells van de rand
+        assert avatar.region.size == (ANS_CELLS[0] + 4, ANS_CELLS[1] + 2), avatar.region
+        assert (avatar.content_size.width, avatar.content_size.height) == (
+            ANS_CELLS[0] + 2,
+            ANS_CELLS[1],
+        ), avatar.content_size
         # echte kleuren, geen 256 of 16 kleuren
         assert any(
             span.style is not None
@@ -996,7 +1001,8 @@ async def test_every_avatar_screen_row_is_a_whole_row(tmp_roan):
             "".join(seg.text for seg in strips[y])
             for y in range(avatar.region.y, avatar.region.y + avatar.region.height)
         ]
-        assert len(rijen) == avatar.region.height == 12
+        # 12 rijen tekening + 2 rijen rand
+        assert len(rijen) == avatar.region.height == 14
         assert {cell_len(rij) for rij in rijen} == {90}, "schermrijen zijn niet even breed"
         # de tekening staat op elke rij; een afgebroken regel is een paar tekens
         for rij in rijen:
@@ -1050,7 +1056,9 @@ async def test_a_short_screen_scales_the_png_instead_of_squashing_the_drawing(tm
         avatar = app.query_one("#avatar")
         cols, rows = fitted_cells(avatar_path(), AVATAR_COLS, max_rows=app._avatar_rows())
         assert rows < ANS_CELLS[1], app._avatar_rows()
-        assert (avatar.region.width, avatar.region.height) == (cols, rows)
+        # de widget is de raster-maat plus de twee cells van de rand ernaomheen
+        assert avatar.region.size == (cols + 4, rows + 2), avatar.region
+        assert avatar.content_size == (cols + 2, rows), avatar.content_size
         regels = avatar.content.plain.split("\n")
         assert len(regels) == rows
         assert {cell_len(r) for r in regels} == {cols}
@@ -1067,7 +1075,11 @@ async def test_a_missing_ans_still_draws_the_png_in_the_same_cells(tmp_roan, tmp
     async with app.run_test(size=(90, 30)) as pilot:
         await pilot.pause()
         avatar = app.query_one("#avatar")
-        assert (avatar.region.width, avatar.region.height) == ANS_CELLS, avatar.region
+        assert avatar.region.size == (ANS_CELLS[0] + 4, ANS_CELLS[1] + 2), avatar.region
+        assert (avatar.content_size.width, avatar.content_size.height) == (
+            ANS_CELLS[0] + 2,
+            ANS_CELLS[1],
+        ), avatar.content_size
         assert set(avatar.content.plain) <= {"▀", "\n"}, "geen halfblokjes uit de PNG"
 
 
@@ -1265,12 +1277,14 @@ async def test_models_non_model_options_stay_plain_text(tmp_roan):
         assert str(leeg.prompt) == str(leeg.prompt).strip(), repr(str(leeg.prompt))
 
 
-# ---------- het portret staat rechtsboven aan een lijn ----------
-# Het portret stond linksboven als kale 24x12 ANSI-tekening. Nu staat het in een
-# eigen rij (`#avatar-row`) met een Rule ernaast: de kortste widget in een
-# horizontale rij gaat naar links, dus de lijn neemt de ruimte en het portret
-# komt tegen de rechterrand te staan. De rij kost geen extra rijen (de lijn
-# deelt de eerste tekenrij van het portret), dus #messages houdt dezelfde hoogte.
+# ---------- het portret zweeft rechtsboven over het gesprek ----------
+# Het portret is een DIRECT kind van de App met `position: absolute`, dus het
+# neemt geen rijen uit de flow: #messages begint op rij 0 en loopt onder het
+# portret door. De chat hoort daar volgens de gebruiker bij; de eerste
+# chatregel staat daarom op dezelfde rij als de bovenrand van het portret.
+# De doos is 2 cells breder dan de tekening (de `round` rand), en `_place_avatar`
+# zet de offset op schermbreedte min die buitenbreedte, zodat hij tegen de
+# rechterrand plakt.
 
 
 def _avatar_screen_rows(app) -> list[str]:
@@ -1286,62 +1300,77 @@ def _avatar_screen_rows(app) -> list[str]:
 @pytest.mark.asyncio
 @pytest.mark.parametrize("size", [(60, 26), (80, 24), (100, 50), (120, 40), (46, 20)])
 async def test_avatar_sits_top_right_flush_against_the_edge(tmp_roan, size):
-    """Het portret staat bovenaan en tegen de rechterrand.
+    """Het portret zweeft bovenaan tegen de rechterrand van het scherm.
 
-    `position: absolute` kent geen 'right', dus de ✕ moest met een offset in de
-    flow worden gezet; in een rij is dat niet nodig: de kortste widget gaat naar
-    links en de langste vult de rest, dus de avatar eindigt op de rechterrand
-    van zijn eigen rij.
+    `position: absolute` kent geen 'right', dus de rand wordt met een offset
+    berekend; die komt uit `_place_avatar`, dat de offset pas ná de volgende
+    refresh zet omdat `on_resize` nog de oude schermmaat ziet.
     """
     app = RoanApp(FakeAgent())
     async with app.run_test(size=size) as pilot:
         await pilot.pause()
         avatar = app.query_one("#avatar")
-        rij = app.query_one("#avatar-row")
         assert avatar.region.y == 0, avatar.region
-        assert avatar.region.right == rij.region.right, (avatar.region, rij.region)
-        assert avatar.region.x > rij.region.x, "het portret hoort rechts, niet links"
-        # de rij staat bovenaan: het gesprek begint eronder
-        assert app.query_one("#messages").region.y == rij.region.height
+        assert avatar.region.x > 0, "het portret hoort rechts, niet links"
+        assert avatar.region.right == app.screen.size.width, (
+            avatar.region,
+            app.screen.size.width,
+        )
+        # het zweeft: het gesprek begint op rij 0, niet onder het portret
+        assert app.query_one("#messages").region.y == 0
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("size", [(60, 26), (80, 24), (100, 50)])
-async def test_the_rule_runs_from_the_left_edge_into_the_avatar(tmp_roan, size):
-    """De lijn loopt van de linkerrand naar het portret, zonder kade.
+async def test_the_first_chat_line_shares_the_row_with_the_avatar_border(tmp_roan, size):
+    """De bovenrand van het portret en de eerste chatregel staan op rij 0.
 
-    Een gat of een schermlijn ertussen zou twee losse dingen maken; de lijn
-    moet tegen de eerste kolom van het portret aanlopen.
+    Vóór deze wijziging stond het portret in een rij boven het gesprek, dus de
+    eerste chatregel begon pas onder de 14 rijen van de doos. Nu loopt de chat
+    eronderdoor: de sysline staat links van het portret, op dezelfde rij.
     """
+    from roan.i18n import t
+
     app = RoanApp(FakeAgent())
     async with app.run_test(size=size) as pilot:
         await pilot.pause()
-        rule = app.query_one("#avatar-rule")
         avatar = app.query_one("#avatar")
-        assert rule.region.x == 0, rule.region
-        assert rule.region.y == avatar.region.y, (rule.region, avatar.region)
-        assert rule.region.height == 1, rule.region
-        assert rule.region.right == avatar.region.x, (rule.region, avatar.region)
-        rij = _avatar_screen_rows(app)[0]
-        assert set(rij[: avatar.region.x]) == {"─"}, rij[: avatar.region.x]
-        assert rij[rule.region.x : rule.region.right] == "─" * rule.region.width
+        assert avatar.region.y == 0, avatar.region
+        rij0 = _avatar_screen_rows(app)[0]
+        # de bovenrand van de doos staat op rij 0
+        assert rij0[avatar.region.x] == "╭", rij0
+        # ...en de eerste chatregel staat ernaast, niet eronder
+        assert app.query_one("#messages").region.y == 0
+        # De systeemregel begint op rij 0, links van het portret. Op een smal
+        # venster kappt het zwevende portret haar af, dus check het begin.
+        sysline = t("ready", model="test-model", provider="lmstudio")
+        links = rij0[: avatar.region.x]
+        assert links.strip().startswith(sysline[: len(links.strip())]), (
+            rij0[: avatar.region.x]
+        )
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("size", [(60, 26), (80, 24), (100, 50)])
-async def test_the_avatar_row_costs_no_extra_rows(tmp_roan, size):
-    """De lijn deelt de bovenste tekenrij van het portret.
+async def test_the_floating_avatar_costs_no_extra_rows(tmp_roan, size):
+    """`position: absolute` houdt het portret buiten de flow.
 
-    Zonder dit zou de rij 13 hoog zijn in plaats van 12 en schoof het gesprek
-    een regel omlaag op elk scherm.
+    Vóór deze wijziging stond het in een rij van `height: auto` boven het
+    gesprek, dus #messages begon pas op rij 14. Nu vult het gesprek alles tussen
+    schermtop en de footer, en blijft de statusbalk de laatste rij.
     """
     app = RoanApp(FakeAgent())
     async with app.run_test(size=size) as pilot:
         await pilot.pause()
         avatar = app.query_one("#avatar")
-        rij = app.query_one("#avatar-row")
-        assert rij.region.height == avatar.region.height, (rij.region, avatar.region)
-        assert app.query_one("#messages").region.y == avatar.region.height
+        messages = app.query_one("#messages")
+        footer = app.query_one("#footer")
+        assert avatar.styles.position == "absolute", avatar.styles.position
+        assert avatar.layer == "overlay", avatar.layer
+        assert messages.region.y == 0, messages.region
+        assert messages.region.x == 0, messages.region
+        assert messages.region.width == app.screen.size.width, messages.region
+        assert messages.region.height + footer.region.height == app.screen.size.height
         status = app.query_one("#status")
         assert status.region.y + status.region.height == app.screen.size.height
 
@@ -1350,8 +1379,10 @@ async def test_the_avatar_row_costs_no_extra_rows(tmp_roan, size):
 async def test_the_avatar_still_flush_right_and_unwrapped_after_a_resize(tmp_roan):
     """Na een resize staat het portret weer tegen de nieuwe rechterrand.
 
-    De regel is 1fr en het portret een vast aantal cellen, dus dat vraagt geen
-    enkele berekening — en dus ook geen `offset` die een resize achterloopt.
+    Dat vraagt nu wél een berekening, want het portret zweeft en `position:
+    absolute` kent geen 'right'. De offset wordt pas ná de volgende refresh
+    gezet; anders rekende hij met de schermmaat van vóór de resize en zou het
+    portret één resize achterlopen (zoals de oude zwevende ✕ deed).
     """
     from rich.cells import cell_len
 
@@ -1362,10 +1393,9 @@ async def test_the_avatar_still_flush_right_and_unwrapped_after_a_resize(tmp_roa
             await pilot.resize_terminal(*size)
             await pilot.pause()
             avatar = app.query_one("#avatar")
-            rule = app.query_one("#avatar-rule")
-            rij = app.query_one("#avatar-row")
-            assert avatar.region.right == rij.region.right, (size, avatar.region, rij.region)
-            assert rule.region.right == avatar.region.x, (size, rule.region, avatar.region)
+            breedte, _ = app._avatar_outer()
+            assert avatar.region.right == size[0], (size, avatar.region)
+            assert avatar.region.x == size[0] - breedte, (size, avatar.region, breedte)
             # elke schermrij waar het portret staat is even breed: niets loopt om
             assert {cell_len(rij_) for rij_ in _avatar_screen_rows(app)} == {
                 app.screen.size.width
@@ -1416,69 +1446,51 @@ async def test_ctrl_c_and_ctrl_q_still_quit_without_the_close_button(tmp_roan, k
 
 
 @pytest.mark.asyncio
-async def test_every_hook_glyph_is_the_prompt_mark_or_part_of_the_artwork(tmp_roan):
-    """De ╹ staat links in het invoerveld of binnen het portret, nergens anders.
+async def test_the_input_box_has_no_hook_glyph(tmp_roan):
+    """Het ╹ naast het invoerveld is weg; de gebruiker vond het een los teken.
 
-    De gebruiker zag 'iets rechts' en dacht aan de ╹; dat was de zwevende ✕ (zie
-    de test hierboven). Deze test legt vast dat er rechtsbuiten het portret geen
-    ╹ getekend wordt, zodat een volgende verslechtering meteen valt.
+    Wat overblijft is alleen de ╹ die ín de chafa-tekening zit (rij 6), en die
+    staat binnen het avatar-widget.
     """
     app = RoanApp(FakeAgent())
     async with app.run_test(size=(100, 50)) as pilot:
         await pilot.pause()
         avatar = app.query_one("#avatar")
-        mark = app.query_one("#prompt-mark")
-        assert mark.region.x == 3, mark.region
+        assert not app.query("#prompt-mark")
 
+        box = app.query_one("#prompt-row")
+        for y in range(box.region.y, box.region.y + box.region.height):
+            for x, char in enumerate(_row_text(app.screen, y)):
+                if char == "╹":
+                    assert not (
+                        box.region.x <= x < box.region.x + box.region.width
+                    ), f"╹ linksboven in het inputkader op ({y},{x})"
+
+        # De enige resterende ╹ zit binnen het portret.
         treffers = [
             (y, x)
-            for y, rij in enumerate(
-                _row_text(app.screen, y) for y in range(app.screen.size.height)
-            )
-            for x, char in enumerate(rij)
+            for y in range(app.screen.size.height)
+            for x, char in enumerate(_row_text(app.screen, y))
             if char == "╹"
         ]
-        # de promptmerker, plus de ╹ die in de chafa-tekening zit (rij 6)
-        assert mark.region.y <= app.screen.size.height
         for y, x in treffers:
-            in_avatar = (
-                avatar.region.y <= y < avatar.region.y + avatar.region.height
-                and avatar.region.x <= x < avatar.region.right
-            )
-            at_mark = (y, x) == (mark.region.y, mark.region.x)
-            assert in_avatar or at_mark, f"╹ op onverwachte plek ({y}, {x})"
-        # de een in de tekening staat echt in het portret
-        kunst = [
-            (y, x) for y, x in treffers if not (y, x) == (mark.region.y, mark.region.x)
-        ]
-        assert len(kunst) == 1, kunst
-        kunst_y, kunst_x = kunst[0]
-        assert avatar.region.y <= kunst_y < avatar.region.y + avatar.region.height
-        # en buiten het portret staat hij links, bij het invoerveld
-        buiten = [
-            (y, x)
-            for y, x in treffers
-            if not (
-                avatar.region.y <= y < avatar.region.y + avatar.region.height
-                and avatar.region.x <= x < avatar.region.right
-            )
-        ]
-        assert buiten == [(mark.region.y, mark.region.x)], buiten
-
-
+            assert avatar.region.y <= y < avatar.region.y + avatar.region.height, (y, x)
+            assert avatar.region.x <= x < avatar.region.x + avatar.region.width, (y, x)
 @pytest.mark.asyncio
 async def test_the_short_screen_avatar_has_no_hook_glyph_outside_the_artwork(tmp_roan):
-    """Op een kort scherm is het portret een PNG-raster en blijft één ╹ over.
+    """Op een kort scherm is het portret een PNG-raster en blijft geen ╹ over.
 
     De tekening uit assets/avatar.ans is 12 rijen; past die niet, dan schaalt
-    het raster uit de PNG en verdwijnt de ╹ uit de tekening. Links in het
-    invoerveld blijft hij wel staan.
+    het raster uit de PNG en verdwijnt de ╹ uit de tekening. Er staat geen ╹ meer
+    in het invoerveld (`#prompt-mark` bestaat niet meer), dus een eventuele ╹
+    moet ín het portret zitten — nergens anders op het scherm. Het portret
+    zweeft en plakt tegen de rechterrand van het scherm.
     """
     app = RoanApp(FakeAgent())
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
         avatar = app.query_one("#avatar")
-        mark = app.query_one("#prompt-mark")
+        assert not app.query("#prompt-mark"), "de ╹ in het invoerveld is weg"
         treffers = [
             (y, x)
             for y, rij in enumerate(
@@ -1487,8 +1499,11 @@ async def test_the_short_screen_avatar_has_no_hook_glyph_outside_the_artwork(tmp
             for x, char in enumerate(rij)
             if char == "╹"
         ]
-        assert treffers == [(mark.region.y, mark.region.x)], treffers
-        assert avatar.region.right == app.query_one("#avatar-row").region.right
+        for y, x in treffers:
+            assert avatar.region.y <= y < avatar.region.y + avatar.region.height, (y, x)
+            assert avatar.region.x <= x < avatar.region.x + avatar.region.width, (y, x)
+        # en het portret plakt tegen de rechterrand van het scherm
+        assert avatar.region.right == app.screen.size.width, avatar.region
 
 
 # ---------- de statusbalk: denkniveau klikbaar, bullets, één kleur ----------
@@ -1548,17 +1563,40 @@ async def test_thinking_chip_is_clickable_on_every_level(tmp_roan):
 
 
 @pytest.mark.asyncio
-async def test_thinking_chip_looks_like_a_chip_on_hover(tmp_roan):
-    """Zonder hover is hij niet te onderscheiden van gewone tekst."""
+async def test_the_whole_status_bar_is_grey_until_you_hover(tmp_roan):
+    """De hele balk is grijs; hover maakt alleen de tekst roze, zonder vlak.
+
+    Een vlak oplichten is precies wat de gebruiker niet wilde, dus de hover
+    mag géén `background` zetten, alleen `color`.
+    """
+    selectors = ["#status", "#status-thinking", "#status-mode", "#status-perm", "#status-hints"]
     app = RoanApp(FakeAgent())
     async with app.run_test(size=(110, 26)) as pilot:
         await pilot.pause()
-        region = app.query_one("#status-thinking").region
-        before = _cell_style(app, region.x + 3, region.y)
-        await pilot.hover("#status-thinking", offset=(3, 0))
+        def _tekst(selector):
+            # de ` · ` bullet is een scheider en heeft een eigen, gedempte kleur
+            return {k for char, k in _chip_cells(app, selector) if char.strip() and char != "·"}
+
+        rustig = {s: _tekst(s) for s in selectors}
+        # Zelfde grijstoon over de hele balk.
+        assert len({tuple(sorted(map(str, v))) for v in rustig.values()}) == 1, rustig
+
+        chip = app.query_one("#status-perm")
+        voor = _chip_cells(app, "#status-perm")
+        await pilot.hover("#status-perm", offset=(3, 0))
         await pilot.pause()
-        after = _cell_style(app, region.x + 3, region.y)
-        assert (before.color, before.bgcolor) != (after.color, after.bgcolor)
+        na = _chip_cells(app, "#status-perm")
+        # tekst roze geworden
+        assert [k for c, k in na if c.strip()] != [k for c, k in voor if c.strip()], (
+            "hover veranderde de tekstkleur niet"
+        )
+        # ...maar geen enkele cel een andere achtergrond
+        assert chip.styles.background.a == 0, chip.styles.background
+        # en de rest is grijs gebleven
+        for s in selectors:
+            if s == "#status-perm":
+                continue
+            assert _tekst(s) == rustig[s], s
 
 
 @pytest.mark.asyncio
@@ -1586,32 +1624,35 @@ async def test_status_row_capitalises_the_mode_without_touching_the_config(tmp_r
 
 
 @pytest.mark.asyncio
-async def test_the_three_status_chips_share_one_colour(tmp_roan):
-    """Denkniveau, modus en toestemming zijn één groep, dus één kleur.
+async def test_the_status_chips_are_grey_not_accent(tmp_roan):
+    """Alles in de onderbalk is grijs; alleen bij hover wordt de tekst roze.
 
-    `chat` was paars en `auto` grijs, terwijl ze allebei even klikbaar zijn.
+    Twee dingen zaten hier tegen elkaar in: de helft van de balk was roze en de
+    helft grijs, en het accent stond als Rich-markup IN de tekst, waardoor de
+    CSS de kleur niet kon overnemen en `:hover` niets meer deed.
     """
-    from roan.themes import accent_color
+    from roan.themes import THEME_BY_NAME
 
     app = RoanApp(FakeAgent())
     async with app.run_test(size=(110, 26)) as pilot:
         await pilot.pause()
-        accent = accent_color().lower()
-        for selector in STATUS_CHIPS:
-            cellen = _chip_cells(app, selector)
-            assert cellen, selector
-            # alles op de bullet na is het accent; nergens een grijs ernaast
-            tekst = [kleur for char, kleur in cellen if char != "·"]
-            assert set(tekst) == {accent}, (selector, set(tekst))
-            for char, kleur in cellen:
-                if char == "·":
-                    assert kleur != accent, (selector, "bullet mag niet accent zijn")
-        # en de drie chips zijn dus onderling ook gelijk
-        verdeling = [
-            {kleur for char, kleur in _chip_cells(app, s) if char != "·"}
-            for s in STATUS_CHIPS
+        thema = THEME_BY_NAME[app.theme]
+        accent = str(thema.accent).lower()
+        selectors = list(STATUS_CHIPS) + ["#status-hints", "#status"]
+        for selector in selectors:
+            celen = _chip_cells(app, selector)
+            assert celen, selector
+            tekst = {kleur for char, kleur in celen if char.strip()}
+            for kleur in tekst:
+                assert kleur.lower() != accent, (
+                    f"{selector} tekent nog in het accent: {kleur}"
+                )
+        # Ze delen allemaal dezelfde grijstoon.
+        grijs = [
+            {kleur for char, kleur in _chip_cells(app, s) if char.strip()}
+            for s in selectors
         ]
-        assert verdeling[0] == verdeling[1] == verdeling[2] == {accent}, verdeling
+        assert grijs[0] == grijs[-1], grijs
 
 
 @pytest.mark.asyncio
