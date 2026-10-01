@@ -91,24 +91,19 @@ async def test_ctrl_c_quits_from_modal(roan_cfg):
 
 # ---------- ✕ in de app ----------
 @pytest.mark.asyncio
-async def test_app_has_close_button(roan_cfg):
-    from textual.widgets import Button
+async def test_app_has_no_close_button(roan_cfg):
+    """Het kruisje rechtsboven is weg: daar staat nu de avatar.
 
+    Sluiten kan nog via ctrl+c en ctrl+q, wat hierboven getest staat.
+    """
     app = RoanApp(FakeAgent())
     async with app.run_test() as pilot:
         await pilot.pause()
-        button = app.query_one("#app-close", Button)
-        assert str(button.label) == tui_mod.CLOSE_GLYPH
-
-
-@pytest.mark.asyncio
-async def test_app_close_button_quits(roan_cfg):
-    app = RoanApp(FakeAgent())
-    async with app.run_test() as pilot:
-        await pilot.pause()
-        await pilot.click("#app-close")
-        await pilot.pause()
-        assert getattr(app, "_exit", False) is True or not app.is_running
+        assert not app.query("#app-close")
+        rendered = "".join(
+            seg.text for seg in app.screen._compositor.render_strips()[0]
+        )
+        assert tui_mod.CLOSE_GLYPH not in rendered
 
 
 # ---------- ✕ in de popups ----------

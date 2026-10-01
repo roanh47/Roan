@@ -372,19 +372,6 @@ async def test_enter_runs_a_fully_typed_command(tmp_roan):
 
 
 @pytest.mark.asyncio
-async def test_close_button_sits_top_right(tmp_roan):
-    """De ✕ hoort rechtsboven; `position: absolute` haalt hem uit de flow."""
-    from textual.widgets import Button
-
-    app = RoanApp(FakeAgent())
-    async with app.run_test(size=(90, 30)) as pilot:
-        await pilot.pause()
-        btn = app.query_one("#app-close", Button)
-        assert btn.region.y == 0
-        assert btn.region.x + btn.region.width >= 90 - 6
-
-
-@pytest.mark.asyncio
 async def test_avatar_uses_our_renderer_when_not_a_graphics_protocol(tmp_roan):
     """Zonder sixel/TGP tekenen wij de avatar zelf.
 
@@ -503,22 +490,18 @@ def _row_text(screen, y: int) -> str:
 
 
 @pytest.mark.asyncio
-async def test_close_button_is_five_columns_with_the_glyph_centred(tmp_roan):
+async def test_popup_close_button_is_five_columns_with_the_glyph_centred(tmp_roan):
     """5 kolommen breed en 2 kolommen lucht aan weerszijden van het teken.
 
     In een popup won de generieke `.popup Button` (min-width 6, padding 0 1)
-    van `.close`, waardoor de knop daar 6 kolommen breed werd.
+    van `.close`, waardoor de knop daar 6 kolommen breed werd. Het kruisje rechts
+    bovenin het hoofdscherm is weg sinds de avatar daar staat.
     """
     from textual.widgets import Button
 
     app = RoanApp(FakeAgent())
     async with app.run_test(size=(90, 30)) as pilot:
         await pilot.pause()
-        app_close = app.query_one("#app-close", Button)
-        assert app_close.region.width == 5, app_close.region
-        row = _row_text(app.screen, app_close.region.y)
-        assert row[app_close.region.x : app_close.region.x + 5] == "  ✕  "
-
         scr = SetupScreen(provider="groq", model="m")
         app.push_screen(scr)
         await pilot.pause()
@@ -528,18 +511,6 @@ async def test_close_button_is_five_columns_with_the_glyph_centred(tmp_roan):
         assert row[popup_close.region.x : popup_close.region.x + 5] == "  ✕  "
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("size", [(90, 30), (60, 24), (120, 40)])
-async def test_close_button_keeps_its_width_on_any_window(tmp_roan, size):
-    from textual.widgets import Button
-
-    app = RoanApp(FakeAgent())
-    async with app.run_test(size=size) as pilot:
-        await pilot.pause()
-        assert app.query_one("#app-close", Button).region.width == 5
-
-
-# ---------- twee kolomen lucht tussen twee knoppen ----------
 def _blank_columns_between(left, right) -> int:
     """Lege kolommen tussen twee knoppen.
 
@@ -895,12 +866,17 @@ async def test_clicking_the_mode_chip_cycles_chat_plan_build(tmp_roan):
     async with app.run_test(size=(110, 26)) as pilot:
         await pilot.pause()
         assert config.load_config()["mode"] == "chat"
-        assert str(app.query_one("#status-mode").render()) == "chat"
+        # De chip toont `Mode: Chat`; in de config blijft het `chat` staan,
+        # alleen voor het lezen wordt de eerste letter groot gemaakt.
+        assert str(app.query_one("#status-mode").render()) == "·  Mode: Chat"
         for expected in ("plan", "build", "chat"):
             await pilot.click("#status-mode")
             await pilot.pause()
             assert config.load_config()["mode"] == expected
-            assert str(app.query_one("#status-mode").render()) == expected
+            assert (
+                str(app.query_one("#status-mode").render())
+                == f"·  Mode: {expected.capitalize()}"
+            )
         # en het gesprek bevestigt het, met de nieuwe naam erbij
         assert "chat" in str(list(app.query("#messages > *"))[-1].render())
 
@@ -916,7 +892,10 @@ async def test_clicking_the_permissions_chip_flips_auto_and_user(tmp_roan):
             await pilot.click("#status-perm")
             await pilot.pause()
             assert config.load_config()["permissions"] == expected
-            assert str(app.query_one("#status-perm").render()) == expected
+            assert (
+                str(app.query_one("#status-perm").render())
+                == f"·  Approvals: {expected}"
+            )
         assert "auto" in str(list(app.query("#messages > *"))[-1].render())
 
 
@@ -963,38 +942,6 @@ async def test_hidden_status_chips_stay_quiet_and_model_stays_clickable(tmp_roan
 
 # ---------- de ✕ volgt de rechterrand als het venster van maat verandert ----------
 @pytest.mark.asyncio
-async def test_close_button_follows_the_right_edge_after_a_resize(tmp_roan):
-    """Na een resize staat de ✕ weer precies tegen de nieuwe rechterrand.
-
-    `App._on_resize` stuurt de Resize naar het scherm en zet de nieuwe maat
-    pas daarna; wie in `on_resize` meteen `self.size` gebruikt, rekent nog met
-    de OUDE vensterbreedte en laat de knop één resize achter (of buiten beeld
-    als het venster kleiner werd). Daarom loopt het plaatsen via
-    `call_after_refresh`.
-    """
-    from textual.widgets import Button
-
-    app = RoanApp(FakeAgent())
-    async with app.run_test(size=(90, 30)) as pilot:
-        await pilot.pause()
-        btn = app.query_one("#app-close", Button)
-        assert btn.region.width == 5, btn.region
-        assert btn.region.right == 90, btn.region
-
-        for size in [(46, 20), (120, 40), (60, 24), (33, 12)]:
-            await pilot.resize_terminal(*size)
-            await pilot.pause()
-            width = app.size.width
-            assert btn.region.width == 5, (size, btn.region)
-            assert btn.region.right == width, (size, btn.region, width)
-            # het teken blijft in het midden van zijn 5 kolommen
-            row = _row_text(app.screen, btn.region.y)
-            assert row[btn.region.x : btn.region.right] == "  ✕  ", (size, row)
-
-
-# ---------- de avatar is de vooraf gerenderde tekening ----------
-# assets/avatar.ans is met chafa gemaakt (24x12, echte truecolor) en staat als
-# tekst in de repo; de PNG is alleen de terugvalroute.
 
 
 @pytest.mark.asyncio
@@ -1122,3 +1069,725 @@ async def test_a_missing_ans_still_draws_the_png_in_the_same_cells(tmp_roan, tmp
         avatar = app.query_one("#avatar")
         assert (avatar.region.width, avatar.region.height) == ANS_CELLS, avatar.region
         assert set(avatar.content.plain) <= {"▀", "\n"}, "geen halfblokjes uit de PNG"
+
+
+# ---------- de provider staat in de modellenlijst flush rechts ----------
+# De rij was `<model>  ·  <provider>`, waardoor de provider meebeweeg met de
+# lengte van de modelnaam. `ModelsScreen._row` vult de modelnaam nu aan tot de
+# rij precies zo breed is als de lijst, zodat elke provider op dezelfde kolom
+# eindigt; een te lange modelnaam wordt met een liggende streep afgekapt zodat
+# de rij nooit ombreekt.
+
+MODELS_MIXED = [
+    ("groq", "m"),
+    ("cerebras", "qwen3-coder-480b-a35b-instruct-2507"),
+    ("xai", "grok-3-mini-beta"),
+    ("openai", "gpt-5-nano"),
+]
+
+
+def _models_rows(screen):
+    """(rijteksten, inwendige breedte) van #models-list, zoals getekend."""
+    from textual.widgets import OptionList
+
+    listing = screen.query_one("#models-list", OptionList)
+    width = listing.scrollable_content_region.width
+    regels = []
+    for y in range(listing.scrollable_content_region.height):
+        strip = listing.render_line(y)
+        regels.append("".join(seg.text for seg in strip).rstrip())
+    while regels and not regels[-1]:
+        regels.pop()
+    return regels, width
+
+
+def _provider_end_cells(regels, items):
+    """Per rij de kolom (in cellen) waar de provider eindigt, of None."""
+    from rich.cells import cell_len
+
+    columns = []
+    for regel, (provider, _) in zip(regels, items):
+        kolommen = 0
+        gevonden = None
+        for index, char in enumerate(regel):
+            if regel.startswith(str(provider), index):
+                gevonden = kolommen + cell_len(str(provider)) - 1
+            kolommen += cell_len(char)
+        columns.append(gevonden)
+    return columns
+
+
+@pytest.mark.asyncio
+async def test_models_provider_is_flush_right_on_every_row(tmp_roan):
+    """Alle rijen eindigen op dezelfde kolom: de één na de laatste van de lijst."""
+    from roan.tui import ModelsScreen
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        screen = ModelsScreen(MODELS_MIXED, [], [])
+        app.push_screen(screen)
+        await pilot.pause()
+        regels, width = _models_rows(screen)
+        assert len(regels) == len(MODELS_MIXED), regels
+        kolommen = _provider_end_cells(regels, MODELS_MIXED)
+        assert kolommen == [width - 1] * len(MODELS_MIXED), (kolommen, width, regels)
+
+
+@pytest.mark.asyncio
+async def test_models_rows_do_not_wrap_when_the_popup_is_narrow(tmp_roan):
+    """Eén regel per model, ook als de modelnaam niet in de lijst past.
+
+    Voor de opvulling brak een lange modelnaam de rij om, waardoor de provider
+    op een aparte regel onderaan terechtkwam.
+    """
+    from rich.cells import cell_len
+    from textual.widgets import OptionList
+
+    from roan.tui import ModelsScreen
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(50, 30)) as pilot:
+        await pilot.pause()
+        screen = ModelsScreen(MODELS_MIXED, [], [])
+        app.push_screen(screen)
+        await pilot.pause()
+        regels, width = _models_rows(screen)
+        listing = screen.query_one("#models-list", OptionList)
+        assert len(regels) == len(MODELS_MIXED), regels
+        assert all(cell_len(regel) <= width for regel in regels), (regels, width)
+        assert all(hoogte == 1 for hoogte in listing._line_cache.heights.values())
+        assert all("·" in regel for regel in regels), regels
+        assert _provider_end_cells(regels, MODELS_MIXED) == [width - 1] * len(MODELS_MIXED)
+
+
+@pytest.mark.asyncio
+async def test_models_provider_stays_flush_right_after_a_resize(tmp_roan):
+    """De opvulling was op de breedte van toen gemaakt en dus gegooid bij resize."""
+    from roan.tui import ModelsScreen
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        screen = ModelsScreen(MODELS_MIXED, [], [])
+        app.push_screen(screen)
+        await pilot.pause()
+        for size in [(60, 30), (140, 40), (50, 30), (100, 30)]:
+            await pilot.resize_terminal(*size)
+            await pilot.pause()
+            regels, width = _models_rows(screen)
+            assert len(regels) == len(MODELS_MIXED), (size, regels)
+            kolommen = _provider_end_cells(regels, MODELS_MIXED)
+            assert kolommen == [width - 1] * len(MODELS_MIXED), (size, kolommen, width, regels)
+
+
+@pytest.mark.asyncio
+async def test_models_provider_is_flush_right_while_filtering(tmp_roan):
+    """Ook na filteren op provider of op zoektekst, en met een lange naam."""
+    from textual.widgets import Select
+
+    from roan.tui import ModelsScreen
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        screen = ModelsScreen(MODELS_MIXED, [], [])
+        app.push_screen(screen)
+        await pilot.pause()
+
+        screen.query_one("#prov", Select).value = "cerebras"
+        await pilot.pause()
+        items = [("cerebras", MODELS_MIXED[1][1])]
+        regels, width = _models_rows(screen)
+        assert _provider_end_cells(regels, items) == [width - 1], regels
+
+        screen.query_one("#prov", Select).value = "__all__"
+        await pilot.pause()
+        screen.query_one("#msearch").value = "grok"
+        await pilot.pause()
+        items = [("xai", "grok-3-mini-beta")]
+        regels, width = _models_rows(screen)
+        assert _provider_end_cells(regels, items) == [width - 1], regels
+
+        screen.query_one("#msearch").value = ""
+        await pilot.pause()
+        regels, width = _models_rows(screen)
+        assert _provider_end_cells(regels, MODELS_MIXED) == [width - 1] * len(MODELS_MIXED)
+
+
+@pytest.mark.asyncio
+async def test_models_row_id_and_pick_survive_the_right_aligned_row(tmp_roan):
+    """De `id` blijft `provider|model`; de pick-handler splitst 'm erop."""
+    from textual.widgets import OptionList
+
+    from roan.tui import ModelsScreen
+
+    gekozen = []
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        screen = ModelsScreen(MODELS_MIXED, [], [])
+        app.push_screen(screen, gekozen.append)
+        await pilot.pause()
+        listing = screen.query_one("#models-list", OptionList)
+        ids = [listing.get_option_at_index(i).id for i in range(listing.option_count)]
+        assert ids == [f"{p}|{m}" for p, m in MODELS_MIXED], ids
+        listing.highlighted = 1
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+    assert gekozen == [MODELS_MIXED[1]], gekozen
+
+
+@pytest.mark.asyncio
+async def test_models_non_model_options_stay_plain_text(tmp_roan):
+    """De lege-stand en de 'nog N modellen'-regel zijn geen modelrijen."""
+    from textual.widgets import OptionList
+
+    from roan.tui import ModelsScreen
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(80, 30)) as pilot:
+        await pilot.pause()
+        screen = ModelsScreen([("groq", f"m{i}") for i in range(405)], [], [])
+        app.push_screen(screen)
+        await pilot.pause()
+        listing = screen.query_one("#models-list", OptionList)
+        laatste = listing.get_option_at_index(listing.option_count - 1)
+        assert laatste.id is None
+        tekst = str(laatste.prompt)
+        assert tekst == tekst.strip(), repr(tekst)
+
+        screen.query_one("#msearch").value = "zzz"
+        await pilot.pause()
+        leeg = listing.get_option_at_index(0)
+        assert leeg.id is None
+        assert str(leeg.prompt) == str(leeg.prompt).strip(), repr(str(leeg.prompt))
+
+
+# ---------- het portret staat rechtsboven aan een lijn ----------
+# Het portret stond linksboven als kale 24x12 ANSI-tekening. Nu staat het in een
+# eigen rij (`#avatar-row`) met een Rule ernaast: de kortste widget in een
+# horizontale rij gaat naar links, dus de lijn neemt de ruimte en het portret
+# komt tegen de rechterrand te staan. De rij kost geen extra rijen (de lijn
+# deelt de eerste tekenrij van het portret), dus #messages houdt dezelfde hoogte.
+
+
+def _avatar_screen_rows(app) -> list[str]:
+    """De getekende schermrijen waar het portret staat."""
+    avatar = app.query_one("#avatar")
+    strips = app.screen._compositor.render_strips()
+    return [
+        "".join(seg.text for seg in strips[y])
+        for y in range(avatar.region.y, avatar.region.y + avatar.region.height)
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("size", [(60, 26), (80, 24), (100, 50), (120, 40), (46, 20)])
+async def test_avatar_sits_top_right_flush_against_the_edge(tmp_roan, size):
+    """Het portret staat bovenaan en tegen de rechterrand.
+
+    `position: absolute` kent geen 'right', dus de ✕ moest met een offset in de
+    flow worden gezet; in een rij is dat niet nodig: de kortste widget gaat naar
+    links en de langste vult de rest, dus de avatar eindigt op de rechterrand
+    van zijn eigen rij.
+    """
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=size) as pilot:
+        await pilot.pause()
+        avatar = app.query_one("#avatar")
+        rij = app.query_one("#avatar-row")
+        assert avatar.region.y == 0, avatar.region
+        assert avatar.region.right == rij.region.right, (avatar.region, rij.region)
+        assert avatar.region.x > rij.region.x, "het portret hoort rechts, niet links"
+        # de rij staat bovenaan: het gesprek begint eronder
+        assert app.query_one("#messages").region.y == rij.region.height
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("size", [(60, 26), (80, 24), (100, 50)])
+async def test_the_rule_runs_from_the_left_edge_into_the_avatar(tmp_roan, size):
+    """De lijn loopt van de linkerrand naar het portret, zonder kade.
+
+    Een gat of een schermlijn ertussen zou twee losse dingen maken; de lijn
+    moet tegen de eerste kolom van het portret aanlopen.
+    """
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=size) as pilot:
+        await pilot.pause()
+        rule = app.query_one("#avatar-rule")
+        avatar = app.query_one("#avatar")
+        assert rule.region.x == 0, rule.region
+        assert rule.region.y == avatar.region.y, (rule.region, avatar.region)
+        assert rule.region.height == 1, rule.region
+        assert rule.region.right == avatar.region.x, (rule.region, avatar.region)
+        rij = _avatar_screen_rows(app)[0]
+        assert set(rij[: avatar.region.x]) == {"─"}, rij[: avatar.region.x]
+        assert rij[rule.region.x : rule.region.right] == "─" * rule.region.width
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("size", [(60, 26), (80, 24), (100, 50)])
+async def test_the_avatar_row_costs_no_extra_rows(tmp_roan, size):
+    """De lijn deelt de bovenste tekenrij van het portret.
+
+    Zonder dit zou de rij 13 hoog zijn in plaats van 12 en schoof het gesprek
+    een regel omlaag op elk scherm.
+    """
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=size) as pilot:
+        await pilot.pause()
+        avatar = app.query_one("#avatar")
+        rij = app.query_one("#avatar-row")
+        assert rij.region.height == avatar.region.height, (rij.region, avatar.region)
+        assert app.query_one("#messages").region.y == avatar.region.height
+        status = app.query_one("#status")
+        assert status.region.y + status.region.height == app.screen.size.height
+
+
+@pytest.mark.asyncio
+async def test_the_avatar_still_flush_right_and_unwrapped_after_a_resize(tmp_roan):
+    """Na een resize staat het portret weer tegen de nieuwe rechterrand.
+
+    De regel is 1fr en het portret een vast aantal cellen, dus dat vraagt geen
+    enkele berekening — en dus ook geen `offset` die een resize achterloopt.
+    """
+    from rich.cells import cell_len
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(100, 50)) as pilot:
+        await pilot.pause()
+        for size in [(60, 26), (33, 12), (120, 40), (80, 24), (100, 50)]:
+            await pilot.resize_terminal(*size)
+            await pilot.pause()
+            avatar = app.query_one("#avatar")
+            rule = app.query_one("#avatar-rule")
+            rij = app.query_one("#avatar-row")
+            assert avatar.region.right == rij.region.right, (size, avatar.region, rij.region)
+            assert rule.region.right == avatar.region.x, (size, rule.region, avatar.region)
+            # elke schermrij waar het portret staat is even breed: niets loopt om
+            assert {cell_len(rij_) for rij_ in _avatar_screen_rows(app)} == {
+                app.screen.size.width
+            }, size
+
+
+# ---------- de zwevende ✕ rechtsboven is weg ----------
+# Die hoek hoort nu bij het portret. Sluiten kan nog met Ctrl+C en Ctrl+Q en
+# met de ✕ in elke popup.
+
+
+@pytest.mark.asyncio
+async def test_app_has_no_close_button_in_the_corner(tmp_roan):
+    from roan.tui import CLOSE_GLYPH
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(100, 50)) as pilot:
+        await pilot.pause()
+        assert not app.query("#app-close"), "de zwevende ✕ hoort weg"
+        assert not app.query("#app-close")
+        # en er wordt ook geen ✕ meer getekend
+        for y in range(4):
+            assert CLOSE_GLYPH not in _row_text(app.screen, y)
+        # de popup-✕ blijft
+        from roan.tui import SetupScreen
+
+        scr = SetupScreen(provider="groq", model="m")
+        app.push_screen(scr)
+        await pilot.pause()
+        assert scr.query_one("#close")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("key", ["ctrl+c", "ctrl+q"])
+async def test_ctrl_c_and_ctrl_q_still_quit_without_the_close_button(tmp_roan, key):
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(100, 50)) as pilot:
+        await pilot.pause()
+        await pilot.press(key)
+        await pilot.pause()
+        assert getattr(app, "_exit", False) is True or not app.is_running
+
+
+# ---------- waar staat de ╹ ? ----------
+# Er staan twee ╹ op het scherm, en allebei zijn ze bedoeld: één als
+# promptmerker links in het invoerveld (Region(x=3, y=...)), en één ín de
+# chafa-tekening van het portret. Niets zet er één rechtsbuiten het portret.
+
+
+@pytest.mark.asyncio
+async def test_every_hook_glyph_is_the_prompt_mark_or_part_of_the_artwork(tmp_roan):
+    """De ╹ staat links in het invoerveld of binnen het portret, nergens anders.
+
+    De gebruiker zag 'iets rechts' en dacht aan de ╹; dat was de zwevende ✕ (zie
+    de test hierboven). Deze test legt vast dat er rechtsbuiten het portret geen
+    ╹ getekend wordt, zodat een volgende verslechtering meteen valt.
+    """
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(100, 50)) as pilot:
+        await pilot.pause()
+        avatar = app.query_one("#avatar")
+        mark = app.query_one("#prompt-mark")
+        assert mark.region.x == 3, mark.region
+
+        treffers = [
+            (y, x)
+            for y, rij in enumerate(
+                _row_text(app.screen, y) for y in range(app.screen.size.height)
+            )
+            for x, char in enumerate(rij)
+            if char == "╹"
+        ]
+        # de promptmerker, plus de ╹ die in de chafa-tekening zit (rij 6)
+        assert mark.region.y <= app.screen.size.height
+        for y, x in treffers:
+            in_avatar = (
+                avatar.region.y <= y < avatar.region.y + avatar.region.height
+                and avatar.region.x <= x < avatar.region.right
+            )
+            at_mark = (y, x) == (mark.region.y, mark.region.x)
+            assert in_avatar or at_mark, f"╹ op onverwachte plek ({y}, {x})"
+        # de een in de tekening staat echt in het portret
+        kunst = [
+            (y, x) for y, x in treffers if not (y, x) == (mark.region.y, mark.region.x)
+        ]
+        assert len(kunst) == 1, kunst
+        kunst_y, kunst_x = kunst[0]
+        assert avatar.region.y <= kunst_y < avatar.region.y + avatar.region.height
+        # en buiten het portret staat hij links, bij het invoerveld
+        buiten = [
+            (y, x)
+            for y, x in treffers
+            if not (
+                avatar.region.y <= y < avatar.region.y + avatar.region.height
+                and avatar.region.x <= x < avatar.region.right
+            )
+        ]
+        assert buiten == [(mark.region.y, mark.region.x)], buiten
+
+
+@pytest.mark.asyncio
+async def test_the_short_screen_avatar_has_no_hook_glyph_outside_the_artwork(tmp_roan):
+    """Op een kort scherm is het portret een PNG-raster en blijft één ╹ over.
+
+    De tekening uit assets/avatar.ans is 12 rijen; past die niet, dan schaalt
+    het raster uit de PNG en verdwijnt de ╹ uit de tekening. Links in het
+    invoerveld blijft hij wel staan.
+    """
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        avatar = app.query_one("#avatar")
+        mark = app.query_one("#prompt-mark")
+        treffers = [
+            (y, x)
+            for y, rij in enumerate(
+                _row_text(app.screen, y) for y in range(app.screen.size.height)
+            )
+            for x, char in enumerate(rij)
+            if char == "╹"
+        ]
+        assert treffers == [(mark.region.y, mark.region.x)], treffers
+        assert avatar.region.right == app.query_one("#avatar-row").region.right
+
+
+# ---------- de statusbalk: denkniveau klikbaar, bullets, één kleur ----------
+STATUS_CHIPS = ("#status-thinking", "#status-mode", "#status-perm")
+
+
+def _chip_cells(app, selector: str) -> list:
+    """[(teken, kleur)] van alle zichtbare tekstcellen in een chip."""
+    region = app.query_one(selector).region
+    cellen = []
+    x = 0
+    for seg in app.screen._compositor.render_strips()[region.y]:
+        for char in seg.text:
+            if region.x <= x < region.right and char.strip():
+                cellen.append((char, seg.style.color.triplet.hex.lower()))
+            x += 1
+    return cellen
+
+
+def _bar_text(app) -> str:
+    return _row_text(app.screen, app.query_one("#status-bar").region.y).rstrip()
+
+
+@pytest.mark.asyncio
+async def test_clicking_the_thinking_chip_cycles_all_four_levels(tmp_roan):
+    """Het denkniveau is een knopje: off → low → medium → high → off.
+
+    Dit was een bug: `#status-thinking` had geen Click-handler, dus de chip
+    reageerde nergens op. Nu doet hij hetzelfde als modus en toestemming.
+    """
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(110, 26)) as pilot:
+        await pilot.pause()
+        chip = app.query_one("#status-thinking")
+        assert config.load_config()["thinking"] == "off"
+        assert "off" in str(chip.render())
+        for expected in ("low", "medium", "high", "off"):
+            await pilot.click("#status-thinking")
+            await pilot.pause()
+            assert config.load_config()["thinking"] == expected
+            assert str(chip.render()).endswith(f"Think: {expected}")
+            # en een regel eronder bevestigt het, met de nieuwe naam erbij
+            assert expected in str(list(app.query("#messages > *"))[-1].render())
+
+
+@pytest.mark.asyncio
+async def test_thinking_chip_is_clickable_on_every_level(tmp_roan):
+    """Ook `high` moet door kunnen naar `off`, dus alle vier de niveaus werken."""
+    config.save_config({"thinking": "high"})
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(110, 26)) as pilot:
+        await pilot.pause()
+        await pilot.click("#status-thinking")
+        await pilot.pause()
+        assert config.load_config()["thinking"] == "off"
+        assert str(app.query_one("#status-thinking").render()).endswith("Think: off")
+
+
+@pytest.mark.asyncio
+async def test_thinking_chip_looks_like_a_chip_on_hover(tmp_roan):
+    """Zonder hover is hij niet te onderscheiden van gewone tekst."""
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(110, 26)) as pilot:
+        await pilot.pause()
+        region = app.query_one("#status-thinking").region
+        before = _cell_style(app, region.x + 3, region.y)
+        await pilot.hover("#status-thinking", offset=(3, 0))
+        await pilot.pause()
+        after = _cell_style(app, region.x + 3, region.y)
+        assert (before.color, before.bgcolor) != (after.color, after.bgcolor)
+
+
+@pytest.mark.asyncio
+async def test_status_row_reads_think_mode_approvals(tmp_roan):
+    """De balk zegt waar de drie chips ophangen, met ` · ` ertussen."""
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(110, 26)) as pilot:
+        await pilot.pause()
+        row = _bar_text(app)
+        assert row.endswith(
+            "Think: off  ·  Mode: Chat  ·  Approvals: auto  ·  ctrl+p commands"
+        ), row
+        # links blijft model · provider zoals het was
+        assert row.startswith("  ◆ test-model  ·  lmstudio"), row
+
+
+@pytest.mark.asyncio
+async def test_status_row_capitalises_the_mode_without_touching_the_config(tmp_roan):
+    """`Chat` op het scherm, `chat` in de config."""
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(110, 26)) as pilot:
+        await pilot.pause()
+        assert "Mode: Chat" in _bar_text(app)
+        assert config.load_config()["mode"] == "chat"
+
+
+@pytest.mark.asyncio
+async def test_the_three_status_chips_share_one_colour(tmp_roan):
+    """Denkniveau, modus en toestemming zijn één groep, dus één kleur.
+
+    `chat` was paars en `auto` grijs, terwijl ze allebei even klikbaar zijn.
+    """
+    from roan.themes import accent_color
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(110, 26)) as pilot:
+        await pilot.pause()
+        accent = accent_color().lower()
+        for selector in STATUS_CHIPS:
+            cellen = _chip_cells(app, selector)
+            assert cellen, selector
+            # alles op de bullet na is het accent; nergens een grijs ernaast
+            tekst = [kleur for char, kleur in cellen if char != "·"]
+            assert set(tekst) == {accent}, (selector, set(tekst))
+            for char, kleur in cellen:
+                if char == "·":
+                    assert kleur != accent, (selector, "bullet mag niet accent zijn")
+        # en de drie chips zijn dus onderling ook gelijk
+        verdeling = [
+            {kleur for char, kleur in _chip_cells(app, s) if char != "·"}
+            for s in STATUS_CHIPS
+        ]
+        assert verdeling[0] == verdeling[1] == verdeling[2] == {accent}, verdeling
+
+
+@pytest.mark.asyncio
+async def test_the_bullets_between_the_status_chips_are_dim(tmp_roan):
+    """De ` · ` ertussen is een scheider, geen chip: dus niet in het accent."""
+    from roan.themes import accent_color
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(110, 26)) as pilot:
+        await pilot.pause()
+        accent = accent_color().lower()
+        for selector in STATUS_CHIPS[1:] + ("#status-hints",):
+            cellen = _chip_cells(app, selector)
+            bullets = [kleur for char, kleur in cellen if char == "·"]
+            assert len(bullets) == 1, (selector, bullets)
+            assert bullets[0] != accent, (selector, bullets[0])
+        # de eerste chip begint zonder bullet, dus niets aan het begin
+        eerste = [char for char, _ in _chip_cells(app, STATUS_CHIPS[0])]
+        assert "·" not in eerste, eerste
+
+
+@pytest.mark.asyncio
+async def test_status_bar_never_clips_the_model_at_any_width(tmp_roan):
+    """Bij 60, 80, 100 en 140 kolommen past de balk en blijft de linkerkant heel.
+
+    De chiptekst is nu langer (`Think: medium`), dus de drempels in
+    `STATUS_FITS` staan verder omhoog dan eerst.
+    """
+    for width in (60, 80, 100, 140):
+        app = RoanApp(FakeAgent())
+        async with app.run_test(size=(width, 26)) as pilot:
+            await pilot.pause()
+            row = _bar_text(app)
+            bar = app.query_one("#status-bar")
+            assert bar.region.height == 1, width
+            assert bar.region.y == 25, width
+            assert "◆ test-model  ·  lmstudio" in row, (width, row)
+            # niets loopt de balk uit en geen enkele chip is gekneed
+            assert len(row) <= width, (width, row)
+            for selector in ("#status", *STATUS_CHIPS, "#status-hints"):
+                node = app.query_one(selector)
+                if not node.display:
+                    continue
+                if selector == "#status":
+                    continue
+                assert node.region.width == len(str(node.render())) + 2, (
+                    width,
+                    selector,
+                )
+
+
+@pytest.mark.asyncio
+async def test_status_bar_fits_with_token_usage_too(tmp_roan):
+    """Met verbruik erbij is het rijtje het langst; dan past het vanaf 122."""
+    agent = FakeAgent()
+    agent.usage = {"prompt": 12345, "completion": 900}
+    config.save_config({"context_window": 200000})
+    app = RoanApp(agent)
+    async with app.run_test(size=(140, 26)) as pilot:
+        await pilot.pause()
+        row = _bar_text(app)
+        assert "12.3K (6%)" in row, row
+        assert "◆ test-model  ·  lmstudio" in row, row
+        assert len(row) <= 140, row
+    # op 110 past het verbruik er niet bij, maar het model wel
+    app = RoanApp(agent)
+    async with app.run_test(size=(110, 26)) as pilot:
+        await pilot.pause()
+        row = _bar_text(app)
+        assert app.query_one("#status-tokens").display is False
+        assert "◆ test-model  ·  lmstudio" in row, row
+        assert len(row) <= 110, row
+
+
+@pytest.mark.asyncio
+async def test_status_bar_ladder_shows_more_chips_the_wider_it_gets(tmp_roan):
+    """De drempels staan in een vaste volgorde: hoe breder, hoe meer chips."""
+    gates = {
+        60: ["#status-hints"],
+        80: ["#status-perm", "#status-hints"],
+        100: ["#status-mode", "#status-perm", "#status-hints"],
+        140: ["#status-thinking", "#status-mode", "#status-perm", "#status-hints"],
+    }
+    for width, expected in gates.items():
+        app = RoanApp(FakeAgent())
+        async with app.run_test(size=(width, 26)) as pilot:
+            await pilot.pause()
+            shown = [
+                selector
+                for selector in (
+                    "#status-tokens",
+                    "#status-thinking",
+                    "#status-mode",
+                    "#status-perm",
+                    "#status-hints",
+                )
+                if app.query_one(selector).display
+            ]
+            assert shown == expected, (width, shown)
+
+
+@pytest.mark.asyncio
+async def test_hidden_chips_take_their_bullet_with_them(tmp_roan):
+    """Geen losse ` · ` aan het begin van het rijtje, wel één ervoor.
+
+    De bullet zit in het stukje dat volgt, dus een weggezet stukje neemt zijn
+    bullet mee; het eerste zichtbare stukje begint dus zonder bullet.
+    """
+    per_breedte = {
+        60: ["·  ctrl+p commands"],
+        80: ["Approvals: auto", "·  ctrl+p commands"],
+        100: ["Mode: Chat", "·  Approvals: auto", "·  ctrl+p commands"],
+        140: [
+            "Think: off",
+            "·  Mode: Chat",
+            "·  Approvals: auto",
+            "·  ctrl+p commands",
+        ],
+    }
+    for width, expected in per_breedte.items():
+        app = RoanApp(FakeAgent())
+        async with app.run_test(size=(width, 26)) as pilot:
+            await pilot.pause()
+            texts = [
+                str(app.query_one(selector).render())
+                for selector in (
+                    "#status-tokens",
+                    "#status-thinking",
+                    "#status-mode",
+                    "#status-perm",
+                    "#status-hints",
+                )
+                if app.query_one(selector).display and app.query_one(selector).render()
+            ]
+            assert texts == expected, (width, texts)
+
+
+@pytest.mark.asyncio
+async def test_ctrl_p_hint_stays_clickable_at_the_narrowest_width(tmp_roan):
+    """ctrl+p staat buiten de drempellijst en blijft dus overal klikbaar."""
+    from roan.tui import CommandScreen
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(60, 26)) as pilot:
+        await pilot.pause()
+        hints = app.query_one("#status-hints")
+        assert hints.display is True
+        assert "ctrl+p commands" in _bar_text(app)
+        await pilot.click("#status-hints")
+        await pilot.pause()
+        assert isinstance(app.screen, CommandScreen)
+
+
+@pytest.mark.asyncio
+async def test_the_bullet_follows_a_resize(tmp_roan):
+    """Na een resize schuift de bullet mee: het eerste stukje heeft er geen.
+
+    Anders blijft er een ` · ` aan het begin van het rijtje staan zodra een
+    chip wegvalt, of verdwijnt hij juist terwijl hij er nog moet staan.
+    """
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(110, 26)) as pilot:
+        await pilot.pause()
+        assert app.query_one("#status-thinking").display is True
+        assert str(app.query_one("#status-thinking").render()) == "Think: off"
+
+        await pilot.resize_terminal(80, 26)
+        await pilot.pause()
+        assert app.query_one("#status-thinking").display is False
+        assert str(app.query_one("#status-perm").render()) == "Approvals: auto"
+        assert "·" not in _bar_text(app).split("lmstudio")[-1].split("Approvals")[0]
+
+        await pilot.resize_terminal(110, 26)
+        await pilot.pause()
+        assert str(app.query_one("#status-thinking").render()) == "Think: off"
+        assert str(app.query_one("#status-perm").render()) == "·  Approvals: auto"
+        assert _bar_text(app).endswith(
+            "Think: off  ·  Mode: Chat  ·  Approvals: auto  ·  ctrl+p commands"
+        )

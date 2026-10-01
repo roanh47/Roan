@@ -97,6 +97,31 @@ def _compact_tokens(n: int) -> str:
 
 IMAGE_MODES = ("auto", "sixel", "tgp", "halfcell", "unicode")
 
+# Vanaf welke vensterbreedte een chip uit de statusbalk mag blijven staan.
+#
+# De drempels zijn gemeten, niet geschat: 4 kolomen balkpadding, ~30 kolomen
+# voor `◆ model  ·  provider` links (dat is `◆ glm-5.3-flash  ·  lmstudio` = 28
+# plus twee ruimte) en de clusterbreedte tot en met die chip. Elke chip kost zijn
+# tekst plus 2 kolommen padding, en elke bullet 3 kolommen (`·  `, de spatie
+# ervoor komt uit de padding van de vorige chip). Dus, met de langste waarden
+# (`Think: medium`, `Mode: Build`, `Approvals: user`):
+#
+#   hints                     20
+#   perm   20 + 20      = 40  ->  4 + 30 + 40  =  74
+#   mode   40 + 15      = 55  ->  4 + 30 + 55  =  89, met marge 90
+#   think  55 + 17      = 72  ->  4 + 30 + 72  = 106
+#   tokens 72 + 14      = 86  ->  4 + 30 + 86  = 118, met marge 122
+#
+# Zo valt de 1fr-linkerkant nooit weg; ctrl+p staat buiten deze lijst en blijft
+# dus op elke breedte staan (die chip is wel 20 kolommen breed, dus onder de 52
+# kolommen gaat de provider als eerste in de knelp).
+STATUS_FITS = (
+    ("#status-perm", 74),
+    ("#status-mode", 90),
+    ("#status-thinking", 106),
+    ("#status-tokens", 122),
+)
+
 
 def _image_widget_class(mode: str | None = None):
     """Kies de renderroutine voor de avatar.
@@ -931,6 +956,12 @@ class ModelsScreen(ModalScreen):
     #models-list {
         height: 1fr;
         margin-top: 1;
+        /* Elke rij is precies zo breed als de lijst en eindigt rechts op de
+           provider. Mocht een rij na een resize toch een kolom te breed zijn,
+           dan breekt hij niet om: hij wordt op één regel aan de rechterkant
+           afgekapt met een liggende streep. */
+        text-wrap: nowrap;
+        text-overflow: ellipsis;
     }
     """
 
@@ -954,6 +985,7 @@ class ModelsScreen(ModalScreen):
         self.data = {"free": free, "paid": paid, "custom": custom}
         self.fixed_provider = fixed_provider
         self._query = ""
+        self._built_width = -1
 
     def compose(self) -> ComposeResult:
         with Vertical(id="models-box", classes="popup"):
@@ -1021,9 +1053,11 @@ class ModelsScreen(ModalScreen):
             items = [(p, m) for p, m in items if q in m.casefold() or q in str(p).casefold()]
         return items
 
-    def _rebuild(self) -> None:
+    def _rebuild(self, keep_highlight: bool = False) -> None:
         items = self._visible()
         listing = self.query_one("#models-list", OptionList)
+        width = self._list_width()
+        keep = listing.highlighted if keep_highlight else None
         listing.clear_options()
         if not items:
             empty = t("search_no_results") if self._query else t("models_none")
@@ -1031,11 +1065,79 @@ class ModelsScreen(ModalScreen):
         else:
             cap = 400
             for p, m in items[:cap]:
-                listing.add_option(Option(f"{m}  ·  {p}", id=f"{p}|{m}"))
+                listing.add_option(Option(self._row(m, p, width), id=f"{p}|{m}"))
             if len(items) > cap:
                 listing.add_option(Option(t("models_more", n=len(items) - cap), id=None))
-            listing.highlighted = 0
+            listing.highlighted = 0 if not keep else min(keep, listing.option_count - 1)
+        self._built_width = width
         self.query_one("#models-hint", Static).update(t("models_hint", n=len(items)))
+
+    def _list_width(self) -> int:
+        """Inwendige breedte van de modellenlijst, in kolommen."""
+        return self.query_one("#models-list", OptionList).scrollable_content_region.width
+
+    @staticmethod
+    def _clip(text: str, cells: int) -> str:
+        """Kort `text` af tot `cells` kolommen, met een liggende streep erin."""
+        from rich.cells import cell_len
+
+        out: list[str] = []
+        used = 0
+        for char in text:
+            wide = cell_len(char)
+            if used + wide > cells - 1:
+                break
+            out.append(char)
+            used += wide
+        return "".join(out) + "…"
+
+    def _row(self, model: str, provider: str, width: int):
+        """Eén modelrij: de modelnaam links, de provider flush rechts.
+
+        De provider eindigt op elke rij op dezelfde kolom, dus de modelnaam
+        krijgt er opvulling achter tot de rij precies `width` kolommen breed is.
+        Een modelnaam die te lang is wordt afgekapt in plaats van omgebroken, zodat
+        de provider altijd in beeld blijft en de rij één regel blijft. De scheiding
+        staat er nog steeds tussen, en de provider is gedimd. `width` 0 betekent:
+        de lijst is nog niet uitgemeten (eerste build tijdens mount), dan blijft de
+        rij onopgeschoond en repaint het scherm zichzelf via `on_resize`.
+
+        `provider|model` blijft de `id` van de optie; de pick-handler splitst erop.
+        """
+        from rich.cells import cell_len
+        from rich.text import Text
+
+        tail = f"  ·  {provider}"
+        if width > 0:
+            # Kolommen die over blijven voor de modelnaam, minstens één zodat de
+            # scheiding nooit tegen de provider aan plakt.
+            room = max(width - cell_len(tail), 1)
+            name = model if cell_len(model) <= room else self._clip(model, room)
+            head = name + " " * (room - cell_len(name))
+        else:
+            head = model
+        row = Text(head)
+        row.append(tail, "dim")
+        return row
+
+    def on_resize(self, event) -> None:
+        """Het venster is breder of krapper geworden (`textual.events.Resize`).
+
+        De opvulling in de rijen is op de breedte van toen gemaakt, dus die moet
+        opnieuw zodra de lijst van breedte verandert. `Resize` zakt niet door, dus
+        deze handler vuurt per scherm. In `on_resize` is de nieuwe maat nog niet
+        binnen (App._on_resize zet 'm pas later), dus de eerste keer is de
+        vergelijking een niet-doet en repaint de tweede de rijen.
+        """
+        self._realign()
+        # En nog een keer nakijken na de volgende refresh, voor het geval de
+        # eerste resize nog de oude opzet van de lijst zag.
+        self.call_after_refresh(self._realign)
+
+    def _realign(self) -> None:
+        """Herbouw de rijen alleen als de lijst een andere breedte kreeg."""
+        if self._list_width() != self._built_width:
+            self._rebuild(keep_highlight=True)
 
     @on(Input.Changed, "#msearch")
     def _on_search(self, event: Input.Changed) -> None:
@@ -1424,11 +1526,30 @@ class RoanApp(App):
     ]
 
     CSS = """
-    /*GEEN horizontale padding: _size_avatar zet de breedte gelijk aan het aantal
-       kolommen van de tekst, dus padding zou de bruikbare breedte verkleinen en
-       elke regel op de volgende regel laten doorlopen (Rich wrapt dan).*/
-    /* Breedte volgt de tekst (24 kolommen voor de meegeleverde tekening);
-       _size_avatar zet daarna het precieze aantal cellen. */
+    /* De bovenste rij: de lijn links, het portret rechts. `width: auto` op
+       #avatar volgt de tekst (24 kolommen voor de meegeleverde tekening) en
+       _size_avatar zet daarna het precieze aantal cellen. In een horizontale
+       rij gaat de kortste widget naar links en neemt de langste de rest, dus
+       het portret staat vanzelf tegen de rechterrand.
+       GEEN horizontale padding: dat zou de bruikbare breedte verkleinen, zodat
+       de 24 kolommen niet passen en Rich elke regel op de volgende regel laat
+       doorlopen (losse streepjes tussen de regels door). */
+    #avatar-row {
+        height: auto;
+        width: 1fr;
+        layout: horizontal;
+    }
+    /* De lijn waar het portret aan vastzit. Zelfde kleur als het kader van het
+       invoerveld, zodat het één familie lijkt. `margin: 0` haalt de marge van
+       `Rule.-horizontal` uit de DEFAULT_CSS van Rule weg: die kost drie rijen
+       (1 boven, 1 onder) en de regel moet er één zijn. */
+    #avatar-rule {
+        height: 1;
+        width: 1fr;
+        margin: 0;
+        padding: 0;
+        color: $border;
+    }
     #avatar {
         width: auto;
         height: auto;
@@ -1457,14 +1578,6 @@ class RoanApp(App):
         color: $text-muted;
         content-align: center middle;
         padding: 0;
-    }
-    /* Rechtsboven zweven boven het chatvlak: `position: absolute` haalt de
-       knop uit de flow, zodat hij geen rij kost. De offset zet 'm op de
-       rechterrand (zie _place_close). */
-    #app-close {
-        position: absolute;
-        layer: overlay;
-        background: transparent;
     }
     .close:hover,
     .close:focus {
@@ -1513,38 +1626,48 @@ class RoanApp(App):
         background: transparent;
         padding: 0 2;
     }
-    /* Rechts het rijtje met tokens, denkniveau, modus en toestemming; de
-       ctrl+p-hint staat helemaal rechts en is klikbaar. */
+    /* Rechts het rijtje met tokens, denkniveau, modus en toestemming, met een
+       ` · ` ertussen; de ctrl+p-hint staat helemaal rechts en is klikbaar. */
     #status-right {
         width: auto;
         height: 1;
         layout: horizontal;
     }
-    #status-tokens,
-    #status-thinking,
-    #status-mode,
-    #status-perm {
+    /* Het verbruik is een getal, geen knopje: dus niet in de accentkleur. */
+    #status-tokens {
         width: auto;
         height: 1;
         color: $text-muted;
         padding: 0 1;
     }
-    #status-hints {
+    /* Denkniveau, modus en toestemming zijn alle drie hetzelfde soort chip:
+       één kleur (het accent), één hover. Anders las `chat` wel als actief en
+       `auto` als uitlegtekst, terwijl ze allebei even klikbaar zijn. */
+    #status-thinking,
+    #status-mode,
+    #status-perm {
         width: auto;
         height: 1;
         color: $accent;
-        text-style: bold;
+        padding: 0 1;
+    }
+    #status-hints {
+        width: auto;
+        height: 1;
+        color: $text-muted;
         padding: 0 1;
     }
     #status-hints:hover {
         background: $accent 30%;
     }
-    /* Model, modus en toestemming zijn net zo knopjes; ze zeggen het met een
-       hover, maar zacht: de linkerkant is 1fr en licht dus niet op als blok. */
+    /* Model, denkniveau, modus en toestemming zijn net zo knopjes; ze zeggen
+       het met een hover, maar zacht: de linkerkant is 1fr en licht dus niet op
+       als blok. */
     #status:hover {
         color: $accent;
         text-style: bold;
     }
+    #status-thinking:hover,
     #status-mode:hover,
     #status-perm:hover {
         background: $accent 30%;
@@ -1578,11 +1701,6 @@ class RoanApp(App):
     }
     #status {
         width: 1fr;
-        height: 1;
-        color: $text-muted;
-    }
-    #status-hints {
-        width: auto;
         height: 1;
         color: $text-muted;
     }
@@ -1749,13 +1867,21 @@ class RoanApp(App):
     # ---------- layout ----------
     def compose(self) -> ComposeResult:
         avatar = self._resolve_avatar()
+        # Bovenkant: één rij met het portret rechts tegen de rand en een
+        # ╰──────-lijn die van de linkerrand naar het portret loopt. De rij
+        # staat boven het gesprek, niet eronder: anders schoof het gesprek omlaag
+        # en leek het portret bij de input te horen. De chat loopt er gewoon
+        # onderdoor, precies zoals het bij een zwevend portret hoort.
         if avatar:
-            # Alleen bij een echt beeldprotocol (sixel/TGP) nemen we de widget
-            # van textual_image; die zet doorzichtige pixels anders op wit.
-            if _HAS_HD and _image_is_graphical():
-                yield _image_widget_class()(avatar, id="avatar")
-            else:
-                yield Static(self._avatar_text(), id="avatar")
+            with Horizontal(id="avatar-row"):
+                yield Rule(id="avatar-rule")
+                # Alleen bij een echt beeldprotocol (sixel/TGP) nemen we de
+                # widget van textual_image; die zet doorzichtige pixels anders
+                # op wit.
+                if _HAS_HD and _image_is_graphical():
+                    yield _image_widget_class()(avatar, id="avatar")
+                else:
+                    yield Static(self._avatar_text(), id="avatar")
         yield Messages(id="messages")
         # Vastgezet aan de onderkant als één blok, anders landen de status en
         # het invoerveld allebei op dezelfde rij en schrijven ze over elkaar.
@@ -1776,9 +1902,6 @@ class RoanApp(App):
                     yield Static(id="status-mode")
                     yield Static(id="status-perm")
                     yield Static(t("hint_commands"), id="status-hints")
-        # Rechtsboven, zwevend boven het chatvlak: kost geen extra rij en de
-        # ✕ staat waar je verwacht, linksbovenin een terminal.
-        yield Button(CLOSE_GLYPH, id="app-close", classes="close")
 
     def _theme_bg(self) -> tuple[int, int, int]:
         """RGB van de thema-achtergrond, om de avatar-op en tekenen.
@@ -1813,9 +1936,10 @@ class RoanApp(App):
     def _size_avatar(self) -> None:
         """Zet de avatar op het aantal cellen dat zijn verhouding respecteert.
 
-        `self.size` in `on_resize` is nog de OUDE maat (zie `_place_close`),
-        dus de maat wordt pas na de volgende refresh gezet; anders rekent hij
-        met het scherm van vóór de resize.
+        `self.size` in `on_resize` is nog de OUDE maat (`App._on_resize` zet pas
+        later de nieuwe grootte en stuurt de Resize naar het scherm), dus de maat
+        wordt pas na de volgende refresh gezet; anders rekent hij met het scherm
+        van vóór de resize.
         """
         self.call_after_refresh(self._size_avatar_now)
 
@@ -1857,34 +1981,17 @@ class RoanApp(App):
         node.styles.width = cols
         node.styles.height = rows
 
-    def _place_close(self) -> None:
-        """Zet de ✕ op de rechterrand; `position: absolute` kent geen 'right'.
-
-        De knop is 5 kolommen breed (zie `.close`), dus 5 kolomen van de rand
-        af is de rechterrand precies.
-
-        `self.size` in `on_resize` is nog de OUDE maat: App._on_resize zet pas
-        later de nieuwe grootte en stuurt de Resize naar het scherm. Zonder de
-        call_after_refresh bleef de ✕ dus één resize achter en stond hij
-        scheef, of buiten beeld als het venster kleiner werd. Daarom rekenen we
-        pas na de volgende refresh, als de nieuwe maat binnen is.
-        """
-        self.call_after_refresh(self._place_close_now)
-
-    def _place_close_now(self) -> None:
-        for node in self.query("#app-close"):
-            node.styles.offset = (max(0, (self.size.width or 80) - 5), 0)
-
     def on_resize(self) -> None:
-        self._place_close()
         self._size_avatar()
         if self.is_running:
-            self._fit_status_bar()
+            # In `on_resize` staat `self.size` nog op de OUDE maat; pas na de
+            # volgende refresh is de nieuwe breedte binnen. Zonder die uitstap
+            # bleef de balk één resize achter en stonden de chips fout.
+            self.call_after_refresh(self._fit_status_bar)
 
     def on_mount(self) -> None:
         self.query_one("#input", Input).focus()
         self._size_avatar()
-        self._place_close()
         self._update_status()
         self._render_history()
         if not is_configured():
@@ -1914,9 +2021,11 @@ class RoanApp(App):
         """Vult de onderste balk.
 
         Links alleen model en provider — de api-key-status ("key ingesteld")
-        was nutteloos, want die staat al in de setup. Rechts de token-usage,
-        het denkniveau, de modus en de toestemming, kort genoeg om op één regel
-        te passen.
+        was nutteloos, want die staat al in de setup. Rechts de token-usage, het
+        denkniveau, de modus en de toestemming, met een ` · ` ertussen en alle
+        drie de knopjes in dezelfde accentkleur: zo leest het rijtje als één
+        groep in plaats van als losse woorden. De drie chips zelf schildert
+        `_fit_status_bar`, want hun bullets hangen aan de vensterbreedte.
         """
         cfg = load_config()
         accent = accent_color()
@@ -1925,33 +2034,53 @@ class RoanApp(App):
         )
 
         self.query_one("#status-tokens", Static).update(self._tokens_text())
-        self.query_one("#status-thinking", Static).update(
-            f"[b {accent}]think[/] {cfg.get('thinking') or 'off'}"
-        )
-        self.query_one("#status-mode", Static).update(
-            f"[b {accent}]{cfg.get('mode') or 'chat'}[/]"
-        )
-        self.query_one("#status-perm", Static).update(
-            f"{cfg.get('permissions') or 'auto'}"
+        self.query_one("#status-hints", Static).update(
+            f"[dim]·  [/dim]{t('hint_commands')}"
         )
         self._fit_status_bar()
 
     def _fit_status_bar(self) -> None:
-        """Verberg de minst belangrijke stukjes als het venster smal is.
+        """Schildert het rechter rijtje en verbergt wat er niet in past.
 
         Model en provider blijven altijd staan; daarna vallen de chips één voor
-        één weg. Anders knijpt de 1fr-linkerkant zijn tekst weg en verdwijnt de
-        provider uit de balk.
+        één weg, in de volgorde van `STATUS_FITS`. Anders knijpt de
+        1fr-linkerkant zijn tekst weg en verdwijnt de provider uit de balk.
+        De ctrl+p-hint staat niet in die lijst en blijft dus altijd staan.
+
+        De bullet zit in het stukje dat volgt, dus een chip die weggaat neemt
+        zijn bullet mee; het eerste zichtbare stukje begint dus zonder bullet.
+        Daarom schilderen we hier, en niet in `_update_status`: na een resize
+        moet de bullet mee verschuiven.
+
+        Zichtbaar is wat in `STATUS_FITS` past op deze breedte. De verbruik-chip
+        heeft daarnaast tekst nodig: zonder api-venster is er niets te tonen en
+        die kolommen zijn beter voor `model · provider`.
         """
         width = self.size.width or 80
-        for selector, minimum in (
-            ("#status-thinking", 100),
-            ("#status-mode", 88),
-            ("#status-perm", 76),
-            ("#status-tokens", 64),
-        ):
+        tokens = self._tokens_text()
+        cfg = load_config()
+        accent = accent_color()
+        shown = {
+            selector
+            for selector, minimum in STATUS_FITS
+            if width >= minimum and (selector != "#status-tokens" or bool(tokens))
+        }
+        for selector, _minimum in STATUS_FITS:
             for node in self.query(selector):
-                node.display = width >= minimum
+                node.display = selector in shown
+
+        first = "#status-tokens" not in shown
+        for selector, text in (
+            (
+                "#status-thinking",
+                f"Think: {cfg.get('thinking') or THINKING_LEVELS[0]}",
+            ),
+            ("#status-mode", f"Mode: {str(cfg.get('mode') or MODES[0]).capitalize()}"),
+            ("#status-perm", f"Approvals: {cfg.get('permissions') or PERMISSIONS[0]}"),
+        ):
+            bullet = "" if first or selector not in shown else "[dim]·  [/dim]"
+            self.query_one(selector, Static).update(f"{bullet}[b {accent}]{text}[/]")
+            first = first and selector not in shown
 
     def _tokens_text(self) -> str:
         """Token-usage zoals opencode het toont: bijvoorbeeld `12.3K (4%)`.
@@ -1980,6 +2109,24 @@ class RoanApp(App):
     def _status_clicked(self) -> None:
         """Model · provider is een knopje: klikken doet hetzelfde als `/models`."""
         self._run_command("/models")
+
+    @on(Click, "#status-thinking")
+    def _thinking_clicked(self) -> None:
+        """Eén klik op het denkniveau = het volgende niveau
+        (off → low → medium → high → off).
+
+        Precies hetzelfde als `_mode_clicked` en `_perm_clicked`: de chip toont
+        wat je krijgt, en een regel eronder bevestigt het. Zo is het niveau ook
+        te wijzigen zonder het commando `/thinking` te kennen.
+        """
+        current = str(load_config().get("thinking") or THINKING_LEVELS[0])
+        index = (
+            THINKING_LEVELS.index(current) if current in THINKING_LEVELS else -1
+        )
+        new = THINKING_LEVELS[(index + 1) % len(THINKING_LEVELS)]
+        save_config({"thinking": new})
+        self._update_status()
+        self._sysline(t("msg_thinking_set", name=new))
 
     @on(Click, "#status-mode")
     def _mode_clicked(self) -> None:
@@ -2367,11 +2514,11 @@ class RoanApp(App):
         self._messages().scroll_page_down(animate=False)
 
     def action_quit_app(self) -> None:
-        """Ctrl+C, Ctrl+Q of de ✕ rechtsboven."""
-        self.exit()
+        """Ctrl+C of Ctrl+Q.
 
-    @on(Button.Pressed, "#app-close")
-    def _close_app(self, event: Button.Pressed) -> None:
+        De zwevende ✕ rechtsboven is weg: die hoek hoort nu bij het portret.
+        Sluiten kan dus alleen met een toets, of met de ✕ van een popup.
+        """
         self.exit()
 
     def action_clear_chat(self) -> None:
