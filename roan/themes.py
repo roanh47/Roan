@@ -49,14 +49,6 @@ SURFACE1 = {
     "mocha": "#45475A",
 }
 
-# De scrollbalk: rustig, niet schreeuwerig.
-SCROLLBAR = {
-    "latte": "#BCC0CC",
-    "frappe": "#51576D",
-    "macchiato": "#494D64",
-    "mocha": "#45475A",
-}
-
 THEME_NAMES = ("latte", "frappe", "macchiato", "mocha")
 DEFAULT_THEME = "mocha"
 
@@ -82,10 +74,13 @@ def _build(flavor: str) -> Theme:
     variables["input-selection-foreground"] = on_pink
     variables["input-cursor-background"] = pink
     variables["input-cursor-foreground"] = on_pink
-    variables["scrollbar"] = SCROLLBAR[flavor]
+    variables["scrollbar"] = pink
     variables["scrollbar-hover"] = pink
     variables["scrollbar-active"] = pink
-    variables["scrollbar-background"] = builtin.surface
+    # Het spoor is het paneelkleur van het ingebouwde thema, dus precies de
+    # achtergrond van de invoervelden: de balk valt dan weg tegen het veld
+    # ernaast in plaats van als losse donkere strook te staan.
+    variables["scrollbar-background"] = builtin.panel
     return Theme(
         name=flavor,
         primary=pink,

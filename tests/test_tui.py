@@ -883,7 +883,12 @@ async def test_clicking_the_mode_chip_cycles_chat_plan_build(tmp_roan):
 
 @pytest.mark.asyncio
 async def test_clicking_the_permissions_chip_flips_auto_and_user(tmp_roan):
-    """Auto ⇄ user, net als het commando zonder argument."""
+    """Auto ⇄ user, net als het commando zonder argument.
+
+    Op het scherm staat `Approvals: Auto`/`User` (de waarde wordt voor het lezen
+    met een hoofdletter geschreven, net als `Mode: Chat`); in de config blijft
+    `auto`/`user` in klein staan.
+    """
     app = RoanApp(FakeAgent())
     async with app.run_test(size=(110, 26)) as pilot:
         await pilot.pause()
@@ -892,9 +897,10 @@ async def test_clicking_the_permissions_chip_flips_auto_and_user(tmp_roan):
             await pilot.click("#status-perm")
             await pilot.pause()
             assert config.load_config()["permissions"] == expected
+            assert config.load_config()["permissions"].islower()
             assert (
                 str(app.query_one("#status-perm").render())
-                == f"·  Approvals: {expected}"
+                == f"·  Approvals: {expected.capitalize()}"
             )
         assert "auto" in str(list(app.query("#messages > *"))[-1].render())
 
@@ -907,10 +913,15 @@ async def test_clickable_status_items_show_it_on_hover(tmp_roan):
         async with app.run_test(size=(110, 26)) as pilot:
             await pilot.pause()
             region = app.query_one(selector).region
-            before = _cell_style(app, region.x + 1, region.y)
+            # De eerste cel is bij een chip de ` · `, en die is een scheider: die
+            # blijft grijs op hover. De test wil dus de WOORDEN zien omslaan.
+            x = region.x + 1
+            if str(app.query_one(selector).render()).startswith("·"):
+                x += 3
+            before = _cell_style(app, x, region.y)
             await pilot.hover(selector, offset=(1, 0))
             await pilot.pause()
-            after = _cell_style(app, region.x + 1, region.y)
+            after = _cell_style(app, x, region.y)
             assert (before.color, before.bgcolor) != (after.color, after.bgcolor), selector
 
 
@@ -965,11 +976,9 @@ async def test_avatar_draws_the_pre_rendered_ansi_at_its_own_size(tmp_roan):
         assert len(regels) == ANS_CELLS[1], f"{len(regels)} rijen, geen {ANS_CELLS[1]}"
         assert {cell_len(r) for r in regels} == {ANS_CELLS[0]}, "rij niet 24 kolommen"
         # de buitenste maat is de inhoud plus de twee cells van de rand
-        assert avatar.region.size == (ANS_CELLS[0] + 4, ANS_CELLS[1] + 2), avatar.region
-        assert (avatar.content_size.width, avatar.content_size.height) == (
-            ANS_CELLS[0] + 2,
-            ANS_CELLS[1],
-        ), avatar.content_size
+        assert avatar.region.size == (ANS_CELLS[0] + 2, ANS_CELLS[1] + 2), avatar.region
+        # het vlak van het kader is exact de tekening: geen lucht ertussen
+        assert avatar.content_size == ANS_CELLS, avatar.content_size
         # echte kleuren, geen 256 of 16 kleuren
         assert any(
             span.style is not None
@@ -1057,8 +1066,8 @@ async def test_a_short_screen_scales_the_png_instead_of_squashing_the_drawing(tm
         cols, rows = fitted_cells(avatar_path(), AVATAR_COLS, max_rows=app._avatar_rows())
         assert rows < ANS_CELLS[1], app._avatar_rows()
         # de widget is de raster-maat plus de twee cells van de rand ernaomheen
-        assert avatar.region.size == (cols + 4, rows + 2), avatar.region
-        assert avatar.content_size == (cols + 2, rows), avatar.content_size
+        assert avatar.region.size == (cols + 2, rows + 2), avatar.region
+        assert avatar.content_size == (cols, rows), avatar.content_size
         regels = avatar.content.plain.split("\n")
         assert len(regels) == rows
         assert {cell_len(r) for r in regels} == {cols}
@@ -1075,11 +1084,9 @@ async def test_a_missing_ans_still_draws_the_png_in_the_same_cells(tmp_roan, tmp
     async with app.run_test(size=(90, 30)) as pilot:
         await pilot.pause()
         avatar = app.query_one("#avatar")
-        assert avatar.region.size == (ANS_CELLS[0] + 4, ANS_CELLS[1] + 2), avatar.region
-        assert (avatar.content_size.width, avatar.content_size.height) == (
-            ANS_CELLS[0] + 2,
-            ANS_CELLS[1],
-        ), avatar.content_size
+        assert avatar.region.size == (ANS_CELLS[0] + 2, ANS_CELLS[1] + 2), avatar.region
+        # het vlak van het kader is exact de tekening: geen lucht ertussen
+        assert avatar.content_size == ANS_CELLS, avatar.content_size
         assert set(avatar.content.plain) <= {"▀", "\n"}, "geen halfblokjes uit de PNG"
 
 
@@ -1607,7 +1614,7 @@ async def test_status_row_reads_think_mode_approvals(tmp_roan):
         await pilot.pause()
         row = _bar_text(app)
         assert row.endswith(
-            "Think: off  ·  Mode: Chat  ·  Approvals: auto  ·  ctrl+p commands"
+            "Think: off  ·  Mode: Chat  ·  Approvals: Auto  ·  ctrl+p commands"
         ), row
         # links blijft model · provider zoals het was
         assert row.startswith("  ◆ test-model  ·  lmstudio"), row
@@ -1763,12 +1770,12 @@ async def test_hidden_chips_take_their_bullet_with_them(tmp_roan):
     """
     per_breedte = {
         60: ["·  ctrl+p commands"],
-        80: ["Approvals: auto", "·  ctrl+p commands"],
-        100: ["Mode: Chat", "·  Approvals: auto", "·  ctrl+p commands"],
+        80: ["Approvals: Auto", "·  ctrl+p commands"],
+        100: ["Mode: Chat", "·  Approvals: Auto", "·  ctrl+p commands"],
         140: [
             "Think: off",
             "·  Mode: Chat",
-            "·  Approvals: auto",
+            "·  Approvals: Auto",
             "·  ctrl+p commands",
         ],
     }
@@ -1822,13 +1829,305 @@ async def test_the_bullet_follows_a_resize(tmp_roan):
         await pilot.resize_terminal(80, 26)
         await pilot.pause()
         assert app.query_one("#status-thinking").display is False
-        assert str(app.query_one("#status-perm").render()) == "Approvals: auto"
+        assert str(app.query_one("#status-perm").render()) == "Approvals: Auto"
         assert "·" not in _bar_text(app).split("lmstudio")[-1].split("Approvals")[0]
 
         await pilot.resize_terminal(110, 26)
         await pilot.pause()
         assert str(app.query_one("#status-thinking").render()) == "Think: off"
-        assert str(app.query_one("#status-perm").render()) == "·  Approvals: auto"
+        assert str(app.query_one("#status-perm").render()) == "·  Approvals: Auto"
         assert _bar_text(app).endswith(
-            "Think: off  ·  Mode: Chat  ·  Approvals: auto  ·  ctrl+p commands"
+            "Think: off  ·  Mode: Chat  ·  Approvals: Auto  ·  ctrl+p commands"
         )
+
+# =====================================================================
+# Vijf kleine metingen: de bullet blijft grijs op hover, `Approvals: Auto`,
+# de providerkiezer flush rechts, één kolom naast de modellenlijst, en de
+# kleuren van de scrollbalk.
+# =====================================================================
+
+
+def _bullet_and_word(app, selector):
+    """(kleur, vet) van de ` · ` in een chip, en van het woord erna."""
+    node = app.query_one(selector)
+    region = node.region
+    x = region.x + node.styles.padding.left
+    bullet = _cell_style(app, x, region.y)
+    word = _cell_style(app, x + 3, region.y)
+    return (bullet.color.triplet.hex.lower(), bool(bullet.bold)), (
+        word.color.triplet.hex.lower(),
+        bool(word.bold),
+    )
+
+
+def _scrollbar_columns(app, listing):
+    """Per rij van de lijst: (kleur, achtergrond) van de laatste kolom."""
+    x = listing.region.x + listing.region.width - 1
+    return [
+        (
+            _cell_style(app, x, y).color.triplet.hex.lower(),
+            _cell_style(app, x, y).bgcolor.triplet.hex.lower(),
+        )
+        for y in range(listing.region.y, listing.region.bottom)
+    ]
+
+
+MODELS_MANY = [(f"provider-{i % 3}", f"model-met-een-lange-naam-{i:03d}") for i in range(60)]
+
+
+@pytest.mark.asyncio
+async def test_hover_leaves_the_bullet_between_the_chips_alone(tmp_roan):
+    """Op :hover wordt alleen het WOORD roze; de ` · ` blijft precies zoals hij was.
+
+    `[dim]` in de markup is een relatieve stijl: Textual dimt de kleur die het
+    widget op dat moment heeft, dus de bullet kreeg op hover de pink mee
+    (`#a988a5`) en werd bovendien vet. De bullet staat nu als absolute kleur in
+    de markup, dus geen widget-CSS en ook `:hover { text-style: bold }` kan hem
+    nog raken.
+    """
+    from roan.themes import PINK
+
+    pink = PINK["mocha"].lower()
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(110, 26)) as pilot:
+        await pilot.pause()
+        for selector in STATUS_CHIPS[1:] + ("#status-hints",):
+            chip = app.query_one(selector)
+            assert chip.display is True, selector
+            assert str(chip.render()).startswith("·"), selector
+            voor_bullet, voor_woord = _bullet_and_word(app, selector)
+            await pilot.hover(selector, offset=(4, 0))
+            await pilot.pause()
+            na_bullet, na_woord = _bullet_and_word(app, selector)
+            # de bullet is onveranderd, kleur EN gewicht
+            assert na_bullet == voor_bullet, (selector, voor_bullet, na_bullet)
+            # ...en is nog steeds de gedempte grijs, niet de pink
+            assert na_bullet[0] != pink, (selector, na_bullet)
+            # het woord erop turns wél roze (en vet)
+            assert na_woord[0] == pink, (selector, na_woord)
+            assert na_woord != voor_woord, (selector, voor_woord, na_woord)
+
+
+@pytest.mark.asyncio
+async def test_the_bullet_is_one_grey_for_every_chip_and_follows_the_theme(tmp_roan):
+    """Alle bullets zijn dezelfde gedempte grijs, en ze volgen het thema mee.
+
+    De kleur wordt uit de eigen CSS-regels van de chip berekend in plaats van
+    vastgespikkeld, dus elke Catppuccin-smaak krijgt zijn eigen gedempte grijs.
+    """
+    per_thema = {}
+    for thema in ("mocha", "latte", "frappe", "macchiato"):
+        app = RoanApp(FakeAgent())
+        async with app.run_test(size=(110, 26)) as pilot:
+            await pilot.pause()
+            app.theme = thema
+            await pilot.pause()
+            # de balk schildert zichzelf op de volgende `_update_status`
+            app._update_status()
+            await pilot.pause()
+            kleuren = set()
+            for selector in STATUS_CHIPS[1:] + ("#status-hints",):
+                bullet, _woord = _bullet_and_word(app, selector)
+                kleuren.add(bullet)
+            assert len(kleuren) == 1, (thema, kleuren)
+            per_thema[thema] = kleuren.pop()
+    assert per_thema["mocha"] == ("#73737a", False), per_thema
+    # vier smaken, dus vier eigen grijzen: het is echt afgeleid, niet vastgezet
+    assert len({kleur for kleur, _ in per_thema.values()}) == 4, per_thema
+
+
+@pytest.mark.asyncio
+async def test_the_permissions_value_is_capitalised_on_screen_only(tmp_roan):
+    """`Approvals: Auto`/`User` op het scherm, `auto`/`user` in de config."""
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(110, 26)) as pilot:
+        await pilot.pause()
+        for waarde in ("auto", "user"):
+            config.save_config(
+                {
+                    "provider": "lmstudio",
+                    "model": "test-model",
+                    "tui": "default",
+                    "permissions": waarde,
+                }
+            )
+            app._update_status()
+            await pilot.pause()
+            assert config.load_config()["permissions"] == waarde
+            assert str(app.query_one("#status-perm").render()) == (
+                f"·  Approvals: {waarde.capitalize()}"
+            )
+            assert f"Approvals: {waarde.capitalize()}" in _bar_text(app)
+            # de modus doet hetzelfde, en blijft ook klein in de config
+            assert str(app.query_one("#status-mode").render()) == "·  Mode: Chat"
+            assert config.load_config()["mode"] == "chat"
+
+
+@pytest.mark.asyncio
+async def test_the_provider_select_ends_flush_right(tmp_roan):
+    """#prov eindigt precies op de rand van het popup; #cat houdt 2 kolomen lucht."""
+    from roan.tui import ModelsScreen
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(80, 30)) as pilot:
+        await pilot.pause()
+        screen = ModelsScreen(MODELS_MIXED, [], [])
+        app.push_screen(screen)
+        await pilot.pause()
+        box = screen.query_one("#models-box")
+        cat = screen.query_one("#cat")
+        prov = screen.query_one("#prov")
+        content = box.content_region
+        rand = content.x + content.width  # de kolom ná de laatste van het popup
+        # flush: geen enkele kolom lucht meer tussen #prov en die rand
+        assert prov.region.x + prov.region.width == rand, (prov.region, content)
+        # tussen de twee kiezers blijven er twee lege kolommen staan
+        assert prov.region.x - (cat.region.x + cat.region.width) == 2, (
+            cat.region,
+            prov.region,
+        )
+        assert cat.region.x + cat.region.width < rand
+
+
+@pytest.mark.asyncio
+async def test_one_clear_column_to_the_right_of_the_models_list(tmp_roan):
+    """Precies één kolom lucht tussen de lijst (met haar scrollbar) en de rand.
+
+    Geen scrollbar = geen scrollbalk, dus hier is een lijst nodig die echt te
+    scrollen is: 60 modellen in een popup van 80x30.
+    """
+    from textual.widgets import OptionList
+
+    from roan.tui import ModelsScreen
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(80, 30)) as pilot:
+        await pilot.pause()
+        screen = ModelsScreen(MODELS_MANY, [], [])
+        app.push_screen(screen)
+        await pilot.pause()
+        box = screen.query_one("#models-box")
+        listing = screen.query_one("#models-list", OptionList)
+        assert listing.show_vertical_scrollbar is True, "geen scrollbar om te meten"
+        assert listing.max_scroll_y > 0, "lijst die niet te scrollen is"
+        rand = box.content_region.right - 1  # laatste kolom van het popup
+        laatste = listing.region.right - 1  # laatste kolom van de lijst
+        # Precies één kolom lucht: de lijst eindigt op `rand - 1`, dus kolom
+        # `rand` blijft leeg. De scrollbar zit ín de lijst, op de twee laatste
+        # kolommen daarvan.
+        assert laatste == rand - 1, (listing.region, box.content_region)
+        assert listing.scrollbar_size_vertical == 2
+        duim = _cell_style(app, rand - 1, listing.region.y + 1)
+        spoor = _cell_style(app, rand - 1, listing.region.bottom - 1)
+        assert duim.color.triplet.hex.lower() != spoor.color.triplet.hex.lower(), (
+            "geen duim en spoor te onderscheiden"
+        )
+        # en die laatste lijstkolom is de scrollbar, dus de modelrij stopt een
+        # kolom eerder: de rij zit tot en met `rand - 3`, en `rand` is leeg
+        regel = _row_text(app.screen, listing.region.y)
+        assert "model-met-een-lange-naam-000" in regel, regel
+        assert "provider-0" in regel, regel
+        assert regel[rand] == " ", regel[laatste - 2 : rand + 2]
+
+
+@pytest.mark.asyncio
+async def test_every_model_row_still_ends_on_the_same_column_after_the_margin(tmp_roan):
+    """De marge kost een kolom, maar de rijen blijven één regel en één kolom breed.
+
+    `text-wrap: nowrap` en de opvulling in `_row` lopen allebei over
+    `scrollable_content_region.width`, dus die wordt nu één kolom smaller; de
+    provider moet daarna nog steeds op precies dezelfde kolom eindigen.
+    """
+    from textual.widgets import OptionList
+
+    from roan.tui import ModelsScreen
+
+    veel = [
+        ("groq", "kort"),
+        ("cerebras", "qwen3-coder-480b-a35b-instruct-2507"),
+        ("xai", "grok-3-mini-beta"),
+        ("openai", "gpt-5-nano"),
+    ]
+    veel = [(f"{p}-{i}", m) for i in range(15) for p, m in veel]
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(80, 30)) as pilot:
+        await pilot.pause()
+        screen = ModelsScreen(veel, [], [])
+        app.push_screen(screen)
+        await pilot.pause()
+        listing = screen.query_one("#models-list", OptionList)
+        regels, width = _models_rows(screen)
+        zichtbaar = veel[: len(regels)]
+        assert len(regels) == len(zichtbaar), (len(regels), len(veel))
+        assert listing.show_vertical_scrollbar is True, "scrollbar meetbaar nodig"
+        # één regel per model, en niets groeit een kolom
+        assert all(hoogte == 1 for hoogte in listing._line_cache.heights.values())
+        assert {len(regel) for regel in regels} == {width}, (set(map(len, regels)), width)
+        # en de provider eindigt op elke rij op de laatste kolom van de lijst
+        assert _provider_end_cells(regels, zichtbaar) == [width - 1] * len(zichtbaar), width
+        # de lijst is één kolom smaller dan het popup, min de twee scrollbar
+        box = screen.query_one("#models-box")
+        assert width == box.content_region.width - 3, (width, box.content_region)
+
+
+@pytest.mark.asyncio
+async def test_the_scrollbar_thumb_is_pink_and_its_track_matches_the_searchbar(tmp_roan):
+    """Duim = de pink van het thema, spoor = de achtergrond van het zoekveld.
+
+    Vóór deze meting was de duim grijs (`$scrollbar`) en het spoor `$surface`
+    (`$scrollbar-background`), dus een losse donkere strook naast een grijs
+    invoerveld. Nu is het spoor precies het paneelkleur van het thema.
+    """
+    from textual.widgets import OptionList
+
+    from roan.themes import THEME_BY_NAME
+    from roan.tui import ModelsScreen
+
+    for thema in ("mocha", "latte", "frappe", "macchiato"):
+        app = RoanApp(FakeAgent())
+        async with app.run_test(size=(80, 30)) as pilot:
+            await pilot.pause()
+            app.theme = thema
+            await pilot.pause()
+            screen = ModelsScreen(MODELS_MANY, [], [])
+            app.push_screen(screen)
+            await pilot.pause()
+            listing = screen.query_one("#models-list", OptionList)
+            assert listing.show_vertical_scrollbar is True, thema
+            pink = str(THEME_BY_NAME[thema].primary).lower()
+            paneel = str(THEME_BY_NAME[thema].panel).lower()
+            kolommen = _scrollbar_columns(app, listing)
+            duim = {bg for fg, bg in kolommen if fg == pink}
+            spoor = {bg for fg, bg in kolommen if fg != pink}
+            assert duim, (thema, "geen duim in het accent", kolommen)
+            assert spoor, (thema, "geen spoor", kolommen)
+            # het spoor is het paneelkleur van het thema...
+            assert spoor == {paneel}, (thema, spoor, paneel)
+            # ...dus precies wat het zoekveld ernaast als achtergrond heeft
+            zoekveld = screen.query_one("#msearch")
+            stijl = _cell_style(app, zoekveld.region.x + 3, zoekveld.region.y)
+            assert stijl.bgcolor.triplet.hex.lower() == paneel, (
+                thema,
+                stijl.bgcolor,
+                paneel,
+            )
+
+
+def test_every_flavour_keeps_pink_thumb_and_panel_track():
+    """Alle vier de smaken: duim = eigen pink, spoor = eigen paneelkleur."""
+    from roan import themes as themes_module
+    from roan.themes import DEFAULT_THEME, PINK, THEME_NAMES, THEMES
+    from textual.theme import BUILTIN_THEMES
+
+    assert THEME_NAMES == ("latte", "frappe", "macchiato", "mocha")
+    assert DEFAULT_THEME == "mocha"
+    # de losse SCROLLBAR-tabel is weg: de duim is nu overal de eigen pink
+    assert not hasattr(themes_module, "SCROLLBAR")
+    for thema in THEMES:
+        pink = PINK[thema.name]
+        paneel = BUILTIN_THEMES[f"catppuccin-{thema.name}"].panel
+        variables = thema.variables
+        assert variables["scrollbar"] == pink, thema.name
+        assert variables["scrollbar-hover"] == pink, thema.name
+        assert variables["scrollbar-active"] == pink, thema.name
+        assert variables["scrollbar-background"] == paneel, thema.name

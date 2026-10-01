@@ -947,7 +947,13 @@ class ModelsScreen(ModalScreen):
     }
     #models-filters Select {
         width: 1fr;
-        /* twee kolomen lucht tussen de categorie- en de providerkiezer */
+        margin-right: 0;
+    }
+    /* Twee kolomen lucht tussen de categorie- en de providerkiezer, en nergens
+       anders. De marge hoorde eerst op de hele rij, dus ook op de LAATSTE
+       kiezer, en die eindigde daardoor twee kolommen voor de rand van het
+       popup. */
+    #models-filters #cat {
         margin-right: 2;
     }
     #msearch {
@@ -956,6 +962,9 @@ class ModelsScreen(ModalScreen):
     #models-list {
         height: 1fr;
         margin-top: 1;
+        /* Eén kolom lucht tussen de lijst (dus inclusief haar scrollbar) en de
+           rand van het popup: anders plakte de scrollbar tegen de rand. */
+        margin-right: 1;
         /* Elke rij is precies zo breed als de lijst en eindigt rechts op de
            provider. Mocht een rij na een resize toch een kolom te breed zijn,
            dan breekt hij niet om: hij wordt op één regel aan de rechterkant
@@ -1930,11 +1939,11 @@ class RoanApp(App):
             max_rows=self._avatar_rows(),
         )
         # `styles.width/height` is bij Textual de buitenste maat (border-box).
-        # Een tekencel is twee keer zo hoog als breed, dus de rand is links en
-        # rechts 1 cel maar boven en onder 1 rij = 2 cellen. Voor een vierkante
-        # doos moet de breedte daarom met 4 toenemen, niet met 2: anders is de
-        # doos 2 breed maar 4 hoog en dus niet vierkant.
-        return cols + 4, rows + 2
+        # Alleen de rand telt mee: geen lucht ertussen, het portret vult het vlak.
+        # Een cel is twee keer zo hoog als breed, dus 26 x 14 cellen oogt
+        # bijna vierkant; met +4 kreeg je een wél vierkante doos maar met twee
+        # lege kolommen ernaast, en dat wilde de gebruiker niet.
+        return cols + 2, rows + 2
 
     def _size_avatar(self) -> None:
         """Zet de avatar op het aantal cellen dat zijn verhouding respecteert.
@@ -2067,9 +2076,39 @@ class RoanApp(App):
 
         self.query_one("#status-tokens", Static).update(self._tokens_text())
         self.query_one("#status-hints", Static).update(
-            f"[dim]·  [/dim]{t('hint_commands')}"
+            f"{self._bullet()}{t('hint_commands')}"
         )
         self._fit_status_bar()
+
+    def _bullet(self) -> str:
+        """De ` · ` als scheider tussen twee chips, in een vaste gedempte kleur.
+
+        Dit stond als `[dim]` in de markup, en dat is een RELATIEVE stijl: Textual
+        dimt de kleur die het widget op dat moment heeft. Op `:hover` had de chip
+        dan de pink en werd de bullet dim-pink mee — terwijl de gebruiker juist
+        alleen de woorden roze wilde zien, met een scheider die grijs blijft.
+        Daarom rekenen we de gedempte kleur zelf uit en zetten we die als
+        absolute kleur (`[#rrggbb]`) in de markup; `:hover` en elke andere
+        widget-CSS kunnen daar dan niet meer bij. `not bold` doet hetzelfde voor
+        de `:hover { text-style: bold }` uit de CSS, zodat de bullet echt
+        onveranderd blijft.
+
+        Uitgangswaarden zijn de eigen CSS-regels van de chip, dus de bullet volgt
+        het thema mee in plaats van een vastgespikkelde hex: de grijs-tint is
+        `$text-muted` (`auto 60%` over de balkachtergrond, dus het contrast
+        daarop) en `dim` is Textual's eigen `DIM_FACTOR`-blend richting die
+        achtergrond. Op mocha komt daar #73737a uit, precies de kleur die de
+        `[dim]`-variant gaf.
+        """
+        from textual.constants import DIM_FACTOR
+
+        chip = self.query_one("#status-thinking", Static)
+        achtergrond = chip.visual_style.background
+        grijs = achtergrond.get_contrast_text(chip.styles.color.a)
+        gedempt = grijs.blend(achtergrond, 1 - grijs.a).blend(
+            achtergrond, 1 - DIM_FACTOR
+        )
+        return f"[not bold #{gedempt.r:02x}{gedempt.g:02x}{gedempt.b:02x}]·  [/]"
 
     def _fit_status_bar(self) -> None:
         """Schildert het rechter rijtje en verbergt wat er niet in past.
@@ -2107,9 +2146,14 @@ class RoanApp(App):
                 f"Think: {cfg.get('thinking') or THINKING_LEVELS[0]}",
             ),
             ("#status-mode", f"Mode: {str(cfg.get('mode') or MODES[0]).capitalize()}"),
-            ("#status-perm", f"Approvals: {cfg.get('permissions') or PERMISSIONS[0]}"),
+            # Net als de modus, maar alleen voor het LEZEN: de config bewaart
+            # `auto`/`user` in klein, zoals het commando het ook schrijft.
+            (
+                "#status-perm",
+                f"Approvals: {str(cfg.get('permissions') or PERMISSIONS[0]).capitalize()}",
+            ),
         ):
-            bullet = "" if first or selector not in shown else "[dim]·  [/dim]"
+            bullet = "" if first or selector not in shown else self._bullet()
             self.query_one(selector, Static).update(f"{bullet}{text}")
             first = first and selector not in shown
 
