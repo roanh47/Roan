@@ -15,6 +15,7 @@ from textual.widgets import (
     Label,
     Markdown,
     OptionList,
+    Rule,
     Select,
     Static,
 )
@@ -31,8 +32,11 @@ except Exception:
 from . import commands
 from .agent import Agent
 from .config import (
+    MODES,
+    PERMISSIONS,
     PROVIDER_PRESETS,
     ROAN_DIR,
+    THINKING_LEVELS,
     add_endpoint,
     get_endpoint,
     get_endpoints,
@@ -69,6 +73,15 @@ from .themes import (
 BUNDLED_AVATAR = Path(__file__).parent / "assets" / "avatar.png"
 
 CLOSE_GLYPH = "✕"
+
+
+def _compact_tokens(n: int) -> str:
+    """12345 -> 12.3K, zoals opencode het in de balk zet."""
+    if n < 1000:
+        return str(n)
+    if n < 1_000_000:
+        return f"{n / 1000:.1f}K"
+    return f"{n / 1_000_000:.1f}M"
 
 
 IMAGE_MODES = ("auto", "sixel", "tgp", "halfcell", "unicode")
@@ -152,6 +165,20 @@ POPUP_CSS = """
         height: 1;
         color: $text-muted;
     }
+    /* vet kopje: het gaat hier om (bijvoorbeeld 'Provider' in de setup) */
+    .popup .section.strong {
+        text-style: bold;
+    }
+    /* scheidingslijn tussen twee groepen velden. `Rule.sep` weegt zwaarder dan
+       `Rule.-horizontal` uit de DEFAULT_CSS van Rule, dus de marge van Rule
+       (margin: 1 0) valt weg en de lijn kost maar één regel. */
+    Rule.sep {
+        height: 1;
+        width: 1fr;
+        margin: 0;
+        padding: 0;
+        color: $border;
+    }
     /* de huidige waarde naast een kies-knop */
     .popup .value {
         width: 1fr;
@@ -200,6 +227,16 @@ POPUP_CSS = """
         color: $foreground;
         padding: 0 1;
     }
+    /* De ✕ is overal 5 kolommen breed met het teken gecentreerd. Zonder deze
+       regel wint `.popup Button` (specificiteit 0,2,0) van `.close` (0,1,0) en
+       wordt de knop 6 kolommen: min-width 6 plus padding 0 1. */
+    .popup Button.close {
+        width: 5;
+        min-width: 5;
+        max-width: 5;
+        padding: 0;
+        content-align: center middle;
+    }
     .popup Button.-primary {
         background: $accent;
         color: $background;
@@ -216,8 +253,20 @@ POPUP_CSS = """
         margin-top: 1;
         align-horizontal: right;
     }
+    /* Twee kolomen lucht tussen twee knoppen. Textual neemt tussen twee
+       naast elkaar liggende widgets de GROOTSTE van de rechter- en de
+       linkermarge (geen som), dus `margin-right: 2` levert precies twee lege
+       kolommen ertussen; de laatste knop krijgt geen marge, zodat de rij
+       flush tegen de rand blijft staan. */
     .popup .actions Button {
-        margin-left: 1;
+        margin-right: 2;
+    }
+    .popup .actions Button:last-child {
+        margin-right: 0;
+    }
+    /* In een rij staat de waarde links en de kies-knop rechts: 2 kolomen lucht. */
+    .popup .row Button {
+        margin-left: 2;
     }
 """
 
@@ -314,10 +363,18 @@ class HistoryInput(Input):
 class SetupScreen(ModalScreen):
     """Setup-scherm: provider, api-sleutel, model. Automatisch bij de eerste start."""
 
+    # Wat er in het api-key-veld staat zolang je er niet in klikt. Dit is géén
+    # '(leeg = behouden)': het veld toont altijd iets, en de echte sleutel komt
+    # tevoorschijn zodra je op het veld klikt.
+    KEY_MASK = "sk-…"
+
     CSS = POPUP_CSS + """
     #setup-box {
         width: 92%;
         max-width: 74;
+        /* Op een heel klein venster past de kist niet; dan scroll je naar de
+           knoppen toe in plaats van dat Opslaan buiten beeld valt. */
+        overflow-y: auto;
     }
     """
 
@@ -329,6 +386,11 @@ class SetupScreen(ModalScreen):
         self.base_url = base_url or cfg.get("base_url") or ""
         # Verplicht = er is nog niets ingesteld; dan kun je dit scherm niet wegklikken.
         self.required = required
+        # De bewaarde sleutel; het veld toont KEY_MASK tot je erop klikt.
+        self.api_key = cfg.get("api_key") or ""
+        # Per keer dat het scherm opent staat het velw weer op de maskering.
+        self._revealed = False
+        self._unmasking = False
 
     BINDINGS = [("escape", "cancel", "terug")]
 
@@ -350,22 +412,34 @@ class SetupScreen(ModalScreen):
         custom = self.provider in ("", "custom")
         self.query_one("#lbl-base-url").display = custom
         self.query_one("#base_url").display = custom
+        # Zonder base url is die groep leeg; dan hoort er ook geen lijn bij.
+        self.query_one("#sep-base-url").display = custom
 
     def compose(self) -> ComposeResult:
         with Vertical(id="setup-box", classes="popup"):
             yield from _titlebar(t("setup_title"), close_id=None if self.required else "close")
-            yield Label(t("setup_provider"), classes="section")
+            yield Label(t("setup_provider"), classes="section strong")
             with Horizontal(classes="row"):
                 yield Static(self._provider_line(), id="cur-provider", classes="value")
                 yield Button(t("setup_choose"), id="choose-provider")
+            # Lijnen tussen de groepen: anders plakt provider, sleutel, model
+            # en base url aan elkaar tot één blok.
+            yield Rule(id="sep-api-key", classes="sep")
             yield Label(t("setup_api_key"), classes="section")
-            yield Input(value="", password=True, placeholder="sk-…", id="api_key")
+            yield Input(
+                value=self.KEY_MASK if self.api_key else "",
+                password=False,
+                placeholder=self.KEY_MASK,
+                id="api_key",
+            )
+            yield Rule(id="sep-model", classes="sep")
             yield Label(t("setup_model"), classes="section")
             with Horizontal(classes="row"):
                 yield Static(self._model_line(), id="cur-model", classes="value")
                 yield Button(t("setup_choose"), id="choose-model")
             # De base URL is alleen nodig als je er zelf een intikt; bij een
             # bekende provider weet Roan hem al (zie on_mount).
+            yield Rule(id="sep-base-url", classes="sep")
             yield Label(t("setup_base_url"), id="lbl-base-url", classes="section")
             yield Input(value=self.base_url, id="base_url")
             if self.required:
@@ -376,6 +450,43 @@ class SetupScreen(ModalScreen):
                 if not self.required:
                     yield Button(t("setup_cancel"), id="cancel")
                 yield Button(t("setup_save"), id="save", variant="primary")
+
+    # ---------- api key: gemaskeerd tot je erop klikt ----------
+    def _set_key_value(self, value: str) -> None:
+        """Zet het veld op `value` zonder de eigen Changed-handler te laten loopen."""
+        box = self.query_one("#api_key", Input)
+        self._unmasking = True
+        try:
+            box.value = value
+            box.cursor_position = len(value)
+        finally:
+            self._unmasking = False
+
+    @on(Click, "#api_key")
+    def _reveal_key(self, event: Click) -> None:
+        """Eén klik op het veld: de echte, opgeslagen sleutel komt tevoorschijn."""
+        if self._revealed:
+            return
+        self._revealed = True
+        self._set_key_value(self.api_key)
+
+    @on(Input.Changed, "#api_key")
+    def _on_key_typed(self, event: Input.Changed) -> None:
+        """De eerste toets vervángt de maskering; daarna is het een gewoon veld.
+
+        Let op: niet `KEY_MASK.startswith(...)` gebruiken om een gelekte
+        maskering terug te zetten — 's' is een voorvoegsel van 'sk-…', dus dan
+        zou de eerste letter van een nieuwe sleutel weer wegvallen.
+        """
+        if self._revealed or self._unmasking:
+            return
+        typed = event.value
+        if typed == self.KEY_MASK:
+            return
+        self._revealed = True
+        if typed.startswith(self.KEY_MASK):
+            typed = typed[len(self.KEY_MASK) :]
+        self._set_key_value(typed)
 
     # ---------- provider / model kiezen ----------
     def _choose_provider(self) -> None:
@@ -391,7 +502,11 @@ class SetupScreen(ModalScreen):
                 self.base_url = resolved
                 self.query_one("#base_url", Input).value = resolved
             if api_key:
-                self.query_one("#api_key", Input).value = api_key
+                # Een sleutel uit de providerkiezer is echt getypt werk: hij
+                # moet opgeslagen worden, dus het velw toont hem meteen.
+                self.api_key = api_key
+                self._revealed = True
+                self._set_key_value(api_key)
             self.query_one("#cur-provider", Static).update(self._provider_line())
 
         self.app.push_screen(ProviderScreen(), picked)
@@ -440,7 +555,15 @@ class SetupScreen(ModalScreen):
         self._save()
 
     def _save(self) -> None:
-        api_key = self.query_one("#api_key", Input).value.strip()
+        raw_key = self.query_one("#api_key", Input).value.strip()
+        if self._revealed:
+            # Het veld staat op de echte sleutel: wat erin staat is echt werk.
+            api_key = raw_key
+        elif raw_key and raw_key != self.KEY_MASK:
+            api_key = raw_key
+        else:
+            # Nog gemaskeerd en niets getypt: de bewaarde sleutel blijft zoals hij is.
+            api_key = ""
         base_url = self.query_one("#base_url", Input).value.strip()
 
         updates: dict = {}
@@ -788,7 +911,8 @@ class ModelsScreen(ModalScreen):
     }
     #models-filters Select {
         width: 1fr;
-        margin-right: 1;
+        /* twee kolomen lucht tussen de categorie- en de providerkiezer */
+        margin-right: 2;
     }
     #msearch {
         margin-top: 1;
@@ -1062,7 +1186,8 @@ class CommandScreen(ModalScreen):
             listing.add_option(Option(t("search_no_results"), id=None, disabled=True))
         else:
             for name, cmd in items:
-                usage = f"  {cmd.usage}" if cmd.usage else ""
+                hint = commands.arg_hint(name)
+                usage = f"  {hint}" if hint else ""
                 listing.add_option(Option(f"/{name}{usage}  ·  {t(cmd.description)}", id=name))
             listing.highlighted = 0
         self.query_one("#commands-hint", Static).update(t("commands_hint", n=len(items)))
@@ -1314,6 +1439,7 @@ class RoanApp(App):
     .close {
         width: 5;
         min-width: 5;
+        max-width: 5;
         height: 1;
         border: none;
         background: $panel;
@@ -1375,6 +1501,43 @@ class RoanApp(App):
         height: 1;
         background: transparent;
         padding: 0 2;
+    }
+    /* Rechts het rijtje met tokens, denkniveau, modus en toestemming; de
+       ctrl+p-hint staat helemaal rechts en is klikbaar. */
+    #status-right {
+        width: auto;
+        height: 1;
+        layout: horizontal;
+    }
+    #status-tokens,
+    #status-thinking,
+    #status-mode,
+    #status-perm {
+        width: auto;
+        height: 1;
+        color: $text-muted;
+        padding: 0 1;
+    }
+    #status-hints {
+        width: auto;
+        height: 1;
+        color: $accent;
+        text-style: bold;
+        padding: 0 1;
+    }
+    #status-hints:hover {
+        background: $accent 30%;
+    }
+    /* Model, modus en toestemming zijn net zo knopjes; ze zeggen het met een
+       hover, maar zacht: de linkerkant is 1fr en licht dus niet op als blok. */
+    #status:hover {
+        color: $accent;
+        text-style: bold;
+    }
+    #status-mode:hover,
+    #status-perm:hover {
+        background: $accent 30%;
+        text-style: bold;
     }
     /* Kader om de input, met de ╹ als linkerbovenhoek — zoals opencode.
        Hoogte 3 = 2 randen + 1 tekstregel; bij height 1 blijft de content-hoogte
@@ -1553,10 +1716,15 @@ class RoanApp(App):
             with Horizontal(id="prompt-row"):
                 yield Static("╹", id="prompt-mark")
                 yield HistoryInput(placeholder=t("input_placeholder"), id="input")
-            # Onderste balk: model links, toetsen rechts.
+            # Onderste balk, zoals opencode: model links, rechts de status.
             with Horizontal(id="status-bar"):
                 yield Static(id="status")
-                yield Static(t("hint_commands"), id="status-hints")
+                with Horizontal(id="status-right"):
+                    yield Static(id="status-tokens")
+                    yield Static(id="status-thinking")
+                    yield Static(id="status-mode")
+                    yield Static(id="status-perm")
+                    yield Static(t("hint_commands"), id="status-hints")
         # Rechtsboven, zwevend boven het chatvlak: kost geen extra rij en de
         # ✕ staat waar je verwacht, linksbovenin een terminal.
         yield Button(CLOSE_GLYPH, id="app-close", classes="close")
@@ -1600,13 +1768,19 @@ class RoanApp(App):
         node.styles.height = rows
 
     def _place_close(self) -> None:
-        """Zet de ✕ op de rechterrand; `position: absolute` kent geen 'right'."""
+        """Zet de ✕ op de rechterrand; `position: absolute` kent geen 'right'.
+
+        De knop is 5 kolommen breed (zie `.close`), dus 5 kolomen van de rand
+        af is de rechterrand precies.
+        """
         for node in self.query("#app-close"):
-            node.styles.offset = (max(0, (self.size.width or 80) - 7), 0)
+            node.styles.offset = (max(0, (self.size.width or 80) - 5), 0)
 
     def on_resize(self) -> None:
         self._place_close()
         self._size_avatar()
+        if self.is_running:
+            self._fit_status_bar()
 
     def on_mount(self) -> None:
         self.query_one("#input", Input).focus()
@@ -1638,18 +1812,100 @@ class RoanApp(App):
         self._update_jump()
 
     def _update_status(self) -> None:
+        """Vult de onderste balk.
+
+        Links alleen model en provider — de api-key-status ("key ingesteld")
+        was nutteloos, want die staat al in de setup. Rechts de token-usage,
+        het denkniveau, de modus en de toestemming, kort genoeg om op één regel
+        te passen.
+        """
         cfg = load_config()
-        base = str(cfg.get("base_url") or "")
-        if base.startswith(("http://localhost", "http://127.0.0.1")):
-            key = t("status_local")
-        elif cfg.get("api_key"):
-            key = t("status_key_set")
-        else:
-            key = t("status_no_key")
         accent = accent_color()
         self.query_one("#status", Static).update(
-            f"[b {accent}]◆[/] {cfg['model'] or '?'}  ·  {cfg['provider'] or '?'}  ·  {key}"
+            f"[b {accent}]◆[/] {cfg.get('model') or '?'}  ·  {cfg.get('provider') or '?'}"
         )
+
+        self.query_one("#status-tokens", Static).update(self._tokens_text())
+        self.query_one("#status-thinking", Static).update(
+            f"[b {accent}]think[/] {cfg.get('thinking') or 'off'}"
+        )
+        self.query_one("#status-mode", Static).update(
+            f"[b {accent}]{cfg.get('mode') or 'chat'}[/]"
+        )
+        self.query_one("#status-perm", Static).update(
+            f"{cfg.get('permissions') or 'auto'}"
+        )
+        self._fit_status_bar()
+
+    def _fit_status_bar(self) -> None:
+        """Verberg de minst belangrijke stukjes als het venster smal is.
+
+        Model en provider blijven altijd staan; daarna vallen de chips één voor
+        één weg. Anders knijpt de 1fr-linkerkant zijn tekst weg en verdwijnt de
+        provider uit de balk.
+        """
+        width = self.size.width or 80
+        for selector, minimum in (
+            ("#status-thinking", 100),
+            ("#status-mode", 88),
+            ("#status-perm", 76),
+            ("#status-tokens", 64),
+        ):
+            for node in self.query(selector):
+                node.display = width >= minimum
+
+    def _tokens_text(self) -> str:
+        """Token-usage zoals opencode het toont: bijvoorbeeld `12.3K (4%)`.
+
+        Zonder api-venster weten we niets, dan verbergen we het stukje liever
+        dan een verzonnen nul tonen.
+        """
+        usage = getattr(self.agent, "usage", None) or {}
+        prompt = int(usage.get("prompt") or 0)
+        completion = int(usage.get("completion") or 0)
+        total = prompt + completion
+        if total <= 0:
+            return ""
+        window = int(load_config().get("context_window") or 0)
+        if window > 0:
+            pct = min(100, round(100 * prompt / window))
+            return f"{_compact_tokens(prompt)} ({pct}%)"
+        return _compact_tokens(total)
+
+    @on(Click, "#status-hints")
+    def _commands_clicked(self) -> None:
+        """De ctrl+p-hint is een knopje, niet alleen een tekst."""
+        self._cmd_commands()
+
+    @on(Click, "#status")
+    def _status_clicked(self) -> None:
+        """Model · provider is een knopje: klikken doet hetzelfde als `/models`."""
+        self._run_command("/models")
+
+    @on(Click, "#status-mode")
+    def _mode_clicked(self) -> None:
+        """Eén klik op de moduschip = de volgende modus (chat → plan → build → chat).
+
+        De chip toont de huidige modus, dus je ziet meteen wat je krijgt; een
+        regel eronder bevestigt het en zegt welke modus je nu hebt.
+        """
+        current = str(load_config().get("mode") or MODES[0])
+        index = MODES.index(current) if current in MODES else -1
+        new = MODES[(index + 1) % len(MODES)]
+        save_config({"mode": new})
+        self._update_status()
+        self._sysline(t("msg_mode_set", name=new))
+
+    @on(Click, "#status-perm")
+    def _perm_clicked(self) -> None:
+        """Zelfde idee als de modus: auto ⇄ user, net als het commando zonder
+        argument, zodat de chip en de commandopalette hetzelfde doen."""
+        current = str(load_config().get("permissions") or PERMISSIONS[0])
+        index = PERMISSIONS.index(current) if current in PERMISSIONS else -1
+        new = PERMISSIONS[(index + 1) % len(PERMISSIONS)]
+        save_config({"permissions": new})
+        self._update_status()
+        self._sysline(t("msg_permissions_set", name=new))
 
     # ---------- helpers ----------
     def _messages(self) -> VerticalScroll:
@@ -1737,6 +1993,15 @@ class RoanApp(App):
             return True
         if name == "language":
             self._cmd_language(args)
+            return True
+        if name == "mode":
+            self._cmd_choice(args, "mode", MODES, "msg_modes", "msg_mode_set")
+            return True
+        if name == "permissions":
+            self._cmd_choice(args, "permissions", PERMISSIONS, "msg_permissions", "msg_permissions_set")
+            return True
+        if name == "thinking":
+            self._cmd_choice(args, "thinking", THINKING_LEVELS, "msg_thinking_levels", "msg_thinking_set")
             return True
         if name == "tui":
             self._cmd_tui(args)
@@ -1834,6 +2099,30 @@ class RoanApp(App):
         new_code = self.agent.set_language(code)
         self._update_status()
         self._sysline(t("msg_language_set", lang=new_code))
+
+    def _cmd_choice(
+        self, args, key: str, allowed: tuple[str, ...], list_key: str, set_key: str
+    ) -> None:
+        """Kort instelcommando voor een van een vaste lijst waarden.
+
+        Zonder argument noemen we de opties; met een argument zetten we hem en
+        vullen we de statusbalk meteen bij. Met één optie wisselen we om, zoals
+        je van een knop verwacht.
+        """
+        current = str(load_config().get(key) or allowed[0])
+        if not args:
+            if len(allowed) == 1:
+                args = [current]
+            else:
+                self._sysline(t(list_key, options=", ".join(allowed)))
+                return
+        value = args[0].lower()
+        if value not in allowed:
+            self._sysline(t(list_key, options=", ".join(allowed)))
+            return
+        save_config({key: value})
+        self._update_status()
+        self._sysline(t(set_key, name=value))
 
     def _cmd_compact(self) -> None:
         self._sysline(t("msg_summarizing"))
@@ -2012,15 +2301,17 @@ class RoanApp(App):
         """Commando's die bij een half getypte `/` horen.
 
         Alleen zolang er nog geen spatie is: zodra er argumenten volgen is het
-        commando al gekozen en vullen we niets meer aan.
+        commando al gekozen en vullen we niets meer aan. Een exacte treffer
+        sluit de langere varianten niet uit: bij `/model` moet `/models` er
+        nog steeds bijstaan, anders is die onbereikbaar zodra je het eerste
+        commando volledig hebt getypt.
         """
         if not text.startswith("/") or " " in text:
             return []
         prefix = text[1:].casefold()
-        exact = [n for n in commands.names() if n == prefix]
-        if exact:
-            return exact
-        return [n for n in commands.names() if n.startswith(prefix)]
+        return [
+            n for n in commands.names() if n == prefix or n.startswith(prefix)
+        ]
 
     def _update_slash(self) -> None:
         listing = self.query_one("#slash", OptionList)
@@ -2031,7 +2322,8 @@ class RoanApp(App):
             return
         for name in matches:
             cmd = commands.COMMANDS[name]
-            usage = f" {cmd.usage}" if cmd.usage else ""
+            hint = commands.arg_hint(name)
+            usage = f" {hint}" if hint else ""
             listing.add_option(
                 Option(f"/{name}{usage}  ·  {t(cmd.description)}", id=name)
             )

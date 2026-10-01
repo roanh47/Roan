@@ -738,3 +738,224 @@ async def test_saving_without_touching_the_key_keeps_the_stored_one(tmp_roan):
         await pilot.pause()
     assert results == [True]
     assert config.load_config()["api_key"] == "sk-bewaarde-sleutel"
+
+
+# ---------- de slash staat maar één keer in de commandoregel ----------
+@pytest.mark.asyncio
+async def test_slash_popup_shows_the_slash_once(tmp_roan):
+    from textual.widgets import OptionList
+
+    from roan import commands
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        listing = app.query_one("#slash", OptionList)
+        for name in commands.names():
+            app.query_one("#input").value = f"/{name}"
+            app._update_slash()
+            await pilot.pause()
+            assert listing.option_count >= 1, name
+            for index in range(listing.option_count):
+                option = listing.get_option_at_index(index)
+                assert option.id not in (None, ""), name
+                prompt = str(option.prompt)
+                dup = f"/{option.id}/{option.id}"
+                assert dup not in prompt, f"{prompt!r} bevat {dup!r}"
+
+
+@pytest.mark.asyncio
+async def test_slash_popup_shows_arguments_without_repeating_the_name(tmp_roan):
+    from textual.widgets import OptionList
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        listing = app.query_one("#slash", OptionList)
+        app.query_one("#input").value = "/tui"
+        app._update_slash()
+        await pilot.pause()
+        prompt = str(listing.get_option_at_index(0).prompt)
+        assert prompt.startswith("/tui <fullscreen|default>"), prompt
+
+        app.query_one("#input").value = "/theme"
+        app._update_slash()
+        await pilot.pause()
+        assert str(listing.get_option_at_index(0).prompt).startswith("/theme <naam>")
+
+
+@pytest.mark.asyncio
+async def test_command_palette_shows_the_slash_once(tmp_roan):
+    from roan.commands import COMMANDS
+    from roan.tui import CommandScreen
+    from textual.widgets import OptionList
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.push_screen(CommandScreen())
+        await pilot.pause()
+        listing = app.screen.query_one("#command-list", OptionList)
+        assert listing.option_count == len(COMMANDS)
+        for index in range(listing.option_count):
+            option = listing.get_option_at_index(index)
+            prompt = str(option.prompt)
+            dup = f"/{option.id}/{option.id}"
+            assert dup not in prompt, f"{prompt!r} bevat {dup!r}"
+            assert prompt.startswith(f"/{option.id}"), prompt
+
+
+@pytest.mark.asyncio
+async def test_command_palette_usage_is_not_duplicated(tmp_roan):
+    from roan.tui import CommandScreen
+    from textual.widgets import OptionList
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.push_screen(CommandScreen())
+        await pilot.pause()
+        listing = app.screen.query_one("#command-list", OptionList)
+        prompts = {
+            str(listing.get_option_at_index(i).id): str(
+                listing.get_option_at_index(i).prompt
+            )
+            for i in range(listing.option_count)
+        }
+        assert "/tui  <fullscreen|default>" in prompts["tui"], prompts["tui"]
+        assert "/theme  <naam>" in prompts["theme"], prompts["theme"]
+        # /help heeft geen argumenten: geen dubbele spatie, geen naam-tweemaal.
+        assert prompts["help"].startswith("/help  ·"), prompts["help"]
+        app.pop_screen()
+        await pilot.pause()
+
+
+def test_help_text_shows_the_slash_once():
+    from roan import commands
+
+    for name in commands.names():
+        line = next(
+            ln
+            for ln in commands.help_text().splitlines()
+            if ln.startswith(f"- **/{name}**")
+        )
+        assert f"/{name}/{name}" not in line, line
+    assert "- **/tui** `<fullscreen|default>`" in commands.help_text()
+    assert "- **/help**" in commands.help_text()
+
+
+# ---------- klikbare statusbalk: model, modus en toestemming ----------
+async def _wait_for_models_screen(app, pilot, tries: int = 80) -> bool:
+    """Het modellenoverzicht wordt in een worker-thread opgehaald."""
+    import asyncio
+
+    for _ in range(tries):
+        await pilot.pause()
+        await asyncio.sleep(0.01)
+        if app.screen.__class__.__name__ == "ModelsScreen":
+            return True
+    return False
+
+
+def _cell_style(app, x: int, y: int):
+    """De stijl van één cel, om een hover zichtbaar te maken in de test."""
+    for seg in app.screen._compositor.render_strips()[y]:
+        if x < len(seg.text):
+            return seg.style
+        x -= len(seg.text)
+    return None
+
+
+@pytest.mark.asyncio
+async def test_clicking_the_model_opens_the_models_screen(tmp_roan, monkeypatch):
+    """Model · provider is een knopje: klikken doet hetzelfde als `/models`."""
+    from roan import tui as tui_mod
+    from roan.tui import ModelsScreen
+
+    # geen netwerk: de lijsten liggen er al
+    monkeypatch.setattr(
+        tui_mod,
+        "gather_models",
+        lambda: ([("groq", "llama-x")], [("openai", "gpt-5")], ["local-a"]),
+    )
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(110, 26)) as pilot:
+        await pilot.pause()
+        assert "test-model" in str(app.query_one("#status").render())
+        assert await pilot.click("#status")
+        assert await _wait_for_models_screen(app, pilot), app.screen
+        assert isinstance(app.screen, ModelsScreen)
+        assert app.screen.query_one("#models-list").option_count == 1
+
+
+@pytest.mark.asyncio
+async def test_clicking_the_mode_chip_cycles_chat_plan_build(tmp_roan):
+    """Eén klik op de chip = de volgende modus, en het blijft saved."""
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(110, 26)) as pilot:
+        await pilot.pause()
+        assert config.load_config()["mode"] == "chat"
+        assert str(app.query_one("#status-mode").render()) == "chat"
+        for expected in ("plan", "build", "chat"):
+            await pilot.click("#status-mode")
+            await pilot.pause()
+            assert config.load_config()["mode"] == expected
+            assert str(app.query_one("#status-mode").render()) == expected
+        # en het gesprek bevestigt het, met de nieuwe naam erbij
+        assert "chat" in str(list(app.query("#messages > *"))[-1].render())
+
+
+@pytest.mark.asyncio
+async def test_clicking_the_permissions_chip_flips_auto_and_user(tmp_roan):
+    """Auto ⇄ user, net als het commando zonder argument."""
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(110, 26)) as pilot:
+        await pilot.pause()
+        assert config.load_config()["permissions"] == "auto"
+        for expected in ("user", "auto"):
+            await pilot.click("#status-perm")
+            await pilot.pause()
+            assert config.load_config()["permissions"] == expected
+            assert str(app.query_one("#status-perm").render()) == expected
+        assert "auto" in str(list(app.query("#messages > *"))[-1].render())
+
+
+@pytest.mark.asyncio
+async def test_clickable_status_items_show_it_on_hover(tmp_roan):
+    """Zonder hover-acht is een chip niet te onderscheiden van gewone tekst."""
+    for selector in ("#status", "#status-mode", "#status-perm", "#status-hints"):
+        app = RoanApp(FakeAgent())
+        async with app.run_test(size=(110, 26)) as pilot:
+            await pilot.pause()
+            region = app.query_one(selector).region
+            before = _cell_style(app, region.x + 1, region.y)
+            await pilot.hover(selector, offset=(1, 0))
+            await pilot.pause()
+            after = _cell_style(app, region.x + 1, region.y)
+            assert (before.color, before.bgcolor) != (after.color, after.bgcolor), selector
+
+
+@pytest.mark.asyncio
+async def test_hidden_status_chips_stay_quiet_and_model_stays_clickable(tmp_roan):
+    """Op een smal venster staan modus en toestemming er niet meer.
+
+    Dan klikt daar niemand, en een klik elders mag ze zeker niet meenemen;
+    model · provider blijft de enige die altijd zichtbaar is.
+    """
+    from roan.tui import ModelsScreen
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(60, 26)) as pilot:
+        await pilot.pause()
+        assert app.query_one("#status-mode").display is False
+        assert app.query_one("#status-perm").display is False
+        assert app.query_one("#status").display is True
+
+        before = (config.load_config()["mode"], config.load_config()["permissions"])
+        await pilot.click("#messages", offset=(5, 5))
+        await pilot.pause()
+        assert (config.load_config()["mode"], config.load_config()["permissions"]) == before
+
+        await pilot.click("#status")
+        assert await _wait_for_models_screen(app, pilot), app.screen
+        assert isinstance(app.screen, ModelsScreen)

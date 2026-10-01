@@ -33,6 +33,9 @@ COMMANDS: dict[str, Command] = {
     "sessions": Command("sessions", "cmd_sessions"),
     "compact": Command("compact", "cmd_compact"),
     "language": Command("language", "cmd_language", "/language <nl|en>"),
+    "mode": Command("mode", "cmd_mode", "/mode <chat|plan|build>"),
+    "permissions": Command("permissions", "cmd_permissions", "/permissions <auto|user>"),
+    "thinking": Command("thinking", "cmd_thinking", "/thinking <off|low|medium|high>"),
     "tui": Command("tui", "cmd_tui", "/tui <fullscreen|default>"),
     "quit": Command("quit", "cmd_quit"),
 }
@@ -46,6 +49,20 @@ def names() -> list[str]:
     return sorted(COMMANDS)
 
 
+def arg_hint(name: str) -> str:
+    """Het argument-deel van de usage, zonder de leidende slash.
+
+    De usage-literalen bevatten al het commando zelf ("/theme <naam>"), dus wie
+    "/theme" al heeft geschreven plakt hier alleen de argumenten achter.
+    Geeft "" terug voor commando's zonder argumenten.
+    """
+    cmd = COMMANDS.get(name.lstrip("/"))
+    if cmd is None or not cmd.usage:
+        return ""
+    _, _, rest = cmd.usage.partition(" ")
+    return rest.strip()
+
+
 def help_text() -> str:
     # De providernaam meesturen, zodat een beschrijving als "{provider}" de
     # echte naam laat zien in plaats van een vaag "deze provider".
@@ -55,7 +72,8 @@ def help_text() -> str:
     lines = [f"**{t('help_title')}**", ""]
     for name in names():
         cmd = COMMANDS[name]
-        usage = f" `{cmd.usage}`" if cmd.usage else ""
+        hint = arg_hint(name)
+        usage = f" `{hint}`" if hint else ""
         lines.append(f"- **/{name}**{usage} — {t(cmd.description, provider=provider)}")
     lines += ["", f"_{t('help_languages')}_"]
     return "\n".join(lines)

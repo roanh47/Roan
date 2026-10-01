@@ -191,6 +191,10 @@ class Agent:
         self.session_id = session_id or time.strftime("%Y%m%d-%H%M%S")
         self.reload()
         self.messages: list[dict] = [{"role": "system", "content": _build_system_prompt()}]
+        # Token-usage van de laatste aanroep, voor de statusbalk. API's sturen
+        # dit alleen mee als je er expliciet om vraagt (stream_options), en niet
+        # alle providers kennen dat.
+        self.usage: dict[str, int] = {"prompt": 0, "completion": 0}
         self.mcp = MCPManager()
         if use_mcp:
             try:
@@ -366,18 +370,50 @@ class Agent:
         self.save()
         return "(maximale aantal tool-rondes bereikt)"
 
+    def _create_stream(self):
+        """Start de stream, met token-usage als de provider dat accepteert.
+
+        `stream_options={"include_usage": True}` is niet overal ondersteund; als
+        de API het afkeurt, proberen we het gewoon zonder.
+        """
+        kwargs = dict(
+            model=self.model,
+            messages=self.messages,
+            tools=self.tools,
+            tool_choice="auto",
+            stream=True,
+        )
+        effort = str(load_config().get("thinking") or "off").lower()
+        if effort and effort != "off":
+            kwargs["reasoning_effort"] = effort
+        try:
+            return self.client.chat.completions.create(
+                stream_options={"include_usage": True}, **kwargs
+            )
+        except Exception:
+            return self.client.chat.completions.create(**kwargs)
+
+    def _record_usage(self, chunk) -> None:
+        """Haal de token-tellers uit het laatste stream-chunk."""
+        usage = getattr(chunk, "usage", None)
+        if usage is None:
+            return
+        self.usage = {
+            "prompt": int(getattr(usage, "prompt_tokens", 0) or 0),
+            "completion": int(getattr(usage, "completion_tokens", 0) or 0),
+        }
+
     def send_stream(self, user_text: str, on_event=None):
         """Yield content-deltas terwijl het model antwoordt. Voert tools uit tussendoor."""
         self.compact()
         self.messages.append({"role": "user", "content": user_text})
         for _ in range(MAX_TOOL_ROUNDS):
-            stream = self.client.chat.completions.create(
-                model=self.model, messages=self.messages, tools=self.tools, tool_choice="auto", stream=True
-            )
+            stream = self._create_stream()
             content_parts: list[str] = []
             tool_calls: dict[int, dict] = {}
 
             for chunk in stream:
+                self._record_usage(chunk)
                 if not chunk.choices:
                     continue
                 delta = chunk.choices[0].delta
