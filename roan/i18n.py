@@ -46,6 +46,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "models_none": "Geen modellen",
         "models_more": "… en nog {n} modellen (filter op provider)",
         "models_fetching": "Modellen ophalen (models.dev + provider) ...",
+        "models_failed": "Modellen ophalen mislukt.",
         "models_unknown_provider": (
             "Model → {model}. Provider '{provider}' is niet bekend — "
             "stel base_url + api_key in via /setup."
@@ -130,6 +131,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "msg_restored": "(gesprek hersteld — {n} berichten)",
         "msg_no_sessions": "Nog geen sessies.",
         "msg_sessions_title": "Sessies",
+        "sessions_hint": "Enter = herstellen  ·  Esc = terug",
+        "sessions_messages": "{n} berichten",
         "msg_memory_empty": "_(nog niets onthouden)_",
         "msg_summarizing": "Gesprek samenvatten ...",
         "msg_compacted": "Gesprek samengevat.",
@@ -164,6 +167,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "transcript_matches": "{n} matches",
         "jump_bottom": "↓ naar beneden",
         "new_messages": "{n} nieuwe berichten",
+        "queue_pending": "{n} in wachtrij",
         "focus_on": "Focus-modus aan",
         "focus_off": "Focus-modus uit",
         # tools
@@ -227,6 +231,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "models_none": "No models",
         "models_more": "… and {n} more models (filter by provider)",
         "models_fetching": "Fetching models (models.dev + provider) ...",
+        "models_failed": "Fetching models failed.",
         "models_unknown_provider": (
             "Model → {model}. Provider '{provider}' is unknown — "
             "set base_url + api_key via /setup."
@@ -271,6 +276,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "msg_restored": "(conversation restored — {n} messages)",
         "msg_no_sessions": "No sessions yet.",
         "msg_sessions_title": "Sessions",
+        "sessions_hint": "Enter = restore  ·  Esc = back",
+        "sessions_messages": "{n} messages",
         "msg_memory_empty": "_(nothing remembered yet)_",
         "msg_summarizing": "Summarising the conversation ...",
         "msg_compacted": "Conversation summarised.",
@@ -344,6 +351,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "transcript_matches": "{n} matches",
         "jump_bottom": "↓ jump to bottom",
         "new_messages": "{n} new messages",
+        "queue_pending": "{n} queued",
         "focus_on": "Focus mode on",
         "focus_off": "Focus mode off",
         "cli_help": (

@@ -28,6 +28,7 @@ says so.
 * [Architecture](architecture.md) - every module, what it owns and which way the dependencies point.
 * [Request lifecycle](request-lifecycle.md) - what happens between pressing Enter and seeing an answer.
 * [Glossary](glossary.md) - the words this project uses in a specific way.
+* [AGENTS](AGENTS.md) - for whoever works on Roan: the board, the suite, the rules and the traps.
 
 ## The harness
 

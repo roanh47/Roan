@@ -21,7 +21,12 @@ generated when a session starts and shown by `/sessions`.
 
 On construction the agent picks up the newest session (unless `restore=False`),
 which is why the TUI comes back to the same conversation after a restart. `/new`
-starts a fresh one; `/sessions` lists them.
+starts a fresh one; `/sessions` opens a popup that lists them newest first (up to
+20) and restores the one you pick: Escape closes the popup, Enter sets the
+`session_id`, resets the message list to the system prompt and lets
+`Agent._restore()` put that conversation back, then re-renders it. `Agent.clear()`
+is deliberately not used here, because it saves immediately and would overwrite
+the file you are restoring.
 
 # The message history
 

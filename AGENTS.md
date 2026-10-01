@@ -17,6 +17,9 @@ Lees daarnaast [`index.md`](index.md) (de inhoudsopgave van de kennisbundel),
 **code is de waarheid**; waar een claim door de suite wordt afgedwongen, zegt het
 concept dat ernaast staat.
 
+Verderop in dit bestand staat **Eisen van de gebruiker**: richting die nog niet
+gebouwd is. Controleer daar of iets wat je bouwt al bedoeld was.
+
 ---
 
 # Het projectbord is verplicht werk, geen administratie
@@ -169,6 +172,207 @@ de gebruiker wilde en diezelfde opdracht had: pixels van een border, een breedte
 van 5, twee kolomen ertussen, geen lucht in een kader. Vraag niet om toestemming
 voor de standaardoplossing als de opdracht ertegenin gaat — bouw wat er gevraagd
 is, en meld het als je denkt dat het beter kan.
+
+---
+
+# Eisen van de gebruiker — richting, nog niet gebouwd
+
+Deze eisen komen van de gebruiker en zijn **langetermijnrichting**, geen werk voor
+de volgende sprint. De code blijft de waarheid; deze lijst zegt waar het heen
+moet. Er staat nog veel niet gebouwd, dus schrijf er nooit "dit werkt" bij.
+
+Per eis: wat de eis is, hoe het er nu staat, en waar hij in de bundel hoort. Het
+conceptbestand is de plek waar een eis blijft staan; hier staat de richting. Is
+een eis af en doorgevoerd, dan verwijs je hem door en haal je hem hier weg — anders
+gaat een volgende agent hem opnieuw bouwen.
+
+## 1. Tien jaar werken zonder update
+
+Letterlijk van de gebruiker: **Roan moet tien jaar blijven werken zonder update.**
+Dat is een ontwerpregel, net zo hard als het pink-accent. Alles wat buiten de repo
+kan veranderen wordt daarom **live opgehaald op het moment van gebruik**, nooit
+ingebakken:
+
+- providers en modellen komen van **models.dev** op het moment van gebruik, niet
+  uit een lijst in de repo;
+- prijzen, mogelijkheden en beschikbaarheid idem;
+- elk skill- of stijldocument komt van zijn canonieke externe bron op het moment
+  van gebruik.
+
+Wat er nu staat: [`roan/models.md`](roan/models.md) doet dit voor de modellen —
+`_dev_data()` haalt `https://models.dev/api.json` op met een cache van 300 s en
+valt terug op de `/models` van de provider zelf. Wat **niet** klopt is de
+consequentie: `_dev_data()` vangt elke exception en geeft de laatste cache of `{}`
+terug. Een schemaverandering van models.dev is daarmee onzichtbaar; het scherm
+zegt "geen modellen gevonden" en Roan doet alsof er niets aan de hand is. Dat is
+precies wat deze eis verbiedt.
+
+Het gevolg moet twee delen hebben:
+
+1. **Een vastgezette, gevalideerde responsvorm.** Het models.dev-schema wordt
+   gepind, zodat een verdwenen veld of een ander type één leesbare fout geeft in
+   plaats van honderd `KeyError`s op de achtergrond.
+2. **Hard falen.** Bij een kapotte of onbekende respons stopt het met een duidelijke
+   melding. Verouderde cache stilletjes serveren is uitgesloten.
+
+Bewust **niet** live: het palet en het accent. Die zijn door de gebruiker
+vastgezet; dat is een beslissing, geen veroudering — zie
+[`roan/palette.md`](roan/palette.md) en [`roan/pink-accent.md`](roan/pink-accent.md).
+Maak er geen runtime-fetch van; dat haalt de vastgezette keuze op.
+
+Thuis in de bundel: het bronschema en de foutmelding in
+[`roan/models.md`](roan/models.md); de vastgezette versie als instelling in
+[`roan/config-keys.md`](roan/config-keys.md), met een override in
+[`roan/env-vars.md`](roan/env-vars.md) zodat een server naar een eigen kopie kan
+wijzen zonder de code te raken.
+
+## 2. De Writing Style skill is altijd aanwezig en altijd de laatste
+
+De schrijfstijl van Roan geldt voor **alles wat Roan schrijft**, en het document
+komt van GitHub. Doel: een nieuwere stijl werkt **zonder een nieuwe
+Roan-release**. Zeg het ongeveer zo, want dit is de formulering die telt: als Roan
+2.0 is en de schrijfstijl 3.0 is, dan gebruikt Roan 3.0. Een release is geen
+reden om de stijl te pinnen.
+
+Drie dingen die erbij horen:
+
+- **Het stijldocument heeft een versie.** Die wordt uitgelezen, niet geraden uit de
+  inhoud.
+- **De opgehaalde versie wordt ergens in `~/.Roan` vastgelegd** voor diagnose. Vraag
+  het je af na een storing: welke stijl draaide deze installatie?
+- **Geen netwerk is geen stilzwijgende terugval.** Je krijgt de gecachte kopij,
+  mét een zichtbare aanduiding dat die verouderd is. Anders denkt de gebruiker
+  dat de nieuwe stijl draait, en dat klopt niet.
+
+Wat er nu staat: niets. Skills zijn lokale bestanden in `~/.Roan/skills/` en de
+prompt krijgt alleen naam en beschrijving, het lichaam op verzoek via `read_skill`
+— zie [`roan/skills-memory-profile.md`](roan/skills-memory-profile.md). Er wordt
+niets van GitHub gehaald.
+
+Thuis in de bundel: de stijl als skill in
+[`roan/skills-memory-profile.md`](roan/skills-memory-profile.md), de bron-URL en de
+vastgelegde versie in [`roan/config-keys.md`](roan/config-keys.md), een
+netwerk-uitschakelaar in [`roan/env-vars.md`](roan/env-vars.md). Het cachepad
+hoort bij de paden in `roan/config.py`, en `ensure_home()` in `roan/home.py` maakt
+de map aan — zie [`roan/configuration.md`](roan/configuration.md).
+
+## 3. Identiteit en opslag, zoals hermes / opencode / claude
+
+Hermes weet dat hij Hermes heet, opencode weet dat het openCode heet, Claude weet
+dat het Claude heet. **Roan moet weten dat het Roan is, en dat ook zeggen.** In de
+system-prompt, niet in een persona die het model verzint.
+
+Daarnaast één **gecentraliseerde plek voor identiteit en voor wat de gebruiker
+heeft meegegeven**. Alles onder `~/.Roan`: config, sessions, cache, logs, plans,
+skills. Nergens anders toestand — niet in de werkmap, niet in de repo, niet in
+een losse dotfile elders.
+
+Wat er nu staat: de opslag is grotendeels gecentraliseerd. `roan/config.py`
+definieert de paden (`ROAN_DIR` en de rest) en `ensure_home()` in `roan/home.py`
+maakt de structuur aan. Twee wankelkheden: `agent.py` maakt zijn **eigen**
+`SESSIONS_DIR` aan in plaats van de paden uit `config.py` te gebruiken, en de
+identiteit staat **verspreid** — de naam in `DEFAULT_INSTRUCTIONS` in
+`roan/i18n.py`, de feiten over de gebruiker in `~/.Roan/user.md`. Dat is precies
+wat deze eis afschaft.
+
+Het gecentraliseerde record hoort naast die twee plekken: wie Roan is (naam,
+versie, eigen toestand) plus wat de gebruiker meegaf (profiel, instructies,
+skills, memory) in **één** record, in plaats van vier bestanden die elk één stuk
+bevatten. Open vraag, en blijf hem als vraag staan: één bestand in `~/.Roan`, of
+een blok in `config.json`? Kies één, en houd ze niet allebei.
+
+Thuis in de bundel: [`roan/configuration.md`](roan/configuration.md) voor de
+layout van `~/.Roan`, [`roan/capital-r-home.md`](roan/capital-r-home.md) voor de
+naam en de map, en de volgorde waarin het in de system-prompt komt in
+[`roan/agent.md`](roan/agent.md).
+
+## 4. Dingen bereiken zonder API-sleutels
+
+Roan moet dingen kunnen **zien** — de GitHub-repositories van de gebruiker en
+vergelijkbare dingen — via gewone webaanroepen waarvoor **geen API-sleutel**
+nodig is. Later komt OneDrive erbij. Zo wordt alles wat de gebruiker ooit maakte
+en publiceerde bereikbaar vanaf één plek, uiteindelijk ook op een publieke URL.
+
+De gevolgen staan vast en zijn niet onderhandelbaar:
+
+- **alleen ongeauthenticeerd lezen** — geen token, geen OAuth, geen account;
+- **read-only als uitgangspunt** — schrijven komt niet zonder nieuw besluit;
+- **geen credentials in `config.json`**, ook niet voor iets "dat toch publiek is";
+- **rate limits en voorwaarden respecteren** — identificeer je, houd je rate in, en
+  pak een `Retry-After` op;
+- **verzin nooit data die je niet kon ophalen** — mislukt de fetch, dan zeg je dat.
+
+Wat er nu staat: `roan/tools.py` heeft `fetch_url` en `web_search`. Dat is de
+naad. Er is geen repositorylijst, geen OneDrive, geen galerij.
+
+Thuis in de bundel: [`roan/tools.md`](roan/tools.md) voor wat het model mag
+aanroepen, [`local-first.md`](local-first.md) voor het principe "geen sleutels,
+geen account" waar dit precies bij past, en
+[`roan/config-keys.md`](roan/config-keys.md) voor de regel dat er geen
+credentials in de config komen. Let op: dit is wel uitgaand verkeer, maar dan
+naar publiek materiaal en alleen lezend. Zet het in
+[`local-first.md`](local-first.md) als het gebouwd wordt, want die beslissing gaat
+er nu over.
+
+## 5. Berichten in de wachtrij
+
+Terwijl Roan nog antwoordt, typ je de volgende opdracht gewoon door. Die gaat in
+de wacht en wordt verstuurd **daarna**. Dit wordt nu gebouwd; hier staat de
+bedoeling, zodat hij daarna afgedwongen blijft.
+
+Het bedoelde gedrag, concre genoeg om een test op te schrijven:
+
+- een getipt bericht gaat **nooit verloren** en komt **nooit midden in een
+  antwoord** binnen;
+- de volgorde is de volgorde van typen — twee berichten gaan in die volgorde de
+  deur uit;
+- het is **zichtbaar** dat er iets wacht, anders lijkt het of de input de tekst
+  opat;
+- na het lopende antwoord gaat het vanzelf, zonder tweede Enter.
+
+Een wachtrij die een latere refactor stilzwijgend verliest is geen functionaliteit
+maar een regressie. Wat hier staat moet terug in de suite.
+
+Thuis in de bundel: [`roan/tui.md`](roan/tui.md) voor het invoer- en verzendpad,
+[`request-lifecycle.md`](request-lifecycle.md) voor wat er per beurt gebeurt.
+
+## 6. De basiskennis bijwerken
+
+De gebruiker wil een **voor de hand liggende, gecentraliseerde manier om Roan
+nieuwe informatie te geven of te veranderen wat hij weet**, en wil die kennis
+bovendien vanaf een externe bron actueel kunnen houden.
+
+Wat er nu staat: de kennis zit verspreid over vier bestanden — `instructions.md`,
+`user.md`, `memory.md` en `skills/` (zie
+[`roan/skills-memory-profile.md`](roan/skills-memory-profile.md)). Er is geen plek
+waar je zegt "dit is wat ik weet", en niets ervan komt van buiten de machine.
+
+**Open vraag, en blijf hem als vraag staan:** waar staat de canonieke kopie? In
+deze repo, of in een externe bron die Roan ophaalt? Twee eisen uit dit document
+verkleinen de keuze al: die canonieke kopie kan niet in `~/.Roan` staan, want daar
+hoort alleen toestand te staan en twee canonieke kopijen zijn erger dan één; en
+wat Roan op het moment van gebruik leest is een cache onder `~/.Roan/cache`. Voor
+het ophalen zelf geldt dezelfde discipline als eis 1 en 2 — één mechanisme, niet
+drie.
+
+Thuis in de bundel: [`roan/skills-memory-profile.md`](roan/skills-memory-profile.md)
+voor de kennisbestanden zelf, [`roan/config-keys.md`](roan/config-keys.md) voor
+de externe bron, [`roan/env-vars.md`](roan/env-vars.md) voor de
+netwerk-uitschakelaar.
+
+## Wat hier nog niet staat
+
+- [ ] models.dev-schema vastgezet, en hard falen bij een afwijking — eis 1
+- [ ] Writing Style als live skill, met versie, cache en een staleness-aanduiding
+      — eis 2
+- [ ] één identiteits- en kennisrecord, in plaats van i18n plus `user.md` — eis 3
+- [ ] repositories, en later OneDrive, zonder sleutels — eis 4
+- [ ] wachtrij: in uitvoering, nog zonder test — eis 5
+- [ ] centrale basiskennis, en de beslissing over de canonieke kopie — eis 6
+
+Raakt een van deze punten je werk, maak dan een issue op het bord en verwijs hier
+vandaan naar het conceptbestand. Niet stilletjes omzeilen, en niet "voorlopig" in
+de code zetten zonder dat hier te staan.
 
 ---
 

@@ -1,13 +1,16 @@
 import asyncio
 import json
 import os
+import weakref
 from pathlib import Path
 
 from textual import on, work
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.css.scalar import Scalar, Unit
 from textual.events import Click
 from textual.binding import Binding
+from textual.geometry import Region
 from textual.screen import ModalScreen
 from textual.widgets import (
     Button,
@@ -76,6 +79,21 @@ BUNDLED_AVATAR = Path(__file__).parent / "assets" / "avatar.png"
 # raster uit de PNG mag schalen.
 AVATAR_COLS = 26
 
+# Lucht tussen het laatste teken van een berichtregel en de rand van het
+# zwevende portret. Voor de rijen die het portret beslaat is zijn linkerrand de
+# rechterrand van het scherm, dus de tekst breekt daarvoor af — met één kolom
+# ertussen, want plakken tegen de ╭ van het kader leest als afgebroken.
+# `styles.margin_right` zou hetzelfde doen, maar dat plakt in Textual 8.2.8:
+# gemeten leest het terug als 0. Daarom zetten wij een breedte, `styles.width`.
+AVATAR_WRAP_GAP = 1
+
+# Hoeveel ronden `_wrap_ronde` maximaal achter elkaar loopt zonder dat er een
+# nieuwe aanleiding komt. Nodig omdat één breedte de hoogtes verandert en dus
+# de plek van de volgende berichten; twee ronden zijn normaal genoeg. Het
+# plafond is er voor het geval dat een bericht echt hoogte 0 houdt (een lege
+# `Static`), zodat er geen eindeloze lus ontstaat.
+WRAP_RONDES = 3
+
 # Pad waar nooit een vooraf gerenderde tekening staat. `render_avatar` en
 # `avatar_cells` zoeken eerst het .ans-bestand en vallen anders terug op de
 # PNG; wijst je hen hierheen, dan lezen ze een leeg apparaat, krijgen ze geen
@@ -85,6 +103,75 @@ NO_AVATAR_ANS = Path(os.devnull)
 
 CLOSE_GLYPH = "✕"
 
+# Het teken dat beide kanten van het gesprek markeren. Hetzelfde teken, maar de
+# kleur zegt wie er spreekt: de gebruiker in de pink van het thema (`$accent`),
+# Roan in het gedempte grijs (`$text-muted`), zodat het als secondair leest.
+# Beide kleuren staan in de CSS van `RoanApp`, dus ze volgen het thema mee en
+# een theme-switch hoeft geen enkele plek in de code te raken.
+PROMPT_MARK = "❯"
+
+# Kolommen lege ruimte tussen het eind van een rij en de scrollbar ernaast.
+#
+# Waarom niet gewoon `margin-right` of `padding-right` op de lijst: die leggen de
+# kolom aan de ANDERE kant van de scrollbar, dus tegen de rand van het popup.
+# De gebruiker wil de lucht tussen de tekst en de scrollbar, zodat de
+# gemarkeerde rij niet in de scrollbar lijkt te lopen. De scrollbar zit altijd
+# tegen de rechterrand van de inwendige breedte (gemeten in 8.2.8, zie
+# `Widget._arrange_scrollbars`), dus die kolom kan alleen uit de rij zelf komen:
+# de rij is één kolom korter dan de lijst. `scrollbar-gutter: stable` reserveert
+# de scrollbarkolommen ook als de scrollbar er nog niet is, zodat de breedte van
+# de rij niet meer springt zodra de lijst over de drempel heen groeit.
+SCROLLBAR_GAP = 1
+
+
+def clip_cells(text: str, cells: int) -> str:
+    """Kort `text` af tot `cells` kolommen, met een liggende streep erin.
+
+    Past `text` al, dan komt hij onveranderd terug — anders zou een passende
+    tekst alsnog een streep krijgen. Afkappen en nooit ombreken: een rij die
+    ombreekt wordt twee regels en de tabelkolomen van de commandopalette zouden
+    allemaal een regel opschuiven.
+    """
+    from rich.cells import cell_len
+
+    if cell_len(text) <= cells:
+        return text
+    out: list[str] = []
+    used = 0
+    for char in text:
+        wide = cell_len(char)
+        if used + wide > cells - 1:
+            break
+        out.append(char)
+        used += wide
+    return "".join(out) + "…"
+
+
+def user_line(content: str) -> Static:
+    """De regel van de gebruiker: pink ❯ en pinke tekst.
+
+    Eén plek voor alle drie de call sites (live, hersteld gesprek, transcript),
+    zodat de kleur niet op de ene plek pink en op de andere niet kan zijn. De
+    kleur komt uit de CSS-klasse `.user-line`, niet uit de markup: markup wint
+    van CSS en zou het thema dus negeren.
+    """
+    return Static(f"{PROMPT_MARK} {content}", classes="user-line")
+
+
+def roan_reply(content) -> Horizontal:
+    """Roans antwoord: de grijze ❯ links, de markdown ernaast.
+
+    Zonder teken leek elk antwoord op de volgende regel van de gebruiker. Het
+    teken staat in een eigen kolom, zodat de tekst van beide kanten op dezelfde
+    kolom begint. De kleur is `$text-muted`, dus dit is secondair en niet het
+    accent.
+    """
+    return Horizontal(
+        Static(PROMPT_MARK, classes="roan-mark"),
+        Markdown(content),
+        classes="roan-reply",
+    )
+
 
 def _compact_tokens(n: int) -> str:
     """12345 -> 12.3K, zoals opencode het in de balk zet."""
@@ -93,6 +180,18 @@ def _compact_tokens(n: int) -> str:
     if n < 1_000_000:
         return f"{n / 1000:.1f}K"
     return f"{n / 1_000_000:.1f}M"
+
+
+def _cellen(scalar: Scalar | None) -> int | None:
+    """Hoeveel cellen een `Scalar` waard is, of `None` als hij niets zegt.
+
+    `None` betekent: er staat geen regel, of de regel is geen aantal cellen
+    (`50%`, `1fr`). Wij zetten zelf alleen cellen of niets, en daarom willen we
+    een breedte in `%` of `fr` niet als cells lezen en overschrijven.
+    """
+    if scalar is None or scalar.unit is not Unit.CELLS:
+        return None
+    return int(scalar.value)
 
 
 IMAGE_MODES = ("auto", "sixel", "tgp", "halfcell", "unicode")
@@ -427,6 +526,8 @@ class SetupScreen(ModalScreen):
         # Per keer dat het scherm opent staat het velw weer op de maskering.
         self._revealed = False
         self._unmasking = False
+        # Er loopt al een modellenlaadbeurt (netwerk).
+        self._loading_models = False
 
     BINDINGS = [("escape", "cancel", "terug")]
 
@@ -552,10 +653,25 @@ class SetupScreen(ModalScreen):
 
     @work(thread=True, exclusive=True)
     def _load_models(self) -> None:
-        free, paid, custom = gather_models()
+        # Zelfde vlag als in de app: twee klikken op 'Kies…' mogen geen twee
+        # browsers bovenop elkaar zetten. `exclusive=True` houdt de worker
+        # uniek, maar het SCHERM wordt elke keer opnieuw gepusht, dus de vlag
+        # is wat er echt voor zorgt.
+        if self._loading_models:
+            return
+        self._loading_models = True
+        try:
+            free, paid, custom = gather_models()
+        except Exception:
+            self.app.call_from_thread(self._loading_done)
+            return
         self.app.call_from_thread(self._open_models, free, paid, custom)
 
+    def _loading_done(self) -> None:
+        self._loading_models = False
+
     def _open_models(self, free, paid, custom) -> None:
+        self._loading_done()
         def picked(result) -> None:
             if not result:
                 return
@@ -962,14 +1078,29 @@ class ModelsScreen(ModalScreen):
     #models-list {
         height: 1fr;
         margin-top: 1;
-        /* Eén kolom lucht tussen de lijst (dus inclusief haar scrollbar) en de
-           rand van het popup: anders plakte de scrollbar tegen de rand. */
-        margin-right: 1;
+        /* De scrollbarkolommen ook reserveren als de scrollbar er nog niet is,
+           zodat de rijbreedte niet springt zodra de lijst over de drempel heen
+           groeit. De lucht tussen rij en scrollbar komt uit de rij zelf, zie
+           `SCROLLBAR_GAP`. */
+        scrollbar-gutter: stable;
         /* Elke rij is precies zo breed als de lijst en eindigt rechts op de
            provider. Mocht een rij na een resize toch een kolom te breed zijn,
            dan breekt hij niet om: hij wordt op één regel aan de rechterkant
            afgekapt met een liggende streep. */
         text-wrap: nowrap;
+        text-overflow: ellipsis;
+    }
+    /* De hint staat op de rij met de knoppen en neemt wat overblijft. Zo staat
+       hij niet op een eigen regel (waar hij een regel wegpakkte en de knoppen
+       naar beneden duwde) en hij kan de knoppen ook niet van een smalle
+       terminal af duwen: `1fr` geeft hem de rest en `ellipsis` kap hem af.
+       `margin-top: 0` is nodig omdat `.popup .hint` er 1 zet, en binnen een
+       rij van hoogte 1 zou de hint dan buiten de rij vallen. */
+    #models-hint {
+        width: 1fr;
+        height: 1;
+        margin-top: 0;
+        color: $text-muted;
         text-overflow: ellipsis;
     }
     """
@@ -1023,8 +1154,10 @@ class ModelsScreen(ModalScreen):
                 )
             yield Input(placeholder=t("search_hint"), id="msearch")
             yield OptionList(id="models-list")
-            yield Static(id="models-hint", classes="hint")
+            # De hint deelt de rij met de knoppen: hij neemt de ruimte die
+            # overblijft, de knoppen staan rechts met twee kolommen ertussen.
             with Horizontal(classes="actions"):
+                yield Static(id="models-hint", classes="hint")
                 yield Button(t("btn_back"), id="mback")
                 yield Button(t("btn_choose"), id="mchoose", variant="primary")
 
@@ -1082,23 +1215,20 @@ class ModelsScreen(ModalScreen):
         self.query_one("#models-hint", Static).update(t("models_hint", n=len(items)))
 
     def _list_width(self) -> int:
-        """Inwendige breedte van de modellenlijst, in kolommen."""
-        return self.query_one("#models-list", OptionList).scrollable_content_region.width
+        """Inwendige breedte van de rijen, in kolommen.
+
+        Eén kolom korter dan de lijst zelf: die kolom blijft leeg en scheidt de
+        rij van de scrollbar (zie `SCROLLBAR_GAP`). De rij, en niet de lijst,
+        is die kolom korter, want de scrollbar zit in Textual altijd tegen de
+        rechterrand van de inwendige breedte — gemeten, niet aangenomen.
+        """
+        breedte = self.query_one("#models-list", OptionList).scrollable_content_region.width
+        return max(breedte - SCROLLBAR_GAP, 1)
 
     @staticmethod
     def _clip(text: str, cells: int) -> str:
         """Kort `text` af tot `cells` kolommen, met een liggende streep erin."""
-        from rich.cells import cell_len
-
-        out: list[str] = []
-        used = 0
-        for char in text:
-            wide = cell_len(char)
-            if used + wide > cells - 1:
-                break
-            out.append(char)
-            used += wide
-        return "".join(out) + "…"
+        return clip_cells(text, cells)
 
     def _row(self, model: str, provider: str, width: int):
         """Eén modelrij: de modelnaam links, de provider flush rechts.
@@ -1118,10 +1248,14 @@ class ModelsScreen(ModalScreen):
 
         tail = f"  ·  {provider}"
         if width > 0:
+            if cell_len(tail) >= width:
+                # Zelfs de provider past niet meer: dan sturen we alleen het
+                # einde van de provider aan, zodat de rij nooit ombreekt.
+                return Text(clip_cells(tail, width), style="dim")
             # Kolommen die over blijven voor de modelnaam, minstens één zodat de
             # scheiding nooit tegen de provider aan plakt.
-            room = max(width - cell_len(tail), 1)
-            name = model if cell_len(model) <= room else self._clip(model, room)
+            room = width - cell_len(tail)
+            name = model if cell_len(model) <= room else clip_cells(model, room)
             head = name + " " * (room - cell_len(name))
         else:
             head = model
@@ -1246,6 +1380,11 @@ class CommandScreen(ModalScreen):
     #command-list {
         height: 1fr;
         margin-top: 1;
+        /* Zelfde luchtkolom als de modellenlijst: de rij stopt één kolom vóór
+           de scrollbar, en de scrollbarkolommen liggen er altijd. */
+        scrollbar-gutter: stable;
+        text-wrap: nowrap;
+        text-overflow: ellipsis;
     }
     """
 
@@ -1275,6 +1414,13 @@ class CommandScreen(ModalScreen):
     def __init__(self) -> None:
         super().__init__()
         self._query = ""
+        self._built_width = -1
+
+    # Twee kolommen lucht tussen het commando en zijn beschrijving.
+    COLUMNS_GAP = 2
+    # Een commando is nooit langer dan dit; op een smalle terminal wordt de
+    # linkerkolom op maat gekapt in plaats van dat de rij ombreekt.
+    LEFT_MAX = 34
 
     def compose(self) -> ComposeResult:
         with Vertical(id="commands-box", classes="popup"):
@@ -1298,19 +1444,96 @@ class CommandScreen(ModalScreen):
             ]
         return items
 
+    def _list_width(self) -> int:
+        """Breedte waar een rij in past, in kolommen (zelfde regel als modellen)."""
+        breedte = self.query_one("#command-list", OptionList).scrollable_content_region.width
+        return max(breedte - SCROLLBAR_GAP, 1)
+
+    @staticmethod
+    def _left(name: str) -> str:
+        """De linkerkolom: `/commando` met zijn argumenthint erachter."""
+        hint = commands.arg_hint(name)
+        return f"/{name}  {hint}" if hint else f"/{name}"
+
+    def _row(self, left: str, description: str, left_width: int):
+        """Eén regel van de tabel: commando links, beschrijving op één kolom.
+
+        `left_width` is de breedste linkerkolom van de ZICHTBARE regels, dus
+        elke beschrijving begint op dezelfde kolom. Wat niet past wordt
+        afgekapt en nooit omgebroken: een omgebroken rij is er twee, en dan
+        schuift de tabel omlaag. Past de linkerkolom niet, dan gaat de helft
+        van de breedte naar de beschrijving en wordt de linkerkolom op maat
+        gekapt — allebei voor alle rijen tegelijk, dus de kolom blijft staan.
+
+        De linkerkolom is vet (de sleutelkolom van de tabel) en heeft géén
+        eigen kleur: een kleur in de tekst zou de kleur van de gemarkeerde rij
+        overschrijven, en dan is de rij onleesbaar.
+        """
+        from rich.cells import cell_len
+        from rich.text import Text
+
+        available = self._list_width()
+        if available <= 0:
+            # Nog niet uitgemeten (eerste build tijdens mount): onopgeschoond,
+            # en `on_resize` bouwt de rij opnieuw zodra de breedte bekend is.
+            return Text(f"{left}  ·  {description}")
+        desc_room = max(available // 2, 8)
+        left_room = available - desc_room - self.COLUMNS_GAP
+        if left_room < 4:
+            # Te smal voor twee kolommen: dan toch een bruikbaar stuk links.
+            left_room = max(available - 12, 1)
+        left_width = min(left_width, left_room, self.LEFT_MAX)
+        left = clip_cells(left, left_width)
+        right_room = max(available - left_width - self.COLUMNS_GAP, 1)
+        right = clip_cells(description, right_room)
+        row = Text(left, style="bold")
+        # De opvulling zit in de rij en niet in de stijl: zo begint elke
+        # beschrijving op dezelfde kolom en blijft de rij één stuk tekst.
+        row.append(" " * (left_width - cell_len(left) + self.COLUMNS_GAP))
+        row.append(right)
+        # En de rij loopt door tot de luchtkolom: ook een korte beschrijving
+        # eindigt dan op dezelfde kolom als een lange, één kolom vóór de
+        # scrollbar. Dus één rij is één blok, en de lijst is een tabel.
+        row.pad_right(max(0, available - row.cell_len))
+        return row
+
     def _rebuild(self) -> None:
+        from rich.cells import cell_len
+
         listing = self.query_one("#command-list", OptionList)
         listing.clear_options()
         items = self._visible()
         if not items:
             listing.add_option(Option(t("search_no_results"), id=None, disabled=True))
         else:
-            for name, cmd in items:
-                hint = commands.arg_hint(name)
-                usage = f"  {hint}" if hint else ""
-                listing.add_option(Option(f"/{name}{usage}  ·  {t(cmd.description)}", id=name))
+            # De breedste linkerkolom van wat er nu zichtbaar is; zo staat elke
+            # beschrijving op dezelfde kolom, en verandert die kolom mee met de
+            # zoekopdracht.
+            lefts = [self._left(name) for name, _ in items]
+            left_width = max(cell_len(left) for left in lefts)
+            for (name, cmd), left in zip(items, lefts):
+                # De `id` blijft de naam: `_pick_highlighted` en het gesproken
+                # commando hangen eraan.
+                listing.add_option(
+                    Option(self._row(left, t(cmd.description), left_width), id=name)
+                )
             listing.highlighted = 0
+        self._built_width = self._list_width()
         self.query_one("#commands-hint", Static).update(t("commands_hint", n=len(items)))
+
+    def on_resize(self, event) -> None:
+        """Een andere vensterbreedte: de tabelkolom moet mee.
+
+        Zelfde patroon als `ModelsScreen`: de rijen zijn op de breedte van toen
+        gemaakt, dus na een resize worden ze opnieuw opgebouwd.
+        """
+        self._realign()
+        self.call_after_refresh(self._realign)
+
+    def _realign(self) -> None:
+        """Herbouw de rijen alleen als de lijst een andere breedte kreeg."""
+        if self._list_width() != self._built_width:
+            self._rebuild()
 
     def _pick_highlighted(self) -> None:
         listing = self.query_one("#command-list", OptionList)
@@ -1342,6 +1565,74 @@ class CommandScreen(ModalScreen):
             self.dismiss(None)
 
 
+def _session_messages(path: Path) -> int:
+    """Hoeveel berichten een sessiebestand bevat (0 als het onleesbaar is)."""
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return 0
+    berichten = data.get("messages")
+    return len(berichten) if isinstance(berichten, list) else 0
+
+
+class SessionsScreen(ModalScreen):
+    """Opgeslagen gesprekken kiezen (of alleen bekijken).
+
+    Zelfde vorm als de andere browsers: titelbalk met ✕, een lijst, een hint
+    onderaan. Enter herstelt het gekozen gesprek; Escape sluit de popup.
+    """
+
+    CSS = POPUP_CSS + """
+    #sessions-box {
+        width: 84%;
+        max-width: 84;
+        height: 72%;
+    }
+    #sessions-list {
+        height: 1fr;
+        margin-top: 1;
+        scrollbar-gutter: stable;
+        text-wrap: nowrap;
+        text-overflow: ellipsis;
+    }
+    """
+
+    BINDINGS = [("escape", "close", "terug"), ("q", "close", "terug")]
+
+    def __init__(self, sessions: list[tuple[str, int]]) -> None:
+        super().__init__()
+        # (sessie-id, aantal berichten), nieuwste eerst.
+        self.sessions = sessions
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="sessions-box", classes="popup"):
+            yield from _titlebar(t("msg_sessions_title"))
+            yield OptionList(id="sessions-list")
+            yield Static(t("sessions_hint"), id="sessions-hint", classes="hint")
+
+    def on_mount(self) -> None:
+        listing = self.query_one("#sessions-list", OptionList)
+        for session_id, count in self.sessions:
+            listing.add_option(
+                Option(f"{session_id}  ·  {t('sessions_messages', n=count)}", id=session_id)
+            )
+        if listing.option_count:
+            listing.highlighted = 0
+        listing.focus()
+
+    def action_close(self) -> None:
+        self.dismiss(None)
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        if event.option_id:
+            self.dismiss(str(event.option_id))
+
+    @on(Button.Pressed)
+    def _on_button(self, event: Button.Pressed) -> None:
+        if event.button.id == "close":
+            self.dismiss(None)
+
+
 class Messages(VerticalScroll):
     """Berichtenlijst. Muiswiel-snelheid volgt de `scroll_speed`-instelling."""
 
@@ -1350,6 +1641,43 @@ class Messages(VerticalScroll):
             return float(load_config().get("scroll_speed") or 1)
         except (TypeError, ValueError):
             return 1.0
+
+    def mount(self, *widgets, **kwargs):
+        """Een nieuw bericht vraagt de breedte van het portret op.
+
+        De app rekent die in `_apply_avatar_wrap`: naast het zwevende portret
+        is een bericht smaller, eronder weer vol. Deze ene plek dekt alles —
+        `_write`, `_sysline` en `_render_history` mounten allebei via hier, dus
+        geen enkele aanroepende plek hoeft iets te weten. De echte
+        breedteberekening komt zodra het scherm is ingedeeld; zie
+        `on_mount`.
+        """
+        await_mount = super().mount(*widgets, **kwargs)
+        self._schedule_wrap()
+        return await_mount
+
+    def watch_scroll_y(self, old_value: float, new_value: float) -> None:
+        """Scrollen wisselt berichten van breedte.
+
+        Een bericht dat omhoog schuift de band van het portret in komt moet
+        smaller worden en dat er weer uit komt weer breed; anders bleef de
+        tekst afbreken op de plek waar hij toevallig stond toen het scherm
+        in beeld kwam.
+
+        Direct, en niet uitgesteld tot na de volgende refresh: de rollen
+        veranderen mét de scroll, en een breedte die pas ná het tekenen
+        verandert zou het scherm nog een keer opbouwen. Dat kostte bij 200
+        berichten een halve frame per scrollslag (gemeten 100 ms tegenover
+        68 ms). De stijlbreedtes hangen niet aan de scroll, dus de posities
+        kloppen hier al: `arrange` geeft de rijen van de lijst zelf.
+        """
+        super().watch_scroll_y(old_value, new_value)
+        if self.is_mounted:
+            self.app._apply_avatar_wrap()
+
+    def _schedule_wrap(self) -> None:
+        if self.is_mounted:
+            self.app._schedule_avatar_wrap()
 
     def on_mouse_scroll_down(self, event) -> None:
         speed = self._speed()
@@ -1431,6 +1759,7 @@ class TranscriptScreen(ModalScreen):
         self.matches: list[int] = []
         self._pos = -1
         self._widgets: list = []
+        self._texts: list[str] = []
 
     def compose(self) -> ComposeResult:
         with Vertical(id="transcript-box", classes="popup"):
@@ -1442,18 +1771,22 @@ class TranscriptScreen(ModalScreen):
     def on_mount(self) -> None:
         body = self.query_one("#tbody", VerticalScroll)
         self._widgets = []
+        self._texts = []
         for msg in self.entries:
             role = msg.get("role")
             content = msg.get("content") or ""
             if role == "user":
-                widget = Static(f"[bold {accent_color()}]❯ {content}[/bold {accent_color()}]")
+                widget = user_line(content)
             elif role == "assistant":
-                widget = Markdown(content)
+                widget = roan_reply(content)
             elif role == "tool":
                 widget = Static(f"  [dim]↳ {content}[/dim]")
             else:
                 continue
             self._widgets.append(widget)
+            # De tekst waarin het transcript zoekt. Niet `widget.source`: een
+            # `.roan-reply` is een rij, en die heeft geen `source`.
+            self._texts.append(content)
             body.mount(widget)
         body.scroll_end(animate=False)
 
@@ -1469,8 +1802,7 @@ class TranscriptScreen(ModalScreen):
         self._pos = -1
         if not query:
             return
-        for i, widget in enumerate(self._widgets):
-            text = getattr(widget, "source", None) or str(widget.render())
+        for i, text in enumerate(self._texts):
             if query in str(text).lower():
                 self.matches.append(i)
         hint = self.query_one("#thint", Static)
@@ -1521,7 +1853,7 @@ class RoanApp(App):
     MIN_SIZE = (1, 1)
 
     BINDINGS = [
-        Binding("ctrl+c", "quit_app", "quit", priority=True),
+        Binding("ctrl+c", "stop_or_quit", "stop", priority=True),
         Binding("ctrl+q", "quit_app", "quit"),
         ("ctrl+p", "commands", "commando's"),
         ("ctrl+l", "clear_chat", "clear"),
@@ -1618,6 +1950,44 @@ class RoanApp(App):
     #footer {
         dock: bottom;
         height: auto;
+    }
+    /* De wachtrij boven het invoerveld: alleen zichtbaar als er iets wacht.
+       Eén regel, in de footer, dus hij duwt het gesprek nooit weg. */
+    #queue {
+        display: none;
+        height: 1;
+        margin: 0 2;
+        color: $text-muted;
+        text-overflow: ellipsis;
+    }
+    #queue.visible {
+        display: block;
+    }
+    /* De twee kanten van het gesprek. De kleur staat hier en niet in de markup:
+       markup wint van CSS, dus een kleur in de tekst zou een theme-switch
+       negeren. `$accent` is de Catppuccin-pink van de actieve smaak, dus de
+       regel van de gebruiker blijft precies wat hij was. */
+    .user-line {
+        color: $accent;
+        text-style: bold;
+    }
+    .roan-reply {
+        height: auto;
+    }
+    .roan-reply > Markdown {
+        width: 1fr;
+        /* Standaard heeft Markdown twee kolommen padding, en met het teken
+           ervoor schuift de tekst dan een kolom naar rechts ten opzichte van de
+           tekst van de gebruiker. Eén kolom padding zet beide kanten weer
+           gelijk. */
+        padding: 0 1;
+    }
+    /* Het teken van Roan: gedempt, dus het leest als secondair naast de pink
+       van de gebruiker. */
+    .roan-mark {
+        width: 1;
+        height: 1;
+        color: $text-muted;
     }
     #messages {
         height: 1fr;
@@ -1785,6 +2155,22 @@ class RoanApp(App):
         self.avatar_path = avatar_path
         self.renderer = renderer
         self._new_since_scroll = 0
+        # Er loopt een modellenlaadbeurt (netwerk): klikken en /models doen dan
+        # niets, zodat er niet meerdere browsers tegelijk open gaan.
+        self._models_busy = False
+        # Wachtrij voor berichten die je intypt terwijl Roan nog antwoordt. Het
+        # veld blijft dus bruikbaar tijdens een antwoord.
+        self._queue: list[str] = []
+        self._streaming = False
+        # Ctrl+C (of een ander signaal) zegt de worker: hou op met lezen.
+        self._stop = False
+        # Voor de wrapping om het portret heen: of er al een ronde onderweg is
+        # (meerdere aanleidingen per frame delen dan één), hoeveel ronden er
+        # gelopen zijn (plafond) en hoeveel berichten er smal staan (want
+        # zonder portret hoeft er niets gereset te worden).
+        self._wrap_pending = False
+        self._wrap_rondes = 0
+        self._wrap_smal: weakref.WeakSet = weakref.WeakSet()
         for theme in THEMES:
             self.register_theme(theme)
         cfg_theme = load_config().get("theme") or DEFAULT_THEME
@@ -1880,6 +2266,8 @@ class RoanApp(App):
             yield Static(id="jump")
             # Slash-suggesties, verscholen tot je "/" typt (zoals opencode).
             yield OptionList(id="slash")
+            # Wachtrij, alleen zichtbaar als er berichten wachten.
+            yield Static(id="queue")
             # Input als kader; geen ╹ ernaast, die oogde als een los teken.
             with Horizontal(id="prompt-row"):
                 yield HistoryInput(placeholder=t("input_placeholder"), id="input")
@@ -2019,9 +2407,205 @@ class RoanApp(App):
         # bij elkaar passen.
         node.styles.width, node.styles.height = self._avatar_outer()
 
+    # ---------- de tekst loopt om het portret heen ----------
+    def _avatar_band(self) -> Region | None:
+        """De schermrijen die het zwevende portret beslaat, of `None`.
+
+        `None` betekent: er is geen portret (te smalle terminal of geen
+        afbeelding), dus er valt niets te ontwijken.
+
+        Wij lezen de stijl-offset en niet `avatar.region`. Bij een resize draait
+        deze pass in dezelfde rij callbacks als `_place_avatar_now`, en de
+        compositor heeft de nieuwe plaats dan nog niet verwerkt: `region` zou
+        dan nog de oude plek geven. `_place_avatar_now` zet een offset in
+        cells tegen de rechterrand en `_size_avatar_now` een maat in cells,
+        dus deze twee stijlen zijn altijd actueel en komen uit dezelfde meting
+        als de doos, zodat band en doos niet uit elkaar kunnen lopen.
+
+        `query_one_optional` en niet `query`: `query` loopt de hele DOM af en
+        kost met 200 berichten 4,7 ms per frame; `query_one_optional` heeft
+        daarvoor een cache.
+        """
+        node = self.query_one_optional("#avatar")
+        if node is None:
+            return None
+        breedte = _cellen(node.styles.width)
+        hoogte = _cellen(node.styles.height)
+        if not breedte or not hoogte:
+            # Nog geen maat: `_size_avatar_now` meet de doos nu pas. Wij weten
+            # dan nog niets en laten de berichten gewoon vol breed.
+            return None
+        offset = node.styles.offset
+        links, boven = _cellen(offset.x), _cellen(offset.y)
+        if links is None or boven is None:
+            # Een offset in `%` of `fr` kan hier niet: `_place_avatar_now`
+            # zet altijd cellen. Zekerheidshalve: liever geen band dan een
+            # band op een onbekende plek.
+            return None
+        return Region(links, boven, breedte, hoogte)
+
+    def _on_layout_refresh(self, screen=None) -> None:
+        """Het scherm is opnieuw ingedeeld, dus de hoogtes zijn vers.
+
+        Dit is de enige plek waar een pass altijd klopt: bij een mount, een
+        scroll en een resize staat `call_after_refresh` namelijk soms te vroeg,
+        omdat een net toegevoegd bericht dan nog hoogte 0 heeft. Het signaal
+        vuurt nadat de indeling klaar is, en dus ook steeds opnieuw nadat wij
+        zelf een breedte hebben gezet.
+        """
+        self._schedule_avatar_wrap()
+
+    def _schedule_avatar_wrap(self) -> None:
+        """Begin een nieuwe ronde breedtes nalopen.
+
+        Elke `styles.width` vraagt om een nieuwe layout, dus meerdere passes in
+        één frame zouden het scherm vaker opbouwen dan nodig. De vlag zorgt
+        dat een mount, een resize en het inrichten van het scherm allemaal één
+        pass delen; scrollen loopt synchroon via `Messages.watch_scroll_y`.
+        """
+        self._wrap_rondes = 0
+        self._schedule_wrap_ronde()
+
+    def _schedule_wrap_ronde(self) -> None:
+        """Eén ronde aanmelden; het werk gebeurt na de volgende refresh."""
+        if self._wrap_pending or self._wrap_rondes >= WRAP_RONDES:
+            return
+        self._wrap_pending = True
+        self._wrap_pending = self.call_after_refresh(self._wrap_ronde)
+
+    def _wrap_ronde(self) -> None:
+        """Eén ronde, en daarna een volgende zolang dat zinvol is.
+
+        Een nieuwe breedte verandert de hoogtes, en dus de plek van de erna
+        volgende berichten; zonder nog een ronde te lopen kan er dus een
+        verschil blijven staan tussen wat er staat en wat er hoort. De teller
+        legt er een plafond op: `_wrap_rondes` wordt alleen door een echte
+        aanleiding op nul gezet, niet door een volgende ronde zelf.
+        """
+        self._wrap_pending = False
+        self._wrap_rondes += 1
+        self._apply_avatar_wrap()
+
+    def _apply_avatar_wrap(self) -> bool:
+        """Laat het gesprek om het zwevende portret heen lopen.
+
+        Voor de rijen die het portret beslaat is zijn linkerrand de rechterrand
+        van het scherm: elk bericht dat die rijen raakt krijgt daarom een
+        uitdrukkelijke `styles.width` en breekt vóór het kader af, met
+        `AVATAR_WRAP_GAP` lucht ertussen. Onder het portret geldt de gewone
+        volle breedte weer, dus `width = None` en daarmee `auto`.
+
+        Er wordt per bericht maar één ding vergeleken: de breedte die er al
+        staat. Alleen als die echt verandert schrijven wij hem, want elke
+        schrijfactie is een layout. En de loop stopt bij het eerste bericht
+        onder het portret: alles wat daaronder zit is per definitie niet smal.
+        Zo blijft een pass tijdens het scrollen even goedkoop als het scherm
+        hoog is, hoeveel berichten er ook onder staan.
+
+        Geeft terug of er iets is veranderd; dat is wat de volgende ronde
+        op gang brengt, want een nieuwe breedte verandert de hoogtes en dus de
+        plek van de erna volgende berichten.
+
+        BEGRENZING, en dit is het enige verschil met een tekstverwerker: een
+        bericht dat boven het portret begint en eronder doorloopt wordt
+        HELMAAL smal. Eén widget heeft één breedte, dus een blok dat over de
+        bandgrens heen loopt kan niet boven smal en onder breed zijn. Splitsen
+        zou `render_lines` en een herbouw van de Markdown uit losse regels
+        vergen, en dat verliest links en klikhandlers. De onderste rijen van
+        zo'n bericht blijven dus smal totdat het scrollt of een resize komt.
+        """
+        msgs = self.query_one_optional("#messages", VerticalScroll)
+        if msgs is None:
+            return False
+        band = self._avatar_band()
+        if band is None:
+            # Zonder portret blijft niets smal staan: anders zou een bericht
+            # nog smal zijn nadat het portret bij een ander schermformaat weg is.
+            smal = self._wrap_smal
+            self._wrap_smal = weakref.WeakSet()
+            veranderd = False
+            for kind in list(smal):
+                veranderd |= self._set_width(kind, None)
+            return veranderd
+        # De posities komen uit de layout van de lijst zelf en niet uit de
+        # compositor: `arrange` ligt in de cache van de container en kost
+        # nagenoeg niets, terwijl `kind.region` ná een scroll de héle
+        # compositor-map opnieuw opbouwt (gemeten 8,9 ms bij 200 berichten).
+        # De lijst staat op rij 0, dus `content_region` is het nulpunt en
+        # `scroll_offset` de verplaatsing van de inhoud.
+        oorsprong = msgs.content_region.offset
+        scrol = msgs.scroll_offset
+        plaatsingen = msgs.arrange(msgs.scrollable_content_region.size).placements
+        if any(not plaatsing.region.height for plaatsing in plaatsingen):
+            # De lijst is nog niet ingedeeld: een bericht dat pas is toegevoegd
+            # heeft hoogte 0 en telt niet mee, dus alle posities kloppen niet.
+            # Wij doen dan niets en vragen een volgende ronde aan; het plafond
+            # in `_schedule_wrap_ronde` begrenst dat.
+            self._schedule_wrap_ronde()
+            return False
+        # De band, omgerekend naar de rijen van de lijst zelf: schermrij =
+        # oorsprong + lijstrij - scroll, dus andersom. Zo hoeft de loop niet te
+        # weten waar het scherm begint, alleen waar de inhoud begint.
+        bovenband = band.y - oorsprong.y + scrol.y
+        onderband = band.bottom - oorsprong.y + scrol.y
+        smal: set = set()
+        veranderd = False
+        for plaatsing in plaatsingen:
+            regio = plaatsing.region + plaatsing.offset
+            if regio.y >= onderband:
+                # De plaatsingen lopen van boven naar beneden, dus dit is het
+                # eerste bericht dat helemaal onder het portret staat.
+                break
+            if regio.y + regio.height <= bovenband:
+                # Helemaal erboven: onbereikbaar, want boven het scherm.
+                continue
+            kind = plaatsing.widget
+            links = oorsprong.x + regio.x - scrol.x
+            smal.add(kind)
+            # `max(1, ...)`: een breedte van 0 levert een onzichtbaar bericht
+            # en een negatieve mag niet, dus op een terminal die nauwelijks
+            # breder is dan het portret blijft er in elk geval één kolom over.
+            veranderd |= self._set_width(
+                kind, max(1, band.x - AVATAR_WRAP_GAP - links)
+            )
+        # Wat vorige ronde smal stond en nu buiten de band valt, wordt weer
+        # vol breed; de loop hierboven bereikt die berichten niet meer.
+        for kind in list(self._wrap_smal):
+            if kind not in smal:
+                veranderd |= self._set_width(kind, None)
+        # Een `WeakSet`, zodat een bericht dat uit het gesprek verdwijnt niet
+        # in de weg staat en niet vastgehouden wordt door deze app.
+        self._wrap_smal = weakref.WeakSet(smal)
+        return veranderd
+
+    @staticmethod
+    def _set_width(kind, gewenst: int | None) -> bool:
+        """Zet de breedte van een bericht, alleen als hij echt verandert.
+
+        `styles.width = None` wist de eigen breedte en laat `auto` terug, dus de
+        volle breedte van de container. Een breedte in `%` of `fr` komt uit de
+        CSS van dat widget; die laten wij staan in plaats van hem te overschrijven
+        of te wissen.
+        """
+        huidig = kind.styles.width
+        if gewenst is None:
+            if huidig is None or _cellen(huidig) is None:
+                return False
+            kind.styles.width = None
+            return True
+        if _cellen(huidig) == gewenst:
+            return False
+        kind.styles.width = gewenst
+        return True
+
     def on_resize(self) -> None:
         self._size_avatar()
         self._place_avatar()
+        # Na een resize staat het portret op een andere plek en dus ook de
+        # breedte van de berichten ernaast; `_place_avatar` zet de nieuwe
+        # offset eerder in deze rij callbacks, dus deze pass rekent met de
+        # nieuwe maat mee.
+        self._schedule_avatar_wrap()
         if self.is_running:
             # In `on_resize` staat `self.size` nog op de OUDE maat; pas na de
             # volgende refresh is de nieuwe breedte binnen. Zonder die uitstap
@@ -2030,6 +2614,16 @@ class RoanApp(App):
 
     def on_mount(self) -> None:
         self.query_one("#input", Input).focus()
+        # Het schemerscherm is de enige die weet WANNER de indeling klopt: pas
+        # na zijn refresh zijn de hoogtes van net toegevoegde berichten bekend.
+        # `call_after_refresh` is daarvoor te vroeg — gemeten: vlak na een
+        # mount stonden alle nieuwe berichten nog op hoogte 0, waardoor de
+        # breedteberekening niets deed en niets meer een pass kreeg. Dit
+        # signaal vuurt na elke indeling (mount, scroll, resize) en dus ook
+        # steeds opnieuw nadat wij zelf een breedte hebben gezet.
+        self.screen.screen_layout_refresh_signal.subscribe(
+            self, self._on_layout_refresh, immediate=True
+        )
         self._size_avatar()
         self._place_avatar()
         self._update_status()
@@ -2042,14 +2636,19 @@ class RoanApp(App):
         self._sysline(t("ready", model=cfg["model"], provider=cfg["provider"]))
 
     def _render_history(self) -> None:
-        """Toon het herstelde gesprek zodat de context zichtbaar is."""
+        """Toon het herstelde gesprek zodat de context zichtbaar is.
+
+        Zelfde twee kanten als een live gesprek: `user_line` voor de gebruiker,
+        `roan_reply` voor Roan. Anders las een hersteld gesprek anders dan een
+        live gesprek.
+        """
         for msg in getattr(self.agent, "messages", [])[1:]:
             role = msg.get("role")
             content = msg.get("content")
             if role == "user" and content:
-                self._write(Static(f"[bold {accent_color()}]❯ {content}[/bold {accent_color()}]"))
+                self._write(user_line(content))
             elif role == "assistant" and content:
-                self._write(Markdown(content))
+                self._write(roan_reply(content))
         if len(getattr(self.agent, "messages", [])) > 1:
             self._sysline(t("msg_restored", n=len(self.agent.messages) - 1))
         msgs = self._messages()
@@ -2182,7 +2781,14 @@ class RoanApp(App):
 
     @on(Click, "#status")
     def _status_clicked(self) -> None:
-        """Model · provider is een knopje: klikken doet hetzelfde als `/models`."""
+        """Model · provider is een knopje: klikken doet hetzelfde als `/models`.
+
+        Loopt er al een modellenlaadbeurt, dan negeert deze klik. Zonder die
+        vlag zette een tweede klik tijdens het ophalen een tweede popup bovenop
+        de eerste.
+        """
+        if self._models_busy:
+            return
         self._run_command("/models")
 
     @on(Click, "#status-thinking")
@@ -2460,6 +3066,12 @@ class RoanApp(App):
         )
 
     def _cmd_sessions(self) -> None:
+        """`/sessions`: een popup met de opgeslagen gesprekken.
+
+        Vóór stond hier een lijstje Markdown ín de chat, tussen de berichten
+        door, en je kon er niets mee. Nu is het een popup zoals alle andere, met
+        Escape om weg te gaan en Enter om een gesprek te herstellen.
+        """
         from .agent import SESSIONS_DIR
 
         if not SESSIONS_DIR.exists():
@@ -2469,10 +3081,40 @@ class RoanApp(App):
         if not files:
             self._sysline(t("msg_no_sessions"))
             return
-        lines = [f"**{t('msg_sessions_title')}**", ""]
-        for f in files[:20]:
-            lines.append(f"- `{f.stem}`")
-        self._write(Markdown("\n".join(lines)))
+
+        def chosen(session_id) -> None:
+            if session_id:
+                self._restore_session(str(session_id))
+
+        self.push_screen(
+            SessionsScreen([(f.stem, _session_messages(f)) for f in files[:20]]),
+            chosen,
+        )
+
+    def _restore_session(self, session_id: str) -> None:
+        """Herstel een opgeslagen gesprek (id = naam van het bestand).
+
+        `Agent.clear()` zou het bestand meteen weer overschrijven met een leeg
+        gesprek, dus wij zetten alleen het systeembericht terug en laten
+        `_restore` de berichten er weer bij zetten. `save()` daarna is wat de
+        sessie weer bruikbaar maakt voor de volgende keer.
+        """
+        systeem = (
+            self.agent.messages[0]
+            if getattr(self.agent, "messages", None)
+            else {"role": "system", "content": ""}
+        )
+        self.agent.session_id = session_id
+        self.agent.messages = [systeem]
+        self.agent._restore()
+        self.agent.save()
+        reload_ = getattr(self.agent, "reload", None)
+        if callable(reload_):
+            # Zodat de request-headers de nieuwe sessie-id dragen.
+            reload_()
+        self._messages().remove_children()
+        self._update_status()
+        self._render_history()
 
     def _cmd_theme(self, args) -> None:
         if args:
@@ -2505,15 +3147,57 @@ class RoanApp(App):
         self._update_status()
 
     def _cmd_models(self) -> None:
+        """`/models`: één browser per keer.
+
+        Zit er al een lopende laadbeurt, dan doet deze klik niets — zonder die
+        vlag zette elke klik tijdens het ophalen een tweede (en derde)
+        ModelsScreen bovenop de eerste, want het scherm wordt bij elke
+        aanroep opnieuw gepusht, niet alleen als de lijst klaar is.
+        """
+        if self._models_busy:
+            return
         self._sysline(t("models_fetching"))
         self._fetch_models()
 
+    def _models_claim(self) -> bool:
+        """Vlag 'er loopt een modellenlaadbeurt'; False als dat al zo was."""
+        if self._models_busy:
+            return False
+        self._models_busy = True
+        return True
+
+    def _models_release(self, failed: bool = False) -> None:
+        """De laadbeurt is klaar (of mislukt): de volgende klik mag weer."""
+        self._models_busy = False
+        if failed:
+            self._sysline(t("models_failed"))
+
+    def _fetch_models(self, fixed_provider: str | None = None) -> bool:
+        """Start het ophalen, als er nog geen laadbeurt loopt. Geeft True terug
+        als hij daadwerkelijk gestart is.
+
+        De vlag wordt hier gezet en niet in de worker: die draait in een
+        thread, dus een vlag die daar staat is te laat of komt er helemaal niet
+        als de volgende klik al binnenkomt.
+        """
+        if not self._models_claim():
+            return False
+        self._fetch_models_worker(fixed_provider)
+        return True
+
     @work(thread=True, exclusive=True)
-    def _fetch_models(self, fixed_provider: str | None = None) -> None:
-        free, paid, custom = gather_models()
+    def _fetch_models_worker(self, fixed_provider: str | None = None) -> None:
+        try:
+            free, paid, custom = gather_models()
+        except Exception:
+            self.call_from_thread(self._models_release, True)
+            return
         self.call_from_thread(self._open_models, free, paid, custom, fixed_provider)
 
     def _open_models(self, free, paid, custom, fixed_provider: str | None = None) -> None:
+        # De lijst liggen er: de laadbeurt is klaar, dus de volgende klik mag
+        # weer een browser openen (de huidige staat als modal bovenop).
+        self._models_release()
         def chosen(result) -> None:
             if not result:
                 return
@@ -2589,11 +3273,15 @@ class RoanApp(App):
         self._messages().scroll_page_down(animate=False)
 
     def action_quit_app(self) -> None:
-        """Ctrl+C of Ctrl+Q.
+        """Ctrl+Q (of Ctrl+C als er niets antwoordt).
 
-        De zwevende ✕ rechtsboven is weg: die hoek hoort nu bij het portret.
+        De zwevende ✕ rechtsboven is weg: die hoort nu bij het portret.
         Sluiten kan dus alleen met een toets, of met de ✕ van een popup.
         """
+        # Wat er nog in de wachtrij ligt wordt niet meer verstuurd: de app gaat
+        # toch dicht, en een half afgehandelde wachtrij is onzin.
+        self._queue.clear()
+        self._stop = True
         self.exit()
 
     def action_clear_chat(self) -> None:
@@ -2715,15 +3403,41 @@ class RoanApp(App):
             self._run_command(text)
             return
 
-        self._write(Static(f"[bold {accent_color()}]❯ {text}[/bold {accent_color()}]"))
-        self._stream_response(text)
+        # De regel van de gebruiker gaat meteen in het gesprek, ook als er nog
+        # een antwoord onderweg is: je moet terug kunnen lezen wat je stuurde.
+        self._write(user_line(text))
+        if self._streaming:
+            # Er antwoordt nog iemand. Het veld blijft gewoon bruikbaar, dus
+            # je kunt alvast de volgende vraag intypen; die gaat in de
+            # wachtrij en vertrekt zodra het huidige antwoord klaar is.
+            self._queue.append(text)
+            self._update_queue()
+            return
+        self._send_now(text)
 
-    @work(thread=True, exclusive=True)
-    def _stream_response(self, text: str) -> None:
-        inp = self.query_one("#input", Input)
-        self.call_from_thread(setattr, inp, "disabled", True)
-        md = Markdown("…")
-        self.call_from_thread(self._write, md)
+    # ---------- wachtrij ----------
+    def _send_now(self, text: str) -> None:
+        """Zet één bericht op de agent en stream het antwoord."""
+        self._streaming = True
+        self._stop = False
+        self._update_queue()
+        self._stream_reply(text)
+
+    @work(thread=True)
+    def _stream_reply(self, text: str) -> None:
+        """Eén antwoord binnenhalen, in een thread.
+
+        De wachtrij draait hier omheen: dit werkt één bericht en roept
+        `_reply_done`, en dát pakt het volgende bericht uit de wachtrij. Zo
+        draait er nooit meer dan één stream tegelijk en kan een bericht nooit
+        twee keer verstuurd worden.
+
+        Het veld wordt NIET disabled: je mag alvast door typen. De wachtrij
+        staat in de footer (`_update_queue`).
+        """
+        reply = roan_reply("…")
+        self.call_from_thread(self._write, reply)
+        md = reply.query_one(Markdown)
         buf: list[str] = []
 
         def on_event(ev: dict) -> None:
@@ -2731,13 +3445,49 @@ class RoanApp(App):
 
         try:
             for delta in self.agent.send_stream(text, on_event=on_event):
+                if self._stop:
+                    break
                 buf.append(delta)
                 self.call_from_thread(md.update, "".join(buf))
         except Exception as e:
             self.call_from_thread(md.update, f"**Fout:** {e}")
         finally:
-            self.call_from_thread(setattr, inp, "disabled", False)
-            self.call_from_thread(inp.focus)
+            self.call_from_thread(self._reply_done)
+
+    def _reply_done(self) -> None:
+        """Eén antwoord is klaar: de volgende uit de wachtrij, of niets meer."""
+        if self._queue:
+            # Poppen vóór het versturen: een bericht dat hier weg is, is
+            # verstuurd en kan niet dubbel in de wachtrij terechtkomen.
+            self._send_now(self._queue.pop(0))
+            return
+        self._streaming = False
+        self._update_queue()
+
+    def _update_queue(self) -> None:
+        """Het rijtje boven het invoerveld: hoeveel berichten er nog wachten."""
+        queue = self.query_one("#queue", Static)
+        wacht = len(self._queue)
+        if not wacht:
+            queue.remove_class("visible")
+            return
+        queue.add_class("visible")
+        eerst = clip_cells(self._queue[0], 48)
+        queue.update(f"{t('queue_pending', n=wacht)}  ·  {eerst}")
+
+    def _stop_reply(self) -> None:
+        """Ctrl+C tijdens een antwoord: stop de stream en leeg de wachtrij."""
+        self._stop = True
+        self._queue.clear()
+        self._update_queue()
+        self._sysline(t("msg_aborted"))
+
+    def action_stop_or_quit(self) -> None:
+        """Ctrl+C: eerst het lopende antwoord stoppen, sluiten daarna pas."""
+        if self._streaming:
+            self._stop_reply()
+            return
+        self.exit()
 
     def _render_tool_event(self, ev: dict) -> None:
         if ev.get("type") == "tool_call":

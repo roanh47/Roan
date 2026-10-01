@@ -1,8 +1,13 @@
 """TUI-tests via Textual's headless pilot (geen netwerk)."""
 
+import asyncio
+import json
+import threading
+
 import pytest
 
 from roan import config
+from roan.i18n import t
 from roan.tui import HistoryInput, RoanApp, SetupScreen
 
 
@@ -778,6 +783,7 @@ async def test_command_palette_shows_the_slash_once(tmp_roan):
 
 @pytest.mark.asyncio
 async def test_command_palette_usage_is_not_duplicated(tmp_roan):
+    from roan.i18n import t
     from roan.tui import CommandScreen
     from textual.widgets import OptionList
 
@@ -796,7 +802,11 @@ async def test_command_palette_usage_is_not_duplicated(tmp_roan):
         assert "/tui  <fullscreen|default>" in prompts["tui"], prompts["tui"]
         assert "/theme  <naam>" in prompts["theme"], prompts["theme"]
         # /help heeft geen argumenten: geen dubbele spatie, geen naam-tweemaal.
-        assert prompts["help"].startswith("/help  ·"), prompts["help"]
+        # De rij is nu twee kolommen (commando, dan beschrijving op één vaste
+        # kolom), dus het scheidingsteken tussen beide staat er niet meer.
+        assert prompts["help"].startswith("/help "), prompts["help"]
+        assert prompts["help"].rstrip().endswith(t("cmd_help")), prompts["help"]
+        assert "/help  ·" not in prompts["help"], prompts["help"]
         app.pop_screen()
         await pilot.pause()
 
@@ -1138,7 +1148,11 @@ def _provider_end_cells(regels, items):
 
 @pytest.mark.asyncio
 async def test_models_provider_is_flush_right_on_every_row(tmp_roan):
-    """Alle rijen eindigen op dezelfde kolom: de één na de laatste van de lijst."""
+    """Alle rijen eindigen op dezelfde kolom: de één na de laatste van de lijst.
+
+    Die kolom is de laatste kolom van de lijst MIN de één die leeg blijft
+    tussen de rij en de scrollbar (`SCROLLBAR_GAP`).
+    """
     from roan.tui import ModelsScreen
 
     app = RoanApp(FakeAgent())
@@ -1150,7 +1164,7 @@ async def test_models_provider_is_flush_right_on_every_row(tmp_roan):
         regels, width = _models_rows(screen)
         assert len(regels) == len(MODELS_MIXED), regels
         kolommen = _provider_end_cells(regels, MODELS_MIXED)
-        assert kolommen == [width - 1] * len(MODELS_MIXED), (kolommen, width, regels)
+        assert kolommen == [width - 2] * len(MODELS_MIXED), (kolommen, width, regels)
 
 
 @pytest.mark.asyncio
@@ -1177,7 +1191,7 @@ async def test_models_rows_do_not_wrap_when_the_popup_is_narrow(tmp_roan):
         assert all(cell_len(regel) <= width for regel in regels), (regels, width)
         assert all(hoogte == 1 for hoogte in listing._line_cache.heights.values())
         assert all("·" in regel for regel in regels), regels
-        assert _provider_end_cells(regels, MODELS_MIXED) == [width - 1] * len(MODELS_MIXED)
+        assert _provider_end_cells(regels, MODELS_MIXED) == [width - 2] * len(MODELS_MIXED)
 
 
 @pytest.mark.asyncio
@@ -1197,7 +1211,7 @@ async def test_models_provider_stays_flush_right_after_a_resize(tmp_roan):
             regels, width = _models_rows(screen)
             assert len(regels) == len(MODELS_MIXED), (size, regels)
             kolommen = _provider_end_cells(regels, MODELS_MIXED)
-            assert kolommen == [width - 1] * len(MODELS_MIXED), (size, kolommen, width, regels)
+            assert kolommen == [width - 2] * len(MODELS_MIXED), (size, kolommen, width, regels)
 
 
 @pytest.mark.asyncio
@@ -1218,7 +1232,7 @@ async def test_models_provider_is_flush_right_while_filtering(tmp_roan):
         await pilot.pause()
         items = [("cerebras", MODELS_MIXED[1][1])]
         regels, width = _models_rows(screen)
-        assert _provider_end_cells(regels, items) == [width - 1], regels
+        assert _provider_end_cells(regels, items) == [width - 2], regels
 
         screen.query_one("#prov", Select).value = "__all__"
         await pilot.pause()
@@ -1226,12 +1240,12 @@ async def test_models_provider_is_flush_right_while_filtering(tmp_roan):
         await pilot.pause()
         items = [("xai", "grok-3-mini-beta")]
         regels, width = _models_rows(screen)
-        assert _provider_end_cells(regels, items) == [width - 1], regels
+        assert _provider_end_cells(regels, items) == [width - 2], regels
 
         screen.query_one("#msearch").value = ""
         await pilot.pause()
         regels, width = _models_rows(screen)
-        assert _provider_end_cells(regels, MODELS_MIXED) == [width - 1] * len(MODELS_MIXED)
+        assert _provider_end_cells(regels, MODELS_MIXED) == [width - 2] * len(MODELS_MIXED)
 
 
 @pytest.mark.asyncio
@@ -1990,15 +2004,22 @@ async def test_the_provider_select_ends_flush_right(tmp_roan):
 
 
 @pytest.mark.asyncio
-async def test_one_clear_column_to_the_right_of_the_models_list(tmp_roan):
-    """Precies één kolom lucht tussen de lijst (met haar scrollbar) en de rand.
+async def test_one_clear_column_between_the_models_list_and_its_scrollbar(tmp_roan):
+    """Precies één kolom lucht tussen het eind van de rij en de scrollbar.
+
+    Vóór stond die kolom aan de ANDERE kant van de scrollbar (tussen scrollbar
+    en rand van het popup), waar hij niets deed: de gemarkeerde rij liep
+    meteen in de scrollbar. `margin-right`/`padding-right` kunnen dat niet
+    repareren, want Textual tekent de scrollbar altijd tegen de rechterrand
+    van de inwendige breedte (gemeten in 8.2.8). Dus is de rij zelf één kolom
+    korter dan de lijst; de scrollbar staat nu tegen de rand van het popup.
 
     Geen scrollbar = geen scrollbalk, dus hier is een lijst nodig die echt te
     scrollen is: 60 modellen in een popup van 80x30.
     """
     from textual.widgets import OptionList
 
-    from roan.tui import ModelsScreen
+    from roan.tui import SCROLLBAR_GAP, ModelsScreen
 
     app = RoanApp(FakeAgent())
     async with app.run_test(size=(80, 30)) as pilot:
@@ -2012,35 +2033,41 @@ async def test_one_clear_column_to_the_right_of_the_models_list(tmp_roan):
         assert listing.max_scroll_y > 0, "lijst die niet te scrollen is"
         rand = box.content_region.right - 1  # laatste kolom van het popup
         laatste = listing.region.right - 1  # laatste kolom van de lijst
-        # Precies één kolom lucht: de lijst eindigt op `rand - 1`, dus kolom
-        # `rand` blijft leeg. De scrollbar zit ín de lijst, op de twee laatste
-        # kolommen daarvan.
-        assert laatste == rand - 1, (listing.region, box.content_region)
+        # De lijst eindigt nu tegen de rand van het popup: geen marge meer.
+        assert laatste == rand, (listing.region, box.content_region)
         assert listing.scrollbar_size_vertical == 2
-        duim = _cell_style(app, rand - 1, listing.region.y + 1)
-        spoor = _cell_style(app, rand - 1, listing.region.bottom - 1)
-        assert duim.color.triplet.hex.lower() != spoor.color.triplet.hex.lower(), (
-            "geen duim en spoor te onderscheiden"
-        )
-        # en die laatste lijstkolom is de scrollbar, dus de modelrij stopt een
-        # kolom eerder: de rij zit tot en met `rand - 3`, en `rand` is leeg
+        sb_links = laatste - 1  # eerste kolom van de scrollbar
+        # Eén kolom lucht: de rij stopt op `sb_links - 2`, kolom `sb_links - 1`
+        # blijft leeg.
         regel = _row_text(app.screen, listing.region.y)
         assert "model-met-een-lange-naam-000" in regel, regel
         assert "provider-0" in regel, regel
-        assert regel[rand] == " ", regel[laatste - 2 : rand + 2]
+        laatste_tekst = max(i for i, teken in enumerate(regel[: sb_links + 1]) if teken != " ")
+        assert laatste_tekst == sb_links - 1 - SCROLLBAR_GAP, (
+            laatste_tekst,
+            sb_links,
+            regel[laatste_tekst - 2 : sb_links + 2],
+        )
+        assert regel[sb_links - 1] == " ", regel[sb_links - 3 : sb_links + 2]
+        # en de duum van de scrollbar is nog altijd van het spoor te onderscheiden
+        duim = _cell_style(app, sb_links, listing.region.y + 1)
+        spoor = _cell_style(app, sb_links, listing.region.bottom - 1)
+        assert duim.color.triplet.hex.lower() != spoor.color.triplet.hex.lower(), (
+            "geen duim en spoor te onderscheiden"
+        )
 
 
 @pytest.mark.asyncio
-async def test_every_model_row_still_ends_on_the_same_column_after_the_margin(tmp_roan):
-    """De marge kost een kolom, maar de rijen blijven één regel en één kolom breed.
+async def test_every_model_row_still_ends_on_the_same_column_after_the_gap(tmp_roan):
+    """De luchtkolom kost een kolom, maar de rijen blijven één regel en één kolom korter.
 
-    `text-wrap: nowrap` en de opvulling in `_row` lopen allebei over
-    `scrollable_content_region.width`, dus die wordt nu één kolom smaller; de
-    provider moet daarna nog steeds op precies dezelfde kolom eindigen.
+    `text-wrap: nowrap` en de opvulling in `_row` lopen over de breedte van de
+    lijst min die één kolom, dus die wordt één kolom smaller; de provider moet
+    daarna nog steeds op precies dezelfde kolom eindigen.
     """
     from textual.widgets import OptionList
 
-    from roan.tui import ModelsScreen
+    from roan.tui import SCROLLBAR_GAP, ModelsScreen
 
     veel = [
         ("groq", "kort"),
@@ -2062,12 +2089,15 @@ async def test_every_model_row_still_ends_on_the_same_column_after_the_margin(tm
         assert listing.show_vertical_scrollbar is True, "scrollbar meetbaar nodig"
         # één regel per model, en niets groeit een kolom
         assert all(hoogte == 1 for hoogte in listing._line_cache.heights.values())
-        assert {len(regel) for regel in regels} == {width}, (set(map(len, regels)), width)
-        # en de provider eindigt op elke rij op de laatste kolom van de lijst
-        assert _provider_end_cells(regels, zichtbaar) == [width - 1] * len(zichtbaar), width
-        # de lijst is één kolom smaller dan het popup, min de twee scrollbar
+        assert {len(regel) for regel in regels} == {width - SCROLLBAR_GAP}, (
+            set(map(len, regels)),
+            width,
+        )
+        # en de provider eindigt op elke rij op dezelfde kolom, één vóór het gat
+        assert _provider_end_cells(regels, zichtbaar) == [width - 2] * len(zichtbaar), width
+        # de lijst is twee scrollbarkolommen smaller dan het popup; de rij nog één
         box = screen.query_one("#models-box")
-        assert width == box.content_region.width - 3, (width, box.content_region)
+        assert width == box.content_region.width - 2, (width, box.content_region)
 
 
 @pytest.mark.asyncio
@@ -2131,3 +2161,974 @@ def test_every_flavour_keeps_pink_thumb_and_panel_track():
         assert variables["scrollbar-hover"] == pink, thema.name
         assert variables["scrollbar-active"] == pink, thema.name
         assert variables["scrollbar-background"] == paneel, thema.name
+
+
+# ---------- de tekst loopt om het zwevende portret heen ----------
+# Vóór deze wijziging liep het gesprek vol breed door en tekende het zwevende
+# portret erover heen, wat afgebroken tekst leek. Nu is voor de rijen die het
+# portret beslaat zijn linkerrand de rechterrand: een bericht breekt vóór het
+# kader af en er komt geen teken onder. `_apply_avatar_wrap` in roan/tui.py
+# rekent dat uit; de tests hieronder leggen het gedrag vast.
+
+# Lang genoeg om over de bandgrens heen te lopen.
+LANG = (
+    "Dit is een vrij lange regel tekst die over de hele breedte loopt om te "
+    "zien waar hij afgebroken wordt, en die dus netjes voor het zwevende "
+    "portret moet blijven liggen in plaats van eronderdoor."
+)
+
+
+async def _breedtes_vast(pilot, ronden: int = 4) -> None:
+    """Laat de breedtes van het gesprek vastliggen.
+
+    Een andere breedte verandert de hoogtes, en dus de plek van het volgende
+    bericht; de berekening loopt daarom net als een layout in rondes. Vier
+    `pause()`'s zijn ruim voldoende (gemeten: 2 tot 3 ronden).
+    """
+    for _ in range(ronden):
+        await pilot.pause()
+
+
+def _avatar_cellen(app) -> list[str]:
+    """De cellen die het portret ZELF tekent: zijn rand om zijn tekening.
+
+    Zo kan de test de getekende rechthoek van het portret vergelijken met wat
+    het portret hoort te tekenen, en dus zien of er iets anders ertussen zit.
+    """
+    avatar = app.query_one("#avatar")
+    regio = avatar.region
+    kunst = avatar.content.plain.split("\n")
+    cellen = []
+    for rij_index in range(regio.height):
+        rij = [" "] * regio.width
+        if rij_index == 0:
+            rij[0], rij[-1] = "╭", "╮"
+            rij[1:-1] = ["─"] * (regio.width - 2)
+        elif rij_index == regio.height - 1:
+            rij[0], rij[-1] = "╰", "╯"
+            rij[1:-1] = ["─"] * (regio.width - 2)
+        else:
+            rij[0], rij[-1] = "│", "│"
+            kunst_rij = kunst[rij_index - 1] if rij_index - 1 < len(kunst) else ""
+            for x, teken in enumerate(kunst_rij[: regio.width - 2]):
+                rij[x + 1] = teken
+        cellen.append("".join(rij))
+    return cellen
+
+
+def _raakt_band(regio, band) -> bool:
+    """Of een bericht één van de rijen van het portret raakt."""
+    return regio.y < band.bottom and regio.bottom > band.y
+
+
+def _smalle_breedtes(kind) -> int | None:
+    """De breedte in cellen die wij hebben gezet, of None (dus `auto`)."""
+    from roan.tui import _cellen
+
+    return _cellen(kind.styles.width)
+
+
+@pytest.mark.asyncio
+async def test_the_chat_wraps_before_the_avatar(tmp_roan):
+    """Voor de rijen van het portret is zijn linkerrand de rechterrand.
+
+    Per cel gecontroleerd: elk teken in de rechthoek van het portret is van
+    het portret zelf (dus geen chattekst), geen enkel bericht komt onder die
+    rechthoek, en de kolom ertussen is leeg.
+    """
+    from textual.geometry import Region
+    from textual.widgets import Markdown, Static
+
+    from roan.tui import AVATAR_WRAP_GAP
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(60, 26)) as pilot:
+        await pilot.pause()
+        msgs = app.query_one("#messages")
+        msgs.remove_children()
+        await pilot.pause()
+        app._write(Static(f"0 {LANG}"))
+        app._write(Markdown(f"1 {LANG}"))
+        await _breedtes_vast(pilot)
+
+        band = app.query_one("#avatar").region
+        assert band == Region(x=34, y=0, width=26, height=14), band
+        # de band die wij rekenen is de gemeten rechthoek van het portret
+        assert app._avatar_band() == band, app._avatar_band()
+
+        # 1. elk teken in de rechthoek van het portret is van het portret zelf
+        rijen = _avatar_screen_rows(app)
+        verwacht = _avatar_cellen(app)
+        for i, rij in enumerate(rijen):
+            assert rij[band.x : band.x + band.width] == verwacht[i], (
+                f"rij {band.y + i} is overschreven",
+                rij[band.x : band.x + band.width],
+                verwacht[i],
+            )
+
+        # 2. geen enkel bericht komt onder het portret; wat erin ligt is smaller
+        #    met precies de luchtkolom ertussen
+        in_band = 0
+        for kind in msgs.children:
+            if not _raakt_band(kind.region, band):
+                assert _smalle_breedtes(kind) is None, (
+                    kind.region,
+                    kind.styles.width,
+                )
+                continue
+            in_band += 1
+            assert _smalle_breedtes(kind) is not None, kind.styles.width
+            assert kind.region.right == band.x - AVATAR_WRAP_GAP, kind.region
+        assert in_band >= 2, "beide berichten horen in de band te staan"
+
+        # 3. de luchtkolom is leeg op elke rij die het portret beslaat
+        lucht = band.x - AVATAR_WRAP_GAP
+        for i, rij in enumerate(rijen):
+            assert rij[lucht] == " ", f"rij {band.y + i}, kolom {lucht}: {rij!r}"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("size", [(60, 26), (100, 50)])
+async def test_a_message_below_the_avatar_uses_the_whole_width(tmp_roan, size):
+    """Onder het portret geldt de gewone volle breedte weer.
+
+    De breedte blijft daar leeg, dus `auto`: het bericht vult de hele lijst en
+    hoeft niets te weten van het portret.
+    """
+    from textual.widgets import Markdown, Static
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=size) as pilot:
+        await pilot.pause()
+        msgs = app.query_one("#messages")
+        msgs.remove_children()
+        await pilot.pause()
+        for n in range(10):
+            app._write(Markdown(f"- vulruimte {n}"))
+        app._write(Static(f"ONDER {LANG}"))
+        await _breedtes_vast(pilot)
+
+        band = app._avatar_band()
+        laatste = msgs.children[-1]
+        assert laatste.region.y >= band.bottom, laatste.region
+        assert _smalle_breedtes(laatste) is None, laatste.styles.width
+        smalle = [k for k in msgs.children if _raakt_band(k.region, band)]
+        assert smalle, "er moeten smalle berichten zijn"
+        assert laatste.region.width > min(k.region.width for k in smalle)
+
+
+@pytest.mark.asyncio
+async def test_scrolling_narrows_and_widens_the_messages_beside_the_avatar(tmp_roan):
+    """Scrollen wisselt de breedte: die erin komen smal, die eruit gaan breed.
+
+    Zonder dit zou de tekst blijven afbreken op de plek waar een bericht
+    toevallig stond toen het scherm in beeld kwam.
+    """
+    from textual.widgets import Markdown
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(60, 26)) as pilot:
+        await pilot.pause()
+        msgs = app.query_one("#messages")
+        msgs.remove_children()
+        await pilot.pause()
+        for n in range(12):
+            app._write(Markdown(f"bericht {n} {LANG}"))
+        await _breedtes_vast(pilot)
+        msgs.scroll_home(animate=False)
+        await _breedtes_vast(pilot)
+
+        band = app._avatar_band()
+        voor = {id(k): _smalle_breedtes(k) for k in msgs.children}
+        assert any(breedte is not None for breedte in voor.values()), "bovenin smal"
+
+        await pilot.press("pagedown")
+        await _breedtes_vast(pilot)
+
+        # wie in de band staat is smal, wie er buiten staat vol breed
+        for kind in msgs.children:
+            breedte = _smalle_breedtes(kind)
+            if _raakt_band(kind.region, band):
+                assert breedte is not None, (kind.region, voor[id(kind)])
+                assert kind.region.right == band.x - 1, kind.region
+            else:
+                assert breedte is None, (kind.region, voor[id(kind)])
+        # en het is allebei gebeurd: iemand werd breed en iemand werd smal
+        gewijzigd = [
+            (kind.region.y, voor[id(kind)], _smalle_breedtes(kind))
+            for kind in msgs.children
+            if voor[id(kind)] != _smalle_breedtes(kind)
+        ]
+        assert any(van is not None and naar is None for _, van, naar in gewijzigd), (
+            "niemand ging van smal naar breed",
+            gewijzigd,
+        )
+        assert any(van is None and naar is not None for _, van, naar in gewijzigd), (
+            "niemand ging van breed naar smal",
+            gewijzigd,
+        )
+
+
+@pytest.mark.asyncio
+async def test_two_hundred_messages_keep_the_wrap_cheap_while_scrolling(tmp_roan):
+    """Met 200 berichten mag scrollen niet duur worden.
+
+    De pass hoeft niet alle berichten te bezoeken: hij stopt bij het eerste
+    bericht onder het portret, en schrijft alleen een breedte als die echt
+    verandert. Gemeten: 0,1 ms per pass bij 200 berichten, en dat is ná een
+    scroll, dus als de compositor-map nog ongeldig is.
+    """
+    import statistics
+    import time
+
+    from textual.widgets import Markdown
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(60, 26)) as pilot:
+        await pilot.pause()
+        msgs = app.query_one("#messages")
+        msgs.remove_children()
+        await pilot.pause()
+        for n in range(200):
+            app._write(Markdown(f"bericht {n}. {LANG}"))
+        await _breedtes_vast(pilot, 5)
+        assert len(msgs.children) == 200
+
+        msgs.scroll_home(animate=False)
+        await _breedtes_vast(pilot)
+        tijden = []
+        for _ in range(25):
+            msgs.scroll_to(y=msgs.scroll_y + 5, animate=False)
+            await pilot.pause()
+            t0 = time.perf_counter()
+            app._apply_avatar_wrap()
+            tijden.append(time.perf_counter() - t0)
+        mediaan = statistics.median(tijden)
+        print(f"\n  pass over 200 berichten: mediaan {mediaan * 1000:.3f} ms")
+        assert mediaan < 0.010, f"de pass werd duur: {mediaan * 1000:.3f} ms"
+        # en na al dat scrollen kloppen de breedtes nog steeds
+        band = app._avatar_band()
+        for kind in msgs.children:
+            assert (_smalle_breedtes(kind) is not None) == _raakt_band(
+                kind.region, band
+            ), kind.region
+
+
+@pytest.mark.asyncio
+async def test_without_an_avatar_no_message_stays_narrow(tmp_roan):
+    """Geen portret? Dan blijft er geen enkel bericht smal staan.
+
+    Anders zou een bericht nog smal blijven nadat het portret bij een ander
+    schermformaat of zonder afbeelding verdwenen is.
+    """
+    from textual.widgets import Markdown
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(60, 26)) as pilot:
+        await pilot.pause()
+        msgs = app.query_one("#messages")
+        msgs.remove_children()
+        await pilot.pause()
+        for n in range(6):
+            app._write(Markdown(f"{n} {LANG}"))
+        await _breedtes_vast(pilot)
+        assert [k for k in msgs.children if _smalle_breedtes(k) is not None], (
+            "sanity: er moeten smalle berichten zijn"
+        )
+
+        await app.query_one("#avatar").remove()
+        await _breedtes_vast(pilot)
+        assert app._avatar_band() is None
+        for kind in msgs.children:
+            assert _smalle_breedtes(kind) is None, (kind.region, kind.styles.width)
+
+
+@pytest.mark.asyncio
+async def test_without_an_avatar_file_nothing_is_narrowed(
+    tmp_roan, tmp_path, monkeypatch
+):
+    """Zonder avatar-bestand is er geen band en blijft alles vol breed."""
+    from textual.widgets import Markdown
+
+    import roan.tui as tui
+
+    monkeypatch.setattr(tui, "BUNDLED_AVATAR", tmp_path / "er-is-geen-foto.png")
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(60, 26)) as pilot:
+        await pilot.pause()
+        assert not list(app.query("#avatar")), "er hoort geen portret te zijn"
+        msgs = app.query_one("#messages")
+        for n in range(3):
+            app._write(Markdown(f"{n} {LANG}"))
+        await _breedtes_vast(pilot)
+        assert app._avatar_band() is None
+        assert [k.styles.width for k in msgs.children] == [None] * len(msgs.children)
+
+
+@pytest.mark.asyncio
+async def test_a_message_that_straddles_the_avatar_stays_narrow_all_the_way(tmp_roan):
+    """Eén widget heeft één breedte: wie over de bandgrens loopt is helemaal smal.
+
+    Dit is de enige plek waar dit afwijkt van een tekstverwerker. Splitsen zou
+    `render_lines` en een herbouw van het Markdown uit losse regels vergen, en
+    dat verliest links en klikhandlers. Vastgelegd, zodat het een bewuste keuze
+    blijft en niet per ongeluk verandert.
+    """
+    from textual.widgets import Markdown
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(60, 26)) as pilot:
+        await pilot.pause()
+        msgs = app.query_one("#messages")
+        msgs.remove_children()
+        await pilot.pause()
+        app._write(Markdown(f"0 {LANG}"))
+        app._write(Markdown(f"1 {LANG}"))
+        await _breedtes_vast(pilot)
+
+        band = app._avatar_band()
+        over = [k for k in msgs.children if k.region.y < band.bottom < k.region.bottom]
+        assert over, "er hoort een bericht over de grens te staan"
+        for kind in over:
+            assert _smalle_breedtes(kind) is not None, kind.styles.width
+            assert kind.region.right == band.x - 1, kind.region
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("size", [(60, 26), (80, 24), (100, 50)])
+async def test_a_resize_recalculates_the_width_beside_the_avatar(tmp_roan, size):
+    """Na een resize staat het portret op een andere plek, dus de breedte ook.
+
+    Het portret zelf verandert er niet van: maat, plaats en inhoud blijven
+    gelijk (`_avatar_outer` en `_place_avatar` zijn niet aangeraakt).
+    """
+    from textual.widgets import Markdown
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(100, 50)) as pilot:
+        await pilot.pause()
+        msgs = app.query_one("#messages")
+        msgs.remove_children()
+        await pilot.pause()
+        for n in range(4):
+            app._write(Markdown(f"bericht {n} {LANG}"))
+        await _breedtes_vast(pilot)
+
+        for maat in [size, (70, 30), size]:
+            await pilot.resize_terminal(*maat)
+            await _breedtes_vast(pilot)
+            avatar = app.query_one("#avatar")
+            breedte, _ = app._avatar_outer()
+            assert avatar.region.x == maat[0] - breedte, (maat, avatar.region)
+            band = app._avatar_band()
+            assert band == avatar.region, (band, avatar.region)
+            for kind in msgs.children:
+                if _raakt_band(kind.region, band):
+                    assert kind.region.right == band.x - 1, (maat, kind.region)
+                else:
+                    assert _smalle_breedtes(kind) is None, (maat, kind.region)
+
+
+@pytest.mark.asyncio
+async def test_nothing_is_rewritten_when_the_chat_does_not_move(tmp_roan):
+    """Een pass die niets te veranderen heeft, schrijft ook niets.
+
+    Elke `styles.width` is een layout, dus zonder deze vergelijking zou elk
+    scrollen het hele scherm opnieuw opbouwen.
+    """
+    from textual.widgets import Markdown
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(60, 26)) as pilot:
+        await pilot.pause()
+        msgs = app.query_one("#messages")
+        msgs.remove_children()
+        await pilot.pause()
+        for n in range(5):
+            app._write(Markdown(f"{n} {LANG}"))
+        await _breedtes_vast(pilot)
+        assert app._apply_avatar_wrap() is False
+        assert app._apply_avatar_wrap() is False
+
+
+# ---------- 1. de hint van de modelbrowser staat op de knoppenrij ----------
+@pytest.mark.asyncio
+async def test_models_hint_shares_the_row_with_the_buttons(tmp_roan):
+    """De hint staat op dezelfde rij als Terug en Kies, met twee kolommen ertussen.
+
+    Vóór stond de hint op een eigen regel boven de knoppen: een regel extra, en
+    op een smalle terminal schoof hij de knoppen van het scherm af.
+    """
+    from roan.i18n import t
+    from textual.widgets import Button
+
+    from roan.tui import ModelsScreen
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        screen = ModelsScreen(MODELS_MANY, [], [])
+        app.push_screen(screen)
+        await pilot.pause()
+        hint = screen.query_one("#models-hint")
+        back = screen.query_one("#mback", Button)
+        choose = screen.query_one("#mchoose", Button)
+        assert hint.region.y == back.region.y == choose.region.y, (
+            hint.region,
+            back.region,
+        )
+        assert hint.region.right == back.region.x, (hint.region, back.region)
+        # twee lege kolommen tussen Terug en Kies, en Kies flush tegen de rand
+        assert choose.region.x - (back.region.x + back.region.width) == 2, (
+            back.region,
+            choose.region,
+        )
+        box = screen.query_one("#models-box")
+        assert choose.region.right == box.content_region.right, (choose.region, box.region)
+        assert t("models_hint", n=len(MODELS_MANY)) in str(hint.render())
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("size", [(100, 30), (64, 26), (52, 24), (44, 22), (38, 20)])
+async def test_the_models_buttons_survive_a_narrow_window(tmp_roan, size):
+    """De hint neemt de rest (`1fr`) en wordt afgekapt; hij duwt de knoppen niet weg."""
+    from roan.i18n import t
+    from textual.widgets import Button
+
+    from roan.tui import ModelsScreen
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=size) as pilot:
+        await pilot.pause()
+        screen = ModelsScreen(MODELS_MANY, [], [])
+        app.push_screen(screen)
+        await pilot.pause()
+        await pilot.pause()
+        hint = screen.query_one("#models-hint")
+        back = screen.query_one("#mback", Button)
+        choose = screen.query_one("#mchoose", Button)
+        assert hint.region.height == 1, hint.region
+        assert choose.region.right <= app.screen.size.width, (size, choose.region)
+        assert choose.region.x - (back.region.x + back.region.width) == 2, size
+        assert str(back.label) == t("btn_back")
+        assert str(choose.label) == t("btn_choose")
+
+
+# ---------- 2. de luchtkolom staat links van de scrollbar, niet rechts ----------
+@pytest.mark.asyncio
+@pytest.mark.parametrize("selector", ["#models-list", "#command-list"])
+async def test_the_clear_column_sits_between_the_row_and_the_scrollbar(tmp_roan, selector):
+    """Gemeten, niet aangenomen: laatste cel, gat, scrollbar.
+
+    De lucht stond eerst rechts van de scrollbar (tussen scrollbar en rand van het
+    popup), waar de gemarkeerde rij nog steeds tegen de scrollbar aan plakte.
+    Een `margin-right` of `padding-right` kan dat niet repareren: Textual tekent
+    de scrollbar altijd tegen de rechterrand van de inwendige breedte, dus de
+    luchtkolom komt uit de rij zelf.
+
+    Wat niet kan: de achtergrond van de rij ophogen. Textual kleurt de helft
+    option over de volle breedte van `scrollable_content_region`, dus de ene
+    luchtkolom draagt bij een gemarkeerde rij de rij-kleur in plaats van de
+    vlakkleur. Gemeten en gedocumenteerd, niet weggelaten.
+    """
+    from roan.tui import SCROLLBAR_GAP, CommandScreen, ModelsScreen
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        if selector == "#models-list":
+            app.push_screen(ModelsScreen(MODELS_MANY, [], []))
+            box_id = "#models-box"
+        else:
+            app.push_screen(CommandScreen())
+            box_id = "#commands-box"
+        await pilot.pause()
+        await pilot.pause()
+        listing = app.screen.query_one(selector)
+        sb = listing.vertical_scrollbar
+        sc = listing.scrollable_content_region
+        assert listing.show_vertical_scrollbar is True, selector
+        # de scrollbar staat meteen na de inwendige breedte van de rij
+        assert sb.region.x == sc.right, (selector, sb.region, sc)
+        assert listing.scrollbar_size_vertical == 2, selector
+        # elke rij stopt een kolom vóór de scrollbar
+        hoogste = -1
+        for y in range(sc.height):
+            regel = _row_text(app.screen, sc.y + y)
+            assert regel[sc.right - 1] == " ", (selector, y, regel)
+            hoogste = max(
+                hoogste,
+                max(
+                    (i for i, teken in enumerate(regel[sc.x : sc.right - 1]) if teken != " "),
+                    default=-1,
+                )
+                + sc.x,
+            )
+        assert hoogste <= sc.right - 1 - SCROLLBAR_GAP, (selector, hoogste, sc.right)
+        # en rechts van de scrollbar is de luchtkolom weg: hij zit nu links
+        box = app.screen.query_one(box_id)
+        assert sb.region.right == box.content_region.right, (selector, sb.region, box.region)
+        if selector == "#models-list":
+            # de modellenlijstrij lopen tot die kolom toe, dus daar is de laatste
+            # tekstcel echt de laatste kolom vóór de lucht
+            assert hoogste == sc.right - 1 - SCROLLBAR_GAP, (hoogste, sc)
+
+
+@pytest.mark.asyncio
+async def test_the_models_rows_stay_one_column_even_next_to_the_scrollbar(tmp_roan):
+    """De rij is precies `scrollable_content_region` min de luchtkolom.
+
+    Dus elke rij eindigt op dezelfde kolom, één vóór de scrollbar, en er breekt
+    niets om.
+    """
+    from textual.widgets import OptionList
+
+    from roan.tui import SCROLLBAR_GAP, ModelsScreen
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        screen = ModelsScreen(MODELS_MANY, [], [])
+        app.push_screen(screen)
+        await pilot.pause()
+        await pilot.pause()
+        listing = screen.query_one("#models-list", OptionList)
+        sc = listing.scrollable_content_region
+        assert listing.show_vertical_scrollbar is True
+        for y in range(sc.height):
+            regel = "".join(seg.text for seg in listing.render_line(y))
+            assert len(regel.rstrip()) == sc.width - SCROLLBAR_GAP, (y, len(regel), sc)
+        assert set(listing._line_cache.heights.values()) == {1}
+
+
+# ---------- 3. drie klikken op model · provider geven één browser ----------
+@pytest.mark.asyncio
+async def test_three_clicks_on_the_model_open_exactly_one_screen(tmp_roan, monkeypatch):
+    """Eén laadbeurt per keer: drie klikken tijdens het ophalen geven één popup.
+
+    `exclusive=True` op de worker hield de worker uniek, maar het scherm wordt bij
+    elke aanroep opnieuw gepusht, dus zonder een eigen vlag stonden er na drie
+    klikken drie browsers op elkaar.
+    """
+    from roan import tui as tui_mod
+    from roan.tui import ModelsScreen
+
+    aanroepen = []
+
+    def traag() -> None:
+        import time
+
+        aanroepen.append(1)
+        time.sleep(0.4)
+        return ([("groq", "llama-x")], [("openai", "gpt-5")], ["lokaal"])
+
+    monkeypatch.setattr(tui_mod, "gather_models", traag)
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(110, 26)) as pilot:
+        await pilot.pause()
+        assert app._models_busy is False
+        for _ in range(3):
+            await pilot.click("#status")
+            assert len(app.screen_stack) == 1, app.screen_stack
+        assert await _wait_for_models_screen(app, pilot), app.screen
+        await pilot.pause()
+        schermen = [s for s in app.screen_stack if isinstance(s, ModelsScreen)]
+        assert len(schermen) == 1, [type(s).__name__ for s in app.screen_stack]
+        assert len(aanroepen) == 1, f"gather_models {len(aanroepen)} keer aangeroepen"
+        assert app._models_busy is False, "na het ophalen mag de vlag weer omlaag"
+
+
+# ---------- 4. pink voor de gebruiker, grijs voor Roan ----------
+@pytest.mark.asyncio
+async def test_the_user_mark_is_pink_and_the_roan_mark_is_grey(tmp_roan):
+    """De gebruiker praat in de pink, Roan in het gedempte grijs.
+
+    Beide kleuren komen uit de CSS van de app (`$accent` en `$text-muted`), dus
+    een theme-switch raakt geen code aan.
+    """
+    from roan.themes import PINK
+    from roan.tui import PROMPT_MARK
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        await pilot.press(*"hallo", "enter")
+        await pilot.pause()
+        await pilot.pause()
+        gebruiker = app.query("#messages > .user-line").first()
+        antwoord = app.query("#messages > .roan-reply").first()
+        pink = PINK[app.theme]
+        assert str(gebruiker.render()) == f"{PROMPT_MARK} hallo", gebruiker.render()
+        stijl = _cell_style(app, gebruiker.region.x, gebruiker.region.y)
+        assert stijl.color.triplet.hex.lower() == pink.lower(), (
+            stijl.color.triplet.hex,
+            pink,
+        )
+        assert stijl.bold is True, "de gebruikersregel is vet, net als eerst"
+        mark = antwoord.query_one(".roan-mark")
+        assert str(mark.render()) == PROMPT_MARK
+        grijs = _cell_style(app, mark.region.x, mark.region.y)
+        assert grijs.color.triplet.hex.lower() != pink.lower(), (
+            "Roans teken mag niet de pink zijn",
+            grijs.color.triplet.hex,
+        )
+        # en het is echt een gedempte kleur, geen zwart
+        assert grijs.color.triplet.hex.lower() not in ("000000", "ffffff")
+        # beide tekens staan op dezelfde kolom
+        assert mark.region.x == gebruiker.region.x, (mark.region, gebruiker.region)
+
+
+@pytest.mark.asyncio
+async def test_a_restored_conversation_uses_the_same_two_sides(tmp_roan):
+    """`_render_history` gebruikt dezelfde helper, dus pink en grijs als live."""
+    from roan.tui import PROMPT_MARK
+
+    agent = FakeAgent()
+    agent.messages = [
+        {"role": "system", "content": "sys"},
+        {"role": "user", "content": "vraag"},
+        {"role": "assistant", "content": "antwoord"},
+    ]
+    app = RoanApp(agent)
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        gebruiker = app.query("#messages > .user-line")
+        antwoord = app.query("#messages > .roan-reply")
+        assert len(gebruiker) == 1, len(gebruiker)
+        assert len(antwoord) == 1, len(antwoord)
+        assert str(gebruiker.first().render()) == f"{PROMPT_MARK} vraag"
+        assert str(antwoord.first().query_one("Markdown").source) == "antwoord"
+
+
+# ---------- 5. de commandopalette is een tabel met twee kolommen ----------
+def _command_kolommen(listing):
+    """Per rij de kolom waar de beschrijving begint, volgens de tabelregels.
+
+    De regels van het scherm worden hier overgenomen (breedste ZICHTBARE
+    linkerkolom, twee kolommen ertussen, kappen wat niet past). Zo meet de test
+    dezelfde breedte als het scherm, in plaats van te gokken.
+    """
+    from rich.cells import cell_len
+
+    from roan.commands import COMMANDS
+    from roan.i18n import t as vertaal
+    from roan.tui import SCROLLBAR_GAP, CommandScreen, clip_cells
+
+    namen = [str(listing.get_option_at_index(i).id) for i in range(listing.option_count)]
+    scherm = CommandScreen()
+    available = listing.scrollable_content_region.width - SCROLLBAR_GAP
+    linker_room = available - max(available // 2, 8) - CommandScreen.COLUMNS_GAP
+    if linker_room < 4:
+        linker_room = max(available - 12, 1)
+    linker = min(
+        max((cell_len(scherm._left(n)) for n in namen), default=0),
+        linker_room,
+        CommandScreen.LEFT_MAX,
+    )
+    kolom = linker + CommandScreen.COLUMNS_GAP
+    return {
+        name: str(listing.get_option_at_index(i).prompt).index(
+            clip_cells(vertaal(COMMANDS[name].description), max(available - kolom, 1))
+        )
+        for i, name in enumerate(namen)
+    }
+
+
+@pytest.mark.asyncio
+async def test_every_command_description_starts_in_the_same_column(tmp_roan):
+    """Niet raden: de breedste ZICHTBARE linkerkolom bepaalt de kolom."""
+    from roan.commands import COMMANDS
+    from roan.tui import CommandScreen
+    from textual.widgets import OptionList
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        app.push_screen(CommandScreen())
+        await pilot.pause()
+        await pilot.pause()
+        listing = app.screen.query_one("#command-list", OptionList)
+        assert [str(listing.get_option_at_index(i).id) for i in range(listing.option_count)] == sorted(
+            COMMANDS
+        ), "de id blijft de naam; `_pick_highlighted` hangt eraan"
+        kolommen = _command_kolommen(listing)
+        assert len(set(kolommen.values())) == 1, kolommen
+        for i, name in enumerate(sorted(COMMANDS)):
+            prompt = str(listing.get_option_at_index(i).prompt)
+            assert prompt.startswith(f"/{name}"), prompt
+
+
+@pytest.mark.asyncio
+async def test_the_command_table_moves_its_column_when_the_filter_narrows_it(tmp_roan):
+    """Na filteren wordt de tabel opnieuw gebouwd: kolom meegerekend, één rij."""
+    from roan.tui import CommandScreen
+    from textual.widgets import OptionList
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        app.push_screen(CommandScreen())
+        await pilot.pause()
+        await pilot.pause()
+        listing = app.screen.query_one("#command-list", OptionList)
+        breed = set(_command_kolommen(listing).values())
+        app.screen.query_one("#csearch").value = "model"
+        await pilot.pause()
+        await pilot.pause()
+        listing = app.screen.query_one("#command-list", OptionList)
+        assert listing.option_count == 3, listing.option_count  # /model /models /mode
+        smal = _command_kolommen(listing)
+        assert len(set(smal.values())) == 1, smal
+        assert smal != breed, (smal, breed)  # de kolom is meegerekend
+        assert set(listing._line_cache.heights.values()) == {1}
+
+
+@pytest.mark.asyncio
+async def test_the_command_table_never_wraps_on_a_narrow_window(tmp_roan):
+    """Kappen, nooit ombreken: ook op 40 kolomen blijft het één regel per commando."""
+    from textual.widgets import OptionList
+
+    from roan.tui import CommandScreen
+
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        app.push_screen(CommandScreen())
+        await pilot.pause()
+        for size in ((60, 24), (40, 20), (100, 30)):
+            await pilot.resize_terminal(*size)
+            await pilot.pause()
+            await pilot.pause()
+            listing = app.screen.query_one("#command-list", OptionList)
+            assert set(listing._line_cache.heights.values()) == {1}, size
+            sc = listing.scrollable_content_region
+            for y in range(sc.height):
+                regel = "".join(seg.text for seg in listing.render_line(y))
+                assert len(regel) <= sc.width, (size, len(regel), sc.width)
+
+
+# ---------- 6. /sessions opent een popup in plaats van in de chat te printen ----------
+class AgentMetHerstel(FakeAgent):
+    """Agent met `_restore`/`save`, zoals de echte `Agent` die sessies laadt."""
+
+    def __init__(self):
+        super().__init__()
+        self.session_id = "nu"
+        self.messages = [{"role": "system", "content": "sys"}]
+        self.hersteld = 0
+
+    def _restore(self):
+        from roan import agent as agent_mod
+
+        self.hersteld += 1
+        pad = agent_mod.SESSIONS_DIR / f"{self.session_id}.json"
+        if not pad.exists():
+            return
+        data = json.loads(pad.read_text())
+        if isinstance(data.get("messages"), list) and data["messages"]:
+            self.messages.extend(data["messages"])
+
+
+@pytest.mark.asyncio
+async def test_sessions_opens_a_popup_and_writes_nothing_in_the_chat(
+    tmp_roan, monkeypatch
+):
+    """Vóór stond de lijst als Markdown ín de chat, tussen de berichten door."""
+    from roan import agent as agent_mod
+    from roan.tui import SessionsScreen
+
+    monkeypatch.setattr(agent_mod, "SESSIONS_DIR", tmp_roan / "sessions")
+    (tmp_roan / "sessions").mkdir()
+    for i in range(3):
+        (tmp_roan / "sessions" / f"2026010{i + 1}-120000.json").write_text(
+            json.dumps({"id": f"2026010{i + 1}-120000", "messages": [{"role": "user", "content": "hoi"}]})
+        )
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        voor = len(app.query("#messages > *"))
+        await pilot.press(*"/sessions", "enter")
+        await pilot.pause()
+        assert isinstance(app.screen, SessionsScreen), type(app.screen).__name__
+        lijst = app.screen.query_one("#sessions-list")
+        assert lijst.option_count == 3, lijst.option_count
+        # nieuwste eerst
+        assert [str(lijst.get_option_at_index(i).id) for i in range(3)] == [
+            "20260103-120000",
+            "20260102-120000",
+            "20260101-120000",
+        ]
+        assert len(app.query("#messages > *")) == voor, "er komt niets in de chat"
+        assert app.screen.query_one("#sessions-box").classes == {"popup"}
+        assert app.screen.query_one("#sessions-hint") is not None
+        await pilot.press("escape")
+        await pilot.pause()
+        assert not isinstance(app.screen, SessionsScreen)
+        assert len(app.query("#messages > *")) == voor
+
+
+@pytest.mark.asyncio
+async def test_picking_a_session_restores_that_conversation(tmp_roan, monkeypatch):
+    """Enter op een sessie herstelt hem: zelfde gesprek, zelfde weergave."""
+    from roan import agent as agent_mod
+    from roan.tui import SessionsScreen
+
+    monkeypatch.setattr(agent_mod, "SESSIONS_DIR", tmp_roan / "sessions")
+    (tmp_roan / "sessions").mkdir()
+    (tmp_roan / "sessions" / "20260101-120000.json").write_text(
+        json.dumps(
+            {
+                "id": "20260101-120000",
+                "messages": [
+                    {"role": "user", "content": "oude vraag"},
+                    {"role": "assistant", "content": "oud antwoord"},
+                ],
+            }
+        )
+    )
+    agent = AgentMetHerstel()
+    app = RoanApp(agent)
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        await pilot.press(*"/sessions", "enter")
+        await pilot.pause()
+        await pilot.pause()
+        assert isinstance(app.screen, SessionsScreen)
+        await pilot.press("enter")
+        for _ in range(40):
+            await pilot.pause()
+            await asyncio.sleep(0.01)
+            if not isinstance(app.screen, SessionsScreen):
+                break
+        await pilot.pause()
+        assert agent.session_id == "20260101-120000", agent.session_id
+        assert agent.hersteld == 1, agent.hersteld
+        assert [m["content"] for m in agent.messages[1:]] == [
+            "oude vraag",
+            "oud antwoord",
+        ]
+        gebruiker = app.query("#messages > .user-line")
+        antwoord = app.query("#messages > .roan-reply")
+        assert str(gebruiker.first().render()) == "❯ oude vraag"
+        assert str(antwoord.first().query_one("Markdown").source) == "oud antwoord"
+
+
+# ---------- 7. wachtrij: intypen tijdens een antwoord gaat niet verloren ----------
+class LangzameAgent(FakeAgent):
+    """Elk antwoord duurt even, zodat er tijd is om een tweede bericht te typen."""
+
+    def __init__(self):
+        super().__init__()
+        self.gunst = threading.Event()
+        self.gunst.set()
+
+    def send_stream(self, text, on_event=None):
+        self.sent.append(text)
+        for stuk in ("antwoord ", "op: ", text):
+            self.gunst.wait(5)
+            yield stuk
+        self.gunst.set()
+
+
+@pytest.mark.asyncio
+async def test_a_message_typed_during_the_reply_is_sent_after_it(tmp_roan):
+    """Het veld blijft bruikbaar, het bericht gaat in de wachtrij en komt na.
+
+    Vóór werd `inp.disabled = True` gezet tijdens het antwoord, dus je kon pas
+    typen als Roan klaar was.
+    """
+    agent = LangzameAgent()
+    app = RoanApp(agent)
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        inp = app.query_one("#input")
+        queue = app.query_one("#queue")
+        assert queue.display is False
+        agent.gunst.clear()
+        await pilot.press(*"eerste vraag", "enter")
+        await pilot.pause()
+        assert app._streaming is True
+        assert inp.disabled is False, "het veld moet bruikbaar blijven"
+        await pilot.press(*"tweede vraag", "enter")
+        await pilot.pause()
+        await pilot.press(*"derde vraag", "enter")
+        await pilot.pause()
+        assert app._queue == ["tweede vraag", "derde vraag"], app._queue
+        assert queue.display is True
+        assert str(queue.render()).startswith(t("queue_pending", n=2)), str(queue.render())
+        assert agent.sent == ["eerste vraag"], agent.sent
+        # het rijtje staat in de footer, boven het invoerveld
+        assert queue.region.y < inp.region.y, (queue.region, inp.region)
+        assert queue.region.height == 1, queue.region
+
+        agent.gunst.set()
+        for _ in range(300):
+            await pilot.pause()
+            await asyncio.sleep(0.01)
+            if not app._streaming and not app._queue:
+                break
+        await pilot.pause()
+        assert agent.sent == ["eerste vraag", "tweede vraag", "derde vraag"], agent.sent
+        assert app._queue == [] and app._streaming is False
+        assert queue.display is False
+        assert inp.disabled is False
+        # beide antwoorden staan in het gesprek, in dezelfde volgorde
+        antwoorden = [
+            str(w.query_one("Markdown").source)
+            for w in app.query("#messages > .roan-reply")
+        ]
+        assert antwoorden == [
+            "antwoord op: eerste vraag",
+            "antwoord op: tweede vraag",
+            "antwoord op: derde vraag",
+        ], antwoorden
+
+
+@pytest.mark.asyncio
+async def test_ctrl_c_while_draining_keeps_the_session_usable(tmp_roan):
+    """Ctrl+C stopt het antwoord, leegt de wachtrij en laat de app open.
+
+    Het bericht in de wachtrij wordt daarna níet alsnog verstuurd, en een
+    volgend bericht werkt gewoon.
+    """
+    agent = LangzameAgent()
+    app = RoanApp(agent)
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        agent.gunst.clear()
+        await pilot.press(*"vraag in de lucht", "enter")
+        await pilot.pause()
+        await pilot.press(*"wachtende vraag", "enter")
+        await pilot.pause()
+        assert app._queue == ["wachtende vraag"], app._queue
+        await pilot.press("ctrl+c")
+        await pilot.pause()
+        assert app._queue == [], "de wachtrij is geleegd"
+        assert app.is_running, "de app blijft staan, het gesprek is bruikbaar"
+        assert getattr(app, "_exit", False) is False
+        agent.gunst.set()
+        await pilot.pause()
+        await asyncio.sleep(0.3)
+        await pilot.pause()
+        assert agent.sent == ["vraag in de lucht"], agent.sent
+        assert app.query_one("#input").disabled is False
+        # en een volgend bericht wordt gewoon verstuurd
+        await pilot.press(*"na het afbreken", "enter")
+        for _ in range(300):
+            await pilot.pause()
+            await asyncio.sleep(0.01)
+            if not app._streaming and not app._queue:
+                break
+        await pilot.pause()
+        assert agent.sent == ["vraag in de lucht", "na het afbreken"], agent.sent
+
+
+@pytest.mark.asyncio
+async def test_ctrl_c_without_a_reply_still_quits(tmp_roan):
+    """Zonder lopend antwoord blijft Ctrl+C gewoon sluiten."""
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("ctrl+c")
+        await pilot.pause()
+        assert getattr(app, "_exit", False) is True or not app.is_running

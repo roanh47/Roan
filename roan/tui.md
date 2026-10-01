@@ -47,6 +47,7 @@ ask, so the dialog was deleted along with `should_offer_fullscreen()`.
     |  #messages                        height 1fr    |   the conversation
     +-------------------------------------------------+
     |  #jump      (only when scrolled up)             |   docked bottom
+    |  #queue     (only while messages wait)          |   docked bottom
     |  #input     the prompt                          |   docked bottom
     |  #status    model . provider . key state        |   docked bottom, last row
     +-------------------------------------------------+
@@ -64,7 +65,8 @@ looks at the constructor argument, then `config["avatar"]`, then the bundled
 
 | Key | Action |
 |---|---|
-| `Ctrl+C`, `Ctrl+Q` | Quit (`priority=True`, so it beats any widget's own binding) |
+| `Ctrl+Q` | Quit |
+| `Ctrl+C` | Stop the running reply first, quit on the next press (`priority=True`) |
 | `Ctrl+L` | Clear the chat |
 | `Ctrl+N` | New session |
 | `F2` | Setup screen |
@@ -77,16 +79,29 @@ Escape means "back" inside a popup. In a popup with a search field, escape
 
 # Modals
 
-Five modal screens, all `ModalScreen`, all with the same title bar and the same
-shared CSS ([design system](design-system.md)):
+Every modal screen is a `ModalScreen` with the same title bar and the same shared
+CSS ([design system](design-system.md)):
 
 | Screen | Opened by | Returns |
 |---|---|---|
 | `SetupScreen` | first start, `F2`, `/setup` | `True` saved, `False` cancelled |
 | `ProviderScreen` | setup, `/provider` | `{provider, base_url, api_key}` |
-| `ModelsScreen` | setup, `/models` | `(provider, model)` |
+| `ModelsScreen` | setup, `/models`, clicking the model chip | `(provider, model)` |
 | `ThemeScreen` | `/theme` | the flavour name |
+| `CommandScreen` | `Ctrl+P`, `/commands` | the command name |
+| `SessionsScreen` | `/sessions` | the session id |
 | `TranscriptScreen` | `Ctrl+O` | nothing |
+
+Two of them guard their own work: `ModelsScreen` is pushed from a worker thread
+and `_models_busy` makes a second click during the fetch a no-op, so three rapid
+clicks on the model chip open exactly one browser. `SessionsScreen` restores the
+picked session (see [sessions](sessions.md)).
+
+The command palette is a **table**, not a sentence: the left column is
+`/name` plus its argument hint, padded to the widest *visible* left column, and
+the description starts at one fixed column after it. `_rebuild` runs on every
+filter change, so the column follows what is on screen. Both columns are clipped,
+never wrapped.
 
 The setup screen is **mandatory** while `config.is_configured()` is false: no
 clos button, no Cancel, Escape only shows a nudge, and it reopens if it somehow
@@ -99,6 +114,15 @@ closes. `Ctrl+C` still quits, so you can never get stuck. See
 it with the up/down arrows. Clicking works everywhere: mouse support is on in
 both renderers, and a tool result is a clickable widget that expands on click.
 
+# The two sides of the conversation
+
+`user_line(text)` and `roan_reply(text)` build every message row, so the live
+chat, a restored session (`_render_history`) and the transcript cannot drift
+apart. The user gets `$accent` (the flavour's pink) `❯` plus pink bold text;
+Roan gets the same glyph in `$text-muted` in its own column, with the markdown
+beside it. Both colours live in `RoanApp.CSS`, not in the markup: Rich markup
+wins from CSS, so a colour in the text would ignore the theme.
+
 # Streaming
 
 The agent runs in a worker thread (`@work(thread=True)`), so the UI never blocks.
@@ -106,3 +130,19 @@ Events come back through `on_event` callbacks that mount widgets incrementally,
 and the view auto-follows unless you scrolled up, in which case `#jump` shows how
 many new lines are waiting and clicking it jumps back down. `scroll_speed` in
 the config multiplies mouse-wheel scrolling.
+
+The prompt stays enabled while a reply is running. What you submit is queued,
+`#queue` counts it, and `_reply_done` sends the next one as soon as the current
+reply finishes — one stream at a time, popping the queue before sending so a
+message can never go out twice. `Ctrl+C` during a reply sets `_stop`, empties
+the queue and leaves the app running and usable; `Ctrl+Q` always quits.
+
+# One empty column next to a scrollbar
+
+The lists in the popups are one column narrower than `scrollable_content_region`
+(`SCROLLBAR_GAP`). Textual draws a vertical scrollbar flush against the right
+edge of the inner width — measured in 8.2.8, see `Widget._arrange_scrollbars` —
+so `margin-right` or `padding-right` can only ever put that column *outside* the
+scrollbar, next to the popup border. Making the row itself one column shorter
+puts it on the correct side, and `scrollbar-gutter: stable` keeps that width
+steady when the scrollbar appears or disappears.
