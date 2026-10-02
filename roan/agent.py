@@ -139,8 +139,13 @@ TOOLS = [
             "description": "Bewaar een duurzame notitie in het geheugen voor volgende sessies.",
             "parameters": {"type": "object", "properties": {"note": {"type": "string"}}, "required": ["note"]},
         },
-    },
+    }
 ]
+
+# Kennis ophalen en opslaan: internet, GitHub, of gewoon plakken. Allemaal
+# ongeauthenticeerd en alleen lezend — er is geen enkele sleutel voor nodig.
+TOOLS += T.KNOWLEDGE_TOOL_SCHEMAS
+
 
 def read_skill(name: str) -> str:
     """Volledige inhoud van een skill uit ~/.Roan/skills."""
@@ -165,6 +170,8 @@ TOOL_FUNCS = {
     "remember": remember,
     "read_skill": read_skill,
 }
+
+TOOL_FUNCS.update(T.KNOWLEDGE_TOOL_FUNCS)
 
 
 def _build_system_prompt() -> str:

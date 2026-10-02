@@ -90,6 +90,7 @@ CSS ([design system](design-system.md)):
 | `ThemeScreen` | `/theme` | the flavour name |
 | `CommandScreen` | `Ctrl+P`, `/commands` | the command name |
 | `SessionsScreen` | `/sessions` | the session id |
+| `SkillsScreen` | `/skills` | nothing; it only shows what is on disk |
 | `TranscriptScreen` | `Ctrl+O` | nothing |
 
 Two of them guard their own work: `ModelsScreen` is pushed from a worker thread
@@ -107,6 +108,12 @@ The setup screen is **mandatory** while `config.is_configured()` is false: no
 clos button, no Cancel, Escape only shows a nudge, and it reopens if it somehow
 closes. `Ctrl+C` still quits, so you can never get stuck. See
 [configuration](configuration.md).
+
+`SkillsScreen` exists because a browser of what is on disk is not a message: it
+lists every skill with `★` for an always-on one and `○` for a load-on-demand
+one, and shows the full body of the highlighted skill in a scrolling pane. It
+writes **nothing** into `#messages` — a list of files does not belong to the
+conversation. See [skills, memory and profile](skills-memory-profile.md).
 
 # Input
 

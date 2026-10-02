@@ -51,7 +51,6 @@ from .config import (
 from .models import (
     fetch_provider_models,
     list_dev,
-    list_free,
     list_local,
     list_models,
     list_providers,
@@ -1565,28 +1564,93 @@ class CommandScreen(ModalScreen):
             self.dismiss(None)
 
 
-def _session_messages(path: Path) -> int:
-    """Hoeveel berichten een sessiebestand bevat (0 als het onleesbaar is)."""
+def _session_entries(directory: Path | None = None) -> list[dict]:
+    """Elk sessiebestand als één regel van het menu, nieuwste eerst.
+
+    Eén leesbeurt per bestand levert alles wat een rij nodig heeft: het aantal
+    berichten en de eerste gebruikersboodschap, want dat is de titel van het
+    gesprek. Een lijst van bestandsnamen is geen menu — zes tijdstempels zeggen
+    niet welk gesprek je zoekt.
+
+    Gesorteerd op mtime, niet op naam: de naam is meestal een tijdstempel, maar
+    "nieuwste" betekent hier wanneer Roan het bestand het laatst heeft
+    aangeraakt. Bij gelijke mtime wint de naam, zodat de volgorde nooit
+    willekeurig is. Een bestand dat niet leest telt als leeg in plaats van de
+    lijst te breken.
+
+    De `stamp` in de dict is de minuutversie van diezelfde mtime; dat is wat de
+    rij laat zien.
+    """
+    import time as _time
+
+    if directory is None:
+        from .agent import SESSIONS_DIR
+
+        directory = SESSIONS_DIR
+    entries: list[dict] = []
     try:
-        data = json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError):
-        return 0
-    berichten = data.get("messages")
-    return len(berichten) if isinstance(berichten, list) else 0
+        paden = sorted(directory.glob("*.json"))
+    except OSError:
+        return []
+    for pad in paden:
+        try:
+            mtime = pad.stat().st_mtime
+        except OSError:
+            mtime = 0.0
+        try:
+            data = json.loads(pad.read_text())
+        except (OSError, json.JSONDecodeError):
+            data = {}
+        berichten = data.get("messages") if isinstance(data, dict) else None
+        berichten = berichten if isinstance(berichten, list) else []
+        titel = ""
+        for bericht in berichten:
+            if isinstance(bericht, dict) and bericht.get("role") == "user" and bericht.get("content"):
+                # Eén regel: een sessietitel die over de hoogte ombreekt maakt van
+                # elke sessie drie regels, en dan is de lijst geen lijst meer.
+                titel = " ".join(str(bericht["content"]).split())
+                break
+        entries.append(
+            {
+                "id": pad.stem,
+                "count": len(berichten),
+                "title": titel,
+                "mtime": mtime,
+                "stamp": _time.strftime("%Y-%m-%d %H:%M", _time.localtime(mtime)) if mtime else "",
+            }
+        )
+    entries.sort(key=lambda entry: (entry["mtime"], entry["id"]), reverse=True)
+    return entries
 
 
 class SessionsScreen(ModalScreen):
-    """Opgeslagen gesprekken kiezen (of alleen bekijken).
+    """Opgeslagen gesprekken kiezen, als popup boven het gesprek.
 
-    Zelfde vorm als de andere browsers: titelbalk met ✕, een lijst, een hint
-    onderaan. Enter herstelt het gekozen gesprek; Escape sluit de popup.
+    Zelfde vorm als de andere browsers: `Vertical(classes="popup")`, een
+    `_titlebar(...)` met ✕, `CSS = POPUP_CSS + "..."` met alleen de eigen ids, en
+    een hint onderaan die zegt wat Enter en Escape doen. Het scherm staat als
+    `ModalScreen` boven het gesprek in plaats van ervoor: `#messages` blijft
+    staan, alleen verduimd eronder.
+
+    Een rij is één regel: markering, titel (de eerste gebruikersboodschap, met de
+    sessie-id als noodnaam) en rechts een gedempte kolom met datum en aantal
+    berichten. De hoogte van het venster gaat vóór de hoeveelheid detail, dus wat
+    er rechts staat past zich aan: op een breed venster de volledige tijdstempel,
+    op 46 kolommen eerst zonder jaartal en dan zonder uur — een rij die ombreekt is
+    een rij die niemand kan lezen. Het gesprek waar je nu in zit krijgt een `●`,
+    de andere een `○`: hetzelfde tekenpaar als het themascherm.
+
+    Enter herstelt het gekozen gesprek, Escape en ✕ sluiten de popup.
     """
 
     CSS = POPUP_CSS + """
     #sessions-box {
-        width: 84%;
-        max-width: 84;
-        height: 72%;
+        width: 92%;
+        max-width: 92;
+        /* 66% past boven het inputkader en de statusbalk, ook op een
+           20-regels terminal: hoger dan dit en de popup overlapt de rand van
+           het invoerveld, en dat leest als een kapotte render. */
+        height: 66%;
     }
     #sessions-list {
         height: 1fr;
@@ -1599,10 +1663,20 @@ class SessionsScreen(ModalScreen):
 
     BINDINGS = [("escape", "close", "terug"), ("q", "close", "terug")]
 
-    def __init__(self, sessions: list[tuple[str, int]]) -> None:
+    CURRENT_MARK = "●"
+    OTHER_MARK = "○"
+    # Korter dan dit is een titel niet meer te herkennen, dus dan sturen we liever
+    # een deel van de rechterkolom weg dan dat de titel verdwijnt.
+    MIN_TITLE = 10
+
+    def __init__(self, entries: list[dict] | None = None, current: str = "") -> None:
         super().__init__()
-        # (sessie-id, aantal berichten), nieuwste eerst.
-        self.sessions = sessions
+        # Eén dict per sessie, uit `_session_entries`, nieuwste eerst.
+        self.entries = list(entries or [])
+        # De sessie-id waar het gesprek nu in zit; die krijgt een andere markering.
+        self.current = current or ""
+        # De breedte waar de rijen gebouwd zijn; zie `_realign`.
+        self._built_width = -1
 
     def compose(self) -> ComposeResult:
         with Vertical(id="sessions-box", classes="popup"):
@@ -1611,14 +1685,117 @@ class SessionsScreen(ModalScreen):
             yield Static(t("sessions_hint"), id="sessions-hint", classes="hint")
 
     def on_mount(self) -> None:
-        listing = self.query_one("#sessions-list", OptionList)
-        for session_id, count in self.sessions:
-            listing.add_option(
-                Option(f"{session_id}  ·  {t('sessions_messages', n=count)}", id=session_id)
+        self._rebuild()
+        self.query_one("#sessions-list", OptionList).focus()
+
+    def _list_width(self) -> int:
+        """Breedte waar een rij in past, in kolommen.
+
+        Zelfde regel als `ModelsScreen` en `CommandScreen`: de rij is één kolom
+        korter dan de lijst, zodat er lucht tussen rij en scrollbar blijft en de
+        gemarkeerde rij niet in de scrollbar lijkt te lopen (zie `SCROLLBAR_GAP`).
+        """
+        breedte = self.query_one("#sessions-list", OptionList).scrollable_content_region.width
+        return max(breedte - SCROLLBAR_GAP, 1)
+
+    def _meta_ladder(self, entry: dict) -> list[str]:
+        """De rechterkolom, van breed naar smal: wat het venster het minste kan.
+
+        Eén rij blijft één rij, dus in plaats van af te breken laten we delen van
+        de rechterkolom vallen: eerst het jaartal, dan het uur, dan het woord bij
+        het aantal. De datum en het aantal blijven er altijd, want dat is
+        waarmee je kiest.
+
+        De stukken komen van de ene `YYYY-MM-DD HH:MM` die `_session_entries`
+        schrijft: `[5:]` is `MM-DD HH:MM` en `[5:10]` is `MM-DD`.
+        """
+        stamp = str(entry["stamp"] or "")
+        count = t("sessions_messages", n=entry["count"])
+        return [
+            "  ·  ".join(bit for bit in bits if bit)
+            for bits in (
+                (stamp, count),
+                (stamp[5:], count),
+                (stamp[5:10], count),
+                (stamp[5:10], f"×{entry['count']}"),
+                ("", f"×{entry['count']}"),
             )
+        ]
+
+    def _meta(self, entry: dict, width: int) -> str:
+        """De eerste variant uit de ladder die nog past, anders de smalste."""
+        from rich.cells import cell_len
+
+        ladder = self._meta_ladder(entry)
+        for meta in ladder:
+            # markering, één kolom lucht en nog `MIN_TITLE` kolommen titel.
+            if cell_len(meta) + self.MIN_TITLE + 4 <= width:
+                return meta
+        return clip_cells(ladder[-1], max(width - self.MIN_TITLE - 4, 1))
+
+    def _row(self, entry: dict, width: int):
+        """Eén sessie: markering en titel links, datum en aantal rechts.
+
+        De rechterkolom eindigt op elke rij op dezelfde kolom: de titel krijgt
+        daar opvulling achter tot de rij precies `width` kolommen breed is. Wat
+        niet past wordt afgekapt met een liggende streep, nooit omgebroken.
+
+        `width` 0 betekent: de lijst is nog niet uitgemeten (eerste build tijdens
+        mount). Dan blijft de rij onopgeschoond en repaint het scherm zichzelf
+        via `on_resize`.
+        """
+        from rich.cells import cell_len
+        from rich.text import Text
+
+        huidig = entry["id"] == self.current
+        mark = self.CURRENT_MARK if huidig else self.OTHER_MARK
+        # De markering is het enige dat een eigen krijgt: de huidige sessie in de
+        # pink van het thema, de andere gedempt. De titel is vet en heeft géén
+        # kleur, want een kleur in de tekst wint van de stijl van de gemarkeerde
+        # rij en dan is die rij onleesbaar.
+        kop = (f"{mark} ", accent_color() if huidig else "dim")
+        titel = entry["title"] or entry["id"]
+        if width <= 0:
+            row = Text.assemble(kop, (titel, "bold"))
+            row.append(" " + self._meta_ladder(entry)[0], "dim")
+            return row
+        meta = self._meta(entry, width)
+        ruimte = max(width - cell_len(mark) - 3 - cell_len(meta), 1)
+        row = Text.assemble(kop, (clip_cells(titel, ruimte), "bold"))
+        # De opvulling zit tussen titel en rechterkolom, zodat die kolom op elke
+        # rij op dezelfde kolom eindigt. Eén kolom lucht blijft over.
+        row.pad_right(max(0, width - row.cell_len - cell_len(meta) - 1))
+        row.append(" " + meta, "dim")
+        return row
+
+    def on_resize(self, event) -> None:
+        """Bij een andere vensterbreedte de rijen opnieuw op de breedte van toen.
+
+        De rijen worden op maat gemaakt met de beschikbare kolommen, dus na een
+        resize moeten ze opnieuw. Zelfde patroon als `ModelsScreen`: `Resize`
+        zakt niet door, dus deze handler vuurt per scherm, en `on_resize` ziet de
+        nieuwe maat nog niet — de tweede ronde repaint de rijen.
+        """
+        self._realign()
+        self.call_after_refresh(self._realign)
+
+    def _realign(self) -> None:
+        """Herbouw de rijen alleen als de lijst een andere breedte kreeg."""
+        if self._list_width() != self._built_width:
+            self._rebuild()
+
+    def _rebuild(self) -> None:
+        listing = self.query_one("#sessions-list", OptionList)
+        keep = listing.highlighted
+        width = self._list_width()
+        listing.clear_options()
+        if not self.entries:
+            listing.add_option(Option(t("msg_no_sessions"), id=None, disabled=True))
+        for entry in self.entries:
+            listing.add_option(Option(self._row(entry, width), id=entry["id"]))
         if listing.option_count:
-            listing.highlighted = 0
-        listing.focus()
+            listing.highlighted = 0 if keep is None else min(keep, listing.option_count - 1)
+        self._built_width = width
 
     def action_close(self) -> None:
         self.dismiss(None)
@@ -1846,6 +2023,357 @@ class TranscriptScreen(ModalScreen):
     def _on_close_button(self, event: Button.Pressed) -> None:
         if event.button.id == "close":
             self.dismiss(None)
+
+
+class SkillsScreen(ModalScreen):
+    """/skills als menu: welke skills er zijn, welke altijd meegaan, en de body.
+
+    Eerst zette dit commando de lijst als markdown in de chat, en die bleef daar
+    staan tot je het gesprek clears. De chat hoort bij het gesprek; een verwijzing
+    naar bestanden op schijf is een blad met informatie, geen bericht.
+
+    De vorm is die van de andere browsers: een `Vertical(classes="popup")` met
+    `_titlebar(...)` erin, en `CSS = POPUP_CSS + "..."` voor de eigen ids. Links
+    (boven, op smalle schermen) de lijst met naam, beschrijving en een zichtbare
+    markering voor always-skills; daaronder de volledige body van de gekozen
+    skill, in een `VerticalScroll` zodat een lange body scrollt.
+
+    Een always-skill die boven `skills.MAX_ALWAYS_CHARS` uitkomt, of waarvan het
+    deel boven `skills.MAX_ALWAYS_TOTAL` valt, zegt dat hier zichtbaar. De prompt
+    zegt het tegen het model, dit tegen de gebruiker.
+
+    De tekst is Nederlands. `t()` zou de key zelf tonen zolang de string niet in
+    `i18n.py` staat, dus deze schermteksten zijn letterlijk; de keys horen hier
+    later bij: `skills_empty` en `skills_hint`.
+    """
+
+    CSS = POPUP_CSS + """
+    #skills-box {
+        width: 88%;
+        max-width: 96;
+        height: 84%;
+    }
+    #skills-list {
+        height: auto;
+        /* Een lijst die het hele popup eet is geen lijst meer. Acht regels
+           laten de body nog leesbaar, en de lijst scrollt zelf verder. */
+        max-height: 8;
+        margin-top: 1;
+        scrollbar-gutter: stable;
+        text-wrap: nowrap;
+        text-overflow: ellipsis;
+    }
+    #skills-doc {
+        height: 1fr;
+        margin-top: 1;
+        scrollbar-gutter: stable;
+    }
+    #skills-doc Markdown {
+        margin: 0;
+    }
+    """
+
+    BINDINGS = [
+        ("escape", "close", "terug"),
+        ("q", "close", "terug"),
+        ("tab", "focus_doc", "tekst"),
+    ]
+
+    # De markering staat vooraan, zodat afkappen hem nooit wegneemt.
+    ALWAYS_MARK = "★"  # `always: true`: de hele body gaat mee in elke aanvraag
+    LOOSE_MARK = "○"  # alleen naam + beschrijving, body op verzoek via read_skill
+
+    def __init__(self, entries: list[dict] | None = None) -> None:
+        super().__init__()
+        if entries is None:
+            from .skills import load_skills
+
+            entries = load_skills()
+        self.entries = list(entries)
+        from .skills import always_warnings
+
+        # Zichtbaar maken wat er níet volledig meegaat in elke aanvraag.
+        self.warnings = always_warnings([s for s in self.entries if s["always"]])
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="skills-box", classes="popup"):
+            yield from _titlebar(f"Skills ({len(self.entries)})")
+            yield OptionList(id="skills-list")
+            yield VerticalScroll(Markdown(id="skills-md"), id="skills-doc")
+            yield Static(
+                f"{self.ALWAYS_MARK} = altijd aan  ·  Esc = terug",
+                id="skills-hint",
+                classes="hint",
+            )
+
+    def on_mount(self) -> None:
+        listing = self.query_one("#skills-list", OptionList)
+        for index, skill in enumerate(self.entries):
+            # Id per index, niet per naam: twee skills met dezelfde naam zouden
+            # anders dezelfde id krijgen en de tweede overslaan.
+            listing.add_option(Option(self._label(skill), id=str(index)))
+        if self.entries:
+            listing.highlighted = 0
+        self._show(listing.highlighted)
+        listing.focus()
+
+    def _label(self, skill: dict):
+        """Eén regel per skill: markering, naam, beschrijving."""
+        from rich.text import Text
+
+        mark = self.ALWAYS_MARK if skill["always"] else self.LOOSE_MARK
+        return Text.assemble(
+            (f"{mark} ", accent_color()),
+            (str(skill["name"]), "bold"),
+            "  ·  ",
+            str(skill["description"] or ""),
+        )
+
+    def _show(self, index: int | None) -> None:
+        """De body van de gekozen skill (of de lege-melding) in het tekstpaneel."""
+        doc = self.query_one("#skills-md", Markdown)
+        pane = self.query_one("#skills-doc", VerticalScroll)
+        if index is None or not 0 <= index < len(self.entries):
+            from .skills import skills_dir
+
+            doc.update(
+                f"Nog geen skills. Zet een `.md`-bestand in `{skills_dir()}`, "
+                "of een map met een `SKILL.md` erin."
+            )
+            pane.scroll_home(animate=False)
+            return
+        skill = self.entries[index]
+        mark = self.ALWAYS_MARK if skill["always"] else self.LOOSE_MARK
+        # Vet, géén `#`: een markdown-kop eet vier regels marge, en dan staat de
+        # body op een 24-regels scherm onder de vouw terwijl er niets te lezen is.
+        # De beschrijving staat al in de lijstregel erboven; herhalen zou een
+        # derde van het tekstpaneel kosten.
+        parts = [f"**{mark} {skill['name']}**"]
+        warning = self.warnings.get(skill["name"])
+        if warning:
+            parts += ["", f"**{warning}**"]
+        parts += ["", str(skill["body"] or "")]
+        doc.update("\n".join(parts))
+        pane.scroll_home(animate=False)
+
+    def on_option_list_option_highlighted(
+        self, event: OptionList.OptionHighlighted
+    ) -> None:
+        self._show(event.option_index)
+
+    def action_focus_doc(self) -> None:
+        self.query_one("#skills-doc", VerticalScroll).focus()
+
+    def action_close(self) -> None:
+        self.dismiss(None)
+
+    @on(Button.Pressed)
+    def _on_close_button(self, event: Button.Pressed) -> None:
+        if event.button.id == "close":
+            self.dismiss(None)
+
+
+class MemoryScreen(ModalScreen):
+    """/memory als scherm: elke notitie zien, er een toevoegen, er een weghalen.
+
+    Eerst zette dit commando de hele `~/.Roan/memory.md` als markdown in de
+    chat. Die bleef daar staan tot je het gesprek clears, en — dat is het
+    ergste — je kon er niets mee: geen notitie erbij, en zeker geen eruit.
+    Roans eigen `remember` was de enige schrijver en dat blijft zo, maar de
+    gebruiker moet het bestand ook zelf kunnen lezen en corrigeren. De chat
+    hoort bij het gesprek; een bestand op schijf heeft een scherm nodig.
+
+    De vorm is die van `SkillsScreen`: een `Vertical(classes="popup")` met
+    `_titlebar(...)` erin en `CSS = POPUP_CSS + "..."` voor de eigen ids. Eén
+    notitie per regel in de lijst. De lijst kap af met een liggende streep
+    (`text-overflow: ellipsis`, net als bij /skills en /sessions) en de volledige
+    tekst van de gemarkeerde notitie staat eronder in een balkje van maximaal
+    vier regels dat zelf scrollt — het transcript doet het met `ToolResult`
+    op dezelfde manier: kort in de lijst, volledig te lezen.
+
+    `~/.Roan/memory.md` is de enige waarheid: `_reload` leest het bestand van
+    schijf, nooit een lijstje in dit object, zodat "weg" ook echt weg is.
+    """
+
+    CSS = POPUP_CSS + """
+    #memory-box {
+        width: 92%;
+        max-width: 84;
+        height: 84%;
+    }
+    #memory-list {
+        height: 1fr;
+        margin-top: 1;
+        scrollbar-gutter: stable;
+        text-wrap: nowrap;
+        text-overflow: ellipsis;
+    }
+    /* lege staat: staat IN het scherm, niet als chatregel */
+    #memory-empty {
+        height: auto;
+        margin-top: 1;
+        color: $text-muted;
+    }
+    #memory-detail {
+        display: none;
+        height: auto;
+        max-height: 4;
+        margin-top: 1;
+    }
+    #memory-full {
+        height: auto;
+    }
+    #memory-add-row,
+    #memory-remove-row {
+        margin-top: 1;
+    }
+    /* `Input` is standaard `width: 100%`, en in een rij duwt dat de knop
+       buiten het kader. `1fr` laat de knop netjes rechts staan. */
+    #memory-input {
+        width: 1fr;
+    }
+    /* Twee regels toetsen, dus geen vaste hoogte van 1 zoals de andere hints. */
+    #memory-hint {
+        height: auto;
+    }
+    """
+
+    BINDINGS = [
+        ("escape", "close", "terug"),
+        ("q", "close", "terug"),
+        ("d", "remove", "verwijder"),
+        ("delete", "remove", "verwijder"),
+    ]
+
+    def __init__(self) -> None:
+        super().__init__()
+        from .memory import entries
+
+        self.entries = entries()
+
+    def compose(self) -> ComposeResult:
+        from rich.text import Text
+
+        with Vertical(id="memory-box", classes="popup"):
+            yield from _titlebar(f"{t('memory_title')} ({len(self.entries)})")
+            yield OptionList(id="memory-list")
+            yield Static(t("memory_empty"), id="memory-empty")
+            yield VerticalScroll(Static(Text(""), id="memory-full"), id="memory-detail")
+            with Horizontal(classes="row", id="memory-add-row"):
+                yield Input(placeholder=t("memory_new"), id="memory-input")
+                yield Button(t("memory_add"), id="memory-add", variant="primary")
+            with Horizontal(classes="row", id="memory-remove-row"):
+                yield Static(
+                    t("memory_count", n=len(self.entries)),
+                    id="memory-status",
+                    classes="value",
+                )
+                yield Button(t("memory_remove"), id="memory-remove")
+            yield Static(t("memory_hint"), id="memory-hint", classes="hint")
+
+    def on_mount(self) -> None:
+        self._reload()
+        self.query_one("#memory-input", Input).focus()
+
+    # ---------- lezen ----------
+    def _reload(self) -> None:
+        """Lees memory.md opnieuw en teken de lijst (of de lege staat)."""
+        from rich.text import Text
+
+        from .memory import entries
+
+        self.entries = entries()
+        listing = self.query_one("#memory-list", OptionList)
+        # Na een verwijdering blijft de markering waar je was, als die nog bestaat.
+        keep = listing.highlighted if listing.highlighted is not None else 0
+        listing.clear_options()
+        for index, note in enumerate(self.entries):
+            # `Text`, geen markup: een notitie is tekst van de gebruiker en mag
+            # gerust `[iets]` bevatten zonder dat het een opmaakcommando wordt.
+            listing.add_option(Option(Text(note), id=str(index)))
+        self.query_one("#memory-box .title", Static).update(
+            f"{t('memory_title')} ({len(self.entries)})"
+        )
+        listing.display = bool(self.entries)
+        self.query_one("#memory-empty", Static).display = not self.entries
+        self._status(t("memory_count", n=len(self.entries)))
+        if self.entries:
+            listing.highlighted = min(keep, len(self.entries) - 1)
+        else:
+            self._show(None)
+
+    def _show(self, index: int | None) -> None:
+        """De volledige tekst van de gemarkeerde notitie (of verberg het balkje)."""
+        from rich.text import Text
+
+        detail = self.query_one("#memory-detail", VerticalScroll)
+        if index is None or not 0 <= index < len(self.entries):
+            detail.display = False
+            return
+        self.query_one("#memory-full", Static).update(Text(self.entries[index]))
+        detail.display = True
+        detail.scroll_home(animate=False)
+
+    def _status(self, text: str) -> None:
+        self.query_one("#memory-status", Static).update(text)
+
+    # ---------- schrijven ----------
+    def _add(self) -> None:
+        from .memory import remember
+
+        box = self.query_one("#memory-input", Input)
+        note = box.value.strip()
+        if not note:
+            return
+        remember(note)
+        box.value = ""
+        self._reload()
+        box.focus()
+        self._status(t("memory_added"))
+
+    def _remove(self) -> None:
+        from .memory import forget
+
+        listing = self.query_one("#memory-list", OptionList)
+        index = listing.highlighted
+        if index is None or not 0 <= index < len(self.entries):
+            return
+        # Eerst uit het bestand, dan pas de lijst: anders zou een schrijffout
+        # alleen in het scherm zichtbaar zijn.
+        forget(self.entries[index])
+        self._reload()
+        self._status(t("memory_removed"))
+
+    def action_remove(self) -> None:
+        self._remove()
+
+    # ---------- gebeurtenissen ----------
+    def on_option_list_option_highlighted(
+        self, event: OptionList.OptionHighlighted
+    ) -> None:
+        self._show(event.option_index)
+
+    def on_option_list_option_selected(
+        self, event: OptionList.OptionSelected
+    ) -> None:
+        self._show(event.option_index)
+
+    @on(Input.Submitted)
+    def _on_submit(self, event: Input.Submitted) -> None:
+        self._add()
+
+    @on(Button.Pressed)
+    def _on_button(self, event: Button.Pressed) -> None:
+        bid = event.button.id
+        if bid == "close":
+            self.dismiss(None)
+        elif bid == "memory-add":
+            self._add()
+        elif bid == "memory-remove":
+            self._remove()
+
+    def action_close(self) -> None:
+        self.dismiss(None)
 
 
 class RoanApp(App):
@@ -2633,7 +3161,6 @@ class RoanApp(App):
             self._open_setup()
             return
         cfg = load_config()
-        self._sysline(t("ready", model=cfg["model"], provider=cfg["provider"]))
 
     def _render_history(self) -> None:
         """Toon het herstelde gesprek zodat de context zichtbaar is.
@@ -2807,7 +3334,6 @@ class RoanApp(App):
         new = THINKING_LEVELS[(index + 1) % len(THINKING_LEVELS)]
         save_config({"thinking": new})
         self._update_status()
-        self._sysline(t("msg_thinking_set", name=new))
 
     @on(Click, "#status-mode")
     def _mode_clicked(self) -> None:
@@ -2821,7 +3347,6 @@ class RoanApp(App):
         new = MODES[(index + 1) % len(MODES)]
         save_config({"mode": new})
         self._update_status()
-        self._sysline(t("msg_mode_set", name=new))
 
     @on(Click, "#status-perm")
     def _perm_clicked(self) -> None:
@@ -2832,7 +3357,6 @@ class RoanApp(App):
         new = PERMISSIONS[(index + 1) % len(PERMISSIONS)]
         save_config({"permissions": new})
         self._update_status()
-        self._sysline(t("msg_permissions_set", name=new))
 
     # ---------- helpers ----------
     def _messages(self) -> VerticalScroll:
@@ -2890,9 +3414,6 @@ class RoanApp(App):
             return True
         if name == "models":
             self._cmd_models()
-            return True
-        if name == "free":
-            self._cmd_free()
             return True
         if name == "provider":
             self._cmd_provider(args)
@@ -2955,10 +3476,6 @@ class RoanApp(App):
 
         self.push_screen(CommandScreen(), picked)
 
-    def _cmd_free(self) -> None:
-        self._sysline(t("models_fetching"))
-        self._write(Markdown(list_free()))
-
     def _cmd_provider(self, args) -> None:
         if args:
             name = args[0].lower()
@@ -3003,15 +3520,12 @@ class RoanApp(App):
         self.push_screen(ProviderScreen(), picked)
 
     def _cmd_memory(self) -> None:
-        from .memory import load_memory
-
-        mem = load_memory().strip()
-        self._write(Markdown(mem or t("msg_memory_empty")))
+        """Geheugen in een popup; er komt niets meer in de chat te staan."""
+        self.push_screen(MemoryScreen())
 
     def _cmd_skills(self) -> None:
-        from .skills import skills_list_text
-
-        self._write(Markdown(skills_list_text()))
+        """Skills in een popup; er komt niets meer in de chat te staan."""
+        self.push_screen(SkillsScreen())
 
     def _cmd_language(self, args) -> None:
         from .i18n import LANGUAGES
@@ -3025,7 +3539,6 @@ class RoanApp(App):
             return
         new_code = self.agent.set_language(code)
         self._update_status()
-        self._sysline(t("msg_language_set", lang=new_code))
 
     def _cmd_choice(
         self, args, key: str, allowed: tuple[str, ...], list_key: str, set_key: str
@@ -3066,38 +3579,42 @@ class RoanApp(App):
         )
 
     def _cmd_sessions(self) -> None:
-        """`/sessions`: een popup met de opgeslagen gesprekken.
+        """`/sessions`: een popup boven het gesprek met de opgeslagen gesprekken.
 
         Vóór stond hier een lijstje Markdown ín de chat, tussen de berichten
-        door, en je kon er niets mee. Nu is het een popup zoals alle andere, met
-        Escape om weg te gaan en Enter om een gesprek te herstellen.
-        """
-        from .agent import SESSIONS_DIR
+        door, en je kon er niets mee. Nu is het een `ModalScreen` boven het
+        gesprek, zoals alle andere browsers, met Escape om weg te gaan en Enter
+        om een gesprek te herstellen.
 
-        if not SESSIONS_DIR.exists():
-            self._sysline(t("msg_no_sessions"))
-            return
-        files = sorted(SESSIONS_DIR.glob("*.json"), reverse=True)
-        if not files:
-            self._sysline(t("msg_no_sessions"))
-            return
+        Er wordt niets in `#messages` geschreven, ook niet als er nog geen
+        sessies zijn: dan opent de popup met de lege-melding in de lijst in
+        plaats van met een regel in het gesprek. Een verwijzing naar iets op
+        schijf hoort in het venster dat daarvoor gemaakt is, niet tussen de
+        berichten.
+        """
+        entries = _session_entries()
 
         def chosen(session_id) -> None:
             if session_id:
                 self._restore_session(str(session_id))
 
         self.push_screen(
-            SessionsScreen([(f.stem, _session_messages(f)) for f in files[:20]]),
+            SessionsScreen(entries, current=str(getattr(self.agent, "session_id", "") or "")),
             chosen,
         )
 
     def _restore_session(self, session_id: str) -> None:
         """Herstel een opgeslagen gesprek (id = naam van het bestand).
 
-        `Agent.clear()` zou het bestand meteen weer overschrijven met een leeg
-        gesprek, dus wij zetten alleen het systeembericht terug en laten
-        `_restore` de berichten er weer bij zetten. `save()` daarna is wat de
-        sessie weer bruikbaar maakt voor de volgende keer.
+        `Agent.clear()` wordt hier bewust NIET gebruikt: die schrijft meteen een
+        leeg gesprek weg en zou dus het bestand overschrijven dat we net gaan
+        herstellen. Wij zetten alleen het systeembericht terug en laten
+        `Agent._restore()` de berichten er weer bij zetten.
+
+        `save()` komt pas ná het herstel en alleen als er echt iets in het bestand
+        stond. Zonder die voorwaarde zou een kapot of leeg bestand door het
+        herstelpad alsnog leeggemaakt worden — dan is het weg, en daar kon je
+        niks meer mee.
         """
         systeem = (
             self.agent.messages[0]
@@ -3107,7 +3624,8 @@ class RoanApp(App):
         self.agent.session_id = session_id
         self.agent.messages = [systeem]
         self.agent._restore()
-        self.agent.save()
+        if len(self.agent.messages) > 1:
+            self.agent.save()
         reload_ = getattr(self.agent, "reload", None)
         if callable(reload_):
             # Zodat de request-headers de nieuwe sessie-id dragen.

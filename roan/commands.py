@@ -24,7 +24,6 @@ COMMANDS: dict[str, Command] = {
     "theme": Command("theme", "cmd_theme", "/theme <naam>"),
     "model": Command("model", "cmd_model", "/model <naam>"),
     "models": Command("models", "cmd_models"),
-    "free": Command("free", "cmd_free"),
     "provider": Command("provider", "cmd_provider", "/provider <naam>"),
     "setup": Command("setup", "cmd_setup"),
     "memory": Command("memory", "cmd_memory"),

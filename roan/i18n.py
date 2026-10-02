@@ -14,7 +14,7 @@ _current = DEFAULT_LANGUAGE
 STRINGS: dict[str, dict[str, str]] = {
     "nl": {
         # app
-        "app_subtitle": "je agent harness",
+        "app_subtitle": "dit is Roan",
         "input_placeholder": "Bericht aan Roan…  (/help)",
         "hint_commands": "ctrl+p commands",
         "ready": "Klaar — {model} via {provider}",
@@ -95,10 +95,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "cmd_theme": "Wissel thema",
         "cmd_model": "Zet of toon het actieve model",
         "cmd_models": "Model-browser: gratis / betaald / {provider}",
-        "cmd_free": "Lijst 100% gratis modellen",
         "cmd_provider": "Zet of toon de provider",
         "cmd_setup": "Open het setup-scherm",
-        "cmd_memory": "Toon wat Roan onthouden heeft",
+        "cmd_memory": "Geheugen bekijken en bewerken",
         "cmd_skills": "Toon beschikbare skills",
         "cmd_new": "Begin een nieuw gesprek",
         "cmd_sessions": "Toon opgeslagen sessies",
@@ -134,13 +133,27 @@ STRINGS: dict[str, dict[str, str]] = {
         "sessions_hint": "Enter = herstellen  ·  Esc = terug",
         "sessions_messages": "{n} berichten",
         "msg_memory_empty": "_(nog niets onthouden)_",
+        # /memory is een scherm sinds issue #21; msg_memory_empty is alleen nog
+        # de tekst die een leeg geheugen elders beschrijft.
+        "memory_title": "Geheugen",
+        "memory_empty": (
+            "Nog niets onthouden.\n\n"
+            "Alleen de tool remember en dit scherm vullen dit geheugen."
+        ),
+        "memory_new": "Nieuwe notitie…",
+        "memory_add": "Toevoegen",
+        "memory_remove": "Verwijder",
+        "memory_count": "{n} notities",
+        "memory_added": "Toegevoegd.",
+        "memory_removed": "Verwijderd.",
+        "memory_hint": "Enter = toevoegen · Esc = terug\nRoan vult dit met remember",
         "msg_summarizing": "Gesprek samenvatten ...",
         "msg_compacted": "Gesprek samengevat.",
         "msg_nothing_to_compact": "Niets om samen te vatten.",
         "msg_language_set": "Taal → {lang}",
         "msg_languages": "Talen: {langs}",
         "tg_help": (
-            "Roan — agent harness\n\n"
+            "Dit is Roan.\n\n"
             "Stuur gewoon een bericht om te praten.\n\n"
             "Commando's:\n"
             "/help — deze tekst\n"
@@ -173,7 +186,7 @@ STRINGS: dict[str, dict[str, str]] = {
         # tools
         "tool_devmagic": "",
         "cli_help": (
-            "Roan — agent harness\n\n"
+            "Dit is Roan.\n\n"
             "Gebruik: Roan [commando]\n\n"
             "Commando's:\n"
             "  (geen)      Start de TUI\n"
@@ -187,7 +200,7 @@ STRINGS: dict[str, dict[str, str]] = {
             "  help        Deze tekst\n\n"
             "`roan` (kleine letter) werkt ook."
         ),
-        "repl_banner": "Roan — agent harness.  /help voor commando's, /quit om te stoppen.",
+        "repl_banner": "Dit is Roan.  /help voor commando's, /quit om te stoppen.",
         "repl_onboard": (
             "Nog geen model geconfigureerd.\n"
             "Draai `Roan init` om een provider + api_key + model in te stellen,\n"
@@ -201,7 +214,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "msg_aborted": "(afgebroken)",
     },
     "en": {
-        "app_subtitle": "your agent harness",
+        "app_subtitle": "this is Roan",
         "input_placeholder": "Message Roan…  (/help)",
         "hint_commands": "ctrl+p commands",
         "ready": "Ready — {model} via {provider}",
@@ -241,10 +254,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "cmd_theme": "Switch theme",
         "cmd_model": "Set or show the active model",
         "cmd_models": "Model browser: free / paid / {provider}",
-        "cmd_free": "List 100% free models",
         "cmd_provider": "Set or show the provider",
         "cmd_setup": "Open the setup screen",
-        "cmd_memory": "Show what Roan remembered",
+        "cmd_memory": "View and edit memory",
         "cmd_skills": "List available skills",
         "cmd_new": "Start a fresh conversation",
         "cmd_sessions": "List saved sessions",
@@ -279,13 +291,27 @@ STRINGS: dict[str, dict[str, str]] = {
         "sessions_hint": "Enter = restore  ·  Esc = back",
         "sessions_messages": "{n} messages",
         "msg_memory_empty": "_(nothing remembered yet)_",
+        # /memory is a screen since issue #21; msg_memory_empty only still
+        # describes an empty memory somewhere else.
+        "memory_title": "Memory",
+        "memory_empty": (
+            "Nothing remembered yet.\n\n"
+            "Only the remember tool and this screen fill this memory."
+        ),
+        "memory_new": "New note…",
+        "memory_add": "Add",
+        "memory_remove": "Remove",
+        "memory_count": "{n} notes",
+        "memory_added": "Added.",
+        "memory_removed": "Removed.",
+        "memory_hint": "Enter = add · Esc = back\nRoan adds notes via remember",
         "msg_summarizing": "Summarising the conversation ...",
         "msg_compacted": "Conversation summarised.",
         "msg_nothing_to_compact": "Nothing to summarise.",
         "msg_language_set": "Language → {lang}",
         "msg_languages": "Languages: {langs}",
         "tg_help": (
-            "Roan — agent harness\n\n"
+            "Dit is Roan.\n\n"
             "Just send a message to chat.\n\n"
             "Commands:\n"
             "/help — this text\n"
@@ -355,7 +381,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "focus_on": "Focus mode on",
         "focus_off": "Focus mode off",
         "cli_help": (
-            "Roan — agent harness\n\n"
+            "Dit is Roan.\n\n"
             "Usage: Roan [command]\n\n"
             "Commands:\n"
             "  (none)      Start the TUI\n"
@@ -369,7 +395,7 @@ STRINGS: dict[str, dict[str, str]] = {
             "  help        This message\n\n"
             "`roan` (lowercase) works too."
         ),
-        "repl_banner": "Roan — agent harness.  /help for commands, /quit to exit.",
+        "repl_banner": "This is Roan.  /help for commands, /quit to exit.",
         "repl_onboard": (
             "No model configured yet.\n"
             "Run `Roan init` to set a provider + api_key + model,\n"
@@ -530,15 +556,20 @@ def provider_desc(provider: str) -> str:
 
 DEFAULT_INSTRUCTIONS = {
     "nl": (
-        "Je naam is Roan. Je bent een persoonlijke agent harness, gemaakt om Roan Heemstra "
-        "te assisteren en te spiegelen. Je helpt met taken in de terminal, schrijft code, "
-        "zoekt dingen op en voert opdrachten uit. Wees direct, technisch en behulpzaam. "
+        "Dit is Roan. Niet iemand die Roan speelt: Roan.\n\n"
+        "Roan is de gebruiker van deze sessie. Je werkt samen met Roan en namens Roan. "
+        "Je helpt met taken in de terminal, schrijft code, zoekt dingen op en voert "
+        "opdrachten uit. Wees direct, technisch en behulpzaam, en zeg niet dingen als "
+        "\"ik ben een AI\" of \"ik ben een assistent\" — dit is Roan. "
         "Antwoord altijd in het Nederlands."
     ),
     "en": (
-        "Your name is Roan. You are a personal agent harness, built to assist and mirror "
-        "Roan Heemstra. You help with tasks in the terminal, write code, look things up and "
-        "run commands. Be direct, technical and helpful. Always answer in English."
+        "This is Roan. Not someone playing Roan: Roan.\n\n"
+        "Roan is the user in this session. You work with Roan and on Roan's behalf. "
+        "You help with tasks in the terminal, write code, look things up and run "
+        "commands. Be direct, technical and helpful, and do not say things like "
+        "\"I am an AI\" or \"I am an assistant\" — this is Roan. "
+        "Always answer in English."
     ),
 }
 

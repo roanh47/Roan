@@ -10,23 +10,65 @@ sources:
   - id: agent
     resource: agent.py
     title: roan/agent.py
+  - id: tui
+    resource: tui.py
+    title: roan/tui.py
 ---
 
 # Storage
 
 `sessions/` holds one JSON file per conversation, named by session id. The id is
-generated when a session starts and shown by `/sessions`.
+generated when a session starts; `/sessions` uses it as the fallback title of a
+row, so it only shows up when a file has no first user message.
 
     Agent(session_id=None, restore=True, use_mcp=True)
 
 On construction the agent picks up the newest session (unless `restore=False`),
 which is why the TUI comes back to the same conversation after a restart. `/new`
-starts a fresh one; `/sessions` opens a popup that lists them newest first (up to
-20) and restores the one you pick: Escape closes the popup, Enter sets the
-`session_id`, resets the message list to the system prompt and lets
-`Agent._restore()` put that conversation back, then re-renders it. `Agent.clear()`
-is deliberately not used here, because it saves immediately and would overwrite
-the file you are restoring.
+starts a fresh one.
+
+# The picker
+
+`/sessions` pushes `SessionsScreen`, a `ModalScreen` **above** the conversation:
+the screen stack is `["Screen", "SessionsScreen"]`, `#messages` stays mounted with
+its widgets and is only dimmed behind the popup. Nothing is written into
+`#messages` — not the list, and not a "no sessions yet" line either; that message
+is an option in the list instead. A reference to something on disk belongs in the
+window made for it, not between the messages.
+
+The screen follows the shared popup conventions
+([shared popup style](shared-popup-style.md)): a `Vertical(classes="popup")` with
+`_titlebar(...)` and a ✕, `CSS = POPUP_CSS + <own ids>`, Escape and ✕ to close, and
+a hint line under the list that says what Enter and Escape do.
+
+One row per session, one line, newest first, ordered by the file's mtime rather
+than its name (the name is usually a timestamp, but "newest" means last touched).
+A row carries three things:
+
+    ○ maak de popup boven het chatbox    2026-10-02 13:58  ·  2 berichten
+
+* the mark: `●` for the session you are in, `○` for the others;
+* the title: the first user message, flattened to one line, with the session id as
+  fallback when the file has none. A list of timestamps is not a menu;
+* a right-hand column with the date and the message count.
+
+`_session_entries()` builds that in one read per file and `SessionsScreen._meta()`
+picks how much of the right-hand column fits: the full stamp, then without the
+year, then without the time, and as a last resort the bare `×n`. The row is never
+wrapped — it is padded so the right-hand column ends on the same column on every
+row, and clipped with `…` when a title is longer than the space left. So at 46
+columns a row reads `○ vraag nummer 7 o…  10-02  ·  ×2`, and it still fits.
+
+The box is 66% high on purpose: at 88% the popup overlapped the border of the
+input frame on a 24-row terminal, which reads as a broken render. At 66% it
+floats above the chatbox at every size.
+
+Enter (or clicking a row) restores it: `_restore_session` sets the `session_id`,
+resets the message list to the system prompt and lets `Agent._restore()` put that
+conversation back, then re-renders it. **`Agent.clear()` is deliberately not
+called**, because it saves immediately and would overwrite the file being
+restored. `save()` only runs when the file actually yielded messages, so a broken
+or empty file is not wiped out by the restore path.
 
 # The message history
 

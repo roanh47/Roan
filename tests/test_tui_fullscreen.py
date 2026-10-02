@@ -298,8 +298,16 @@ async def test_skills_command_lists(tmp_roan):
         await pilot.pause()
         await pilot.press(*"/skills", "enter")
         await pilot.pause()
-        sources = " ".join(str(w.source) for w in app.query(Markdown))
-        assert "demo" in sources
+        from roan.tui import SkillsScreen
+
+        assert isinstance(app.screen, SkillsScreen)
+        # De skill staat in de lijst van de popup, niet als Markdown in de chat.
+        listing = app.screen.query_one("#skills-list")
+        prompts = " ".join(
+            str(listing.get_option_at_index(i).prompt)
+            for i in range(listing.option_count)
+        )
+        assert "demo" in prompts
 
 
 @pytest.mark.asyncio
@@ -309,7 +317,12 @@ async def test_skills_command_empty(tmp_roan):
         await pilot.pause()
         await pilot.press(*"/skills", "enter")
         await pilot.pause()
-        rendered = " ".join(str(w.render()) for w in app.query("Static"))
+        # /skills is een popup; App._get_dom_base() geeft de default screen,
+        # dus we moeten het ACTieve scherm bevragen.
+        from roan.tui import SkillsScreen
+
+        assert isinstance(app.screen, SkillsScreen)
+        rendered = " ".join(str(w.render()) for w in app.screen.query("Static"))
         assert "skills" in rendered.lower()
 
 

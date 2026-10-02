@@ -887,8 +887,9 @@ async def test_clicking_the_mode_chip_cycles_chat_plan_build(tmp_roan):
                 str(app.query_one("#status-mode").render())
                 == f"·  Mode: {expected.capitalize()}"
             )
-        # en het gesprek bevestigt het, met de nieuwe naam erbij
-        assert "chat" in str(list(app.query("#messages > *"))[-1].render())
+        # er komt GEEN bevestigingsregel meer in de chat: de gebruiker wilde
+        # die statusmeldingen kwijt, de chip zelf is de bevestiging.
+        assert len(app.query("#messages > *")) == 0
 
 
 @pytest.mark.asyncio
@@ -912,7 +913,7 @@ async def test_clicking_the_permissions_chip_flips_auto_and_user(tmp_roan):
                 str(app.query_one("#status-perm").render())
                 == f"·  Approvals: {expected.capitalize()}"
             )
-        assert "auto" in str(list(app.query("#messages > *"))[-1].render())
+        assert len(app.query("#messages > *")) == 0
 
 
 @pytest.mark.asyncio
@@ -1566,8 +1567,8 @@ async def test_clicking_the_thinking_chip_cycles_all_four_levels(tmp_roan):
             await pilot.pause()
             assert config.load_config()["thinking"] == expected
             assert str(chip.render()).endswith(f"Think: {expected}")
-            # en een regel eronder bevestigt het, met de nieuwe naam erbij
-            assert expected in str(list(app.query("#messages > *"))[-1].render())
+            # geen bevestigingsregel in de chat; de chip toont de waarde
+            assert len(app.query("#messages > *")) == 0
 
 
 @pytest.mark.asyncio
@@ -2876,7 +2877,9 @@ async def test_the_command_table_moves_its_column_when_the_filter_narrows_it(tmp
         await pilot.pause()
         await pilot.pause()
         listing = app.screen.query_one("#command-list", OptionList)
-        assert listing.option_count == 3, listing.option_count  # /model /models /mode
+        # /model en /models. /free viel hier ook onder omdat zijn Nederlandse
+        # beschrijving "modellen" bevat, maar dat commando bestaat niet meer.
+        assert listing.option_count == 2, listing.option_count
         smal = _command_kolommen(listing)
         assert len(set(smal.values())) == 1, smal
         assert smal != breed, (smal, breed)  # de kolom is meegerekend

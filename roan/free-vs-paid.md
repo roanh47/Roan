@@ -35,6 +35,12 @@ models report `cost: 0` for reasons that have nothing to do with being free:
 The first version filtered on `cost == 0` and Free had 76 providers, most of them
 wrong.
 
+That listing was also available as the `/free` slash command. It is gone: the
+classification below is not trustworthy enough to show a user a "these are free,
+just use them" list, so the command was removed rather than hidden. The rules
+themselves stay, because the provider picker still needs to sort providers into
+free and paid.
+
 # The rules
 
 `is_free_model(provider, model)` is true in exactly two cases:

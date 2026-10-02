@@ -12,7 +12,7 @@ _TIMEOUT = 8
 
 _HEADERS = {
     "Accept": "application/json",
-    "User-Agent": "Mozilla/5.0 (Roan agent harness)",
+    "User-Agent": "Mozilla/5.0 (Roan)",
 }
 
 

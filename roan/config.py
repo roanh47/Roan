@@ -13,6 +13,9 @@ PLUGINS_DIR = ROAN_DIR / "plugins"
 LOGS_DIR = ROAN_DIR / "logs"
 CACHE_DIR = ROAN_DIR / "cache"
 PLANS_DIR = ROAN_DIR / "plans"
+# Opgehaalde bronnen, één markdown-bestand per bron (bron-URL + datum in de
+# kop). Ook de tekst die de gebruiker zelf plakt. Geen credentials, geen API.
+KNOWLEDGE_DIR = ROAN_DIR / "knowledge"
 
 # Bekende OpenAI-compatibele providers. Alleen base_url + placeholder-key; je
 # vult de api_key en model in via config.json.

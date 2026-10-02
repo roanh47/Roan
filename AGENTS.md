@@ -244,10 +244,20 @@ Drie dingen die erbij horen:
   mét een zichtbare aanduiding dat die verouderd is. Anders denkt de gebruiker
   dat de nieuwe stijl draait, en dat klopt niet.
 
-Wat er nu staat: niets. Skills zijn lokale bestanden in `~/.Roan/skills/` en de
-prompt krijgt alleen naam en beschrijving, het lichaam op verzoek via `read_skill`
-— zie [`roan/skills-memory-profile.md`](roan/skills-memory-profile.md). Er wordt
-niets van GitHub gehaald.
+Wat er nu staat: **de helft werkt, en die helft was het hele probleem.** Een skill
+met `always: true` in de frontmatter gaat nu met zijn **volledige lichaam** in de
+system-prompt van elk verzoek, onder een bindende kop
+(`[Schrijfstijl — altijd van toepassing]`). Zonder die vlag blijft het oude
+gedrag: naam, omschrijving, en het lichaam op verzoek via `read_skill`. Dat was
+waarom de stijl niet werd gevolgd — de regels stonden nooit in de prompt.
+
+Er is een echte `~/.Roan/skills/roan-writing-style/SKILL.md`, en
+`~/.Roan/KNOWLEDGE.md` vertelt wat je in `user.md`, `instructions.md` en
+`skills/` moet zetten.
+
+Wat er nog **niet** staat: de bron op GitHub. De stijl is nu een lokaal bestand;
+haar versie wordt niet uitgelezen en er is geen staleness-aanduiding. Dat is
+issue #15.
 
 Thuis in de bundel: de stijl als skill in
 [`roan/skills-memory-profile.md`](roan/skills-memory-profile.md), de bron-URL en de
@@ -302,8 +312,20 @@ De gevolgen staan vast en zijn niet onderhandelbaar:
   pak een `Retry-After` op;
 - **verzin nooit data die je niet kon ophalen** — mislukt de fetch, dan zeg je dat.
 
-Wat er nu staat: `roan/tools.py` heeft `fetch_url` en `web_search`. Dat is de
-naad. Er is geen repositorylijst, geen OneDrive, geen galerij.
+Wat er nu staat: `roan/tools.py` heeft `store_knowledge`, `fetch_and_store` en
+`github_repos` (plus `fetch_url` en `web_search`), en die zijn inmiddels
+geregistreerd in `agent.TOOLS` zodat het model ze echt kan bellen. Een fetch is
+alleen lezend en zonder sleutel: `file://` en elk ander scheme wordt geweigerd,
+een URL met een ingebedde credential ook, één pagina is maximaal 512.000 bytes en
+overschrijven bewaart de vorige versie. GitHub gaat via `api.github.com` zonder
+authenticatie met 60 verzoeken per uur; een 403 wordt als rate limit gemeld mét
+het moment waarop het vrijkomt.
+
+**LinkedIn kan hier niet.** Elke ongeauthenticeerde GET krijgt een loginmuur en
+dat is zonder account niet te omzeilen. Roan zegt dat en verwijst naar
+`store_knowledge`: open LinkedIn zelf, kopieer de tekst, plak hem.
+
+Wat er nog **niet** staat: OneDrive, en de publieke URL. Issue #17.
 
 Thuis in de bundel: [`roan/tools.md`](roan/tools.md) voor wat het model mag
 aanroepen, [`local-first.md`](local-first.md) voor het principe "geen sleutels,
@@ -347,13 +369,17 @@ Wat er nu staat: de kennis zit verspreid over vier bestanden — `instructions.m
 [`roan/skills-memory-profile.md`](roan/skills-memory-profile.md)). Er is geen plek
 waar je zegt "dit is wat ik weet", en niets ervan komt van buiten de machine.
 
+De opgehaalde bronnen liggen in **`~/.Roan/knowledge/`**: één markdown-bestand per
+bron, met de bron-URL en de datum in de kop, en de vorige versie in
+`knowledge/revisions/`. Dat is bewust een cache plus archief, **geen bron van
+waarheid** — anders is er geen manier om te weten wat de waarheid is.
+
 **Open vraag, en blijf hem als vraag staan:** waar staat de canonieke kopie? In
 deze repo, of in een externe bron die Roan ophaalt? Twee eisen uit dit document
 verkleinen de keuze al: die canonieke kopie kan niet in `~/.Roan` staan, want daar
 hoort alleen toestand te staan en twee canonieke kopijen zijn erger dan één; en
-wat Roan op het moment van gebruik leest is een cache onder `~/.Roan/cache`. Voor
-het ophalen zelf geldt dezelfde discipline als eis 1 en 2 — één mechanisme, niet
-drie.
+wat Roan op het moment van gebruik leest is een cache. Voor het ophalen zelf geldt
+dezelfde discipline als eis 1 en 2 — één mechanisme, niet drie. Issue #18.
 
 Thuis in de bundel: [`roan/skills-memory-profile.md`](roan/skills-memory-profile.md)
 voor de kennisbestanden zelf, [`roan/config-keys.md`](roan/config-keys.md) voor
@@ -363,12 +389,14 @@ netwerk-uitschakelaar.
 ## Wat hier nog niet staat
 
 - [ ] models.dev-schema vastgezet, en hard falen bij een afwijking — eis 1
-- [ ] Writing Style als live skill, met versie, cache en een staleness-aanduiding
-      — eis 2
+- [~] always-on skill + echte stijl aanwezig; nog niet live van GitHub, nog geen
+      versie of staleness-aanduiding — eis 2, issue #15
 - [ ] één identiteits- en kennisrecord, in plaats van i18n plus `user.md` — eis 3
-- [ ] repositories, en later OneDrive, zonder sleutels — eis 4
-- [ ] wachtrij: in uitvoering, nog zonder test — eis 5
-- [ ] centrale basiskennis, en de beslissing over de canonieke kopie — eis 6
+- [~] GitHub zonder sleutels werkt; LinkedIn kan niet, OneDrive en de publieke
+      URL nog niet — eis 4, issue #17
+- [x] wachtrij: gebouwd en getest — eis 5, issue #13
+- [~] `~/.Roan/knowledge/` en `KNOWLEDGE.md` bestaan; de canonieke kopie is nog
+      onbeslist — eis 6, issue #18
 
 Raakt een van deze punten je werk, maak dan een issue op het bord en verwijs hier
 vandaan naar het conceptbestand. Niet stilletjes omzeilen, en niet "voorlopig" in

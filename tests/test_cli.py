@@ -22,7 +22,7 @@ def test_help(capsys, monkeypatch):
     monkeypatch.setattr(sys, "argv", ["roan", "help"])
     cli.main()
     out = capsys.readouterr().out
-    assert "agent harness" in out
+    assert "Dit is Roan." in out
     assert "telegram" in out
 
 
@@ -76,7 +76,7 @@ def test_repl_help_command(tmp_roan, monkeypatch, capsys):
 
     repl_mod.run_repl()
     out = capsys.readouterr().out
-    assert "Roan — agent harness" in out
+    assert "Dit is Roan." in out
 
 
 def test_repl_onboarding_without_config(tmp_roan, monkeypatch, capsys):

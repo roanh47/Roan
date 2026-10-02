@@ -25,7 +25,10 @@ sources:
       instructions.md       replaces the default system prompt
       user.md               who the user is; goes into the system prompt
       memory.md             durable notes (the remember tool)
-      skills/               *.md skills, name + description go into the prompt
+      skills/               *.md skills; `always: true` inlines the whole body
+      KNOWLEDGE.md          what goes in which file, to give Roan your knowledge
+      knowledge/            fetched sources, one .md per source (cache + archive)
+      knowledge/revisions/  the previous version of a replaced source
       cron/jobs.json        scheduled prompts
       plugins/              your own python plugins
       sessions/             one json per conversation

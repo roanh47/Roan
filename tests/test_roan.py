@@ -51,6 +51,9 @@ def test_help_lists_everything():
         assert name in commands.names()
     text = commands.help_text()
     assert "/model" in text
+    # /free is weg: de gratis-classificatie is een valkuil, geen gebruikersfunctie.
+    assert "free" not in commands.names()
+    assert "/free" not in text
 
 
 def test_get_strips_slash():

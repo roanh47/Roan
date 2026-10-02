@@ -12,6 +12,7 @@
       logs/            roan.log
       cache/           tijdelijke bestanden
       plans/           plannen (markdown)
+      knowledge/       opgehaalde bronnen, één .md per bron
 """
 
 from __future__ import annotations
@@ -29,6 +30,7 @@ def _dirs() -> dict[str, Path]:
         "logs": config.LOGS_DIR,
         "cache": config.CACHE_DIR,
         "plans": config.PLANS_DIR,
+        "knowledge": config.KNOWLEDGE_DIR,
     }
 
 
