@@ -299,6 +299,40 @@ async def test_action_new_session(tmp_roan):
 
 
 @pytest.mark.asyncio
+async def test_a_stale_style_is_visible_in_the_tui(tmp_roan):
+    """Een stijl die niet gecontroleerd is hoort te zien te zijn, niet stil (eis 2)."""
+    import time
+
+    from roan import style
+
+    style.install("---\nname: roan-writing-style\nversion: 3.0.0\nalways: true\n---\n\n# Stijl\n")
+    style.write_state(
+        {"checked_at": time.time() - 2 * style.CHECK_INTERVAL, "ok": True, "source": "test"}
+    )
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        plat = " ".join(str(w.render()) for w in app.query("#messages > *"))
+        assert t("style_stale", version="3.0.0", days=2) in plat, plat
+
+
+@pytest.mark.asyncio
+async def test_a_checked_style_stays_quiet(tmp_roan):
+    """Een verse controle is geen melding: een vinkje bij elke start is ruis."""
+    import time
+
+    from roan import style
+
+    style.install("---\nname: roan-writing-style\nversion: 3.0.0\nalways: true\n---\n\n# Stijl\n")
+    style.write_state({"checked_at": time.time(), "ok": True, "source": "test"})
+    app = RoanApp(FakeAgent())
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        plat = " ".join(str(w.render()) for w in app.query("#messages > *"))
+        assert "niet gecontroleerd" not in plat, plat
+
+
+@pytest.mark.asyncio
 async def test_action_clear_chat(tmp_roan):
     app = RoanApp(FakeAgent())
     async with app.run_test() as pilot:
