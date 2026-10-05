@@ -1568,8 +1568,9 @@ def _session_entries(directory: Path | None = None) -> list[dict]:
     """Elk sessiebestand als één regel van het menu, nieuwste eerst.
 
     Eén leesbeurt per bestand levert alles wat een rij nodig heeft: het aantal
-    berichten en de eerste gebruikersboodschap, want dat is de titel van het
-    gesprek. Een lijst van bestandsnamen is geen menu — zes tijdstempels zeggen
+    berichten, de eerste gebruikersboodschap en de naam die je zelf gaf. Die
+    naam wint, want daar gaf je hem voor; zonder naam is de eerste boodschap de
+    titel. Een lijst van bestandsnamen is geen menu — zes tijdstempels zeggen
     niet welk gesprek je zoekt.
 
     Gesorteerd op mtime, niet op naam: de naam is meestal een tijdstempel, maar
@@ -1603,6 +1604,7 @@ def _session_entries(directory: Path | None = None) -> list[dict]:
             data = {}
         berichten = data.get("messages") if isinstance(data, dict) else None
         berichten = berichten if isinstance(berichten, list) else []
+        naam = " ".join(str(data.get("name") or "").split()) if isinstance(data, dict) else ""
         titel = ""
         for bericht in berichten:
             if isinstance(bericht, dict) and bericht.get("role") == "user" and bericht.get("content"):
@@ -1614,13 +1616,129 @@ def _session_entries(directory: Path | None = None) -> list[dict]:
             {
                 "id": pad.stem,
                 "count": len(berichten),
-                "title": titel,
+                # Een naam die je zelf gaf (`/new`, `r` in /sessions) wint van de
+                # eerste boodschap: daar gaf je hem voor.
+                "name": naam,
+                "title": naam or titel,
                 "mtime": mtime,
                 "stamp": _time.strftime("%Y-%m-%d %H:%M", _time.localtime(mtime)) if mtime else "",
             }
         )
     entries.sort(key=lambda entry: (entry["mtime"], entry["id"]), reverse=True)
     return entries
+
+
+class NewSessionScreen(ModalScreen):
+    """`/new` als popup: eerst een naam, dan pas een leeg gesprek.
+
+    Zonder naam is een nieuw gesprek in `/sessions` niets dan een tijdstempel,
+    en juist een gesprek waar je nog niets in gezegd hebt is dan niet terug te
+    vinden. Enter maakt het aan, Escape en ✕ laten alles zoals het was. Een lege
+    naam doet niets en zegt dat ook: dit scherm bestaat om die naam.
+    """
+
+    CSS = POPUP_CSS + """
+    #new-box {
+        width: 70%;
+        max-width: 56;
+    }
+    """
+
+    BINDINGS = [("escape", "cancel", "terug")]
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="new-box", classes="popup"):
+            yield from _titlebar(t("msg_new_session_title"))
+            yield Label(t("new_session_label"), classes="section")
+            yield Input(placeholder=t("new_session_placeholder"), id="new-name")
+            yield Static(t("new_session_hint"), id="new-hint", classes="hint")
+            with Horizontal(classes="actions"):
+                yield Button(t("btn_back"), id="new-back")
+                yield Button(t("btn_create"), id="new-create", variant="primary")
+
+    def on_mount(self) -> None:
+        self.query_one("#new-name", Input).focus()
+
+    @on(Input.Submitted)
+    def _submitted(self, event: Input.Submitted) -> None:
+        self._create()
+
+    @on(Button.Pressed)
+    def _pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "new-create":
+            self._create()
+        else:
+            # Zowel Terug als de ✕ in de titelbalk: niets doen en wegwezen.
+            self.dismiss(None)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+    def _create(self) -> None:
+        naam = " ".join(self.query_one("#new-name", Input).value.split())
+        if not naam:
+            self.query_one("#new-hint", Static).update(t("new_session_needs_name"))
+            return
+        self.dismiss(naam)
+
+
+class RenameScreen(ModalScreen):
+    """Eén sessie een andere naam geven, vanuit het /sessions-scherm.
+
+    Het veld begint met de naam die er al is, zodat je hem kunt aanvullen in
+    plaats van opnieuw te typen. Enter slaat op, Escape laat alles zoals het
+    was; een lege naam doet niets en zegt dat ook.
+    """
+
+    CSS = POPUP_CSS + """
+    #rename-box {
+        width: 70%;
+        max-width: 56;
+    }
+    """
+
+    BINDINGS = [("escape", "cancel", "terug")]
+
+    def __init__(self, session_id: str = "", name: str = "") -> None:
+        super().__init__()
+        self.session_id = session_id
+        self.session_name = name
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="rename-box", classes="popup"):
+            yield from _titlebar(t("rename_title"))
+            yield Label(t("rename_label"), classes="section")
+            yield Input(value=self.session_name, id="rename-name")
+            yield Static(t("rename_hint"), id="rename-hint", classes="hint")
+            with Horizontal(classes="actions"):
+                yield Button(t("btn_back"), id="rename-back")
+                yield Button(t("btn_save"), id="rename-save", variant="primary")
+
+    def on_mount(self) -> None:
+        veld = self.query_one("#rename-name", Input)
+        veld.focus()
+        veld.cursor_position = len(veld.value)
+
+    @on(Input.Submitted)
+    def _submitted(self, event: Input.Submitted) -> None:
+        self._save()
+
+    @on(Button.Pressed)
+    def _pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "rename-save":
+            self._save()
+        else:
+            self.dismiss(None)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+    def _save(self) -> None:
+        naam = " ".join(self.query_one("#rename-name", Input).value.split())
+        if not naam:
+            self.query_one("#rename-hint", Static).update(t("rename_needs_name"))
+            return
+        self.dismiss(naam)
 
 
 class SessionsScreen(ModalScreen):
@@ -1640,7 +1758,9 @@ class SessionsScreen(ModalScreen):
     een rij die niemand kan lezen. Het gesprek waar je nu in zit krijgt een `●`,
     de andere een `○`: hetzelfde tekenpaar als het themascherm.
 
-    Enter herstelt het gekozen gesprek, Escape en ✕ sluiten de popup.
+    Enter herstelt het gekozen gesprek, `r` hernoemt het en Escape en ✕ sluiten
+    de popup. De naam die je bij het hernoemen opgeeft staat daarna in het
+    sessiebestand en wint in de lijst van de eerste boodschap.
     """
 
     CSS = POPUP_CSS + """
@@ -1661,7 +1781,7 @@ class SessionsScreen(ModalScreen):
     }
     """
 
-    BINDINGS = [("escape", "close", "terug"), ("q", "close", "terug")]
+    BINDINGS = [("escape", "close", "terug"), ("q", "close", "terug"), ("r", "rename", "hernoem")]
 
     CURRENT_MARK = "●"
     OTHER_MARK = "○"
@@ -1669,12 +1789,22 @@ class SessionsScreen(ModalScreen):
     # een deel van de rechterkolom weg dan dat de titel verdwijnt.
     MIN_TITLE = 10
 
-    def __init__(self, entries: list[dict] | None = None, current: str = "") -> None:
+    def __init__(
+        self,
+        entries: list[dict] | None = None,
+        current: str = "",
+        on_rename=None,
+    ) -> None:
         super().__init__()
         # Eén dict per sessie, uit `_session_entries`, nieuwste eerst.
         self.entries = list(entries or [])
         # De sessie-id waar het gesprek nu in zit; die krijgt een andere markering.
         self.current = current or ""
+        # Wordt aangeroepen als de sessie waar je in zit een andere naam krijgt,
+        # zodat de agent die naam ook draagt (zie `RoanApp._session_renamed`).
+        self.on_rename = on_rename
+        # De rij die nu hernoemd wordt; None als er geen naamscherm open staat.
+        self._renaming: dict | None = None
         # De breedte waar de rijen gebouwd zijn; zie `_realign`.
         self._built_width = -1
 
@@ -1799,6 +1929,43 @@ class SessionsScreen(ModalScreen):
 
     def action_close(self) -> None:
         self.dismiss(None)
+
+    def action_rename(self) -> None:
+        """`r`: de gemarkeerde sessie een andere naam geven.
+
+        Het naamscherm komt bóven deze popup; bij Escape komt er niets terug en
+        blijft alles zoals het was. De rij houdt zijn markering, zodat je ziet
+        welke je net hernoemd hebt.
+        """
+        listing = self.query_one("#sessions-list", OptionList)
+        index = listing.highlighted
+        if index is None or not (0 <= index < len(self.entries)):
+            return
+        self._renaming = self.entries[index]
+        self.app.push_screen(
+            RenameScreen(
+                session_id=str(self._renaming["id"]),
+                name=str(self._renaming.get("name") or ""),
+            ),
+            self._renamed,
+        )
+
+    def _renamed(self, name) -> None:
+        """Schrijf de nieuwe naam weg en laat de rij meteen meeveranderen."""
+        from .agent import set_session_name
+
+        entry, self._renaming = self._renaming, None
+        naam = " ".join(str(name or "").split())
+        if not entry or not naam:
+            return
+        if not set_session_name(str(entry["id"]), naam):
+            return
+        entry["name"] = naam
+        entry["title"] = naam
+        self._rebuild()
+        self.query_one("#sessions-list", OptionList).focus()
+        if callable(self.on_rename):
+            self.on_rename(str(entry["id"]), naam)
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if event.option_id:
@@ -3425,13 +3592,7 @@ class RoanApp(App):
             self._cmd_skills()
             return True
         if name == "new":
-            import time
-
-            self.agent.session_id = time.strftime("%Y%m%d-%H%M%S")
-            self.agent.clear()
-            self._messages().remove_children()
-            self._update_status()
-            self._sysline(t("msg_new_session", id=self.agent.session_id))
+            self._ask_new_session()
             return True
         if name == "sessions":
             self._cmd_sessions()
@@ -3599,7 +3760,11 @@ class RoanApp(App):
                 self._restore_session(str(session_id))
 
         self.push_screen(
-            SessionsScreen(entries, current=str(getattr(self.agent, "session_id", "") or "")),
+            SessionsScreen(
+                entries,
+                current=str(getattr(self.agent, "session_id", "") or ""),
+                on_rename=self._session_renamed,
+            ),
             chosen,
         )
 
@@ -3807,13 +3972,45 @@ class RoanApp(App):
         self.agent.clear()
 
     def action_new_session(self) -> None:
-        import time
+        self._ask_new_session()
 
-        self.agent.session_id = time.strftime("%Y%m%d-%H%M%S")
+    def _ask_new_session(self) -> None:
+        """`/new` (en Ctrl+N): eerst een naam, dan pas een leeg gesprek.
+
+        Zonder naam is een nieuw gesprek in `/sessions` niets dan een
+        tijdstempel, en juist een gesprek waar je nog niets gezegd hebt is dan
+        niet terug te vinden. De popup vraagt er een; Escape laat alles zoals
+        het was.
+        """
+        self.push_screen(NewSessionScreen(), self._start_session)
+
+    def _start_session(self, name) -> None:
+        """Begin het nieuwe gesprek onder de naam uit de popup."""
+        naam = " ".join(str(name or "").split())
+        if not naam:
+            return
+        from .agent import new_session_id
+
+        self.agent.session_id = new_session_id()
+        # De naam staat meteen in het bestand: `clear()` schrijft het weg en
+        # `Agent.save()` neemt `session_name` mee.
+        self.agent.session_name = naam
         self.agent.clear()
         self._messages().remove_children()
         self._update_status()
-        self._sysline(t("msg_new_session", id=self.agent.session_id))
+        self._sysline(t("msg_new_session", name=naam))
+
+    def _session_renamed(self, session_id: str, name: str) -> None:
+        """Een hernoeming uit /sessions, als het om het huidige gesprek gaat.
+
+        De agent moet die naam ook dragen, anders zet de volgende `save()` het
+        bestand terug op de oude naam.
+        """
+        if session_id != str(getattr(self.agent, "session_id", "") or ""):
+            return
+        self.agent.session_name = name
+        self._update_status()
+        self._sysline(t("msg_session_renamed", name=name))
 
     def action_setup(self) -> None:
         self._open_setup()

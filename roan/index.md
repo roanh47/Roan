@@ -21,6 +21,7 @@ Concepts are grouped by hand rather than by folder, because the package is flat.
 * [Agent](agent.md) - the model loop, streaming and compaction.
 * [Tools](tools.md) - the tools the model may call.
 * [Skills, memory and profile](skills-memory-profile.md) - what goes into the system prompt.
+* [Memory](memory.md) - ~/.Roan/memory.md, the remember tool, and the screen that edits them.
 * [Sessions](sessions.md) - saving, restoring, compacting.
 * [Cron](cron.md) - scheduled prompts.
 * [MCP](mcp.md) - external MCP servers.

@@ -17,9 +17,11 @@ sources:
 
 # Storage
 
-`sessions/` holds one JSON file per conversation, named by session id. The id is
-generated when a session starts; `/sessions` uses it as the fallback title of a
-row, so it only shows up when a file has no first user message.
+`sessions/` holds one JSON file per conversation, named by session id. The id is a
+timestamp with `-2`, `-3` and so on behind it when two sessions start in the same
+second, so two conversations never share a file. A file holds `id`, `messages` and
+— when the user gave one — `name`; `/sessions` falls back to the id only when it
+has neither a name nor a first user message.
 
     Agent(session_id=None, restore=True, use_mcp=True)
 
@@ -48,8 +50,9 @@ A row carries three things:
     ○ maak de popup boven het chatbox    2026-10-02 13:58  ·  2 berichten
 
 * the mark: `●` for the session you are in, `○` for the others;
-* the title: the first user message, flattened to one line, with the session id as
-  fallback when the file has none. A list of timestamps is not a menu;
+* the title: the name you gave it, or else the first user message flattened to one
+  line, with the session id as fallback when the file has neither. A list of
+  timestamps is not a menu;
 * a right-hand column with the date and the message count.
 
 `_session_entries()` builds that in one read per file and `SessionsScreen._meta()`
@@ -69,6 +72,27 @@ conversation back, then re-renders it. **`Agent.clear()` is deliberately not
 called**, because it saves immediately and would overwrite the file being
 restored. `save()` only runs when the file actually yielded messages, so a broken
 or empty file is not wiped out by the restore path.
+
+# Naming
+
+A row is a pointer, so the title has to be something you recognise. That is why
+`/new` (and `Ctrl+N`) opens `NewSessionScreen` first: it asks for a name and starts
+nothing until it has one. A conversation with no messages has no first message to
+fall back on, so without a name it is a bare timestamp in the list — exactly the
+session you cannot find back.
+
+The name lives in the session file as `name`, which is why `Agent.save()` writes it
+next to `id` and `messages`: a rename would otherwise be gone on the next turn.
+`agent.set_session_name()` is the single writer, refuses an empty name, and returns
+`False` when there is no file to write to.
+
+`r` in the picker opens `RenameScreen` with the current name already in the field,
+so you extend it instead of retyping it. Renaming the session you are in moves
+`Agent.session_name` along too (`RoanApp._session_renamed`), because a stale name in
+the agent is a name the next `save()` writes back.
+
+Both screens are ordinary popups: Enter commits, Escape and ✕ leave everything as
+it was, and an empty name keeps the screen open with a line that says so.
 
 # The message history
 

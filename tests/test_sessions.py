@@ -6,13 +6,23 @@ niets in het gesprek schrijft.
 """
 
 import json
+import re
 from pathlib import Path
 
 import pytest
 
 from roan import config
 from roan.i18n import t
-from roan.tui import POPUP_CSS, CLOSE_GLYPH, RoanApp, SessionsScreen
+from roan.tui import (
+    POPUP_CSS,
+    CLOSE_GLYPH,
+    Input,
+    NewSessionScreen,
+    RenameScreen,
+    RoanApp,
+    SessionsScreen,
+    _session_entries,
+)
 
 
 class Agent:
@@ -408,7 +418,9 @@ async def test_the_rows_stay_one_line_at_46_columns(thuis):
             rij = "".join(seg.text for seg in lijst.render_line(y))
             assert len(rij) <= regio.width, (y, len(rij), regio.width)
         eerste = "".join(seg.text for seg in lijst.render_line(0))
-        assert "2026-" in eerste or "10-02" in eerste, eerste
+        # De bovenste rij is de sessie van nu, dus welke datum daar staat hangt
+        # van de klok af; toets op de vorm van de rechterkolom, niet op één dag.
+        assert re.search(r"\d\d-\d\d", eerste), eerste
         assert t("sessions_messages", n=1) in eerste or "×1" in eerste, eerste
 
 
@@ -443,3 +455,134 @@ async def test_no_sessions_at_all_still_opens_a_popup(thuis):
         await pilot.press("enter")  # niets te kiezen: geen crash, geen herstel
         await pilot.pause()
         assert isinstance(app.screen, SessionsScreen)
+
+
+# ---------- 6. een sessie een naam geven ----------
+@pytest.mark.asyncio
+async def test_new_asks_for_a_name_before_it_starts_anything(thuis):
+    """`/new` maakt pas een sessie nadat je in de popup een naam gaf."""
+    app = app_met_gesprek()
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        oud = app.agent.session_id
+        await pilot.press(*"/new", "enter")
+        await pilot.pause()
+        await pilot.pause()
+        assert isinstance(app.screen, NewSessionScreen), stack(app)
+        assert app.agent.session_id == oud, "zonder naam begint er nog niets"
+        app.screen.query_one("#new-name", Input).value = "trading bot"
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.pause()
+        assert not isinstance(app.screen, NewSessionScreen), stack(app)
+        assert app.agent.session_id != oud
+        assert app.agent.session_name == "trading bot"
+
+
+@pytest.mark.asyncio
+async def test_an_empty_name_keeps_the_popup_open(thuis):
+    """Een naam is het punt van dit scherm: Enter op niets maakt niets."""
+    app = app_met_gesprek()
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        oud = app.agent.session_id
+        await pilot.press(*"/new", "enter")
+        await pilot.pause()
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        assert isinstance(app.screen, NewSessionScreen), stack(app)
+        assert app.agent.session_id == oud
+        hint = "".join(seg.text for seg in app.screen.query_one("#new-hint").render_line(0))
+        assert t("new_session_needs_name") in hint, hint
+
+
+def test_a_given_name_wins_from_the_first_message(thuis):
+    """De rij heet naar de naam die je gaf, niet naar de eerste boodschap."""
+    (thuis / "20260102-120000.json").write_text(
+        json.dumps(
+            {
+                "id": "20260102-120000",
+                "name": "trading bot",
+                "messages": [{"role": "user", "content": "een vraag over van alles en nog wat"}],
+            }
+        )
+    )
+    entries = _session_entries()
+    assert entries[0]["name"] == "trading bot"
+    assert entries[0]["title"] == "trading bot"
+
+
+@pytest.mark.asyncio
+async def test_renaming_writes_the_name_and_the_row_follows(thuis):
+    """`r` in /sessions schrijft de nieuwe naam weg en de lijst laat hem zien."""
+    pad = schrijf(thuis, "20260102-120000", "vraag")
+    app = app_met_gesprek()
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        await _open(app, pilot)
+        await pilot.press("r")
+        await pilot.pause()
+        await pilot.pause()
+        assert isinstance(app.screen, RenameScreen), stack(app)
+        app.screen.query_one("#rename-name", Input).value = "china store"
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.pause()
+        assert json.loads(pad.read_text())["name"] == "china store"
+        assert isinstance(app.screen, SessionsScreen), stack(app)
+        lijst = app.screen.query_one("#sessions-list")
+        eerste = "".join(seg.text for seg in lijst.render_line(0))
+        assert "china store" in eerste, eerste
+
+
+@pytest.mark.asyncio
+async def test_renaming_the_session_you_are_in_moves_the_agent_along(thuis):
+    """Het gesprek waar je in zit draagt de nieuwe naam ook.
+
+    Anders schrijft de eerstvolgende `save()` de oude naam terug en is de
+    hernoeming verdwenen.
+    """
+    schrijf(thuis, "nu", "vraag")
+    app = app_met_gesprek(Agent("nu"))
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        await _open(app, pilot)
+        await pilot.press("r")
+        await pilot.pause()
+        await pilot.pause()
+        app.screen.query_one("#rename-name", Input).value = "vanavond"
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.pause()
+        assert app.agent.session_name == "vanavond"
+
+
+def test_set_session_name_refuses_a_session_that_is_not_there(thuis):
+    """Geen bestand, geen naam: liever niets dan een half geschreven sessie."""
+    from roan import agent as agent_mod
+
+    assert agent_mod.set_session_name("bestaat-niet", "iets") is False
+    assert agent_mod.session_name("bestaat-niet") == ""
+
+
+def test_a_name_survives_saving_and_restoring(thuis):
+    """De naam staat in het sessiebestand, dus ook na een herstart."""
+    from roan import agent as agent_mod
+
+    agent = agent_mod.Agent(session_id="20260102-120000", restore=False, use_mcp=False)
+    agent.session_name = "trading bot"
+    agent.save()
+    data = json.loads((thuis / "20260102-120000.json").read_text())
+    assert data["name"] == "trading bot"
+    opnieuw = agent_mod.Agent(session_id="20260102-120000", use_mcp=False)
+    assert opnieuw.session_name == "trading bot"
+
+
+def test_new_session_id_steps_aside_when_the_stamp_is_taken(thuis, monkeypatch):
+    """Twee sessies in dezelfde seconde mogen niet hetzelfde bestand krijgen."""
+    from roan import agent as agent_mod
+
+    monkeypatch.setattr(agent_mod.time, "strftime", lambda *a: "20260102-120000")
+    schrijf(thuis, "20260102-120000", "vraag")
+    assert agent_mod.new_session_id() == "20260102-120000-2"

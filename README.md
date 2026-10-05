@@ -94,8 +94,8 @@ Inside the TUI:
 - `/skills` — list available skills
 - `/language <nl|en>` — switch the UI and agent language
 - `/tui <fullscreen|default>` — switch renderer (relaunches, keeps the conversation)
-- `/new` — start a fresh conversation (`Ctrl+N`)
-- `/sessions` — list saved sessions
+- `/new` — start a fresh conversation; it asks for a name first (`Ctrl+N`)
+- `/sessions` — list saved sessions; `r` renames the highlighted one
 - `/compact` — summarise the conversation to free context
 - `/clear` — clear the conversation (`Ctrl+L`)
 - `/quit` — exit

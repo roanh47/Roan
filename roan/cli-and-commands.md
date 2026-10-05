@@ -49,9 +49,9 @@ Registered in `roan/commands.py`; `names()` returns these sixteen:
 | `/language <nl\|en>` | set the UI and agent language |
 | `/memory` | show what Roan remembered |
 | `/skills` | list the available skills |
-| `/sessions` | list saved sessions |
+| `/sessions` | list saved sessions; `r` renames the highlighted one |
 | `/compact` | summarise the conversation |
-| `/new` | start a new session |
+| `/new` | start a new session; it asks for a name first |
 | `/clear` | clear the chat view |
 | `/tui <fullscreen\|default>` | switch renderer and relaunch |
 | `/quit` | quit |

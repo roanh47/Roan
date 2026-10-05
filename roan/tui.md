@@ -90,6 +90,8 @@ CSS ([design system](design-system.md)):
 | `ThemeScreen` | `/theme` | the flavour name |
 | `CommandScreen` | `Ctrl+P`, `/commands` | the command name |
 | `SessionsScreen` | `/sessions` | the session id |
+| `NewSessionScreen` | `/new`, `Ctrl+N` | the name of the new session |
+| `RenameScreen` | `r` in the session picker | the new name |
 | `SkillsScreen` | `/skills` | nothing; it only shows what is on disk |
 | `TranscriptScreen` | `Ctrl+O` | nothing |
 

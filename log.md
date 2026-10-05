@@ -1,5 +1,10 @@
 # Bundle update log
 
+## 2026-10-05
+* **Feature**: Sessions can be named. `/new` and `Ctrl+N` open `NewSessionScreen`, which asks for a name before anything starts, and `r` in the session picker opens `RenameScreen` for the highlighted session. The name is stored as `name` in the session file, wins over the first user message in a row, and survives `save()`.
+* **Fix**: `roan/memory.md` was not linked from any index, so the bundle carried an orphan page.
+* **Fix**: the 46-column session row test asserted the date it was written on (`10-02`) instead of the shape of the right-hand column, so it went red the next day; it now matches `MM-DD`.
+
 ## 2026-09-30
 * **Restructure**: The bundle is no longer a `knowledge/` folder. The repository **is** the bundle: each concept lives in the directory it describes — the harness in `roan/`, the channels in `roan/channels/`, the suite in `tests/` — with `index.md` at every level as the table of contents.
 * **Create**: `index.md` at the root as the bundle table of contents, declaring `okf_version: "0.2"`.

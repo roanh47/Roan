@@ -18,7 +18,7 @@ sources:
 |---|---|
 | `roan/__init__.py` | 1 |
 | `roan/__main__.py` | 3 |
-| `roan/agent.py` | 470 |
+| `roan/agent.py` | 532 |
 | `roan/channels/__init__.py` | 5 |
 | `roan/channels/base.py` | 28 |
 | `roan/channels/telegram.py` | 212 |
@@ -27,7 +27,7 @@ sources:
 | `roan/config.py` | 247 |
 | `roan/cron.py` | 149 |
 | `roan/home.py` | 97 |
-| `roan/i18n.py` | 608 |
+| `roan/i18n.py` | 632 |
 | `roan/init_cmd.py` | 46 |
 | `roan/mcp.py` | 202 |
 | `roan/memory.py` | 74 |
@@ -37,7 +37,7 @@ sources:
 | `roan/skills.py` | 257 |
 | `roan/themes.py` | 127 |
 | `roan/tools.py` | 929 |
-| `roan/tui.py` | 4048 |
+| `roan/tui.py` | 4245 |
 | `roan/update.py` | 63 |
 
 # Root and tests
@@ -46,7 +46,7 @@ sources:
 |---|---|
 | `pyproject.toml` | 34 |
 | `README.md` | 324 |
-| `AGENTS.md` | 482 |
+| `AGENTS.md` | 510 |
 | `tests/fake_mcp_server.py` | 57 |
 | `tests/generate_file_map.py` | 84 |
 | `tests/project_board.py` | 204 |
@@ -64,15 +64,15 @@ sources:
 | `tests/test_providers.py` | 367 |
 | `tests/test_roan.py` | 171 |
 | `tests/test_search.py` | 313 |
-| `tests/test_sessions.py` | 445 |
+| `tests/test_sessions.py` | 588 |
 | `tests/test_setup_required.py` | 183 |
 | `tests/test_skills.py` | 502 |
 | `tests/test_telegram.py` | 158 |
 | `tests/test_themes.py` | 216 |
-| `tests/test_tui.py` | 3137 |
+| `tests/test_tui.py` | 3144 |
 | `tests/test_tui_close.py` | 196 |
 | `tests/test_tui_fullscreen.py` | 362 |
-| `tests/test_tui_look.py` | 367 |
+| `tests/test_tui_look.py` | 397 |
 | `tests/validate_okf.py` | 166 |
 
 # Where to look for what
@@ -91,7 +91,7 @@ sources:
 | MCP | `roan/mcp.py` |
 | Entry points and subcommands | `roan/cli.py` |
 
-The package is 8415 lines of Python in total. `roan/tui.py` is
+The package is 8698 lines of Python in total. `roan/tui.py` is
 the biggest file by far and holds every screen; that is deliberate - see
 [one shared popup style](roan/shared-popup-style.md) - but it is the file to
 split first if it gets unwieldy.

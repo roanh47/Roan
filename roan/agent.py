@@ -17,6 +17,55 @@ from . import tools as T
 MAX_TOOL_ROUNDS = 12
 SESSIONS_DIR = ROAN_DIR / "sessions"
 
+
+def new_session_id() -> str:
+    """Een sessie-id dat nog niet bestaat.
+
+    Het id is het tijdstempel waarop je begint, dus twee sessies in dezelfde
+    seconde mogen niet hetzelfde bestand krijgen. Bestaat het al, dan komt er
+    -2, -3 enzovoort achter: zichtbaar, en de volgorde blijft kloppen.
+    """
+    stempel = time.strftime("%Y%m%d-%H%M%S")
+    kandidaat, n = stempel, 1
+    while (SESSIONS_DIR / f"{kandidaat}.json").exists():
+        n += 1
+        kandidaat = f"{stempel}-{n}"
+    return kandidaat
+
+
+def session_data(session_id: str) -> dict:
+    """Wat er in het sessiebestand staat; {} als het er niet is of niet leest."""
+    try:
+        data = json.loads((SESSIONS_DIR / f"{session_id}.json").read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def session_name(session_id: str) -> str:
+    """De naam die de gebruiker een sessie gaf, of "" als er geen is."""
+    return str(session_data(session_id).get("name") or "").strip()
+
+
+def set_session_name(session_id: str, name: str) -> bool:
+    """Zet een naam in het sessiebestand; False als er niets geschreven is.
+
+    Eén regel, zonder witruimte aan de randen: de naam komt in de lijst van
+    `/sessions` terecht en een rij die ombreekt is geen rij. Het gesprek zelf
+    blijft staan; dit raakt alleen de naam.
+    """
+    naam = " ".join(str(name).split())
+    data = session_data(session_id)
+    if not naam or not data:
+        return False
+    data["name"] = naam
+    try:
+        (SESSIONS_DIR / f"{session_id}.json").write_text(json.dumps(data, indent=2))
+    except OSError:
+        return False
+    return True
+
+
 # Context-compaction: boven deze geschatte omvang wordt het middenstuk samengevat.
 COMPACT_CHARS = 120_000
 KEEP_TAIL = 6
@@ -195,7 +244,10 @@ def _build_system_prompt() -> str:
 
 class Agent:
     def __init__(self, session_id: str | None = None, restore: bool = True, use_mcp: bool = True):
-        self.session_id = session_id or time.strftime("%Y%m%d-%H%M%S")
+        self.session_id = session_id or new_session_id()
+        # De naam die de gebruiker gaf. Leeg betekent: het gesprek heet naar zijn
+        # eerste boodschap (zie `tui._session_entries`).
+        self.session_name = ""
         self.reload()
         self.messages: list[dict] = [{"role": "system", "content": _build_system_prompt()}]
         # Token-usage van de laatste aanroep, voor de statusbalk. API's sturen
@@ -236,17 +288,27 @@ class Agent:
             return
         try:
             data = json.loads(self._session_path.read_text())
-            if isinstance(data.get("messages"), list) and data["messages"]:
-                self.messages.extend(data["messages"])
         except (json.JSONDecodeError, OSError):
-            pass
+            return
+        if not isinstance(data, dict):
+            return
+        self.session_name = str(data.get("name") or "").strip()
+        if isinstance(data.get("messages"), list) and data["messages"]:
+            self.messages.extend(data["messages"])
 
     def save(self) -> None:
+        """Schrijf het gesprek weg, met de naam erbij als die er is.
+
+        De naam hoort in hetzelfde bestand: een hernoeming in `/sessions` zou
+        anders bij de eerstvolgende beurt weer verdwijnen.
+        """
         SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+        data = {"id": self.session_id, "messages": self.messages[1:]}
+        naam = " ".join(str(getattr(self, "session_name", "") or "").split())
+        if naam:
+            data["name"] = naam
         try:
-            self._session_path.write_text(
-                json.dumps({"id": self.session_id, "messages": self.messages[1:]}, indent=2)
-            )
+            self._session_path.write_text(json.dumps(data, indent=2))
         except OSError:
             pass
 

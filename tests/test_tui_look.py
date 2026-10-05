@@ -203,6 +203,11 @@ POPUPS = [
     (lambda: ModelsScreen([("groq", "llama-3")], [], []), "#models-box"),
     (lambda: tui_mod.ThemeScreen(), "#theme-box"),
     (lambda: tui_mod.TranscriptScreen([{"role": "user", "content": "hoi"}]), "#transcript-box"),
+    (lambda: tui_mod.NewSessionScreen(), "#new-box"),
+    (
+        lambda: tui_mod.RenameScreen(session_id="20260102-120000", name="vraag"),
+        "#rename-box",
+    ),
 ]
 
 
@@ -244,6 +249,31 @@ async def test_title_lines_up_with_the_field_labels(roan_cfg):
         title_x = scr.query_one(".titlebar .title").region.x
         label_x = scr.query_one("#setup-box Label").region.x
         assert title_x == label_x
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("size", [(64, 26), (46, 18)])
+@pytest.mark.parametrize(
+    "factory,box",
+    [
+        (lambda: tui_mod.NewSessionScreen(), "#new-box"),
+        (
+            lambda: tui_mod.RenameScreen(session_id="20260102-120000", name="vraag"),
+            "#rename-box",
+        ),
+    ],
+)
+async def test_the_name_popups_fit_on_a_phone(roan_cfg, factory, box, size):
+    """Een popup die hoger is dan het venster zet zijn knoppen stil buiten beeld."""
+    app = RoanApp(FakeAgent())
+    async with app.run_test(size=size) as pilot:
+        await pilot.pause()
+        screen = factory()
+        app.push_screen(screen)
+        await pilot.pause()
+        regio = screen.query_one(box).region
+        assert regio.height <= size[1], (size, regio)
+        assert regio.bottom <= size[1], (size, regio)
 
 
 @pytest.mark.asyncio

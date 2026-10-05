@@ -285,8 +285,15 @@ async def test_input_history_arrow_up(tmp_roan):
 async def test_action_new_session(tmp_roan):
     app = RoanApp(FakeAgent())
     async with app.run_test() as pilot:
+        from roan.tui import NewSessionScreen
+
         old = app.agent.session_id
         app.action_new_session()
+        await pilot.pause()
+        assert isinstance(app.screen, NewSessionScreen), "Ctrl+N vraagt eerst om een naam"
+        assert app.agent.session_id == old, "zonder naam begint er geen nieuwe sessie"
+        app.screen.query_one("#new-name").value = "vanavond"
+        await pilot.press("enter")
         await pilot.pause()
         assert app.agent.session_id != old
 
