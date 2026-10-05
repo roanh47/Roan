@@ -39,6 +39,8 @@ base URL is not a localhost one.
 |---|---|
 | `ROAN_DISABLE_ALTERNATE_SCREEN` | force the classic inline renderer |
 | `ROAN_NO_FLICKER=1` | force the fullscreen renderer |
+| `ROAN_NO_NETWORK=1` | skip the style fetch from GitHub; the copy stays and counts as unchecked |
+| `ROAN_STYLE_URL` | where the writing style is fetched from (a URL or a path) |
 
 Any non-empty value counts for `ROAN_DISABLE_ALTERNATE_SCREEN`; `ROAN_NO_FLICKER`
 requires exactly `1`.

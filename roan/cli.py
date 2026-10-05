@@ -25,6 +25,14 @@ def main() -> None:
 
     init_from_config()
     ensure_home()
+
+    # De schrijfstijl hoort altijd de nieuwste te zijn. Dit kost één keer per
+    # etmaal een halve tel netwerk en blokkeert nooit: mislukken betekent "niet
+    # gecontroleerd", en dat is zichtbaar in de TUI (zie `roan/style.py`).
+    from .style import sync as sync_style
+
+    sync_style()
+
     args = sys.argv[1:]
 
     if args and args[0] in HELP_COMMANDS:

@@ -26,6 +26,7 @@ sources:
       user.md               who the user is; goes into the system prompt
       memory.md             durable notes (the remember tool)
       skills/               *.md skills; `always: true` inlines the whole body
+      writing-style.json    which version of the writing style was fetched, and when
       KNOWLEDGE.md          what goes in which file, to give Roan your knowledge
       knowledge/            fetched sources, one .md per source (cache + archive)
       knowledge/revisions/  the previous version of a replaced source

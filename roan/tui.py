@@ -3307,6 +3307,24 @@ class RoanApp(App):
             # bleef de balk één resize achter en stonden de chips fout.
             self.call_after_refresh(self._fit_status_bar)
 
+    def _style_note(self) -> None:
+        """Zeg het als de schrijfstijl niet gecontroleerd is.
+
+        De stijl gaat in elke aanvraag mee, dus een verouderde versie mag niet
+        stil meelopen. Staat er niets, dan valt er niets te controleren: dan is
+        dit geen waarschuwing maar een lege thuismap.
+        """
+        from . import style
+
+        stand = style.status()
+        if not stand["installed"] or not stand["stale"]:
+            return
+        if stand["checked_at"]:
+            dagen = int(stand["age"] // 86400)
+            self._sysline(t("style_stale", version=stand["version"], days=dagen))
+        else:
+            self._sysline(t("style_never_checked", version=stand["version"]))
+
     def on_mount(self) -> None:
         self.query_one("#input", Input).focus()
         # Het schemerscherm is de enige die weet WANNER de indeling klopt: pas
@@ -3322,6 +3340,7 @@ class RoanApp(App):
         self._size_avatar()
         self._place_avatar()
         self._update_status()
+        self._style_note()
         self._render_history()
         if not is_configured():
             self._write(Markdown(t("onboarding")))

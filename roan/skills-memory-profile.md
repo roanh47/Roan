@@ -77,8 +77,10 @@ in place when the model reads it and the list cannot bury it. `true`, `yes`,
 
 ## What the caps do, and why they are never silent
 
-`MAX_ALWAYS_CHARS` (4 000) caps one skill, `MAX_ALWAYS_TOTAL` (12 000) caps all
-of them together. Both are visible, in two places:
+`MAX_ALWAYS_CHARS` (20 000) caps one skill, `MAX_ALWAYS_TOTAL` (32 000) caps all
+of them together. They sit above the shipped style document on purpose: a style
+guide that is half applied looks applied and is not ([style](style.md)). Both caps
+are visible, in two places:
 
 * in the prompt — a clipped body ends with which rule was cut, how long the
   skill is and how to fetch the rest (`read_skill(name)`); a skill that does not

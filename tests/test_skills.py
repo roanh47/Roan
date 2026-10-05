@@ -478,6 +478,25 @@ async def test_clipped_always_skill_is_visible_in_the_menu(app_home):
         assert "afgekapt" in rendered(screen)
 
 
+def test_the_shipped_style_fits_the_always_budget():
+    """De schrijfstijl uit de repo moet in één keer mee, niet afgekapt.
+
+    De agent hoort altijd in Roans stijl te schrijven. Zakt het budget onder de
+    lengte van het document, dan gaat hij dat stil half doen — en een half
+    toegepaste stijl is erger dan geen stijl.
+    """
+    from roan import style, skills as skills_mod
+
+    tekst = style.bundled_path().read_text(encoding="utf-8")
+    front, body = skills_mod.parse_frontmatter(tekst)
+    assert skills_mod.is_always(front), "de stijl hoort altijd aan te staan"
+    assert front.get("name") == style.STYLE_NAME
+    assert len(body) <= skills_mod.MAX_ALWAYS_CHARS, (len(body), skills_mod.MAX_ALWAYS_CHARS)
+    skill = {"name": style.STYLE_NAME, "description": "", "body": body, "always": True}
+    assert skills_mod.always_warnings([skill]) == {}
+    assert body in skills_mod.always_skills_prompt([skill])
+
+
 def test_warnings_follow_the_budget():
     lang = {"name": "lang", "body": "X" * (skills.MAX_ALWAYS_CHARS + 10), "always": True}
     kort = {"name": "kort", "body": "kort", "always": True}
@@ -491,7 +510,8 @@ def test_warnings_follow_the_budget():
             for name in ("a", "b", "c", "d")
         ]
     )
-    # Drie keer MAX_ALWAYS_CHARS is het budget op; de rest valt eruit.
+    # Twee skills van MAX_ALWAYS_CHARS plus een restje is het budget op; de
+    # rest valt eruit.
     assert "afgekapt" in warnings["a"]
     assert "niet meegestuurd" in warnings["c"]
 

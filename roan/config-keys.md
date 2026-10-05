@@ -37,6 +37,10 @@ Written by `save_config(updates)`, read by `load_config()`. `DEFAULT_CONFIG` in
 | `telegram_token` | (absent) | bot token for the Telegram channel |
 | `avatar` | (absent) | path to an image for the avatar |
 
+The writing style has no key here: its upstream is `ROAN_STYLE_URL` (see
+[environment variables](env-vars.md)) and what was fetched is recorded in
+`~/.Roan/writing-style.json` (see [style](style.md)).
+
 # Endpoints
 
     "endpoints": [

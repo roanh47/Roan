@@ -21,6 +21,8 @@ Concepts are grouped by hand rather than by folder, because the package is flat.
 * [Agent](agent.md) - the model loop, streaming and compaction.
 * [Tools](tools.md) - the tools the model may call.
 * [Skills, memory and profile](skills-memory-profile.md) - what goes into the system prompt.
+* [Shipped skills](skills/index.md) - the skill documents that come with Roan.
+* [Style](style.md) - the writing style: the document in the repo, the sync from GitHub, and the stand.
 * [Memory](memory.md) - ~/.Roan/memory.md, the remember tool, and the screen that edits them.
 * [Sessions](sessions.md) - saving, restoring, compacting.
 * [Cron](cron.md) - scheduled prompts.

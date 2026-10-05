@@ -50,9 +50,12 @@ ALWAYS_LEAD = (
     "en geen samenvatting van een optie: volg ze."
 )
 
-# Limieten voor always-skills: per skill, en voor alle bij elkaar.
-MAX_ALWAYS_CHARS = 4_000
-MAX_ALWAYS_TOTAL = 12_000
+# Limieten voor always-skills: per skill, en voor alle bij elkaar. Ze staan
+# ruim boven de schrijfstijl zoals die uit de repo komt (ongeveer 13 000
+# tekens), want een stijl die half meegaat is erger dan geen stijl: het lijkt
+# toegepast en is het niet. Wat hier overheen gaat wordt zichtbaar afgekapt.
+MAX_ALWAYS_CHARS = 20_000
+MAX_ALWAYS_TOTAL = 32_000
 
 # Wat `always: true` mag schrijven.
 TRUTHY = {"true", "yes", "1", "on", "ja"}
