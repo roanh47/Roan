@@ -1,51 +1,52 @@
 # Roan
 
-A terminal-based agent harness. Bring any OpenAI-compatible model and a set of
-tools; Roan provides the agentic loop, tool-calling, and durable memory.
+Terminal-agent in TypeScript. Core en UI zijn gescheiden: de agent-loop weet niets
+van de terminal, de TUI is een schil die alleen events tekent.
 
-## Install
-
-Stable (main):
-
-```sh
-git clone https://github.com/roanh47/Roan.git
-cd Roan
-pip install -e .
+```
+src/
+  agent.ts      de loop: model → tool → model, met stappenbudget
+  provider.ts   OpenAI-compatibel endpoint, streaming
+  tools.ts      read_file, write_file, list_dir, run_shell
+  config.ts     omgeving en systeemprompt
+  index.ts      CLI: TUI of één opdracht
+  tui/app.tsx   Ink-interface
 ```
 
-Pre-release:
+## Draaien
 
-```sh
-git clone -b pre-release https://github.com/roanh47/Roan.git
-cd Roan
-pip install -e .
+```bash
+npm install
+npm run dev                 # TUI, via tsx
+npm run dev -- -p "hoi"     # één opdracht, zonder TUI
+npm run build && node dist/index.js
 ```
 
-## Configure (`~/.roan/config.json`)
+Instellingen gaan via de omgeving:
 
-```json
-{ "provider": "lmstudio", "model": "local-model" }
+```bash
+export ROAN_API_URL=http://127.0.0.1:1234/v1   # LM Studio, OpenAI, opencode-go…
+export ROAN_API_KEY=                            # leeg mag bij een lokale server
+export ROAN_MODEL=qwen3-coder
 ```
 
-Providers (all OpenAI-compatible): `lmstudio`, `ollama`, `groq`, `openrouter`,
-or `"provider": "custom"` with your own `base_url` and `api_key`.
+De standaard is een lokale LM Studio op poort 1234.
 
-Groq (free tier) example:
+## Waarom deze opzet
 
-```json
-{ "provider": "groq", "api_key": "gsk_...", "model": "llama-3.3-70b-versatile" }
-```
+- **De core is UI-loos.** Alles wat de agent doet komt binnen als `AgentEvent`, dus
+  dezelfde code drijft de TUI en `roan -p`. Een tweede interface (web, Telegram)
+  is een nieuwe schil, geen tweede agent.
+- **Tools zijn een lijst, geen schakelaar.** `builtinTools` is een array; een tool
+  toevoegen is één object met een JSON-schema en een `run`.
+- **Paden blijven binnen de werkmap.** `read_file` en `write_file` weigeren alles
+  wat via `..` of een absoluut pad buiten `--cwd` valt.
+- **Streaming vanaf het begin.** Het antwoord wordt stukje bij stukje getoond in
+  plaats van pas als het model klaar is.
 
-## Files
+## Wat er nog niet is
 
-- `~/.roan/instructions.md` — the system prompt (overrides the default).
-- `~/.roan/memory.md` — durable memory (the agent can call `remember`).
-
-## Tools
-
-`run_shell`, `read_file`, `write_file`, `remember`.
-
-## Status
-
-v0 — working loop, tool-calling, memory. Next: provider discovery via `/models`,
-Claude-Code-style TUI, terminal image rendering, MCP, streaming.
+- Geen tokens/tijd-budget per beurt, alleen een stappenbudget van 24.
+- Geen toestemming vragen vóór `run_shell`; die draait direct.
+- Geen geschiedenis op schijf; elke start begint leeg.
+- Nog geen binaries: daarvoor is `bun build --compile` de volgende stap.

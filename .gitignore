@@ -1,8 +1,12 @@
-__pycache__/
-*.pyc
-*.egg-info/
+node_modules/
 dist/
-build/
-.venv/
-venv/
+*.log
+.env
 .DS_Store
+
+# leftovers from the Python version (archived on the python-backup branch)
+.venv/
+build/
+__pycache__/
+*.egg-info/
+.pytest_cache/
