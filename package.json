@@ -1,7 +1,7 @@
 {
   "name": "roan-cli",
   "version": "0.1.0",
-  "description": "Terminal agent harness",
+  "description": "One agent, several machines",
   "type": "module",
   "bin": {
     "roan": "./dist/index.js"
@@ -18,15 +18,11 @@
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "ink": "^8.0.0",
-    "react": "^19.3.1"
-  },
   "devDependencies": {
     "@types/node": "^26.6.6",
-    "@types/react": "^19.3.0",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {}
 }

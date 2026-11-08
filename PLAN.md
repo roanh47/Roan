@@ -22,16 +22,21 @@ one question: **new chain, or join one.**
 
 - **New chain** creates an ID and a key. You hand that to a second machine and it
   joins.
-- **Joining** means: everything that is there is here, and everything that happens
-  here goes there.
+- **Joining** means: that chain's data becomes yours — sessions, env, skills. Your
+  device does not merge its local state in and does not push it up. Only creating a
+  new chain seeds from local, and that happens once per person. Before joining
+  replaces local state, it is parked aside so nothing is lost silently.
 
 Everything the agent is lives in the chain: conversations, skills, MCP definitions,
 tool settings. Not per session, not per machine — one whole that is the same
 everywhere.
 
 Roan is a service, not a command you start and stop. It listens and sends all the
-time. The TUI, the web UI and the app are windows onto the same chain; close one and
-the rest keeps running.
+time. Every window onto the chain — the web UI on your laptop, on your server, in
+the app — shows the same thing; close one and the rest keeps running.
+
+There is one interface, and it is the web one. No terminal UI: a terminal is a
+machine you run the agent on, not a different product.
 
 ---
 
@@ -109,20 +114,19 @@ There is no `attach` and no `peer add`. You're in a chain or you're not; connect
 machines is joining once, after that it takes care of itself.
 
 `roan daemon` is not a server in the sense of a boss: it's the same machine that
-keeps listening. The TUI starts it and doesn't stop it when you close the window.
+keeps listening. It keeps running when you close the browser tab.
 
 **Web and app.** Every machine serves the web UI itself on `/app`. The Android app
 is a thin shell with a pairing screen — address and token, or a QR — but with the
 agent loop inside, so the phone can work on its own when the rest is offline.
 
-**Consistency without boxing yourself in.** Ink and the browser can't share
-components; don't try. What you do share:
+**One UI, so nothing to keep in step.** Because the interface is the web UI and the
+app is that same UI in a shell, there is no second renderer to drift. What the
+machines share:
 
 - the protocol types (one file, imported by everyone)
-- the session state and the reducer (nanostores, outside React)
+- the session state and the reducer
 - the command grammar (`/new`, `/sessions`, `/model`, `/chain`)
-
-Only the last layer — how a block of text reaches the screen — differs per target.
 
 ---
 
@@ -294,7 +298,8 @@ the table. The chain handles the rest of the folder.
 
 ## Phases
 
-**F0 — done.** Core, tools, streaming, TUI. Lives in `~/Roan-TS`.
+**F0 — done.** Core, tools, streaming, one-shot mode. A terminal UI was removed on
+purpose: the interface is the web one, on every device.
 
 **F1 — the chain.** Start with a choice: new chain or join with a code. Numbered
 events with a sender, storage, catch-up protocol ("I have up to N"), and a daemon that

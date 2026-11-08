@@ -1,10 +1,7 @@
 #!/usr/bin/env node
-import { render } from "ink";
-import React from "react";
 import { Agent } from "./agent.js";
 import { loadConfig } from "./config.js";
 import { builtinTools } from "./tools.js";
-import { App } from "./tui/app.js";
 
 const VERSION = "0.1.0";
 
@@ -30,23 +27,27 @@ function parseArgs(argv: string[]): Args {
   return args;
 }
 
-const HELP = `Roan — terminal agent
+const HELP = `Roan — one agent, several machines
 
-Gebruik
-  roan                     start de TUI
-  roan -p "opdracht"       één opdracht, print het antwoord en stop
-  roan --model <naam>      ander model dan de omgeving aangeeft
-  roan --cwd <map>         werk in een andere map
+Usage
+  roan -p "task"           run one task, print the result and stop
+  roan --model <name>      use another model than the environment says
+  roan --cwd <dir>         work in another directory
+  roan -h | --help         this text
+  roan -v | --version      version
 
-Omgeving
-  ROAN_API_URL   basis-URL van een OpenAI-compatibel endpoint
-                 (standaard http://127.0.0.1:1234/v1)
-  ROAN_API_KEY   sleutel, leeg laten mag bij een lokale server
-  ROAN_MODEL     modelnaam
+There is no terminal interface. The web UI is served by every node and shows the
+same thing on a laptop, a server and a phone. Until it exists, -p is the way in.
 
-Tools die het model kan gebruiken: read_file, write_file, list_dir, run_shell.`;
+Environment
+  ROAN_API_URL   base URL of an OpenAI-compatible endpoint
+                 (default http://127.0.0.1:1234/v1)
+  ROAN_API_KEY   key, may be empty for a local server
+  ROAN_MODEL     model name
 
-async function eenmalig(prompt: string, args: Args): Promise<void> {
+Tools the model can use: read_file, write_file, list_dir, run_shell.`;
+
+async function once(prompt: string, args: Args): Promise<void> {
   const config = loadConfig({ model: args.model, cwd: args.cwd });
   const agent = new Agent({
     provider: config,
@@ -56,8 +57,9 @@ async function eenmalig(prompt: string, args: Args): Promise<void> {
     onEvent: (e) => {
       if (e.type === "assistant_text") process.stdout.write(e.text);
       else if (e.type === "tool_start") process.stdout.write(`\n[${e.name}] ${e.args}\n`);
-      else if (e.type === "tool_end") process.stdout.write(`[${e.ok ? "ok" : "fout"}] ${e.output.split("\n")[0]}\n`);
-      else if (e.type === "error") process.stderr.write(`\nfout: ${e.message}\n`);
+      else if (e.type === "tool_end")
+        process.stdout.write(`[${e.ok ? "ok" : "failed"}] ${e.output.split("\n")[0]}\n`);
+      else if (e.type === "error") process.stderr.write(`\nerror: ${e.message}\n`);
     },
   });
 
@@ -76,13 +78,12 @@ async function main(): Promise<void> {
     return;
   }
   if (args.prompt) {
-    await eenmalig(args.prompt, args);
+    await once(args.prompt, args);
     return;
   }
 
-  const config = loadConfig({ model: args.model, cwd: args.cwd });
-  const app = render(React.createElement(App, { config }));
-  await app.waitUntilExit();
+  console.error("No task given. Run `roan -p \"...\"`. The web UI is not built yet.");
+  process.exitCode = 2;
 }
 
 main().catch((err: unknown) => {
