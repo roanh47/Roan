@@ -16,8 +16,9 @@ server, no head agent, no cloud account.
 
 ## What it is
 
-- **One interface.** A web UI served by every node, identical on a laptop, a server
-  and a phone. The Android app is that same UI in a shell. There is no terminal UI.
+- **One interface, and it is an app.** Roan is a desktop app for Windows, macOS and
+  Linux, and a phone app for Android, built from one UI codebase. You open it like any
+  other application.
 - **A chain.** An append-only log of numbered events that every node keeps in full.
 - **A peer network.** Nodes find each other directly over Tailscale. Nothing in the
   middle forwards or stores your session.
@@ -90,40 +91,32 @@ src/tools.ts       read_file, write_file, list_dir, run_shell + path guard
 src/provider.ts    OpenAI-compatible streaming client (SSE + tool calls)
 src/agent.ts       the loop: model → tool → model, emits AgentEvent
 src/config.ts      environment variables and the system prompt
-src/index.ts       argument parsing, one-shot mode
+src/daemon/main.ts the daemon the app starts; no user-facing command
 ```
 
-## Running it today
+## First launch
 
-```bash
-npm install
-npm run build
-node dist/index.js -p "list the files here"
-```
+You open the app, and the first screen offers two things: **create a chain**, or
+**join one** with a code from a device that already has it.
 
-Configuration is by environment variable:
+Provider and model are picked in the app, from the models.dev catalog (235 providers,
+8,940 models). Nothing is configured by environment variable.
 
-```
-ROAN_API_URL    OpenAI-compatible endpoint, default http://127.0.0.1:1234/v1
-ROAN_API_KEY    optional, may be empty for a local model
-ROAN_MODEL      model name, default local-model
-```
-
-Requires Node 22 or newer.
+The daemon that keeps the chain in sync is started by the app and keeps running when
+you close the window.
 
 ## Status
 
 | Part | State |
 |------|-------|
-| Core loop, streaming, tools, one-shot mode | **working** |
+| Core loop, streaming, tools | **working** |
 | The chain (events, storage, catch-up) | planned |
 | Remote tools between nodes | planned |
-| Web UI | planned |
-| Android app | planned |
+| Desktop app (exe/dmg/AppImage) | planned |
+| Phone app (apk) | planned |
 | Distribution (binaries, npm) | planned |
 
-The web UI does not exist yet, so `-p` is the only way in for now. Nothing is
-published.
+Neither app is built yet, so there is no way in for now. Nothing is published.
 
 ## Requirements for the full setup
 

@@ -1,28 +1,25 @@
 {
-  "name": "roan-cli",
+  "name": "roan",
   "version": "0.1.0",
   "description": "One agent, several machines",
   "type": "module",
-  "bin": {
-    "roan": "./dist/index.js"
-  },
-  "files": [
-    "dist"
-  ],
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit"
+    "test": "node --test dist/**/*.test.js",
+    "dev": "tsx src/daemon/main.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "@types/ws": "^8.18.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   },
   "license": "MIT",
-  "dependencies": {}
+  "dependencies": {
+    "ws": "^8.22.2"
+  }
 }

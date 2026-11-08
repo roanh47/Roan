@@ -32,11 +32,11 @@ tool settings. Not per session, not per machine — one whole that is the same
 everywhere.
 
 Roan is a service, not a command you start and stop. It listens and sends all the
-time. Every window onto the chain — the web UI on your laptop, on your server, in
-the app — shows the same thing; close one and the rest keeps running.
+time. Every app onto the chain — on your laptop, your server, your phone — shows the
+same thing; close the window and the rest keeps running.
 
-There is one interface, and it is the web one. No terminal UI: a terminal is a
-machine you run the agent on, not a different product.
+There is one interface, and it is an app you open: a real desktop application on
+Windows, macOS and Linux, and a real app on Android.
 
 ---
 
@@ -102,27 +102,30 @@ done, the next one can come from any machine.
 
 ## What you build
 
-One binary, same code on every machine:
+Everything is in the app: starting, joining, inviting a machine, choosing a provider
+and a model, approving a shell command.
 
-```
-roan                 start: new chain, or join with a code
-roan invite          create a code for the next machine
-roan daemon          stays in the background listening and syncing
-```
+**First launch** is one screen with two choices:
 
-There is no `attach` and no `peer add`. You're in a chain or you're not; connecting
-machines is joining once, after that it takes care of itself.
+- **Create a chain** — makes the ID and the key, and this machine becomes the first
+  node. Once per person, ever.
+- **Join a chain** — asks for a code (typed or scanned), pulls that chain's data, and
+  parks whatever was on this device.
 
-`roan daemon` is not a server in the sense of a boss: it's the same machine that
-keeps listening. It keeps running when you close the browser tab.
+After that the app remembers and opens straight into the conversation.
 
-**Web and app.** Every machine serves the web UI itself on `/app`. The Android app
-is a thin shell with a pairing screen — address and token, or a QR — but with the
-agent loop inside, so the phone can work on its own when the rest is offline.
+**The daemon exists but you never launch it.** The app starts it on open and it keeps
+running when you close the window, because sync must not stop when the UI does. It is
+the same binary, not a server in the sense of a boss.
 
-**One UI, so nothing to keep in step.** Because the interface is the web UI and the
-app is that same UI in a shell, there is no second renderer to drift. What the
-machines share:
+**Desktop and phone app.** Both are built from the same UI code and bundle it inside
+the binary, so there is nothing to serve and nothing to open in a browser. The desktop
+app runs next to the local daemon and talks to it over a local socket; the phone app
+carries the agent loop itself, so it works on its own when the rest is offline. First
+launch pairs the device (code or QR), after that it is just an app.
+
+**One UI, so nothing to keep in step.** Because both apps are built from the same
+frontend code, there is no second renderer to drift. What the machines share:
 
 - the protocol types (one file, imported by everyone)
 - the session state and the reducer
@@ -298,8 +301,7 @@ the table. The chain handles the rest of the folder.
 
 ## Phases
 
-**F0 — done.** Core, tools, streaming, one-shot mode. A terminal UI was removed on
-purpose: the interface is the web one, on every device.
+**F0 — done.** Core, tools, streaming.
 
 **F1 — the chain.** Start with a choice: new chain or join with a code. Numbered
 events with a sender, storage, catch-up protocol ("I have up to N"), and a daemon that
@@ -311,12 +313,12 @@ and see the same conversation.
 node that does have it, with the result back in the same turn. An offline node means a
 clear error on that step, not on the session.
 
-**F3 — web UI.** React app speaking the same protocol, served by every machine.
-Login with a token per device.
+**F3 — desktop app.** Tauri shell that bundles the UI, talks to the local daemon over
+a local socket, and pairs once per device. Opened from the dock or launcher, not a
+app window.
 
-**F4 — Android with its own loop.** The app runs the agent itself, with the web UI as
-its screen. This is the phase where your phone becomes a real node instead of a
-window.
+**F4 — phone app with its own loop.** The Android app runs the agent itself. This is
+the phase where your phone becomes a real node instead of a window.
 
 **F5 — distribution.** `bun build --compile` for `.exe`, `.dmg`, Linux binary.
 `npm i -g` with a thin launcher package. Docker image for the server.

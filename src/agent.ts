@@ -8,13 +8,15 @@ export interface AgentOptions {
   systemPrompt: string;
   cwd: string;
   maxSteps?: number;
+  /** Earlier turns, replayed from the chain. The system prompt is added here. */
+  history?: ChatMessage[];
   onEvent?: (event: AgentEvent) => void;
   signal?: AbortSignal;
 }
 
 /**
  * De agent-loop: model → tool → model, tot het model klaar is of het stappenbudget op is.
- * Weet niets van de UI; alles gaat via onEvent, zodat de TUI en de one-shot modus
+ * Weet niets van de UI; alles gaat via onEvent, zodat de app en de daemon
  * dezelfde core gebruiken.
  */
 export class Agent {
@@ -24,6 +26,7 @@ export class Agent {
   constructor(private readonly opts: AgentOptions) {
     this.maxSteps = opts.maxSteps ?? 24;
     this.messages.push({ role: "system", content: opts.systemPrompt });
+    if (opts.history) this.messages.push(...opts.history);
   }
 
   get history(): ChatMessage[] {

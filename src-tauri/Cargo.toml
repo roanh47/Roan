@@ -1,0 +1,26 @@
+[package]
+name = "roan"
+version = "0.0.1"
+description = "One agent, several machines"
+authors = ["Roan Heemstra"]
+edition = "2021"
+license = "MIT"
+
+# The library target is what Android links against (cdylib) and what the
+# desktop binary calls into. staticlib is required by the Android build.
+[lib]
+name = "roan_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[features]
+# tauri build passes this so the webview loads the bundled assets from
+# frontendDist instead of a dev server.
+custom-protocol = ["tauri/custom-protocol"]
