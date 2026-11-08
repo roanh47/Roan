@@ -1,0 +1,33 @@
+{
+  "name": "@roanh47/roan",
+  "version": "0.2.0",
+  "description": "Launcher for Roan, a terminal AI agent harness. The harness itself is Python.",
+  "bin": {
+    "roan": "bin/roan.js"
+  },
+  "files": [
+    "bin/roan.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/roanh47/Roan.git",
+    "directory": "npm"
+  },
+  "homepage": "https://github.com/roanh47/Roan",
+  "bugs": {
+    "url": "https://github.com/roanh47/Roan/issues"
+  },
+  "keywords": [
+    "roan",
+    "ai",
+    "agent",
+    "harness",
+    "tui",
+    "cli"
+  ],
+  "author": "Roan Heemstra"
+}
