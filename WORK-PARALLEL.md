@@ -85,6 +85,28 @@ Rules for every job:
       store reads, with a version. Wiring `EventStore.open` to `initSchema` and to
       `StoreLock.acquire` is a follow-up on `store.ts`, deliberately not done here.
 
+## Batch 5 — safety, diagnostics, polish
+
+- [x] `src/tools/secrets-scan.ts` + `src/tools/secrets-scan.test.ts` — scan a directory
+      for likely secrets (provider keys, bearer tokens, private-key blocks, `.env`
+      values); findings carry file, line, kind and a redacted preview only.
+- [x] `src/tools/shell-allowlist.ts` + `src/tools/shell-allowlist.test.ts` — classify a
+      command line as `allow` | `ask` | `deny` from a rule list; `deny` for things that
+      escape the workspace or pipe into a shell, never guesses.
+- [x] `src/tools/dry-run.ts` — describe what a mutating call would do (write, patch,
+      shell) as a short human summary, executing nothing.
+- [x] `src/protocol/redact.ts` + `src/protocol/redact.test.ts` — redact secrets and the
+      home directory out of any string bound for an event or an error message.
+- [x] `src/daemon/diagnostics.ts` — collect a redacted diagnostics object (versions,
+      paths with home collapsed, chain head, provider id) with no secret fields.
+- [x] `web/src/components/EmptyState.tsx` — the empty-session screen, props only.
+- [x] `web/src/components/LoadingSkeleton.tsx` — skeleton rows for a pending turn.
+- [x] `web/src/i18n.ts` — typed dutch and english strings for the app shell.
+- [x] `docs/invite-flow.md` — the invite flow end to end, no screenshots claimed that
+      do not exist.
+- [x] `src/turn/lock.test.ts` — one writer per turn: second acquire fails, release
+      allows reacquire, in-process only.
+
 ## Families to extend when the list runs low
 
 - mobile (Android manifest, foreground service for sync, share sheet, notifications)
