@@ -55,18 +55,18 @@ Rules for every job:
 
 ## Batch 3 — app UI (one component per file)
 
-- [ ] `web/src/components/Onboarding.tsx` — the two-button screen, props only, no socket.
-- [ ] `web/src/components/ProviderPicker.tsx` — searchable provider list from a prop.
-- [ ] `web/src/components/ModelPicker.tsx` — models of the chosen provider, with context
+- [x] `web/src/components/Onboarding.tsx` — the two-button screen, props only, no socket.
+- [x] `web/src/components/ProviderPicker.tsx` — searchable provider list from a prop.
+- [x] `web/src/components/ModelPicker.tsx` — models of the chosen provider, with context
       size and price shown.
-- [ ] `web/src/components/InviteCard.tsx` — the code, a copy button, and a "send to
+- [x] `web/src/components/InviteCard.tsx` — the code, a copy button, and a "send to
       another device" hint.
-- [ ] `web/src/components/SettingsPanel.tsx` — provider, model, workspace path.
-- [ ] `web/src/components/ToolCard.tsx` — one tool call and its result, collapsible.
-- [ ] `web/src/components/ErrorBanner.tsx` — a daemon error, dismissible.
-- [ ] `web/src/components/PeerList.tsx` — connected nodes, their tailnet name, head seq.
-- [ ] `web/src/components/Shortcuts.tsx` — keyboard help overlay.
-- [ ] `web/src/theme.ts` — the colour and spacing tokens, one source, used by new files.
+- [x] `web/src/components/SettingsPanel.tsx` — provider, model, workspace path.
+- [x] `web/src/components/ToolCard.tsx` — one tool call and its result, collapsible.
+- [x] `web/src/components/ErrorBanner.tsx` — a daemon error, dismissible.
+- [x] `web/src/components/PeerList.tsx` — connected nodes, their tailnet name, head seq.
+- [x] `web/src/components/Shortcuts.tsx` — keyboard help overlay.
+- [x] `web/src/theme.ts` — the colour and spacing tokens, one source, used by new files.
 
 ## Batch 4 — chain, sync and storage edge cases
 
