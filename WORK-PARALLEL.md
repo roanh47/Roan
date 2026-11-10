@@ -256,6 +256,47 @@ Rules for every job:
       (`tone`, `title`, `body`, `onDismiss`), auto-dismiss left to the caller, props
       only, no socket, uses `web/src/theme.ts` tokens.
 
+## Batch 10 — testing helpers, docs, safety, mobile, packaging, polish
+
+- [x] `src/testing/fake-clock.ts` + `src/testing/fake-clock.test.ts` — `createFakeClock(startIso)`
+      returning `{ now(), nowIso(), advance(ms), set(iso) }`; `advance` with a negative
+      number or a non-finite value throws naming the value; `set` must not move backwards
+      (throws naming both ISO strings); no timers, no real `Date.now()` outside the seed.
+- [x] `src/testing/event-tape.ts` + `src/testing/event-tape.test.ts` — `recordTape(events)`
+      turning `AgentEvent[]` into JSONL (one event per line) and `replayTape(jsonl)` parsing
+      it back; import `AgentEvent` from `../types.js`; a bad line or an unknown `type`
+      throws with the 1-based line number and the offending text; round-trip test.
+- [x] `src/testing/assertions.ts` + `src/testing/assertions.test.ts` — `assertSameSet`,
+      `assertSortedStrings`, `assertErrorMentions(fn, needle)` built on `node:assert/strict`;
+      each helper tested once for passing and once for failing (try/catch around it).
+- [x] `docs/providers.md` — one page: the adapter interface, how `factory.ts` picks one, how
+      retry and usage counting fit. Read `src/providers/adapter.ts`, `factory.ts`,
+      `catalog.ts`, `retry.ts`, `usage.ts` first; describe only what they do. No screenshots.
+- [x] `docs/turn-lifecycle.md` — one page: a turn from typed text to `turn_end`, the
+      one-writer lock, cancellation and where errors surface. Reference the real files
+      (`src/agent.ts`, `src/turn/lock.ts`, `src/turn/cancel.ts`, `src/daemon/turn-runner.ts`);
+      no claims about behaviour the code does not have.
+- [x] `src/safety/audit-log.ts` + `src/safety/audit-log.test.ts` — an in-memory, capped
+      audit trail for tool decisions: `record({ tool, decision, paths, reason })`, `list()`
+      returning a frozen copy oldest-first, `toLines()` with one compact line per entry;
+      entries carry path *names* only, never values; unknown decision throws naming it.
+- [x] `src/protocol/event-budget.ts` + `src/protocol/event-budget.test.ts` — `eventBytes(event)`
+      (UTF-8 bytes of the JSON payload) and `checkEventBudget(event, maxBytes)` returning
+      `{ ok, bytes, largestField }`; import `Event` from `../sync/types.js`; a bad `maxBytes`
+      throws naming the value; the largest field is reported by key, not content.
+- [x] `src/mobile/backup-policy.ts` + `src/mobile/backup-policy.test.ts` — the phone backup
+      rules as data: what is included (env snapshot, sessions, skills), what never is
+      (`secrets/`), a schedule `{ everyHours, keep }` with `everyHours` clamped to 1–168 and
+      `keep` to 1–30, throwing with the bad field named; `describeBackupPolicy()` returns
+      short lines for the app shell.
+- [x] `src/packaging/release-checklist.ts` + `src/packaging/release-checklist.test.ts` —
+      per-platform release checklist as data (`{ id, text, manual }[]` for windows, macos,
+      linux), `buildChecklist(platform, { signed, notarized })` marking what is still open;
+      an unknown platform throws naming it; no shell strings, no file writes.
+- [x] `web/src/components/StatusBar.tsx` — props only, no socket: chain head seq, peer count,
+      provider label and a connection state (`live` | `syncing` | `offline`), compact single
+      row, uses `web/src/theme.ts` tokens only, no new dependencies.
+
 ## Families to extend when the list runs low
 
 - mobile (Android manifest, foreground service for sync, share sheet, notifications)
