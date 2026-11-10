@@ -138,6 +138,40 @@ Rules for every job:
 - [x] `web/src/components/CostBadge.tsx` — token count and cost from props, hidden
       when the provider reports no price, props only.
 
+## Batch 7 — integration harness and the Android side
+
+- [x] `src/testing/stub-provider.ts` + `src/testing/stub-provider.test.ts` — a scripted
+      OpenAI-compatible streaming server on `node:http`: replies with a queued list of
+      SSE bodies (text deltas, tool-call deltas, usage), records the requests it got,
+      returns its base url and a `close()`. Test drives it with `fetch`.
+- [x] `src/testing/chain-fixture.ts` — build a synthetic event chain in code (sender,
+      seq, payload) with helpers to punch a gap, duplicate an id and reorder; used by
+      the chain tests instead of hand-written literals.
+- [x] `src/testing/two-node.ts` + `src/testing/two-node.test.ts` — an in-process
+      two-node harness over temp dirs: two stores, replicate both ways, assert
+      convergence and one-writer safety. Read `src/sync/replicate.ts` and
+      `src/sync/memory-store.ts` first; do not change them.
+- [x] `src/mobile/manifest.ts` + `src/mobile/manifest.test.ts` — build an Android
+      manifest fragment as typed data (package, permissions, foreground-service
+      declaration, share intent filter), escape attribute values, throw naming the
+      bad field; test the escaping and the missing-field error.
+- [x] `src/mobile/sync-service.ts` — the foreground service described as data
+      (service name, channel id, start/stop actions, wake-lock note, retry policy),
+      validated ids, no platform calls.
+- [x] `src/mobile/share-intake.ts` — normalise a share-sheet payload (`text`, `url`,
+      `file`) into an intake record with a title and a dedupe key; refuse empty
+      payloads with a message that names what was missing.
+- [x] `src/mobile/notifications.ts` — notification channels as data (id, name,
+      importance, description) with the importance mapping validated and a
+      `describeChannels()` used by the app shell.
+- [x] `docs/testing.md` — one page: how the stub provider, fixtures and the two-node
+      harness are used, what is covered and what is not. No claims about runs that
+      did not happen.
+- [x] `web/src/components/UpdateBanner.tsx` — "a newer version is available" banner,
+      props only, dismissible, uses `web/src/theme.ts` tokens.
+- [x] `web/src/components/MobileSyncCard.tsx` — the phone-sync status card (last sync,
+      peers paired, a copy button), props only, no socket.
+
 ## Families to extend when the list runs low
 
 - mobile (Android manifest, foreground service for sync, share sheet, notifications)
