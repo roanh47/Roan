@@ -297,6 +297,57 @@ Rules for every job:
       provider label and a connection state (`live` | `syncing` | `offline`), compact single
       row, uses `web/src/theme.ts` tokens only, no new dependencies.
 
+## Batch 11 — mobile queue, packaging manifests, safety, chain reports, docs
+
+- [x] `src/mobile/queue.ts` + `src/mobile/queue.test.ts` — an outbound sync queue for a
+      phone that is offline: `enqueue(event)` dropping an event whose id is already
+      queued, `head(n)` returning the next `n` in insertion order, `ack(id)` and
+      `size()`, `planFlush(nowIso, max)` returning `{ send: Event[]; hold: number;
+      reason: string }`; import `Event` from `../sync/types.js`, no timers, no I/O,
+      negative `max` throws naming the value.
+- [x] `src/packaging/msix.ts` + `src/packaging/msix.test.ts` — an Appx/MSIX manifest
+      fragment as typed data (identity name, publisher, version, architecture,
+      capabilities list), validating the identity name against the package-name
+      character set and the version as four numeric parts, escaping XML attribute
+      values, throwing with the bad field named; no file writes.
+- [x] `src/packaging/release-manifest.ts` + `src/packaging/release-manifest.test.ts` —
+      a release manifest object for one build: `{ version, platform, arch, file,
+      bytes, sha256, url }[]`, validating version through the existing
+      `semver.ts` (import it, do not change it), requiring an https url, a 64-char
+      lowercase hex sha256 and a positive byte count, sorted by platform then arch;
+      throw naming the offending entry and field.
+- [x] `src/safety/rate-limit.ts` + `src/safety/rate-limit.test.ts` — a pure token
+      bucket per tool: `createLimiter({ perMinute, burst })`, `take(tool, nowMs)`
+      returning `{ ok, waitMs, remaining }`; refills at `perMinute/60000` per ms,
+      unknown amounts clamped or rejected with the bad field named, no timers and no
+      real `Date.now()` (the time is always passed in).
+- [x] `src/testing/temp-dir.ts` + `src/testing/temp-dir.test.ts` — `makeTempDir(prefix)`
+      and `withTempDir(fn)` over `node:fs/promises` under `node:os` tmpdir, always
+      cleaning up even when the callback throws, ids unique per call; test creates
+      files, asserts the path is gone after success and after a throw.
+- [x] `src/chain/summary.ts` + `src/chain/summary.test.ts` — pure `summarize(events)`
+      returning `{ count, firstSeq, lastSeq, perType: Record<string, number>,
+      largest: { seq, bytes } | null, contiguous }` from `Event[]`; sorted type keys,
+      an empty chain returns zeroes and `largest: null`, no I/O, imports only
+      `../sync/types.js`.
+- [x] `src/protocol/version.ts` + `src/protocol/version.test.ts` — protocol version
+      as `{ major, minor }`, `parseVersion(text)` rejecting anything that is not
+      two dot-separated non-negative integers with the input in the message, and
+      `isCompatible(peer, local)` true only on equal major and peer minor ≤ local
+      minor, plus a one-line `describeVersion()`.
+- [x] `docs/chain.md` — one page: the event shape, `seq` contiguity, append-only with
+      one writer, and what export, verify, gc and backfill do. Read
+      `src/chain/store.ts`, `src/chain/export.ts`, `src/chain/verify.ts`,
+      `src/chain/gc.ts`, `src/sync/backfill.ts` first; describe only what they do.
+- [x] `docs/daemon.md` — one page: how the app starts the daemon, the control
+      protocol it speaks, where state lives, and how a turn is started. Read
+      `src/daemon/main.ts`, `src/daemon/control.ts`, `src/daemon/control-protocol.ts`,
+      `src/daemon/paths.ts`, `src/daemon/turn-runner.ts` first; no invented commands.
+- [x] `web/src/components/ToolApprovalCard.tsx` — props only, no socket: the
+      allow/ask/deny decision for one tool call (tool name, the paths it touched, a
+      one-line reason, three callbacks), disabled while a decision is pending, uses
+      `web/src/theme.ts` tokens only, no new dependencies.
+
 ## Families to extend when the list runs low
 
 - mobile (Android manifest, foreground service for sync, share sheet, notifications)
