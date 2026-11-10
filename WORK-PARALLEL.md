@@ -33,24 +33,25 @@ Rules for every job:
 
 ## Batch 2 — providers
 
-- [ ] `src/providers/anthropic.ts` — messages API adapter with the same streaming
+- [x] `src/providers/anthropic.ts` — messages API adapter with the same streaming
       interface the OpenAI adapter exposes; tool calls mapped both ways.
-- [ ] `src/providers/google.ts` — Gemini generateContent adapter, same interface.
-- [ ] `src/providers/openai-compat.ts` — extract the current OpenAI code so there is one
+- [x] `src/providers/google.ts` — Gemini generateContent adapter, same interface.
+- [x] `src/providers/openai-compat.ts` — extract the current OpenAI code so there is one
       adapter and `src/provider.ts` delegates to it.
-- [ ] `src/providers/factory.ts` — pick an adapter from a provider id in the catalog,
+- [x] `src/providers/factory.ts` — pick an adapter from a provider id in the catalog,
       with a clear error naming the provider when it is unsupported.
-- [ ] `src/providers/retry.ts` — exponential backoff on 429 and 5xx only, honouring
+- [x] `src/providers/retry.ts` — exponential backoff on 429 and 5xx only, honouring
       `retry-after`, with a cap and jitter; never retries 400 or 401.
-- [ ] `src/providers/usage.ts` — count tokens from the response `usage` field and keep a
+- [x] `src/providers/usage.ts` — count tokens from the response `usage` field and keep a
       running total per chain in memory.
-- [ ] `src/providers/models-filter.ts` — filter the catalog by tool support, context size
+- [x] `src/providers/models-filter.ts` — filter the catalog by tool support, context size
       and price ceiling, used by the picker.
-- [ ] `src/providers/display.ts` — provider and model labels, ordering, and a search
+- [x] `src/providers/display.ts` — provider and model labels, ordering, and a search
       function over id and name.
-- [ ] `tests/providers-factory.test.ts` — every provider id in the catalog resolves or is
-      explicitly unsupported; no silent failures.
-- [ ] `src/providers/README.md` — how to add a provider in one page.
+- [x] `src/providers/factory.test.ts` — every provider id in the catalog resolves or is
+      explicitly unsupported; no silent failures. (Lives in `src/` because `tsconfig`
+      only includes `src` and `npm test` runs `dist/**/*.test.js`.)
+- [x] `src/providers/README.md` — how to add a provider in one page.
 
 ## Batch 3 — app UI (one component per file)
 
