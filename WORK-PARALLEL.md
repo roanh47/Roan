@@ -107,6 +107,37 @@ Rules for every job:
 - [x] `src/turn/lock.test.ts` — one writer per turn: second acquire fails, release
       allows reacquire, in-process only.
 
+## Batch 6 — packaging, docs and polish
+
+- [x] `src/packaging/winget.ts` — build a winget manifest object from a `PackageInfo`
+      (id, name, publisher, version, licence, installer url + sha256); validate the id
+      and version, escape the YAML strings, return a typed object, throw with the bad
+      field named.
+- [x] `src/packaging/desktop-entry.ts` — generate a Linux `.desktop` entry from app
+      name, comment, exec path, icon and categories; quote/escape per the spec, mark
+      `%U` only when the app takes urls, and round-trip parse its own output.
+- [x] `src/packaging/notarize.ts` — describe the macOS notarization steps as data
+      (`sign`, `zip`, `submit`, `staple`) from an app path plus the *names* of the
+      credential env vars; never read or echo their values, refuse with a clear error
+      when a required name is missing.
+- [x] `src/packaging/icons.ts` — the icon size matrix per platform (Windows `.ico`
+      sizes, macOS `.icns` sizes, Linux png sizes) and a function that reports which
+      sizes are missing from a list of provided ones, sorted, no throwing on odd input.
+- [x] `src/packaging/semver.ts` — strict `major.minor.patch` parse and bump, with
+      optional prerelease kept intact; reject anything else with the offending string
+      in the message. No dependency.
+- [x] `src/packaging/checksums.ts` — sha256 over a list of files, returned sorted by
+      path, plus a `sha256sum`-compatible listing string; skips nothing silently —
+      missing files are reported per file.
+- [x] `docs/packaging.md` — one page: what a release contains per platform, how it is
+      signed, which steps are manual. No screenshots claimed that do not exist.
+- [x] `docs/mobile.md` — the Android app plan: foreground service for sync, share
+      sheet intake, notification channel, what is not built yet.
+- [x] `web/src/components/ReleaseBadge.tsx` — app version and platform, props only,
+      no socket, uses `web/src/theme.ts` tokens.
+- [x] `web/src/components/CostBadge.tsx` — token count and cost from props, hidden
+      when the provider reports no price, props only.
+
 ## Families to extend when the list runs low
 
 - mobile (Android manifest, foreground service for sync, share sheet, notifications)
