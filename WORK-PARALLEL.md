@@ -13,23 +13,23 @@ Rules for every job:
 
 ## Batch 1 — tools (the agent's hands)
 
-- [ ] `src/tools/search.ts` — `grep(pattern, path, options)` over text files, capped
+- [x] `src/tools/search.ts` — `grep(pattern, path, options)` over text files, capped
       results, binary files skipped, regex errors reported as text not thrown.
-- [ ] `src/tools/glob.ts` — `glob(pattern, cwd)` returning sorted relative paths,
+- [x] `src/tools/glob.ts` — `glob(pattern, cwd)` returning sorted relative paths,
       `**` support, ignore `node_modules` and `.git`, capped at 500.
-- [ ] `src/tools/patch.ts` — `apply_patch(path, oldText, newText)`, refuses when the
+- [x] `src/tools/patch.ts` — `apply_patch(path, oldText, newText)`, refuses when the
       old text appears zero or more than once, returns a unified diff.
-- [ ] `src/tools/http.ts` — `fetch_url(url)` returning status, content type and at most
+- [x] `src/tools/http.ts` — `fetch_url(url)` returning status, content type and at most
       20k characters of text, with a timeout and a clear error per failure mode.
-- [ ] `src/tools/git.ts` — read-only `git_status`, `git_diff`, `git_log` for a repo path.
-- [ ] `src/tools/tree.ts` — `list_tree(path, depth)` printing a compact indented tree,
+- [x] `src/tools/git.ts` — read-only `git_status`, `git_diff`, `git_log` for a repo path.
+- [x] `src/tools/tree.ts` — `list_tree(path, depth)` printing a compact indented tree,
       capped, skipping ignored directories.
-- [ ] `src/tools/registry.ts` — a typed registry that takes tool definitions and hands
+- [x] `src/tools/registry.ts` — a typed registry that takes tool definitions and hands
       the agent only those allowed by a policy object; unknown tool names rejected.
-- [ ] `src/tools/policy.ts` — a policy type: per tool `allow` | `ask` | `deny`, plus path
+- [x] `src/tools/policy.ts` — a policy type: per tool `allow` | `ask` | `deny`, plus path
       rules (inside the workspace, never inside `secrets/`), with tests.
-- [ ] `tests/tools-search.test.ts` + `tests/tools-glob.test.ts` — real temp directories.
-- [ ] `src/tools/README.md` — one page: how a tool is defined, how policy applies.
+- [x] `src/tools/search.test.ts` + `src/tools/glob.test.ts` — real temp directories.
+- [x] `src/tools/README.md` — one page: how a tool is defined, how policy applies.
 
 ## Batch 2 — providers
 
