@@ -217,6 +217,45 @@ Rules for every job:
       `src/chain/store.ts`, `src/sync/replicate.ts`, `src/tools/policy.ts`). No claims
       about behaviour that the code does not have; no screenshots.
 
+## Batch 9 — safety edges, sync reports, mobile links, polish
+
+- [x] `src/tools/outline.ts` + `src/tools/outline.test.ts` — `outline(source, file)`
+      listing top-level declarations (export, class, interface, type, function, const)
+      as `{ kind, name, line }[]`, capped at 200, no parser dependency; tests pass
+      source strings directly, no temp files.
+- [x] `src/protocol/size.ts` + `src/protocol/size.test.ts` — `byteLength(text)` over
+      UTF-8 and `truncateForEvent(text, maxBytes)` returning `{ text, truncated,
+      originalBytes }`, cutting on a codepoint boundary with a marker and never
+      splitting a surrogate pair; bad `maxBytes` throws naming the value.
+- [x] `src/turn/cancel.ts` + `src/turn/cancel.test.ts` — a `CancelToken` with
+      `cancel(reason)`, `isCancelled`, `reason`, `throwIfCancelled()` and listener
+      registration; cancel is idempotent and keeps the first reason; no timers.
+- [x] `src/sync/conflict-report.ts` + `src/sync/conflict-report.test.ts` — pure
+      `describeConflict(local, remote)` where each side is `{ head: number; idAt(seq:
+      number): string | undefined }`; returns `{ kind: "none" | "ahead" | "conflict";
+      lines: string[] }` naming the first seq whose ids differ. No I/O.
+- [x] `src/daemon/log-rotate.ts` + `src/daemon/log-rotate.test.ts` — `planRotation(
+      files, policy)` over `{ path, size }[]` returning renames as data
+      (`{ from, to }[]`, newest first), plus `parsePolicy` clamping maxFiles 1–50 and
+      maxBytes; writes nothing.
+- [x] `src/mobile/deeplink.ts` + `src/mobile/deeplink.test.ts` — parse and format
+      `roan://join?code=…&chain=…&expires=…`; missing or malformed parts throw naming
+      the field, round-trip test, reject a non-`roan:` scheme.
+- [x] `src/packaging/updater.ts` + `src/packaging/updater.test.ts` — build an update
+      feed entry `{ version, url, sha256, notes, mandatory }` as typed data, validate
+      version via the existing `semver.ts` (import it, do not change it), require an
+      https url and a 64-char hex sha256, throw naming the bad field.
+- [x] `src/env/diff.ts` + `src/env/diff.test.ts` — pure `diffEnv(local, chain)` telling
+      which keys join would adopt from the chain and which local keys are dropped
+      (rule 9: join adopts, never merges); sorted output, no fs, secrets' *names* only.
+- [x] `docs/security.md` — one page: secrets never travel, the tool policy, redaction,
+      secrets scanning and the command allowlist, referencing the real files
+      (`src/tools/policy.ts`, `src/protocol/redact.ts`, `src/tools/secrets-scan.ts`,
+      `src/tools/shell-allowlist.ts`). No claims the code does not back.
+- [x] `web/src/components/Toast.tsx` — a dismissible toast stack from props
+      (`tone`, `title`, `body`, `onDismiss`), auto-dismiss left to the caller, props
+      only, no socket, uses `web/src/theme.ts` tokens.
+
 ## Families to extend when the list runs low
 
 - mobile (Android manifest, foreground service for sync, share sheet, notifications)
