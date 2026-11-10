@@ -70,16 +70,20 @@ Rules for every job:
 
 ## Batch 4 — chain, sync and storage edge cases
 
-- [ ] `src/chain/export.ts` — export a chain to JSONL and import it into an empty store.
-- [ ] `src/chain/gc.ts` — report what could be compacted; never deletes anything.
-- [ ] `src/chain/verify.ts` — walk a chain and report gaps, duplicate ids, bad order.
-- [ ] `src/sync/backfill.ts` — request a range by seq when a gap is detected.
-- [ ] `src/sync/presence.ts` — track which nodes are live and their heads.
-- [ ] `src/transport/metrics.ts` — per peer counters: frames in, out, reconnects, lag.
-- [ ] `src/chain/lockfile.ts` — refuse to open the store twice from two processes.
-- [ ] `tests/chain-verify.test.ts` — cases with a hole, a duplicate and a good chain.
-- [ ] `src/chain/README.md` — the guarantee: append only, seq contiguous, one writer.
-- [ ] `src/chain/schema.sql` — the schema as a real file the store reads, with a version.
+- [x] `src/chain/export.ts` — export a chain to JSONL and import it into an empty store.
+- [x] `src/chain/gc.ts` — report what could be compacted; never deletes anything.
+- [x] `src/chain/verify.ts` — walk a chain and report gaps, duplicate ids, bad order.
+- [x] `src/sync/backfill.ts` — request a range by seq when a gap is detected.
+- [x] `src/sync/presence.ts` — track which nodes are live and their heads.
+- [x] `src/transport/metrics.ts` — per peer counters: frames in, out, reconnects, lag.
+- [x] `src/chain/lockfile.ts` — refuse to open the store twice from two processes.
+- [x] `src/chain/verify.test.ts` — cases with a hole, a duplicate and a good chain.
+      (In `src/` not `tests/`: `tsconfig` includes only `src`, so a test under
+      `tests/` would never compile or be run by `npm test`.)
+- [x] `src/chain/README.md` — the guarantee: append only, seq contiguous, one writer.
+- [x] `src/chain/schema.sql` + `src/chain/schema.ts` — the schema as a real file the
+      store reads, with a version. Wiring `EventStore.open` to `initSchema` and to
+      `StoreLock.acquire` is a follow-up on `store.ts`, deliberately not done here.
 
 ## Families to extend when the list runs low
 
