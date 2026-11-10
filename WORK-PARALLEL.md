@@ -172,6 +172,51 @@ Rules for every job:
 - [x] `web/src/components/MobileSyncCard.tsx` — the phone-sync status card (last sync,
       peers paired, a copy button), props only, no socket.
 
+## Batch 8 — resume, tools for the loop, packaging and polish
+
+- [x] `src/sync/resume.ts` + `src/sync/resume.test.ts` — pure `planResume(local, remote)`
+      where each side is `{ head: number; have(id: string): boolean }`; returns
+      `{ action: "none" | "pull" | "push" | "conflict"; from: number; reason: string }`.
+      Equal heads → none; remote ahead → pull from local.head + 1; local ahead → push;
+      overlapping tail with a mismatched id → conflict naming the seq. No I/O, no sockets.
+- [x] `src/sync/dedupe.ts` + `src/sync/dedupe.test.ts` — `dedupeEvents(events)` keeps the
+      first event per id in input order and returns `{ kept: Event[]; dropped: Event[];
+      duplicateIds: string[] }` with ids sorted. Import the `Event` type from
+      `./types.js`; import nothing else. Report a seq/id mismatch as dropped too.
+- [x] `src/transport/heartbeat.ts` + `src/transport/heartbeat.test.ts` — heartbeat policy
+      as pure data plus `isPeerStale(lastSeenAt, now, policy)` and `nextBeatAt(now, policy)`;
+      clamp the interval to 1000–60000 ms and the miss threshold to 2–10, throwing with
+      the bad field named; never schedules a timer itself.
+- [x] `src/tools/todo.ts` + `src/tools/todo.test.ts` — an in-memory `TodoStore` for the
+      session todo list: `add(text)`, `complete(id)`, `remove(id)`, `list()` returning a
+      frozen copy, sequential ids; empty text and unknown ids throw with a message naming
+      the input. No file system, no console.
+- [x] `src/tools/read-many.ts` + `src/tools/read-many.test.ts` — `readMany(paths, options)`
+      over `node:fs/promises`: per-path union `{ path, ok: true, text }` or
+      `{ path, ok: false, error }`, results sorted by path, total characters capped
+      (default 40000) with a truncation flag, binary files reported as an error rather
+      than decoded. Tests use real temp directories under `node:os` tmpdir.
+- [x] `src/packaging/appimage.ts` — an AppImage build plan as data: `AppDir` layout
+      entries, an argv array per step (`appimagetool`, `linuxdeploy`), the `.desktop`
+      file name and icon path; validate app name (no spaces or slashes) and version,
+      throw naming the bad field, never build a shell string.
+- [x] `src/packaging/changelog.ts` + `src/packaging/changelog.test.ts` — parse a Keep a
+      Changelog style markdown into typed releases `{ version, date, sections: { kind;
+      entries: string[] }[] }`, newest first; reject a bad `## [x] - date` heading with
+      the offending line in the message, ignore text before the first release.
+- [x] `src/mobile/pairing.ts` + `src/mobile/pairing.test.ts` — encode and decode a pairing
+      payload (`code`, `tailnetName`, `chainId`, `expiresAt`) as a url-safe base64 JSON
+      string; reject a payload that is expired, has a code shorter than 8 chars, or is
+      not decodable, each with its own message; round-trip test.
+- [x] `web/src/components/CommandPalette.tsx` — props only, no socket: a query input,
+      filtered action list from a prop, arrow/enter handling through prop callbacks,
+      empty state, uses `web/src/theme.ts` tokens. No new dependencies.
+- [x] `docs/architecture.md` — one page: the core is renderer-agnostic, the chain is
+      append-only with one writer, tools are distributed while sessions stay where the
+      user typed, and joining adopts the chain. Reference the real files (`src/agent.ts`,
+      `src/chain/store.ts`, `src/sync/replicate.ts`, `src/tools/policy.ts`). No claims
+      about behaviour that the code does not have; no screenshots.
+
 ## Families to extend when the list runs low
 
 - mobile (Android manifest, foreground service for sync, share sheet, notifications)
