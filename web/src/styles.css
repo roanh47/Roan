@@ -657,3 +657,109 @@ textarea {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* Onboarding: the first screen a device shows when it has no chain yet. */
+.app--onboarding {
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr;
+}
+
+.onboarding {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 48px 24px;
+}
+
+.onboarding__title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.onboarding__text {
+  margin: 0;
+  color: #9aa0aa;
+  line-height: 1.5;
+}
+
+.onboarding__primary,
+.onboarding__secondary {
+  border: 1px solid #2b2f38;
+  border-radius: 8px;
+  background: #171a20;
+  color: inherit;
+  padding: 10px 14px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.onboarding__primary {
+  background: #f0b429;
+  border-color: #f0b429;
+  color: #14161a;
+  font-weight: 600;
+}
+
+.onboarding__primary:disabled,
+.onboarding__secondary:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.onboarding__sep {
+  color: #6b7280;
+  text-align: center;
+  font-size: 13px;
+}
+
+.onboarding__label {
+  font-size: 13px;
+  color: #9aa0aa;
+}
+
+.onboarding__row {
+  display: flex;
+  gap: 8px;
+}
+
+.onboarding__input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid #2b2f38;
+  border-radius: 8px;
+  background: #12151a;
+  color: inherit;
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.onboarding__invite {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid #2b2f38;
+  border-radius: 8px;
+  padding: 12px;
+  background: #12151a;
+}
+
+.onboarding__code {
+  font-size: 12px;
+  word-break: break-all;
+  color: #d6d9df;
+}
+
+.onboarding__error {
+  margin: 0;
+  color: #f87171;
+  font-size: 13px;
+}
+
+.onboarding__hint {
+  margin: 8px 0 0;
+  color: #6b7280;
+  font-size: 12px;
+}

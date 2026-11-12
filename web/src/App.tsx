@@ -47,6 +47,7 @@ export default function App(): ReactElement {
   const turn = useMemo(() => openTurn(snapshot.events), [snapshot.events]);
 
   const [notice, setNotice] = useState<string | null>(null);
+  const [joinCode, setJoinCode] = useState("");
 
   useEffect(() => {
     client.connect();
@@ -77,6 +78,99 @@ export default function App(): ReactElement {
     }
   }
 
+  const onboarded = snapshot.chain !== null && snapshot.chain !== "";
+
+  if (!onboarded) {
+    return (
+      <div className="app app--onboarding">
+        <header className="titlebar" data-tauri-drag-region>
+          <div className="titlebar__brand" data-tauri-drag-region>
+            <span className="titlebar__mark" aria-hidden="true" data-tauri-drag-region />
+            <span className="titlebar__name" data-tauri-drag-region>
+              Roan
+            </span>
+          </div>
+          <span className="titlebar__chain" data-tauri-drag-region>
+            {snapshot.status === "open" ? "no chain yet" : "connecting…"}
+          </span>
+        </header>
+
+        <main className="onboarding">
+          <h1 className="onboarding__title">Start on this device</h1>
+          <p className="onboarding__text">
+            A chain is the conversation and everything around it. Create one here,
+            or join one that already exists — joining takes the chain's history as
+            your own.
+          </p>
+
+          <button
+            type="button"
+            className="onboarding__primary"
+            disabled={snapshot.status !== "open"}
+            onClick={() => {
+              try {
+                client.createChain();
+              } catch (error) {
+                setNotice(error instanceof Error ? error.message : "could not create a chain");
+              }
+            }}
+          >
+            Create a new chain
+          </button>
+
+          <div className="onboarding__sep" aria-hidden="true">
+            or
+          </div>
+
+          <label className="onboarding__label" htmlFor="join-code">
+            Join an existing chain
+          </label>
+          <div className="onboarding__row">
+            <input
+              id="join-code"
+              className="onboarding__input"
+              value={joinCode}
+              placeholder="paste the code from the other device"
+              onChange={(event) => setJoinCode(event.target.value)}
+              spellCheck={false}
+              autoComplete="off"
+            />
+            <button
+              type="button"
+              className="onboarding__secondary"
+              disabled={snapshot.status !== "open" || joinCode.trim().length === 0}
+              onClick={() => {
+                try {
+                  client.joinChain(joinCode);
+                } catch (error) {
+                  setNotice(error instanceof Error ? error.message : "could not join");
+                }
+              }}
+            >
+              Join
+            </button>
+          </div>
+
+          {snapshot.invite !== null ? (
+            <div className="onboarding__invite">
+              <span className="onboarding__label">Code for the next device</span>
+              <code className="onboarding__code">{snapshot.invite}</code>
+            </div>
+          ) : null}
+
+          {snapshot.error !== null ? <p className="onboarding__error">{snapshot.error}</p> : null}
+          {notice !== null ? <p className="onboarding__error">{notice}</p> : null}
+
+          <p className="onboarding__hint">
+            {snapshot.status === "open"
+              ? "The daemon is running on this machine."
+              : "Waiting for the daemon on this machine to answer."}
+          </p>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       <header className="titlebar" data-tauri-drag-region>
@@ -104,6 +198,12 @@ export default function App(): ReactElement {
       </main>
 
       <aside className="rail">
+        {snapshot.invite !== null ? (
+          <div className="onboarding__invite">
+            <span className="onboarding__label">Code for the next device</span>
+            <code className="onboarding__code">{snapshot.invite}</code>
+          </div>
+        ) : null}
         <TurnStatus
           turn={turn}
           status={snapshot.status}

@@ -10,3 +10,6 @@ build/
 __pycache__/
 *.egg-info/
 .pytest_cache/
+
+# build products, never committed
+src-tauri/binaries/

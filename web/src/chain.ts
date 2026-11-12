@@ -63,7 +63,33 @@ export interface AppendFrame {
   event: ChainEvent;
 }
 
-export type ServerFrame = HelloFrame | EventsFrame | AppendFrame;
+/** The daemon's answer to "make me a chain", with the code for the next device. */
+export interface ChainCreatedFrame {
+  t: "chain";
+  chain: string;
+  node: string;
+  invite?: string;
+}
+
+/** The daemon's own view of where it is; carries the invite code. */
+export interface DaemonStateFrame {
+  t: "state";
+  data: { chain: string | null; node: string | null; invite?: string | null };
+}
+
+/** The daemon refused: bad code, wrong chain, already onboarding. */
+export interface ControlErrorFrame {
+  t: "control_error";
+  message: string;
+}
+
+export type ServerFrame =
+  | HelloFrame
+  | EventsFrame
+  | AppendFrame
+  | ChainCreatedFrame
+  | DaemonStateFrame
+  | ControlErrorFrame;
 
 export interface ClientHelloFrame {
   t: "hello";
@@ -101,6 +127,8 @@ export interface ChainSnapshot {
   pending: readonly PendingMessage[];
   lastSeq: number;
   error: string | null;
+  /** Set after this device created a chain: the code for the next one. */
+  invite: string | null;
 }
 
 /** An open turn: a turn_start with no matching turn_end. */
@@ -190,6 +218,30 @@ export function parseFrame(raw: unknown): ServerFrame | null {
   if (value.t === "append") {
     if (!isChainEvent(value.event)) return null;
     return { t: "append", event: value.event };
+  }
+
+  if (value.t === "chain") {
+    if (typeof value.chain !== "string" || typeof value.node !== "string") return null;
+    return {
+      t: "chain",
+      chain: value.chain,
+      node: value.node,
+      ...(typeof value.invite === "string" ? { invite: value.invite } : {}),
+    };
+  }
+
+  if (value.t === "state") {
+    const data = value.data;
+    if (!isRecord(data)) return null;
+    const chain = typeof data.chain === "string" ? data.chain : null;
+    const node = typeof data.node === "string" ? data.node : null;
+    const invite = typeof data.invite === "string" ? data.invite : null;
+    return { t: "state", data: { chain, node, invite } };
+  }
+
+  if (value.t === "control_error") {
+    if (typeof value.message !== "string") return null;
+    return { t: "control_error", message: value.message };
   }
 
   return null;
@@ -294,6 +346,7 @@ export class ChainClient {
       pending: this.pending,
       lastSeq: 0,
       error: null,
+      invite: null,
     };
   }
 
@@ -345,6 +398,21 @@ export class ChainClient {
    * Appends a user message. Throws rather than losing it: the composer is
    * disabled in these cases, so an exception here is a bug, not a flow.
    */
+  /**
+   * Starts a new chain on this device. The answer carries the code the next
+   * device pastes in; it is kept in the snapshot so the UI can show it.
+   */
+  createChain(): void {
+    this.send({ t: "create_chain" } as unknown as ClientFrame);
+  }
+
+  /** Adopts an existing chain: its events become this device's history. */
+  joinChain(code: string): void {
+    const trimmed = code.trim();
+    if (trimmed.length === 0) throw new Error("a join code is required");
+    this.send({ t: "join_chain", code: trimmed } as unknown as ClientFrame);
+  }
+
   sendMessage(text: string): PendingMessage {
     const body = text.trim();
     if (body.length === 0) throw new Error("cannot send an empty message");
@@ -396,6 +464,7 @@ export class ChainClient {
       if (this.socket !== socket) return;
       this.retryDelay = this.backoff ? this.backoff.minMs : 0;
       this.update({ status: "open", error: null });
+      this.send({ t: "state" } as unknown as ClientFrame);
       this.resync();
     };
 
@@ -445,6 +514,37 @@ export class ChainClient {
   }
 
   private receive(frame: ServerFrame): void {
+    if (frame.t === "state") {
+      // The daemon is the only one who knows the code; a reload keeps it.
+      if (frame.data.invite !== null && frame.data.invite !== undefined) {
+        this.update({ invite: frame.data.invite });
+      }
+      return;
+    }
+
+    if (frame.t === "control_error") {
+      this.update({ error: frame.message });
+      return;
+    }
+
+    if (frame.t === "chain") {
+      // A chain was just created or joined on this device: start from zero and
+      // let the daemon's next hello name the nodes.
+      this.seen.clear();
+      this.events = [];
+      this.pending = [];
+      this.update({
+        chain: frame.chain,
+        events: [],
+        pending: [],
+        lastSeq: 0,
+        error: null,
+        invite: frame.invite ?? null,
+      });
+      this.resync();
+      return;
+    }
+
     if (frame.t === "hello") {
       // Joining adopts the chain: if the daemon reports another chain, the old
       // transcript belongs to a session this app is no longer in.

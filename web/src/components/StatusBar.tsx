@@ -6,25 +6,21 @@ import type { ColorToken } from "../theme";
 export type StatusState = "live" | "syncing" | "offline";
 
 export interface StatusBarProps {
-  /** Chain head sequence number. Negative or non-finite values render as 0. */
-  headSeq: number;
-  /** Connected peer count. Negative or non-finite values render as 0. */
-  peerCount: number;
-  /** Human label for the active transport, e.g. "iroh" or "local". */
-  providerLabel: string;
-  /** Drives the coloured state dot only — the bar never changes data itself. */
+  /** Drives the coloured state dot only; the bar never mutates data. */
   state: StatusState;
-  /** When given, a refresh button is rendered and calls this; when absent, no button. */
-  onRefresh?: () => void;
+  /** Chain identifier, e.g. "roan-mainnet". */
+  chainId: string;
+  /** Chain head sequence number; negative or non-finite values read as 0. */
+  headSeq: number;
+  /** Connected peer count; negative or non-finite values read as 0. */
+  peerCount: number;
+  /** Active model name, e.g. "deepseek-v4.1-flash". */
+  modelName: string;
 }
 
 const S = space;
 const R = radii;
-
-/** State -> (dot colour token, accessible label). */
-const stateMeta: Readonly<
-  Record<StatusState, { readonly token: ColorToken; readonly label: string }>
-> = Object.freeze({
+const stateMeta: Readonly<Record<StatusState, { readonly token: ColorToken; readonly label: string }>> = Object.freeze({
   live: { token: "accent", label: "Live" },
   syncing: { token: "warn", label: "Syncing" },
   offline: { token: "danger", label: "Offline" },
@@ -32,58 +28,18 @@ const stateMeta: Readonly<
 
 const styles = {
   bar: {
-    display: "flex",
-    alignItems: "center",
-    gap: S.md,
-    flexWrap: "nowrap",
-    padding: `${S.xs}px ${S.sm}px`,
-    border: `1px solid ${cssVar("lineSoft")}`,
-    borderRadius: R.sm,
-    background: cssVar("surface2"),
-    color: cssVar("muted"),
-    fontFamily: fonts.mono,
-    fontSize: 12,
-    lineHeight: 1.5,
-    whiteSpace: "nowrap",
-    overflow: "hidden",
+    display: "flex", alignItems: "center", gap: S.sm,
+    padding: `${S.xs}px ${S.sm}px`, border: `1px solid ${cssVar("lineSoft")}`,
+    borderRadius: R.sm, background: cssVar("surface2"), color: cssVar("muted"),
+    fontFamily: fonts.mono, fontSize: 12, lineHeight: 1.5,
+    whiteSpace: "nowrap", overflow: "hidden",
   },
-  item: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: S.xs,
-    minWidth: 0,
-  },
-  dot: {
-    display: "inline-block",
-    flex: "0 0 auto",
-    width: 7,
-    height: 7,
-    borderRadius: R.pill,
-  },
-  head: {
-    color: cssVar("fg"),
-  },
-  provider: {
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    color: cssVar("faint"),
-  },
-  separator: {
-    color: cssVar("line"),
-  },
-  refresh: {
-    marginLeft: "auto",
-    flex: "0 0 auto",
-    font: "inherit",
-    fontSize: 12,
-    lineHeight: 1,
-    padding: `${S.xs}px ${S.sm}px`,
-    border: `1px solid ${cssVar("line")}`,
-    borderRadius: R.sm,
-    background: "transparent",
-    color: cssVar("fg"),
-    cursor: "pointer",
-  },
+  item: { display: "inline-flex", alignItems: "center", gap: S.xs, minWidth: 0 },
+  dot: { flex: "0 0 auto", width: 7, height: 7, borderRadius: R.pill },
+  strong: { color: cssVar("fg") },
+  faint: { color: cssVar("faint") },
+  ellipsis: { overflow: "hidden", textOverflow: "ellipsis", maxWidth: 160 },
+  separator: { color: cssVar("line") },
 } as const satisfies Record<string, CSSProperties>;
 
 /** Coerces any input to a non-negative integer; bad input reads as 0. */
@@ -92,25 +48,32 @@ function safeCount(value: number): number {
   return Math.max(0, Math.trunc(value));
 }
 
-function peersLabel(count: number): string {
-  return `${count} ${count === 1 ? "peer" : "peers"}`;
+function text(value: string, fallback: string): string {
+  return typeof value === "string" && value.trim().length > 0 ? value : fallback;
 }
 
-/**
- * Compact single-row chain/peer/provider readout. Presentational only — the
- * shell owns the socket, the polling and the refresh action.
- */
-export function StatusBar({
+function Sep(): ReactElement {
+  return (
+    <span aria-hidden="true" style={styles.separator}>
+      ·
+    </span>
+  );
+}
+
+/** Compact status readout: dot, chain id, head seq, peers, model. Presentational only. */
+export default function StatusBar({
+  state,
+  chainId,
   headSeq,
   peerCount,
-  providerLabel,
-  state,
-  onRefresh,
+  modelName,
 }: StatusBarProps): ReactElement {
   const head = safeCount(headSeq);
   const peers = safeCount(peerCount);
   const meta = stateMeta[state] ?? stateMeta.offline;
-  const provider = typeof providerLabel === "string" && providerLabel.length > 0 ? providerLabel : "unknown";
+  const chain = text(chainId, "unknown");
+  const model = text(modelName, "no model");
+  const peerLabel = `${peers} ${peers === 1 ? "peer" : "peers"}`;
 
   return (
     <div
@@ -118,53 +81,36 @@ export function StatusBar({
       style={styles.bar}
       role="status"
       aria-live="polite"
-      aria-label={`Chain head #${head}, ${peersLabel(peers)}, provider ${provider}, ${meta.label}`}
+      aria-label={`${meta.label}, chain ${chain}, head #${head}, ${peerLabel}, model ${model}`}
     >
       <span className="status-bar__state" style={styles.item}>
-        <span
-          aria-hidden="true"
-          style={{ ...styles.dot, background: cssVar(meta.token) }}
-        />
+        <span aria-hidden="true" style={{ ...styles.dot, background: cssVar(meta.token) }} />
         <span style={{ color: cssVar(meta.token) }}>{meta.label}</span>
       </span>
-
-      <span aria-hidden="true" style={styles.separator}>
-        ·
+      <Sep />
+      <span
+        className="status-bar__chain"
+        style={{ ...styles.item, ...styles.strong, ...styles.ellipsis }}
+        title={chain}
+      >
+        {chain}
       </span>
-
-      <span className="status-bar__head" style={{ ...styles.item, ...styles.head }}>
+      <Sep />
+      <span className="status-bar__head" style={{ ...styles.item, ...styles.strong }}>
         head #{head}
       </span>
-
-      <span aria-hidden="true" style={styles.separator}>
-        ·
-      </span>
-
+      <Sep />
       <span className="status-bar__peers" style={styles.item}>
-        {peersLabel(peers)}
+        {peerLabel}
       </span>
-
-      <span aria-hidden="true" style={styles.separator}>
-        ·
+      <Sep />
+      <span
+        className="status-bar__model"
+        style={{ ...styles.item, ...styles.faint, ...styles.ellipsis }}
+        title={model}
+      >
+        {model}
       </span>
-
-      <span className="status-bar__provider" style={{ ...styles.item, ...styles.provider }}>
-        {provider}
-      </span>
-
-      {onRefresh !== undefined ? (
-        <button
-          type="button"
-          className="status-bar__refresh"
-          style={styles.refresh}
-          aria-label="Refresh status"
-          onClick={onRefresh}
-        >
-          Refresh
-        </button>
-      ) : null}
     </div>
   );
 }
-
-export default StatusBar;

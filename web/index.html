@@ -10,6 +10,20 @@
     <meta name="theme-color" content="#0b0c0f" />
     <title>Roan</title>
   </head>
+    <!--
+      When the bundle is served over http (this server's web UI, not a Tauri or
+      Android shell) the daemon is reached through the page's own origin: the
+      server proxies /ws to it. A shell that sets window.__ROAN__ first wins.
+    -->
+    <script>
+      (function () {
+        if (window.__ROAN__) return;
+        if (location.protocol !== "http:" && location.protocol !== "https:") return;
+        window.__ROAN__ = {
+          socket: (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws",
+        };
+      })();
+    </script>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
