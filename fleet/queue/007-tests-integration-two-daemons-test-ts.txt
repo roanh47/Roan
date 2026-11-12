@@ -1,0 +1,1 @@
+`tests/integration/two-daemons.test.ts` — two daemons on two temp homes, one creates, the other joins with the code, both end with the same head.

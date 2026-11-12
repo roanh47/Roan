@@ -1,0 +1,1 @@
+`scripts/smoke.sh` — build, start a stub model, start the daemon, create a chain, send one message, assert the chain grew, exit non-zero on any failure.

@@ -1,0 +1,1 @@
+`web/src/components/Markdown.tsx` — render assistant text with fenced code blocks; never `innerHTML`, never a dependency.

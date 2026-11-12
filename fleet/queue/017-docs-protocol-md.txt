@@ -1,0 +1,1 @@
+`docs/protocol.md` — every frame, every event type, the version rule.

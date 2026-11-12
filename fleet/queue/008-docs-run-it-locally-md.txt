@@ -1,0 +1,1 @@
+`docs/run-it-locally.md` — how to start the daemon and the app shell on a dev machine, with the real commands and the real ports.

@@ -1,0 +1,1 @@
+`src/daemon/errors.ts` — named error classes with codes and user-facing messages.

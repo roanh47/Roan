@@ -1,0 +1,1 @@
+`tests/integration/sync-two-nodes.test.ts` — two real stores and two real sockets in one process, replicate, assert both heads equal.

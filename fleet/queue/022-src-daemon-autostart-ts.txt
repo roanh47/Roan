@@ -1,0 +1,1 @@
+`src/daemon/autostart.ts` — the app starts the daemon if the port is dead, waits for it, and shuts it down on app exit; never starts a second one.

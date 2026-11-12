@@ -1,0 +1,1 @@
+`scripts/dev.sh` — build, start the daemon in the background, print the port, stop it on ctrl-c. No dependencies beyond node.

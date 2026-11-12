@@ -1,0 +1,1 @@
+`docs/android-sync.md` — how the phone keeps syncing in the background.

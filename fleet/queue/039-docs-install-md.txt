@@ -1,0 +1,1 @@
+`docs/install.md` — installing on Windows, macOS, Linux and Android.

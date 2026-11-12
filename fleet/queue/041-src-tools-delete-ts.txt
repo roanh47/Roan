@@ -1,0 +1,1 @@
+`src/tools/delete.ts` — delete a file or empty dir, requires an explicit confirm flag.

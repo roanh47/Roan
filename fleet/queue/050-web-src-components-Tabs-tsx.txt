@@ -1,0 +1,1 @@
+`web/src/components/Tabs.tsx` — accessible tab strip, props only.

@@ -1,0 +1,1 @@
+`CONTRIBUTING.md` — how to build, test and commit in this repo.

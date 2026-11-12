@@ -1,0 +1,1 @@
+`web/src/components/Avatar.tsx` — initial circle with a stable colour per name.

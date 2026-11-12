@@ -1,0 +1,1 @@
+`src/daemon/clock.ts` — injectable clock for tests.

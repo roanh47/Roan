@@ -1,0 +1,1 @@
+`scripts/check-artifacts.sh` — given a release tag, assert exactly four assets with the exact names, exit non-zero otherwise.

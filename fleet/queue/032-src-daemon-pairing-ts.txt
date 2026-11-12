@@ -1,0 +1,1 @@
+`src/daemon/pairing.ts` — the join handshake: connect, verify the token, request the chain, apply env, report the peers.

@@ -1,0 +1,1 @@
+`src/daemon/upgrade.ts` — read the schema version and refuse a newer database.

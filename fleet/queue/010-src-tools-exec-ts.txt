@@ -1,0 +1,1 @@
+`src/tools/exec.ts` — `run_shell` with a timeout, output cap, cwd inside the workspace, and a kill on abort.

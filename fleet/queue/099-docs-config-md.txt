@@ -1,0 +1,1 @@
+`docs/config.md` — every key, its default and what it changes.

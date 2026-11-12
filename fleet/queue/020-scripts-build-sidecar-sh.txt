@@ -1,0 +1,1 @@
+`scripts/build-sidecar.sh` — bundle the daemon to one executable per target with esbuild plus `node --experimental-sea-config` or bun, output in `src-tauri/binaries/` named with the rust target triple. Own only this file.

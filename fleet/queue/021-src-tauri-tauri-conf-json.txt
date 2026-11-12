@@ -1,0 +1,1 @@
+`src-tauri/tauri.conf.json` — add `bundle.externalBin` so the daemon ships inside the app, and a `beforeBuildCommand` that builds the web bundle. Own only this file.

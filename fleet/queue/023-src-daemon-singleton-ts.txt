@@ -1,0 +1,1 @@
+`src/daemon/singleton.ts` — a pid lock in `workspace/daemon.lock`, stale locks reclaimed after a crash, tested.

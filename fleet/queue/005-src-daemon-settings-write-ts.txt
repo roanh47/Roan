@@ -1,0 +1,1 @@
+`src/daemon/settings-write.ts` — write `{provider, baseUrl, model}` to `config.json` atomically (temp file + rename), 0600, never partially written.

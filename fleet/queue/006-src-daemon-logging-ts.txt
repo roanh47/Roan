@@ -1,0 +1,1 @@
+`src/daemon/logging.ts` — append to `workspace/logs/roan.log`, rotate at 2 MB, keep three files, redact secrets with `src/protocol/redact.ts`.

@@ -348,6 +348,160 @@ Rules for every job:
       one-line reason, three callbacks), disabled while a decision is pending, uses
       `web/src/theme.ts` tokens only, no new dependencies.
 
+## Batch 6 — the app must actually work
+
+- [ ] `src/daemon/peers.ts` — start the peer server on 7412 and connect to a joined
+      peer with `src/sync/replicate.ts`, expose live peers for `state.peers`. This is
+      the missing piece: without it two machines do not sync. Own only this file.
+- [ ] `web/src/socket.ts` — the app-side client: control frames and chain frames over
+      one socket, reconnect with backoff, typed callbacks. Own only this file.
+- [ ] `web/src/state.ts` — one store for the app (connection, chain, events, settings)
+      with pure reducers and a subscribe function; no React inside. Own only this file.
+- [ ] `web/src/screens/ChatScreen.tsx` — transcript + composer + status, props only.
+- [ ] `web/src/screens/SettingsScreen.tsx` — provider, model, workspace, save button.
+- [ ] `src/daemon/settings-write.ts` — write `{provider, baseUrl, model}` to
+      `config.json` atomically (temp file + rename), 0600, never partially written.
+- [ ] `src/daemon/logging.ts` — append to `workspace/logs/roan.log`, rotate at 2 MB,
+      keep three files, redact secrets with `src/protocol/redact.ts`.
+- [ ] `tests/integration/two-daemons.test.ts` — two daemons on two temp homes, one
+      creates, the other joins with the code, both end with the same head.
+- [ ] `docs/run-it-locally.md` — how to start the daemon and the app shell on a dev
+      machine, with the real commands and the real ports.
+- [ ] `scripts/dev.sh` — build, start the daemon in the background, print the port,
+      stop it on ctrl-c. No dependencies beyond node.
+
+## Batch 7 — depth
+
+- [ ] `src/tools/exec.ts` — `run_shell` with a timeout, output cap, cwd inside the
+      workspace, and a kill on abort.
+- [ ] `src/daemon/stream.ts` — emit assistant deltas as `assistant_partial` events so
+      the app can show text while the model types, coalesced at most once per 100 ms.
+- [ ] `src/chain/search.ts` — case-insensitive search over event text with seq results.
+- [ ] `src/protocol/compat.ts` — negotiate the version on hello: accept the same major,
+      refuse a higher one with a message naming both versions.
+- [ ] `web/src/components/Markdown.tsx` — render assistant text with fenced code
+      blocks; never `innerHTML`, never a dependency.
+- [ ] `web/src/components/Diff.tsx` — render a unified diff with added and removed
+      lines coloured; props only.
+- [ ] `tests/release-assets.test.ts` — read `.github/workflows/release.yml` and assert
+      exactly four artifacts and the four exact filenames.
+- [ ] `docs/protocol.md` — every frame, every event type, the version rule.
+- [ ] `src/daemon/health.ts` — a `health` request answering version, head, peers,
+      disk path and uptime.
+- [ ] `scripts/smoke.sh` — build, start a stub model, start the daemon, create a chain,
+      send one message, assert the chain grew, exit non-zero on any failure.
+
+## Batch 8 — the app shell (a GUI like Claude Code Desktop)
+
+- [ ] `scripts/build-sidecar.sh` — bundle the daemon to one executable per target with
+      esbuild plus `node --experimental-sea-config` or bun, output in `src-tauri/binaries/`
+      named with the rust target triple. Own only this file.
+- [ ] `src-tauri/tauri.conf.json` — add `bundle.externalBin` so the daemon ships inside
+      the app, and a `beforeBuildCommand` that builds the web bundle. Own only this file.
+- [ ] `src/daemon/autostart.ts` — the app starts the daemon if the port is dead, waits
+      for it, and shuts it down on app exit; never starts a second one.
+- [ ] `src/daemon/singleton.ts` — a pid lock in `workspace/daemon.lock`, stale locks
+      reclaimed after a crash, tested.
+- [ ] `web/src/components/Sidebar.tsx` — session list with search, props only.
+- [ ] `web/src/components/ToolTimeline.tsx` — vertical list of tool calls with status.
+- [ ] `web/src/components/CommandPalette.tsx` — ctrl+k overlay, fuzzy filter, props only.
+- [ ] `web/src/layout.css` — three panes on desktop, one column under 900 px, no
+      horizontal scroll at 390 px.
+- [ ] `docs/gui.md` — pane by pane what the GUI shows, in plain english.
+- [ ] `web/src/components/StatusBar.tsx` — connection, chain head, peers, model.
+
+## Batch 9 — two devices and releases
+
+- [ ] `src/sync/invite.ts` — create and parse an invite code, with a checksum and an
+      expiry field, tested against corrupted input.
+- [ ] `src/net/discovery.ts` — find a peer by name on the tailnet, return candidates in
+      tailscale-first order.
+- [ ] `src/daemon/pairing.ts` — the join handshake: connect, verify the token, request
+      the chain, apply env, report the peers.
+- [ ] `tests/integration/sync-two-nodes.test.ts` — two real stores and two real sockets
+      in one process, replicate, assert both heads equal.
+- [ ] `.github/workflows/ci.yml` — typecheck, tests and web build on every push to main.
+      Own only this file.
+- [ ] `.github/workflows/release-dry.yml` — manual dispatch that builds the four
+      artifacts without publishing. Own only this file.
+- [ ] `docs/release.md` — how the four artifacts are produced, which runner, which command.
+- [ ] `src/version.ts` — one version constant read by the daemon and the app.
+- [ ] `scripts/check-artifacts.sh` — given a release tag, assert exactly four assets with
+      the exact names, exit non-zero otherwise.
+- [ ] `docs/install.md` — installing on Windows, macOS, Linux and Android.
+
+## Batch 10 — more tools
+- [ ] `src/tools/move.ts` — move or rename inside the workspace, refuses to overwrite.
+- [ ] `src/tools/delete.ts` — delete a file or empty dir, requires an explicit confirm flag.
+- [ ] `src/tools/mkdir.ts` — create nested directories, idempotent.
+- [ ] `src/tools/stat.ts` — size, mtime, mode, whether it is a dir, for a list of paths.
+- [ ] `src/tools/hash.ts` — sha256 of a file, streamed.
+- [ ] `src/tools/json.ts` — read and pretty-print JSON, report the parse error position.
+- [ ] `src/tools/csv.ts` — read a CSV into rows with a header, capped.
+- [ ] `src/tools/env-check.ts` — report which env vars exist without printing values.
+- [ ] `src/tools/port.ts` — check if a TCP port is open on the local machine.
+- [ ] `src/tools/process.ts` — list running processes matching a name, no kill.
+
+## Batch 11 — more UI
+- [ ] `web/src/components/Tabs.tsx` — accessible tab strip, props only.
+- [ ] `web/src/components/Modal.tsx` — dialog with Escape and backdrop close, focus trap.
+- [ ] `web/src/components/CopyButton.tsx` — copies text, shows a tick for two seconds.
+- [ ] `web/src/components/SearchField.tsx` — debounced input, props only.
+- [ ] `web/src/components/Badge.tsx` — small status pill with colour variants.
+- [ ] `web/src/components/KeyHint.tsx` — renders a keyboard shortcut label.
+- [ ] `web/src/components/ProgressBar.tsx` — determinate and indeterminate.
+- [ ] `web/src/components/Tooltip.tsx` — hover and focus tooltip, no dependency.
+- [ ] `web/src/components/Avatar.tsx` — initial circle with a stable colour per name.
+- [ ] `web/src/components/Skeleton.tsx` — shimmering placeholder rows.
+
+## Batch 12 — mobile
+- [ ] `docs/android.md` — how the apk is built and installed, no invented steps.
+- [ ] `src-tauri/capabilities/mobile.json` — the permissions the phone build needs.
+- [ ] `docs/android-sync.md` — how the phone keeps syncing in the background.
+- [ ] `web/src/mobile.css` — safe-area insets, 390 px layout, tap targets 44 px.
+- [ ] `docs/android-share.md` — what the share sheet does with a shared file.
+- [ ] `src/platform.ts` — detect desktop or mobile at runtime from user agent, typed.
+- [ ] `docs/android-keystore.md` — how releases are signed, no secrets written down.
+- [ ] `web/src/components/MobileTabBar.tsx` — four tabs, props only.
+- [ ] `docs/android-test.md` — how to test the apk on a real device with adb.
+- [ ] `scripts/install-apk.sh` — adb install the newest apk, with a clear error if adb is missing.
+
+## Batch 13 — quality
+- [ ] `tests/protocol.test.ts` — every frame round-trips, bad input rejected.
+- [ ] `tests/store-append.test.ts` — idempotency and ordering under concurrent appends.
+- [ ] `tests/turn-lock.test.ts` — one writer, expiry, foreign release refused.
+- [ ] `tests/env-snapshot.test.ts` — pack, apply, park, refuse outside the env paths.
+- [ ] `tests/version.test.ts` — compare() across patch, minor and major.
+- [ ] `.editorconfig` — two spaces, utf-8, lf, final newline.
+- [ ] `.prettierrc.json` — width 100, double quotes, semicolons.
+- [ ] `CONTRIBUTING.md` — how to build, test and commit in this repo.
+- [ ] `SECURITY.md` — how to report a problem, what is in scope.
+- [ ] `CHANGELOG.md` — 0.1.0 entry, honest about what works and what does not.
+
+## Batch 14 — daemon depth
+- [ ] `src/daemon/queue.ts` — queue a message when no model is reachable, retry later.
+- [ ] `src/daemon/shutdown.ts` — handle SIGINT and SIGTERM, close the store and sockets.
+- [ ] `src/daemon/metrics.ts` — counts per event type, exported as a plain object.
+- [ ] `src/daemon/replay.ts` — rebuild in-memory state from the chain on start.
+- [ ] `src/daemon/upgrade.ts` — read the schema version and refuse a newer database.
+- [ ] `src/daemon/watchdog.ts` — restart the turn runner if a turn hangs past a cap.
+- [ ] `src/daemon/probes.ts` — check disk space and store size, warn under a threshold.
+- [ ] `src/daemon/clock.ts` — injectable clock for tests.
+- [ ] `src/daemon/ids.ts` — ids that sort by time, no dependency.
+- [ ] `src/daemon/errors.ts` — named error classes with codes and user-facing messages.
+
+## Batch 15 — interop
+- [ ] `docs/mcp.md` — how an MCP server would be declared in the env and used.
+- [ ] `src/mcp/client.ts` — a minimal stdio MCP client that lists tools, no transport work.
+- [ ] `src/skills/loader.ts` — read `skills/<name>/SKILL.md` with frontmatter, no dependency.
+- [ ] `src/skills/select.ts` — pick skills by keyword against a task, capped.
+- [ ] `docs/skills.md` — what a skill is here and how it loads.
+- [ ] `src/memory/store.ts` — append-only notes per day in `memory/YYYY-MM-DD.md`.
+- [ ] `src/memory/recall.ts` — search the notes, return the last N matches.
+- [ ] `docs/memory.md` — what is remembered and what is not.
+- [ ] `src/config/schema.ts` — a typed config with defaults and validation.
+- [ ] `docs/config.md` — every key, its default and what it changes.
+
 ## Families to extend when the list runs low
 
 - mobile (Android manifest, foreground service for sync, share sheet, notifications)

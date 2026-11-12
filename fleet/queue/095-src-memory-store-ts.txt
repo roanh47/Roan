@@ -1,0 +1,1 @@
+`src/memory/store.ts` — append-only notes per day in `memory/YYYY-MM-DD.md`.

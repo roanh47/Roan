@@ -1,0 +1,1 @@
+`src/tools/port.ts` — check if a TCP port is open on the local machine.

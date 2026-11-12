@@ -1,0 +1,1 @@
+`src/tools/json.ts` — read and pretty-print JSON, report the parse error position.

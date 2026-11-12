@@ -1,0 +1,1 @@
+`src/protocol/compat.ts` — negotiate the version on hello: accept the same major, refuse a higher one with a message naming both versions.

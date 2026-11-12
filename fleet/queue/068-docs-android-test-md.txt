@@ -1,0 +1,1 @@
+`docs/android-test.md` — how to test the apk on a real device with adb.

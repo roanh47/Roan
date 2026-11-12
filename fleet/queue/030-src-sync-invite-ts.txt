@@ -1,0 +1,1 @@
+`src/sync/invite.ts` — create and parse an invite code, with a checksum and an expiry field, tested against corrupted input.

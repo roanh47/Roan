@@ -1,0 +1,1 @@
+`docs/release.md` — how the four artifacts are produced, which runner, which command.

@@ -1,0 +1,1 @@
+`src/version.ts` — one version constant read by the daemon and the app.

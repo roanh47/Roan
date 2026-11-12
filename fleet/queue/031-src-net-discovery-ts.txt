@@ -1,0 +1,1 @@
+`src/net/discovery.ts` — find a peer by name on the tailnet, return candidates in tailscale-first order.

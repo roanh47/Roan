@@ -1,0 +1,1 @@
+`CHANGELOG.md` — 0.1.0 entry, honest about what works and what does not.

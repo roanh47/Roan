@@ -1,0 +1,1 @@
+`web/src/components/CopyButton.tsx` — copies text, shows a tick for two seconds.

@@ -1,0 +1,1 @@
+`src/tools/hash.ts` — sha256 of a file, streamed.

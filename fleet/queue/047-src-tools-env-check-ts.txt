@@ -1,0 +1,1 @@
+`src/tools/env-check.ts` — report which env vars exist without printing values.

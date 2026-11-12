@@ -1,0 +1,1 @@
+`src/skills/loader.ts` — read `skills/<name>/SKILL.md` with frontmatter, no dependency.

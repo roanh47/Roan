@@ -1,0 +1,1 @@
+`web/src/components/Diff.tsx` — render a unified diff with added and removed lines coloured; props only.

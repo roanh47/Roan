@@ -1,0 +1,1 @@
+`src/daemon/metrics.ts` — counts per event type, exported as a plain object.

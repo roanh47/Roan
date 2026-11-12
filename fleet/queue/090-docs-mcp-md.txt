@@ -1,0 +1,1 @@
+`docs/mcp.md` — how an MCP server would be declared in the env and used.

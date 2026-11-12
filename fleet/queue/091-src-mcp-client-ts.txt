@@ -1,0 +1,1 @@
+`src/mcp/client.ts` — a minimal stdio MCP client that lists tools, no transport work.

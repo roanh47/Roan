@@ -1,0 +1,1 @@
+`web/src/components/Sidebar.tsx` — session list with search, props only.

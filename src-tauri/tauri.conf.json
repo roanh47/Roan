@@ -4,6 +4,7 @@
   "version": "0.0.1",
   "identifier": "dev.roan",
   "build": {
+    "beforeBuildCommand": "npm --prefix web run build",
     "frontendDist": "../web/dist"
   },
   "app": {
@@ -33,6 +34,9 @@
     "targets": "all",
     "category": "DeveloperTool",
     "shortDescription": "One agent, several machines",
+    "externalBin": [
+      "binaries/roan-daemon"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

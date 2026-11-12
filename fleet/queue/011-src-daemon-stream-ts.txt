@@ -1,0 +1,1 @@
+`src/daemon/stream.ts` — emit assistant deltas as `assistant_partial` events so the app can show text while the model types, coalesced at most once per 100 ms.

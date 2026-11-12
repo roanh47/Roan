@@ -1,0 +1,1 @@
+`src/chain/search.ts` — case-insensitive search over event text with seq results.

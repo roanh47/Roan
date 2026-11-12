@@ -1,0 +1,1 @@
+`web/src/components/StatusBar.tsx` — connection, chain head, peers, model.

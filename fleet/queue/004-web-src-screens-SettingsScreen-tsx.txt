@@ -1,0 +1,1 @@
+`web/src/screens/SettingsScreen.tsx` — provider, model, workspace, save button.

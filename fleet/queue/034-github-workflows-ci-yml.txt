@@ -1,0 +1,1 @@
+`.github/workflows/ci.yml` — typecheck, tests and web build on every push to main. Own only this file.

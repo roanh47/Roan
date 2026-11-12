@@ -1,0 +1,1 @@
+`src/tools/mkdir.ts` — create nested directories, idempotent.

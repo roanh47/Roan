@@ -1,0 +1,1 @@
+`tests/version.test.ts` — compare() across patch, minor and major.

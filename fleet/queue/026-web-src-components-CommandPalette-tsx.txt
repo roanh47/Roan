@@ -1,0 +1,1 @@
+`web/src/components/CommandPalette.tsx` — ctrl+k overlay, fuzzy filter, props only.

@@ -1,0 +1,1 @@
+`src/daemon/health.ts` — a `health` request answering version, head, peers, disk path and uptime.

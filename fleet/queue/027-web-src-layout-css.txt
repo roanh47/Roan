@@ -1,0 +1,1 @@
+`web/src/layout.css` — three panes on desktop, one column under 900 px, no horizontal scroll at 390 px.
