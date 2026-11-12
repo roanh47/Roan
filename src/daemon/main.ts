@@ -6,6 +6,9 @@ import { createIdentity, loadIdentity, type Identity } from "./identity.js";
 import { ensurePaths, resolvePaths, type RoanPaths } from "./paths.js";
 import { loadSettings } from "./settings.js";
 import { startControlServer } from "./control.js";
+import { ChainNodeStore } from "./peer-store.js";
+import { addPeer, peers as peerList, startPeers, stopPeers } from "./peers.js";
+import type { Logger } from "../sync/types.js";
 import { runTurn } from "./turn-runner.js";
 
 const CONTROL_PORT = Number(process.env["ROAN_CONTROL_PORT"] ?? 7411);
@@ -27,6 +30,17 @@ function peerHost(paths: RoanPaths): string {
   return process.env["ROAN_PEER_HOST"] ?? "127.0.0.1";
 }
 
+const peerLogger: Logger = {
+  debug: () => undefined,
+  info: (message, meta) => log("peer: " + message + (meta === undefined ? "" : " " + JSON.stringify(meta))),
+  warn: (message, meta) => log("peer: " + message + (meta === undefined ? "" : " " + JSON.stringify(meta))),
+  error: (message, meta) => log("peer: " + message + (meta === undefined ? "" : " " + JSON.stringify(meta))),
+};
+
+function log(message: string): void {
+  process.stderr.write(message + "\n");
+}
+
 async function main(): Promise<void> {
   const paths = resolvePaths();
   await ensurePaths(paths);
@@ -41,10 +55,43 @@ async function main(): Promise<void> {
     chain: session?.identity.chainId ?? null,
     node: session?.identity.nodeId ?? null,
     head: session ? session.store.head(session.identity.chainId) : 0,
-    peers: [],
+    peers: peerList(),
+    invite:
+      session === null
+        ? null
+        : encodeJoinCode({
+            v: 1,
+            chain: session.identity.chainId,
+            token: session.identity.token,
+            host: peerHost(paths),
+            port: PEER_PORT,
+          }),
   });
 
   let control: Awaited<ReturnType<typeof startControlServer>> | null = null;
+  let replicating = false;
+
+  /**
+   * Opens the peer link for the chain in `session`. Runs once per process: the
+   * replication layer keeps a single listener, and starting it twice would mean
+   * two servers on the same port.
+   */
+  const startReplication = async (): Promise<void> => {
+    if (session === null || replicating) return;
+    const node = new ChainNodeStore(session.store, session.identity.nodeId, session.identity.chainId);
+    await startPeers({
+      store: node,
+      token: session.identity.token,
+      host: peerHost(paths),
+      port: PEER_PORT,
+      logger: peerLogger,
+      onError: (error) => log("peer error: " + error.message),
+    });
+    replicating = true;
+    log("peer: listening on " + peerHost(paths) + ":" + String(PEER_PORT));
+  };
+
+  if (session !== null) await startReplication();
 
   const runMessage = (text: string): void => {
     if (!session) return;
@@ -73,6 +120,7 @@ async function main(): Promise<void> {
       host: peerHost(paths),
       port: PEER_PORT,
     });
+    await startReplication();
     return { t: "chain", chain: created.chainId, node: created.nodeId, invite };
   };
 
@@ -88,6 +136,9 @@ async function main(): Promise<void> {
     const { saveIdentity } = await import("./identity.js");
     await saveIdentity(paths, joined);
     session = { identity: joined, store: EventStore.open(paths.database) };
+    await startReplication();
+    addPeer({ host: parsed.host, port: parsed.port });
+    log("peer: joined " + parsed.host + ":" + String(parsed.port));
     return { t: "chain", chain: joined.chainId, node: joined.nodeId };
   };
 
@@ -108,6 +159,14 @@ async function main(): Promise<void> {
       : "roan daemon: chain " + String(st.chain) + ", node " + String(st.node) + ", control port " + control.port + "\n",
   );
 }
+
+const shutdown = (): void => {
+  void stopPeers()
+    .catch(() => undefined)
+    .finally(() => process.exit(0));
+};
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
 
 main().catch((err: unknown) => {
   process.stderr.write((err instanceof Error ? err.message : String(err)) + "\n");

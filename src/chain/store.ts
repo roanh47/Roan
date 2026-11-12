@@ -235,6 +235,7 @@ export class EventStore {
   private readonly selectRange: StatementSync;
   private readonly selectHead: StatementSync;
   private readonly selectChains: StatementSync;
+  private readonly appendListeners = new Set<(event: Event) => void>();
 
   private constructor(path: string) {
     if (path !== ":memory:") {
@@ -289,7 +290,7 @@ export class EventStore {
    * If an event with the same id already exists in the chain, nothing is written
    * and the stored event is returned (first write wins; the store never updates).
    */
-  append(chain: string, event: NewEvent): Event {
+  append(chain: string, event: NewEvent, options?: { readonly notify?: boolean }): Event {
     const normalized = normalizeNewEvent(chain, event);
     this.assertOpen();
 
@@ -318,7 +319,7 @@ export class EventStore {
       });
       this.db.exec("COMMIT");
 
-      return {
+      const stored: Event = {
         v: 1,
         chain,
         seq,
@@ -328,10 +329,30 @@ export class EventStore {
         type: normalized.type,
         data: JSON.parse(normalized.data) as unknown,
       };
+      // Only after COMMIT: a listener must never see an event that could still
+      // roll back. Replication uses this to push new events to its peers, so an
+      // event applied *from* a peer passes notify:false and does not echo back.
+      if (options?.notify !== false) {
+        for (const listener of this.appendListeners) {
+          listener(stored);
+        }
+      }
+      return stored;
     } catch (err) {
       this.rollback();
       throw err;
     }
+  }
+
+  /**
+   * Called after every append that commits, unless the writer asked for silence.
+   * Returns a function that removes the listener again.
+   */
+  onAppend(listener: (event: Event) => void): () => void {
+    this.appendListeners.add(listener);
+    return () => {
+      this.appendListeners.delete(listener);
+    };
   }
 
   /**
@@ -361,6 +382,23 @@ export class EventStore {
       return 0;
     }
     return asNumber(row["seq"], "seq");
+  }
+
+  /**
+   * The event with `id` in `chain`, or undefined when it is not there.
+   *
+   * Replication asks this to tell "I already have this" from "this is new", and
+   * the answer must come from storage rather than from a copy in memory.
+   */
+  eventById(chain: string, id: string): Event | undefined {
+    this.assertOpen();
+    requireId(chain, "chain");
+    requireId(id, "id");
+    const row = this.selectById.get({ chain, id });
+    if (row === undefined) {
+      return undefined;
+    }
+    return toEvent(row);
   }
 
   /** Every known chain with its event count and head. Ordered by chain name. */

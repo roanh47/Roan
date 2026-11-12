@@ -26,6 +26,8 @@ export interface DaemonState {
   readonly node: string | null;
   readonly head: number;
   readonly peers: readonly string[];
+  /** The code another device pastes in; null before there is a chain. */
+  readonly invite: string | null;
 }
 
 export interface StateResponse { readonly t: "state"; readonly data: DaemonState }
