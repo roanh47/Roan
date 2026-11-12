@@ -127,3 +127,9 @@ Neither app is built yet, so there is no way in for now. Nothing is published.
 ## License
 
 MIT.
+
+## Running it
+
+The quickest way to a Roan you can open is the web UI on one machine:
+`scripts/webui.mjs` serves the bundle and proxies the socket to the daemon.
+See [docs/webui.md](docs/webui.md).
