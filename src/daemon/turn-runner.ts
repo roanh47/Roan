@@ -3,6 +3,7 @@ import { Agent } from "../agent.js";
 import type { EventStore } from "../chain/store.js";
 import type { Event } from "../protocol/types.js";
 import { builtinTools } from "../tools.js";
+import type { Tool } from "../types.js";
 import { acquire, release, SeqConflictError } from "../turn/index.js";
 import type { Event as TurnEvent, TurnEventDraft, TurnStore } from "../turn/types.js";
 import { historyFromEvents } from "./history.js";
@@ -14,6 +15,8 @@ export interface TurnRunnerOptions {
   readonly provider: { baseUrl: string; apiKey: string; model: string };
   readonly cwd: string;
   readonly systemPrompt: string;
+  /** Tools this turn may use; the built-ins when a caller does not say. */
+  readonly tools?: readonly Tool[];
   /** Called for every event the run produces, after it is durable. */
   readonly onAppend: (event: Event) => void;
 }
@@ -72,7 +75,7 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
 
     const agent = new Agent({
       provider: options.provider,
-      tools: builtinTools,
+      tools: [...(options.tools ?? builtinTools)],
       systemPrompt: options.systemPrompt,
       cwd: options.cwd,
       history,

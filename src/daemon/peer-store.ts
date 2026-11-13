@@ -9,11 +9,19 @@ import type { AppendOutcome, Event, NodeStore, Unsubscribe } from "../sync/types
  * second process opening the same file sees the same chain.
  */
 export class ChainNodeStore implements NodeStore {
+  /** Called after an event from a peer is durable, so the daemon can act on it. */
+  private onApplied: ((event: Event) => void) | null = null;
+
   constructor(
     private readonly store: EventStore,
     readonly nodeId: string,
     readonly chain: string,
   ) {}
+
+  /** Every replicated event passes here, still quiet towards replication. */
+  watchApplied(listener: (event: Event) => void): void {
+    this.onApplied = listener;
+  }
 
   head(): number {
     return this.store.head(this.chain);
@@ -66,6 +74,7 @@ export class ChainNodeStore implements NodeStore {
     // notify:false — this came *from* a peer. The store must stay quiet so
     // replication does not send what it just received back out again.
     this.store.append(this.chain, event as never, { notify: false });
+    this.onApplied?.(event);
     return { status: "appended" };
   }
 
