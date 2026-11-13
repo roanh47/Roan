@@ -1,47 +1,35 @@
-# What is left for 0.0.1
+# Wat er nog moet
 
-The loop takes the first unchecked item, does only that, verifies it, commits and
-pushes, and ticks the box. One item per run. Never start a second one.
+## Bewezen en af (niet opnieuw doen)
 
-Rules for every item:
+- Keten synct tussen twee daemons: backfill bij join en live doorsturen.
+- Webui op poort 6769, onboarding (create/join) in de app, invite-code overleeft reload.
+- Memory (USER.md/MEMORY.md) in de prompt, skills op schijf met alleen de naam in de prompt.
+- Env reist als inhoud: skill op A verscheen als bestand op B.
+- `run_on_node`: A's agent liet B `hostname` draaien; beide ketens 9 events, identiek.
 
-- Do not explore the repo. Open the files the item names, plus the one you must edit.
-- Verify with `npx tsc --noEmit`, `npm test` and `npm run build` before committing.
-- Commit and push to `main`. Leave the tree clean.
-- If an item cannot be finished in this run, leave its box unticked and say what blocked it.
+## Nu, in deze volgorde
 
-## 1. Onboarding screen
+1. **Workspace-map als kopie.** Nu reist alleen de agent, niet je projecten. Bestanden
+   als keten-events (tekst) met een limiet; grote blobs via een apart kanaal.
+2. **Botsingsregel voor bestanden.** Twee devices die hetzelfde bestand aanpassen:
+   beide versies bewaren en zeggen dat het botste. Nooit stil één versie weggooien.
+3. **Android-app.** Geen project, geen APK, build nooit gedraaid. `tauri android init`
+   en een echte CI-job die een APK oplevert.
+4. **Desktop-builds.** exe/dmg/AppImage. De sidecar-binary bouwt nu in CI (staat in
+   .gitignore) en moet aan de bundel hangen, anders opent de app en doet hij niets.
+5. **MCP-client.** Hermes' ecosysteem: servers uit `~/.roan/mcp.json`, tools registreren.
+6. **Cron.** Ingeplande beurten in de daemon die een bericht in de keten zetten.
+7. **Subagents.** Een kind met eigen context dat een samenvatting teruggeeft.
+8. **Sessies.** De keten is nu één gesprek; gesprekken moeten apart kunnen.
+9. **Modellenkiezer** in de UI op basis van de models.dev-catalogus.
+10. **Tools aansluiten.** Twintig tool-modules staan geschreven, alleen read/write/list/shell
+    plus memory en skill zijn gewired.
+11. **Peers vinden via Tailscale** in plaats van alleen een invite-code plakken.
 
-- [ ] The app asks the daemon for `{t:"state"}` on open. When `onboarding` is true it
-      shows one screen with two buttons: **Create a chain** and **Join a chain**.
-      Create sends `{t:"create_chain"}` and then shows the `invite` code it gets back
-      with a copy button. Join shows a text field, sends `{t:"join_chain", code}` and
-      shows `control_error.message` inline when it fails. Files: `web/src/App.tsx`,
-      `web/src/chain.ts`, a new `web/src/components/Onboarding.tsx`.
+## Bekend, klein
 
-## 2. Provider and model picker
-
-- [ ] Settings screen listing providers from `src/providers/catalog.ts` (search field,
-      235 entries), and for the chosen provider its models. Choosing one writes
-      `{provider, baseUrl, model}` to `~/.roan/config.json` through a new daemon frame
-      `{t:"save_settings"}`. Files: `src/daemon/control.ts`,
-      `src/daemon/control-protocol.ts`, `web/src/components/Settings.tsx`.
-
-## 3. Invite screen
-
-- [ ] A screen that shows this machine's invite code (from the daemon, not from a log
-      line) at any time, so a second machine can join later without recreating the
-      chain. Add `{t:"invite"}` → `{t:"chain", chain, node, invite}`. Files:
-      `src/daemon/main.ts`, `src/daemon/control.ts`, `web/src/components/Invite.tsx`.
-
-## 4. Peers actually connect
-
-- [ ] After a join, the daemon starts the peer server on port 7412 and connects to the
-      host and port in the code, then replicates with `src/sync/replicate.ts` so both
-      machines hold the same chain. Report in `state.peers`. Files: `src/daemon/main.ts`,
-      `src/daemon/peers.ts`.
-
-## 5. Release
-
-- [ ] When 1 to 4 are ticked: bump `tauri.conf.json` to 0.0.1 if needed, push tag
-      `v0.0.1`, watch the workflow, and report which of the four artifacts landed.
+- Invite-code bevat 127.0.0.1 als `ROAN_PEER_HOST` niet gezet is; op de server staat hij
+  open, lokaal niet.
+- Fout-events uit oude beurten blijven zichtbaar in het transcript.
+- Env en relay zijn met de hand bewezen, niet met tests in de suite.

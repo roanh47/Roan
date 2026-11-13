@@ -7,6 +7,7 @@ import type { Tool } from "../types.js";
 import { acquire, release, SeqConflictError } from "../turn/index.js";
 import type { Event as TurnEvent, TurnEventDraft, TurnStore } from "../turn/types.js";
 import { historyFromEvents } from "./history.js";
+import { runHermesTurn } from "../engine/hermes.js";
 
 export interface TurnRunnerOptions {
   readonly store: EventStore;
@@ -17,6 +18,11 @@ export interface TurnRunnerOptions {
   readonly systemPrompt: string;
   /** Tools this turn may use; the built-ins when a caller does not say. */
   readonly tools?: readonly Tool[];
+  /**
+   * Who runs the turn. `hermes` uses the engine on this machine (real tools,
+   * skills, MCP); `builtin` uses the small loop in this repo.
+   */
+  readonly engine?: "builtin" | "hermes";
   /** Called for every event the run produces, after it is durable. */
   readonly onAppend: (event: Event) => void;
 }
@@ -72,6 +78,25 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
   try {
     const history = historyFromEvents(store.read(chain, 1, 10_000));
     let answer = "";
+
+    if (options.engine === "hermes") {
+      // The engine keeps its own tool loop; the chain keeps the conversation.
+      const result = await runHermesTurn({
+        prompt: userText,
+        cwd: options.cwd,
+        history: history
+          .filter((message) => message.role === "user" || message.role === "assistant")
+          .map((message) => ({
+            role: message.role as "user" | "assistant",
+            text: typeof message.content === "string" ? message.content : "",
+          }))
+          .filter((message) => message.text.length > 0)
+          .slice(-20),
+        ...(options.provider.model.length > 0 ? { model: options.provider.model } : {}),
+      });
+      if (result.text.length > 0) append({ type: "assistant", data: { text: result.text } });
+      return;
+    }
 
     const agent = new Agent({
       provider: options.provider,

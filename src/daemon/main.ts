@@ -213,6 +213,7 @@ async function main(): Promise<void> {
         cwd: paths.syncedWorkspace,
         systemPrompt,
         tools: toolsForTurn(),
+        engine: settings.engine,
         onAppend: (event) => {
           control?.broadcast({ t: "append", event });
           // Skills and memory are copies on every device: an env event that
