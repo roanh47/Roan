@@ -130,26 +130,38 @@ function buildRows(events: readonly ChainEvent[]): Row[] {
         });
         break;
       }
-      case "env": {
+      case "session": {
+        const title = isRecord(event.data) ? pickString(event.data, ["title"]) : null;
+        rows.push({ kind: "meta", key: event.id, label: `nieuw gesprek · ${title ?? ""}`.trim() });
+        break;
+      }
+      case "checkpoint": {
+        const label = isRecord(event.data) ? pickString(event.data, ["label"]) : null;
+        rows.push({ kind: "meta", key: event.id, label: `checkpoint · ${label ?? ""}`.trim() });
+        break;
+      }
+      case "workspace": {
+        const path = isRecord(event.data) ? pickString(event.data, ["path"]) : null;
+        const op = isRecord(event.data) ? pickString(event.data, ["op"]) : null;
         rows.push({
-          kind: "raw",
+          kind: "meta",
           key: event.id,
-          label: "env",
-          body: show(event.data),
+          label: `${op === "delete" ? "verwijderd" : "bijgewerkt"} · ${path ?? ""}`.trim(),
         });
         break;
       }
+      // Bookkeeping the eye should never have to read: the turn spinner in the
+      // status panel already says a turn is running, and the env is not a message.
+      case "env":
       case "turn_start":
       case "turn_end": {
-        rows.push({ kind: "meta", key: event.id, label: labelFor(event) });
         break;
       }
       default: {
         rows.push({
-          kind: "raw",
+          kind: "meta",
           key: event.id,
-          label: event.type,
-          body: show(event.data),
+          label: labelFor(event),
         });
       }
     }

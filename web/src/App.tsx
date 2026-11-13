@@ -52,15 +52,18 @@ export default function App(): ReactElement {
     // Messages from before sessions existed belong to the oldest one, not to
     // everything: otherwise every new conversation shows the whole chain.
     const firstSession = snapshot.sessions[0]?.id;
+    const scoped = new Set(["message", "assistant", "error", "checkpoint", "workspace"]);
     return snapshot.events.filter((event) => {
-      if (event.type !== "message" && event.type !== "assistant") return true;
-      const data = event.data as { session?: unknown } | null;
+      const data = event.data as { session?: unknown; id?: unknown } | null;
+      if (event.type === "session") return data?.id === activeSession;
+      if (!scoped.has(event.type)) return true;
       const owner = typeof data?.session === "string" ? data.session : firstSession;
       return owner === activeSession;
     });
   }, [snapshot.events, activeSession, snapshot.sessions]);
 
   const [notice, setNotice] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [joinCode, setJoinCode] = useState("");
 
   useEffect(() => {
@@ -201,6 +204,15 @@ export default function App(): ReactElement {
         >
           {shortChain(snapshot.chain)}
         </span>
+        <button
+          type="button"
+          className="titlebar__menu"
+          aria-label="Menu"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          ☰
+        </button>
       </header>
 
       <main className="conversation" aria-label="Conversation">
@@ -211,7 +223,16 @@ export default function App(): ReactElement {
         />
       </main>
 
-      <aside className="rail">
+      {menuOpen ? (
+        <button
+          type="button"
+          className="rail__scrim"
+          aria-label="Sluit menu"
+          onClick={() => setMenuOpen(false)}
+        />
+      ) : null}
+
+      <aside className={menuOpen ? "rail rail--open" : "rail"}>
         <div className="rail__sessions">
           <div className="rail__row">
             <span className="onboarding__label">Conversations</span>
@@ -219,7 +240,10 @@ export default function App(): ReactElement {
               type="button"
               className="rail__button"
               disabled={disabled}
-              onClick={() => client.newSession()}
+              onClick={() => {
+                client.newSession();
+                setMenuOpen(false);
+              }}
             >
               New
             </button>
@@ -232,7 +256,10 @@ export default function App(): ReactElement {
                   className={
                     session.id === activeSession ? "rail__session rail__session--active" : "rail__session"
                   }
-                  onClick={() => client.selectSession(session.id)}
+                  onClick={() => {
+                    client.selectSession(session.id);
+                    setMenuOpen(false);
+                  }}
                   title={`${session.title} — ${String(session.messages)} messages`}
                 >
                   {session.title}
