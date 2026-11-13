@@ -45,6 +45,20 @@ export default function App(): ReactElement {
   const client = useMemo(() => new ChainClient({ url: SOCKET_URL, node: NODE }), []);
   const snapshot = useSyncExternalStore(client.subscribe, client.getSnapshot);
   const turn = useMemo(() => openTurn(snapshot.events), [snapshot.events]);
+  const activeSession = snapshot.activeSession ?? snapshot.sessions.at(-1)?.id ?? null;
+  // Only one conversation is on screen; the rest of the chain stays where it is.
+  const visible = useMemo(() => {
+    if (activeSession === null) return snapshot.events;
+    // Messages from before sessions existed belong to the oldest one, not to
+    // everything: otherwise every new conversation shows the whole chain.
+    const firstSession = snapshot.sessions[0]?.id;
+    return snapshot.events.filter((event) => {
+      if (event.type !== "message" && event.type !== "assistant") return true;
+      const data = event.data as { session?: unknown } | null;
+      const owner = typeof data?.session === "string" ? data.session : firstSession;
+      return owner === activeSession;
+    });
+  }, [snapshot.events, activeSession, snapshot.sessions]);
 
   const [notice, setNotice] = useState<string | null>(null);
   const [joinCode, setJoinCode] = useState("");
@@ -71,7 +85,7 @@ export default function App(): ReactElement {
 
   function send(text: string): void {
     try {
-      client.sendMessage(text);
+      client.sendMessage(text, activeSession);
       setNotice(null);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "The message could not be sent.");
@@ -191,13 +205,43 @@ export default function App(): ReactElement {
 
       <main className="conversation" aria-label="Conversation">
         <Transcript
-          events={snapshot.events}
+          events={visible}
           pending={snapshot.pending}
           node={snapshot.node}
         />
       </main>
 
       <aside className="rail">
+        <div className="rail__sessions">
+          <div className="rail__row">
+            <span className="onboarding__label">Conversations</span>
+            <button
+              type="button"
+              className="rail__button"
+              disabled={disabled}
+              onClick={() => client.newSession()}
+            >
+              New
+            </button>
+          </div>
+          <ul className="rail__list">
+            {snapshot.sessions.map((session) => (
+              <li key={session.id}>
+                <button
+                  type="button"
+                  className={
+                    session.id === activeSession ? "rail__session rail__session--active" : "rail__session"
+                  }
+                  onClick={() => client.selectSession(session.id)}
+                  title={`${session.title} — ${String(session.messages)} messages`}
+                >
+                  {session.title}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+
         {snapshot.invite !== null ? (
           <div className="onboarding__invite">
             <span className="onboarding__label">Code for the next device</span>

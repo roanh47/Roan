@@ -74,7 +74,13 @@ export interface ChainCreatedFrame {
 /** The daemon's own view of where it is; carries the invite code. */
 export interface DaemonStateFrame {
   t: "state";
-  data: { chain: string | null; node: string | null; invite?: string | null };
+  data: {
+    chain: string | null;
+    node: string | null;
+    invite?: string | null;
+    sessions?: { id: string; title: string; messages: number }[];
+    activeSession?: string | null;
+  };
 }
 
 /** The daemon refused: bad code, wrong chain, already onboarding. */
@@ -99,7 +105,16 @@ export interface ClientHelloFrame {
   haveSeq: number;
 }
 
-export type ClientFrame = ClientHelloFrame | AppendFrame;
+/** Control requests: creating, joining, sessions, checkpoints. */
+export interface ControlRequestFrame {
+  t: "state" | "create_chain" | "join_chain" | "new_session" | "checkpoint" | "rewind";
+  code?: string;
+  title?: string;
+  label?: string;
+  seq?: number;
+}
+
+export type ClientFrame = ClientHelloFrame | AppendFrame | ControlRequestFrame;
 
 export type ConnectionStatus =
   | "idle"
@@ -129,6 +144,16 @@ export interface ChainSnapshot {
   error: string | null;
   /** Set after this device created a chain: the code for the next one. */
   invite: string | null;
+  /** Conversations in this chain, oldest first. */
+  sessions: readonly SessionSummary[];
+  /** The conversation this device is looking at. */
+  activeSession: string | null;
+}
+
+export interface SessionSummary {
+  readonly id: string;
+  readonly title: string;
+  readonly messages: number;
 }
 
 /** An open turn: a turn_start with no matching turn_end. */
@@ -236,7 +261,14 @@ export function parseFrame(raw: unknown): ServerFrame | null {
     const chain = typeof data.chain === "string" ? data.chain : null;
     const node = typeof data.node === "string" ? data.node : null;
     const invite = typeof data.invite === "string" ? data.invite : null;
-    return { t: "state", data: { chain, node, invite } };
+    const sessions = Array.isArray(data.sessions)
+      ? data.sessions
+          .filter((s): s is { id: string; title: string; messages: number } =>
+            typeof s === "object" && s !== null && typeof (s as { id?: unknown }).id === "string")
+          .map((s) => ({ id: s.id, title: s.title, messages: s.messages }))
+      : undefined;
+    const activeSession = typeof data.activeSession === "string" ? data.activeSession : null;
+    return { t: "state", data: { chain, node, invite, ...(sessions !== undefined ? { sessions } : {}), activeSession } };
   }
 
   if (value.t === "control_error") {
@@ -347,6 +379,8 @@ export class ChainClient {
       lastSeq: 0,
       error: null,
       invite: null,
+      sessions: [],
+      activeSession: null,
     };
   }
 
@@ -413,7 +447,30 @@ export class ChainClient {
     this.send({ t: "join_chain", code: trimmed } as unknown as ClientFrame);
   }
 
-  sendMessage(text: string): PendingMessage {
+  /** Starts a conversation without touching the one you were in. */
+  newSession(title?: string): void {
+    this.send({ t: "new_session", ...(title !== undefined ? { title } : {}) });
+    // The daemon owns the id, so ask again shortly: that answer also carries the
+    // refreshed list, which is what puts the new conversation on screen.
+    setTimeout(() => this.send({ t: "state" }), 250);
+  }
+
+  /** Marks a point to come back to later. */
+  checkpoint(label?: string): void {
+    this.send({ t: "checkpoint", ...(label !== undefined ? { label } : {}) });
+  }
+
+  /** Opens a new conversation from an earlier point; nothing is deleted. */
+  rewind(seq: number): void {
+    this.send({ t: "rewind", seq });
+  }
+
+  /** Chooses which conversation this device shows and writes into. */
+  selectSession(id: string): void {
+    this.update({ activeSession: id });
+  }
+
+  sendMessage(text: string, session?: string | null): PendingMessage {
     const body = text.trim();
     if (body.length === 0) throw new Error("cannot send an empty message");
     if (this.snapshot.status !== "open") {
@@ -432,12 +489,13 @@ export class ChainClient {
       node: this.node,
       ts,
       type: "message",
-      data: { text: body },
+      data: { text: body, ...(session !== undefined && session !== null ? { session } : {}) },
     };
     if (!this.send({ t: "append", event })) {
       throw new Error("socket is not open");
     }
 
+    setTimeout(() => this.send({ t: "state" }), 400);
     const pending: PendingMessage = { id, text: body, ts };
     this.pending = [...this.pending, pending];
     this.update({ pending: this.pending });
@@ -516,9 +574,17 @@ export class ChainClient {
   private receive(frame: ServerFrame): void {
     if (frame.t === "state") {
       // The daemon is the only one who knows the code; a reload keeps it.
-      if (frame.data.invite !== null && frame.data.invite !== undefined) {
-        this.update({ invite: frame.data.invite });
-      }
+      this.update({
+        ...(frame.data.invite !== null && frame.data.invite !== undefined
+          ? { invite: frame.data.invite }
+          : {}),
+        ...(frame.data.sessions !== undefined ? { sessions: frame.data.sessions } : {}),
+        // Follow the daemon's newest session only when this device has not
+        // chosen one itself.
+        ...(this.snapshot.activeSession === null && frame.data.activeSession
+          ? { activeSession: frame.data.activeSession }
+          : {}),
+      });
       return;
     }
 
