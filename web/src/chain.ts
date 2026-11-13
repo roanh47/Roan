@@ -78,6 +78,7 @@ export interface DaemonStateFrame {
     chain: string | null;
     node: string | null;
     invite?: string | null;
+    model?: string;
     sessions?: { id: string; title: string; messages: number }[];
     activeSession?: string | null;
   };
@@ -89,13 +90,20 @@ export interface ControlErrorFrame {
   message: string;
 }
 
+/** The daemon's answer to a request; carries the same id back. */
+export interface ReplyFrame {
+  t: "reply";
+  id: string;
+  data: unknown;
+}
+
 export type ServerFrame =
   | HelloFrame
   | EventsFrame
   | AppendFrame
   | ChainCreatedFrame
   | DaemonStateFrame
-  | ControlErrorFrame;
+  | ControlErrorFrame| ReplyFrame;
 
 export interface ClientHelloFrame {
   t: "hello";
@@ -107,11 +115,19 @@ export interface ClientHelloFrame {
 
 /** Control requests: creating, joining, sessions, checkpoints. */
 export interface ControlRequestFrame {
-  t: "state" | "create_chain" | "join_chain" | "new_session" | "checkpoint" | "rewind";
+  /** Known chain actions plus any request the daemon answers. */
+  t: string;
+  id?: string;
   code?: string;
   title?: string;
   label?: string;
   seq?: number;
+  path?: string;
+  content?: string;
+  query?: string;
+  provider?: string;
+  model?: string;
+  jobs?: unknown[];
 }
 
 export type ClientFrame = ClientHelloFrame | AppendFrame | ControlRequestFrame;
@@ -142,6 +158,8 @@ export interface ChainSnapshot {
   pending: readonly PendingMessage[];
   lastSeq: number;
   error: string | null;
+  /** The model this device answers with. */
+  model?: string;
   /** Set after this device created a chain: the code for the next one. */
   invite: string | null;
   /** Conversations in this chain, oldest first. */
@@ -245,6 +263,11 @@ export function parseFrame(raw: unknown): ServerFrame | null {
     return { t: "append", event: value.event };
   }
 
+  if (value.t === "reply") {
+    if (typeof value.id !== "string") return null;
+    return { t: "reply", id: value.id, data: value.data };
+  }
+
   if (value.t === "chain") {
     if (typeof value.chain !== "string" || typeof value.node !== "string") return null;
     return {
@@ -268,7 +291,18 @@ export function parseFrame(raw: unknown): ServerFrame | null {
           .map((s) => ({ id: s.id, title: s.title, messages: s.messages }))
       : undefined;
     const activeSession = typeof data.activeSession === "string" ? data.activeSession : null;
-    return { t: "state", data: { chain, node, invite, ...(sessions !== undefined ? { sessions } : {}), activeSession } };
+    const model = typeof data.model === "string" ? data.model : undefined;
+    return {
+      t: "state",
+      data: {
+        chain,
+        node,
+        invite,
+        ...(sessions !== undefined ? { sessions } : {}),
+        ...(model !== undefined ? { model } : {}),
+        activeSession,
+      },
+    };
   }
 
   if (value.t === "control_error") {
@@ -355,6 +389,11 @@ export class ChainClient {
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly seen = new Set<string>();
   private events: readonly ChainEvent[];
+  private pendingRequests = new Map<
+    string,
+    { resolve: (value: unknown) => void; timer: ReturnType<typeof setTimeout> }
+  >();
+
   private pending: readonly PendingMessage[];
   private listeners = new Set<() => void>();
   private snapshot: ChainSnapshot;
@@ -465,6 +504,26 @@ export class ChainClient {
     this.send({ t: "rewind", seq });
   }
 
+  /**
+   * Asks the daemon something that is not a message: files, schedules, models.
+   * The answer arrives as a reply frame with the same id.
+   */
+  request<T = unknown>(kind: string, data: Record<string, unknown> = {}): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const id = `req-${String(Date.now())}-${String(Math.random()).slice(2, 8)}`;
+      const timer = setTimeout(() => {
+        this.pendingRequests.delete(id);
+        reject(new Error("no answer from the daemon"));
+      }, 15_000);
+      this.pendingRequests.set(id, { resolve: (value) => resolve(value as T), timer });
+      if (!this.send({ t: kind, id, ...data })) {
+        clearTimeout(timer);
+        this.pendingRequests.delete(id);
+        reject(new Error("socket is not open"));
+      }
+    });
+  }
+
   /** Chooses which conversation this device shows and writes into. */
   selectSession(id: string): void {
     this.update({ activeSession: id });
@@ -572,6 +631,16 @@ export class ChainClient {
   }
 
   private receive(frame: ServerFrame): void {
+    if (frame.t === "reply") {
+      const waiter = this.pendingRequests.get(frame.id);
+      if (waiter !== undefined) {
+        clearTimeout(waiter.timer);
+        this.pendingRequests.delete(frame.id);
+        waiter.resolve(frame.data);
+      }
+      return;
+    }
+
     if (frame.t === "state") {
       // The daemon is the only one who knows the code; a reload keeps it.
       this.update({
@@ -579,6 +648,7 @@ export class ChainClient {
           ? { invite: frame.data.invite }
           : {}),
         ...(frame.data.sessions !== undefined ? { sessions: frame.data.sessions } : {}),
+        ...(frame.data.model !== undefined ? { model: frame.data.model } : {}),
         // Follow the daemon's newest session only when this device has not
         // chosen one itself.
         ...(this.snapshot.activeSession === null && frame.data.activeSession

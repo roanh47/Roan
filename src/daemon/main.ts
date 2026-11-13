@@ -16,16 +16,18 @@ import { MemoryStore } from "../context/memory.js";
 import { SkillLibrary } from "../context/skills.js";
 import { buildSystemPrompt } from "../context/prompt.js";
 import { adoptEnv, adoptEnvEvent, latestEnv, publishEnv } from "./env-sync.js";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { createRunOnNodeTool, serveDelegation, type RelayOptions } from "./relay.js";
 import { readSessions } from "../chain/sessions.js";
-import { diffWorkspace, scanWorkspace, type FileEntry } from "../workspace/scan.js";
+import { diffWorkspace, hashContent, scanWorkspace, type FileEntry } from "../workspace/scan.js";
 import { applyWorkspaceEvent } from "../workspace/sync.js";
 import { randomUUID as uuid } from "node:crypto";
-import { readFile as readFileAsync, writeFile as writeFileAsync } from "node:fs/promises";
+import { mkdir, readFile as readFileAsync, writeFile as writeFileAsync } from "node:fs/promises";
 import { runHooks, type HookConfig } from "../hooks/run.js";
 import { dueJobs, loadCron } from "../cron/jobs.js";
 import { runHermesTurn } from "../engine/hermes.js";
+import { CATALOG } from "../providers/catalog.js";
+import { saveSettings } from "./settings-write.js";
 
 const CONTROL_PORT = Number(process.env["ROAN_CONTROL_PORT"] ?? 7411);
 const PEER_PORT = Number(process.env["ROAN_PEER_PORT"] ?? 7412);
@@ -93,6 +95,7 @@ async function main(): Promise<void> {
   if (identity) session = { identity, store: EventStore.open(paths.database) };
 
   const state = (): DaemonState => ({
+    model: settings.model,
     onboarding: session === null,
     sessions:
       session === null
@@ -255,8 +258,23 @@ async function main(): Promise<void> {
     }
   };
 
+  /** What the chain already says each file is, so a first scan does not repeat it. */
+  const chainWorkspaceIndex = (): Map<string, FileEntry> => {
+    const index = new Map<string, FileEntry>();
+    if (session === null) return index;
+    for (const event of session.store.read(session.identity.chainId, 1, 100_000)) {
+      if (event.type !== "workspace") continue;
+      const data = event.data as { op?: unknown; path?: unknown; hash?: unknown };
+      if (typeof data.path !== "string") continue;
+      if (data.op === "delete") index.delete(data.path);
+      else if (typeof data.hash === "string") index.set(data.path, { path: data.path, hash: data.hash, bytes: 0 });
+    }
+    return index;
+  };
+
   const startWorkspaceLoop = async (): Promise<void> => {
     if (session === null) return;
+    if (workspaceKnown === null) workspaceKnown = chainWorkspaceIndex();
     await publishWorkspace().catch((error: unknown) => log("workspace: " + String(error)));
     if (workspaceTimer !== null) return;
     workspaceTimer = setInterval(() => {
@@ -540,6 +558,138 @@ async function main(): Promise<void> {
     store: () => session?.store ?? null,
     state,
     onMessage: runMessage,
+    onRequest: async (kind, data, reply) => {
+      try {
+        if (kind === "workspace_list") {
+          const scanned = await scanWorkspace(paths.syncedWorkspace);
+          reply({
+            files: [...scanned.values()]
+              .map((entry) => ({ path: entry.path, bytes: entry.bytes, hash: entry.hash }))
+              .sort((a, b) => a.path.localeCompare(b.path)),
+          });
+          return;
+        }
+        if (kind === "workspace_read") {
+          const path = typeof data["path"] === "string" ? data["path"] : "";
+          const full = resolve(paths.syncedWorkspace, path);
+          if (!full.startsWith(paths.syncedWorkspace)) {
+            reply({ error: "buiten de werkmap" });
+            return;
+          }
+          reply({ path, content: await readFileAsync(full, "utf8") });
+          return;
+        }
+        if (kind === "workspace_write") {
+          const path = typeof data["path"] === "string" ? data["path"] : "";
+          const content = typeof data["content"] === "string" ? data["content"] : null;
+          if (content === null || session === null) {
+            reply({ error: "geen inhoud" });
+            return;
+          }
+          const full = resolve(paths.syncedWorkspace, path);
+          if (!full.startsWith(paths.syncedWorkspace)) {
+            reply({ error: "buiten de werkmap" });
+            return;
+          }
+          await mkdir(dirname(full), { recursive: true });
+          await writeFileAsync(full, content, "utf8");
+          const hash = hashContent(content);
+          const current = session;
+          current.store.append(current.identity.chainId, {
+            id: uuid(),
+            node: current.identity.nodeId,
+            type: "workspace",
+            data: { op: "put", path, content, hash },
+          });
+          // Tell the scanner this hash is already in the chain, or it would
+          // publish the same file again a few seconds later.
+          workspaceKnown?.set(path, { path, hash, bytes: content.length });
+          reply({ ok: true, hash });
+          return;
+        }
+        if (kind === "cron_list") {
+          reply({ jobs: await loadCron(paths.home) });
+          return;
+        }
+        if (kind === "cron_save") {
+          const jobs = Array.isArray(data["jobs"]) ? data["jobs"] : [];
+          await writeFileAsync(join(paths.home, "cron.json"), JSON.stringify({ jobs }, null, 2), "utf8");
+          if (session !== null) {
+            const current = session;
+            void publishEnv({
+              store: current.store,
+              chain: current.identity.chainId,
+              node: current.identity.nodeId,
+              home: paths.home,
+            }).catch(() => undefined);
+          }
+          reply({ ok: true });
+          return;
+        }
+        if (kind === "models_search") {
+          const query = (typeof data["query"] === "string" ? data["query"] : "").toLowerCase();
+          const out: { provider: string; providerName: string; model: string; modelName: string; context?: number }[] = [];
+          for (const provider of Object.values(CATALOG.providers)) {
+            for (const model of Object.values(provider.models)) {
+              const hay = `${provider.name} ${model.id} ${model.name}`.toLowerCase();
+              if (query.length > 0 && !hay.includes(query)) continue;
+              out.push({
+                provider: provider.id,
+                providerName: provider.name,
+                model: model.id,
+                modelName: model.name,
+                ...(model.context !== undefined ? { context: model.context } : {}),
+              });
+              if (out.length >= 200) break;
+            }
+            if (out.length >= 200) break;
+          }
+          reply({ models: out, total: Object.keys(CATALOG.providers).length });
+          return;
+        }
+        if (kind === "model_set") {
+          const provider = typeof data["provider"] === "string" ? data["provider"] : "";
+          const model = typeof data["model"] === "string" ? data["model"] : "";
+          const entry = CATALOG.providers[provider];
+          if (entry === undefined || model.length === 0) {
+            reply({ error: "onbekende provider" });
+            return;
+          }
+          const saved = await saveSettings(paths, { model, baseUrl: entry.api });
+          if (session !== null) {
+            const current = session;
+            void publishEnv({
+              store: current.store,
+              chain: current.identity.chainId,
+              node: current.identity.nodeId,
+              home: paths.home,
+            }).catch(() => undefined);
+          }
+          reply({ ok: true, model: saved.model, baseUrl: saved.baseUrl });
+          return;
+        }
+        if (kind === "checkpoints_list") {
+          const list: { seq: number; label: string; ts: number; session?: string }[] = [];
+          if (session !== null) {
+            for (const event of session.store.read(session.identity.chainId, 1, 100_000)) {
+              if (event.type !== "checkpoint") continue;
+              const payload = event.data as { label?: unknown; session?: unknown };
+              list.push({
+                seq: event.seq,
+                label: typeof payload.label === "string" ? payload.label : "checkpoint",
+                ts: event.ts,
+                ...(typeof payload.session === "string" ? { session: payload.session } : {}),
+              });
+            }
+          }
+          reply({ checkpoints: list.reverse() });
+          return;
+        }
+        reply({ error: "onbekend verzoek: " + kind });
+      } catch (error) {
+        reply({ error: error instanceof Error ? error.message : String(error) });
+      }
+    },
     onCheckpoint: (label?: string) => {
       if (session === null) return;
       const current = session;

@@ -2,6 +2,10 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { ReactElement } from "react";
 import { ChainClient, openTurn } from "./chain";
 import { Composer } from "./components/Composer";
+import { WorkspacePanel } from "./panels/WorkspacePanel";
+import { SchedulesPanel } from "./panels/SchedulesPanel";
+import { SettingsPanel } from "./panels/SettingsPanel";
+import { CheckpointsPanel } from "./panels/CheckpointsPanel";
 import { Transcript } from "./components/Transcript";
 import { TurnStatus } from "./components/TurnStatus";
 
@@ -19,7 +23,27 @@ interface HostBridge {
 }
 
 const host = (globalThis as typeof globalThis & { __ROAN__?: HostBridge }).__ROAN__;
-const SOCKET_URL = host?.socket ?? "ws://127.0.0.1:7411/ws";
+/**
+ * Where the daemon is. On the web build that is the server that served this
+ * page; in the desktop app it is this machine; on a phone it is the machine you
+ * named yourself, because a phone has no daemon of its own.
+ */
+function resolveSocketUrl(fallback: string | undefined): string {
+  try {
+    const stored = window.localStorage.getItem("roan.daemon");
+    if (stored !== null && stored.trim().length > 0) return stored.trim();
+  } catch {
+    // storage can be blocked; the defaults below still work
+  }
+  if (fallback !== undefined) return fallback;
+  const { protocol, hostname } = window.location;
+  if ((protocol === "http:" || protocol === "https:") && hostname.includes(".")) {
+    return `${protocol === "https:" ? "wss" : "ws"}://${window.location.host}/ws`;
+  }
+  return "ws://127.0.0.1:7411/ws";
+}
+
+const SOCKET_URL = resolveSocketUrl(host?.socket);
 
 function deviceNode(): string {
   if (host?.node) return host.node;
@@ -36,10 +60,6 @@ function deviceNode(): string {
 
 const NODE = deviceNode();
 
-function shortChain(chain: string | null): string {
-  if (!chain) return "no chain";
-  return chain.length > 16 ? `${chain.slice(0, 16)}…` : chain;
-}
 
 export default function App(): ReactElement {
   const client = useMemo(() => new ChainClient({ url: SOCKET_URL, node: NODE }), []);
@@ -64,6 +84,7 @@ export default function App(): ReactElement {
 
   const [notice, setNotice] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [view, setView] = useState<"chat" | "workspace" | "schedules" | "checkpoints" | "settings">("chat");
   const [joinCode, setJoinCode] = useState("");
 
   useEffect(() => {
@@ -197,13 +218,22 @@ export default function App(): ReactElement {
             Roan
           </span>
         </div>
-        <span
-          className="titlebar__chain"
-          title={snapshot.chain ?? undefined}
-          data-tauri-drag-region
-        >
-          {shortChain(snapshot.chain)}
+        <span className="titlebar__title" data-tauri-drag-region>
+          {view === "chat"
+            ? (snapshot.sessions.find((entry) => entry.id === activeSession)?.title ?? "New conversation")
+            : view === "workspace"
+              ? "Workspace"
+              : view === "schedules"
+                ? "Schedules"
+                : view === "checkpoints"
+                  ? "Checkpoints"
+                  : "Settings"}
         </span>
+        {snapshot.model !== undefined ? (
+          <span className="titlebar__model" title={snapshot.chain ?? undefined}>
+            {snapshot.model}
+          </span>
+        ) : null}
         <button
           type="button"
           className="titlebar__menu"
@@ -215,12 +245,22 @@ export default function App(): ReactElement {
         </button>
       </header>
 
-      <main className="conversation" aria-label="Conversation">
-        <Transcript
-          events={visible}
-          pending={snapshot.pending}
-          node={snapshot.node}
-        />
+      <main className={view === "chat" ? "conversation" : "conversation conversation--panel"} aria-label="Conversation">
+        {view === "chat" ? (
+          <Transcript events={visible} pending={snapshot.pending} node={snapshot.node} />
+        ) : null}
+        {view === "workspace" ? <WorkspacePanel client={client} /> : null}
+        {view === "schedules" ? <SchedulesPanel client={client} /> : null}
+        {view === "checkpoints" ? (
+          <CheckpointsPanel
+            client={client}
+            onRewind={(seq) => {
+              client.rewind(seq);
+              setView("chat");
+            }}
+          />
+        ) : null}
+        {view === "settings" ? <SettingsPanel client={client} current={snapshot.model ?? "onbekend"} /> : null}
       </main>
 
       {menuOpen ? (
@@ -233,6 +273,30 @@ export default function App(): ReactElement {
       ) : null}
 
       <aside className={menuOpen ? "rail rail--open" : "rail"}>
+        <nav className="rail__nav">
+          {(
+            [
+              ["chat", "Conversations"],
+              ["workspace", "Workspace"],
+              ["schedules", "Schedules"],
+              ["checkpoints", "Checkpoints"],
+              ["settings", "Settings"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              className={view === id ? "rail__navitem rail__navitem--active" : "rail__navitem"}
+              onClick={() => {
+                setView(id);
+                setMenuOpen(false);
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+
         <div className="rail__sessions">
           <div className="rail__row">
             <span className="onboarding__label">Conversations</span>
@@ -288,7 +352,7 @@ export default function App(): ReactElement {
         />
       </aside>
 
-      <footer className="dock">
+      <footer className={view === "chat" ? "dock" : "dock dock--hidden"}>
         <Composer disabled={disabled} placeholder={placeholder} onSend={send} />
       </footer>
     </div>

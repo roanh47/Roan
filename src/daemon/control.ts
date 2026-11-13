@@ -16,6 +16,16 @@ export interface ControlServerOptions {
   readonly onCheckpoint?: (label?: string) => void;
   /** Starts a new conversation from an earlier point; nothing is deleted. */
   readonly onRewind?: (seq: number) => void;
+  /**
+   * Everything the app can ask that is not a chain action: list files, save a
+   * schedule, change the model. The handler answers with one value, which goes
+   * back as a reply frame with the same id.
+   */
+  readonly onRequest?: (
+    kind: string,
+    data: Record<string, unknown>,
+    reply: (value: unknown) => void,
+  ) => void;
   readonly onCreate: () => Promise<ChainResponse>;
   readonly onJoin: (code: string) => Promise<ChainResponse>;
   readonly log?: (message: string) => void;
@@ -111,6 +121,30 @@ export function startControlServer(options: ControlServerOptions): Promise<Contr
       }
       if (type === "rewind") {
         if (typeof frame["seq"] === "number") options.onRewind?.(frame["seq"]);
+      }
+      // Anything the app asks that is not a chain action: files, schedules,
+      // models. One request, one reply carrying the same id.
+      if (
+        options.onRequest !== undefined &&
+        typeof type === "string" &&
+        type !== "state" &&
+        type !== "append" &&
+        type !== "new_session" &&
+        type !== "checkpoint" &&
+        type !== "rewind"
+      ) {
+        const id = typeof frame["id"] === "string" ? frame["id"] : null;
+        let answered = false;
+        // Sent straight back to the socket that asked: a reply is not part of
+        // the chain protocol, so it must not go through the peer encoder.
+        void Promise.resolve(
+          options.onRequest(type, frame as Record<string, unknown>, (value) => {
+            if (answered || id === null) return;
+            answered = true;
+            send(socket, { t: "reply", id, data: value });
+          }),
+        );
+        return;
       }
       if (type === "new_session") {
         const title = typeof frame["title"] === "string" ? frame["title"] : undefined;
