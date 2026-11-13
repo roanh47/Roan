@@ -9,7 +9,13 @@ export interface ControlServerOptions {
   /** null until a chain exists on this machine. */
   readonly store: () => EventStore | null;
   readonly state: () => DaemonState;
-  readonly onMessage: (text: string) => void;
+  readonly onMessage: (text: string, session?: string) => void;
+  /** Starts a new conversation without touching the old one. */
+  readonly onNewSession?: (title?: string) => void;
+  /** Marks a point in the current conversation you can come back to. */
+  readonly onCheckpoint?: (label?: string) => void;
+  /** Starts a new conversation from an earlier point; nothing is deleted. */
+  readonly onRewind?: (seq: number) => void;
   readonly onCreate: () => Promise<ChainResponse>;
   readonly onJoin: (code: string) => Promise<ChainResponse>;
   readonly log?: (message: string) => void;
@@ -91,18 +97,24 @@ export function startControlServer(options: ControlServerOptions): Promise<Contr
         return;
       }
       if (type === "append") {
-        const store = options.store();
-        if (!store) return;
-        const event = frame["event"] as { id?: unknown; type?: unknown; data?: unknown } | undefined;
-        if (!event || event.type !== "message") return;
-        const data = event.data as { text?: unknown } | null;
+        const event = frame["event"] as { data?: unknown } | undefined;
+        const data = event?.data as { text?: unknown; session?: unknown } | null | undefined;
         const text = data && typeof data.text === "string" ? data.text : "";
         if (!text.trim()) return;
-        const st = options.state();
-        const id = typeof event.id === "string" ? event.id : `${st.node}-${Date.now()}`;
-        const stored = store.append(st.chain ?? "", { id, node: st.node ?? "app", type: "message", data: { text } });
-        broadcast({ t: "append", event: stored });
-        options.onMessage(text);
+        // The daemon writes the message, because only it can decide which
+        // session it belongs to and keep that decision in the same order.
+        const session = data && typeof data.session === "string" ? data.session : undefined;
+        options.onMessage(text, session);
+      }
+      if (type === "checkpoint") {
+        options.onCheckpoint?.(typeof frame["label"] === "string" ? frame["label"] : undefined);
+      }
+      if (type === "rewind") {
+        if (typeof frame["seq"] === "number") options.onRewind?.(frame["seq"]);
+      }
+      if (type === "new_session") {
+        const title = typeof frame["title"] === "string" ? frame["title"] : undefined;
+        options.onNewSession?.(title);
       }
     });
 

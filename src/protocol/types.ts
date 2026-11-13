@@ -23,7 +23,13 @@ export type EventType =
   | "error"
   | "turn_start"
   | "turn_end"
-  | "env";
+  | "env"
+  /** A conversation starts or changes; the events after it belong to it. */
+  | "session"
+  /** A named point you can rewind to without deleting anything after it. */
+  | "checkpoint"
+  /** One file in the shared workspace, as content rather than as a reference. */
+  | "workspace";
 
 /**
  * One entry in the append-only chain.

@@ -8,6 +8,7 @@ import { acquire, release, SeqConflictError } from "../turn/index.js";
 import type { Event as TurnEvent, TurnEventDraft, TurnStore } from "../turn/types.js";
 import { historyFromEvents } from "./history.js";
 import { runHermesTurn } from "../engine/hermes.js";
+import { sessionMessages } from "../chain/sessions.js";
 
 export interface TurnRunnerOptions {
   readonly store: EventStore;
@@ -23,6 +24,8 @@ export interface TurnRunnerOptions {
    * skills, MCP); `builtin` uses the small loop in this repo.
    */
   readonly engine?: "builtin" | "hermes";
+  /** The conversation this turn belongs to; only its history is sent. */
+  readonly session?: string;
   /** Called for every event the run produces, after it is durable. */
   readonly onAppend: (event: Event) => void;
 }
@@ -76,7 +79,14 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
   }
 
   try {
-    const history = historyFromEvents(store.read(chain, 1, 10_000));
+    const allEvents = store.read(chain, 1, 100_000);
+    const history =
+      options.session === undefined
+        ? historyFromEvents(allEvents)
+        : sessionMessages(allEvents, options.session).map((message) => ({
+            role: message.role,
+            content: message.text,
+          }));
     let answer = "";
 
     if (options.engine === "hermes") {

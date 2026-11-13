@@ -18,6 +18,14 @@ import { buildSystemPrompt } from "../context/prompt.js";
 import { adoptEnv, adoptEnvEvent, latestEnv, publishEnv } from "./env-sync.js";
 import { join } from "node:path";
 import { createRunOnNodeTool, serveDelegation, type RelayOptions } from "./relay.js";
+import { readSessions } from "../chain/sessions.js";
+import { diffWorkspace, scanWorkspace, type FileEntry } from "../workspace/scan.js";
+import { applyWorkspaceEvent } from "../workspace/sync.js";
+import { randomUUID as uuid } from "node:crypto";
+import { readFile as readFileAsync, writeFile as writeFileAsync } from "node:fs/promises";
+import { runHooks, type HookConfig } from "../hooks/run.js";
+import { dueJobs, loadCron } from "../cron/jobs.js";
+import { runHermesTurn } from "../engine/hermes.js";
 
 const CONTROL_PORT = Number(process.env["ROAN_CONTROL_PORT"] ?? 7411);
 const PEER_PORT = Number(process.env["ROAN_PEER_PORT"] ?? 7412);
@@ -86,6 +94,18 @@ async function main(): Promise<void> {
 
   const state = (): DaemonState => ({
     onboarding: session === null,
+    sessions:
+      session === null
+        ? []
+        : readSessions(session.store.read(session.identity.chainId, 1, 10_000)).sessions.map((s) => ({
+            id: s.id,
+            title: s.title,
+            messages: s.messages,
+          })),
+    activeSession:
+      session === null
+        ? null
+        : (readSessions(session.store.read(session.identity.chainId, 1, 10_000)).active?.id ?? null),
     chain: session?.identity.chainId ?? null,
     node: session?.identity.nodeId ?? null,
     head: session ? session.store.head(session.identity.chainId) : 0,
@@ -116,6 +136,15 @@ async function main(): Promise<void> {
     // A tool request that another device addressed to us arrives as a replicated
     // event; it is carried out here, on this machine, and answered in the chain.
     node.watchApplied((event) => {
+      if (event.type === "workspace") {
+        void applyWorkspaceEvent(paths.syncedWorkspace, event as never)
+          .then((outcome) => {
+            if (outcome.kind === "conflict") {
+              log(`workspace: conflict on ${outcome.path}, both versions kept`);
+            }
+          })
+          .catch((error: unknown) => log("workspace: " + String(error)));
+      }
       const relayNow = relayOptions();
       if (relayNow === null) return;
       void serveDelegation(relayNow, event as unknown as import("../protocol/types.js").Event).catch((error: unknown) =>
@@ -175,7 +204,139 @@ async function main(): Promise<void> {
     envTimer.unref();
   };
 
-  if (session !== null) await startEnvLoop();
+  /**
+   * Files travel the same way the env does: as content in the chain, written
+   * out on every device. The scan is what notices an edit, so nothing in the
+   * app has to know a file changed.
+   */
+  let workspaceKnown: Map<string, FileEntry> | null = null;
+  let workspaceTimer: NodeJS.Timeout | null = null;
+
+  const publishWorkspace = async (): Promise<void> => {
+    if (session === null) return;
+    const current = session;
+    const root = paths.syncedWorkspace;
+    const scanned = await scanWorkspace(root);
+    if (workspaceKnown === null) {
+      workspaceKnown = scanned;
+      return;
+    }
+    const before = workspaceKnown;
+    const { puts, deletes } = diffWorkspace(before, scanned);
+    for (const entry of puts) {
+      const content = await readFileAsync(join(root, entry.path), "utf8");
+      const base = before.get(entry.path)?.hash;
+      current.store.append(current.identity.chainId, {
+        id: uuid(),
+        node: current.identity.nodeId,
+        type: "workspace",
+        data: { op: "put", path: entry.path, content, hash: entry.hash, ...(base !== undefined ? { base } : {}) },
+      });
+    }
+    for (const path of deletes) {
+      const gone = before.get(path)?.hash;
+      current.store.append(current.identity.chainId, {
+        id: uuid(),
+        node: current.identity.nodeId,
+        type: "workspace",
+        data: { op: "delete", path, ...(gone !== undefined ? { base: gone } : {}) },
+      });
+    }
+    workspaceKnown = scanned;
+  };
+
+  /** Replays every file event in the chain onto this disk, oldest first. */
+  const applyChainWorkspace = async (root: string): Promise<void> => {
+    if (session === null) return;
+    const events = session.store.read(session.identity.chainId, 1, 100_000);
+    for (const event of events) {
+      if (event.type !== "workspace") continue;
+      await applyWorkspaceEvent(root, event as never);
+    }
+  };
+
+  const startWorkspaceLoop = async (): Promise<void> => {
+    if (session === null) return;
+    await publishWorkspace().catch((error: unknown) => log("workspace: " + String(error)));
+    if (workspaceTimer !== null) return;
+    workspaceTimer = setInterval(() => {
+      void publishWorkspace().catch((error: unknown) => log("workspace: " + String(error)));
+    }, 5_000);
+    workspaceTimer.unref();
+  };
+
+  /** Hooks come from a file next to the agent, so they travel with the env. */
+  const loadHooks = async (): Promise<HookConfig | null> => {
+    try {
+      const raw = await readFileAsync(join(paths.home, "hooks.json"), "utf8");
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      const clean: Record<string, string[]> = {};
+      for (const [point, value] of Object.entries(parsed)) {
+        if (Array.isArray(value)) clean[point] = value.filter((item): item is string => typeof item === "string");
+      }
+      return clean;
+    } catch {
+      return null;
+    }
+  };
+
+  /**
+   * Scheduled turns. The schedule file is part of the agent, the "when did it
+   * last run" file is not: every device keeps its own, so a job does not fire
+   * twice because two machines are awake.
+   */
+  const cronStatePath = join(paths.workspace, "cron-state.json");
+  const lastRun = new Map<string, number>();
+  let cronTimer: NodeJS.Timeout | null = null;
+
+  const readCronState = async (): Promise<void> => {
+    try {
+      const raw = await readFileAsync(cronStatePath, "utf8");
+      const parsed = JSON.parse(raw) as Record<string, number>;
+      for (const [id, value] of Object.entries(parsed)) if (typeof value === "number") lastRun.set(id, value);
+    } catch {
+      // no runs yet
+    }
+  };
+
+  const tickCron = async (): Promise<void> => {
+    if (session === null) return;
+    const jobs = await loadCron(paths.home);
+    if (jobs.length === 0) return;
+    const due = dueJobs(jobs, lastRun, Date.now());
+    for (const job of due) {
+      lastRun.set(job.id, Date.now());
+      await writeFileAsync(cronStatePath, JSON.stringify(Object.fromEntries(lastRun)), "utf8").catch(() => undefined);
+      const existing = readSessions(session.store.read(session.identity.chainId, 1, 100_000)).sessions.find(
+        (entry) => entry.title === job.title,
+      );
+      const target = existing?.id ?? startSession(job.title);
+      if (target === null || target === undefined) continue;
+      log(`cron: running "${job.title}"`);
+      await runMessage(job.prompt, target);
+    }
+  };
+
+  const startCron = async (): Promise<void> => {
+    if (session === null) return;
+    await readCronState();
+    await tickCron().catch((error: unknown) => log("cron: " + String(error)));
+    if (cronTimer !== null) return;
+    cronTimer = setInterval(() => {
+      void tickCron().catch((error: unknown) => log("cron: " + String(error)));
+    }, 30_000);
+    cronTimer.unref();
+  };
+
+  // Both loops start here, after their definitions, for a chain that already exists.
+  if (session !== null) {
+    await startEnvLoop();
+    await startWorkspaceLoop();
+    // The first cron tick uses the session helpers, which are declared below.
+    setTimeout(() => {
+      void startCron().catch((error: unknown) => log("cron: " + String(error)));
+    }, 3_000);
+  }
 
   /** Everything the relay needs, or null before this device has a chain. */
   const relayOptions = (): RelayOptions | null => {
@@ -197,14 +358,86 @@ async function main(): Promise<void> {
   const toolsForTurn = (): readonly import("../types.js").Tool[] => {
     const relayNow = relayOptions();
     if (relayNow === null) return tools;
-    return [...tools, createRunOnNodeTool(relayNow, () => peerList())];
+    return [
+      ...tools,
+      createRunOnNodeTool(relayNow, () => peerList()),
+      {
+        name: "delegate",
+        description:
+          "Hand a self-contained task to a fresh agent with its own context and get only the summary back. " +
+          "Use it for work that would flood this conversation.",
+        parameters: {
+          type: "object",
+          properties: {
+            task: { type: "string", description: "What the subagent must do, complete enough to stand alone" },
+            cwd: { type: "string", description: "Folder to work in; the workspace by default" },
+          },
+          required: ["task"],
+        },
+        async run(args) {
+          const task = String(args["task"] ?? "").trim();
+          if (task.length === 0) throw new Error("task is required");
+          const dir = typeof args["cwd"] === "string" ? args["cwd"] : paths.syncedWorkspace;
+          const result = await runHermesTurn({
+            prompt: `Je bent een subagent. Doe deze taak en antwoord met een korte samenvatting van wat je deed en vond, zonder de hele uitvoer te herhalen.\n\n${task}`,
+            cwd: dir,
+            timeoutMs: 900_000,
+          });
+          return result.text;
+        },
+      },
+    ];
   };
 
-  const runMessage = async (text: string): Promise<void> => {
+  /**
+   * Which conversation this belongs to. A chain with no session yet gets one
+   * named after the first thing that was said, so the list is never empty.
+   */
+  const resolveSession = (wanted?: string): string | null => {
+    if (session === null) return null;
+    const current = session;
+    const index = readSessions(current.store.read(current.identity.chainId, 1, 100_000));
+    if (wanted !== undefined && index.sessions.some((entry) => entry.id === wanted)) return wanted;
+    const active = index.active;
+    if (active !== null) return active.id;
+    return null;
+  };
+
+  const startSession = (title?: string, branchOf?: { session: string; seq: number }): string | null => {
+    if (session === null) return null;
+    const current = session;
+    const id = uuid();
+    current.store.append(current.identity.chainId, {
+      id: uuid(),
+      node: current.identity.nodeId,
+      type: "session",
+      data: { id, title: title ?? "New conversation", ...(branchOf !== undefined ? { branchOf } : {}) },
+    });
+    return id;
+  };
+
+  const runMessage = async (text: string, wanted?: string): Promise<void> => {
     if (!session) return;
     const current = session;
+    const sessionId = resolveSession(wanted) ?? startSession(text.slice(0, 60));
+    if (sessionId === null) return;
+    const stored = current.store.append(current.identity.chainId, {
+      id: uuid(),
+      node: current.identity.nodeId,
+      type: "message",
+      data: { text, session: sessionId },
+    });
+    control?.broadcast({ t: "append", event: stored });
     const systemPrompt = await agentContext.prompt();
-    void runTurn(
+    const hooks = await loadHooks();
+    const started = await runHooks(hooks, "turn_start", {
+      cwd: paths.syncedWorkspace,
+      extra: { ROAN_CHAIN: current.identity.chainId, ROAN_SESSION: sessionId },
+    });
+    for (const result of started) {
+      if (result.exitCode !== 0) log(`hook turn_start failed (${String(result.exitCode)}): ${result.command}`);
+    }
+    await runTurn(
       {
         store: current.store,
         chain: current.identity.chainId,
@@ -214,6 +447,7 @@ async function main(): Promise<void> {
         systemPrompt,
         tools: toolsForTurn(),
         engine: settings.engine,
+        session: sessionId,
         onAppend: (event) => {
           control?.broadcast({ t: "append", event });
           // Skills and memory are copies on every device: an env event that
@@ -227,6 +461,13 @@ async function main(): Promise<void> {
       },
       text,
     );
+    const ended = await runHooks(hooks, "turn_end", {
+      cwd: paths.syncedWorkspace,
+      extra: { ROAN_CHAIN: current.identity.chainId, ROAN_SESSION: sessionId },
+    });
+    for (const result of ended) {
+      if (result.exitCode !== 0) log(`hook turn_end failed (${String(result.exitCode)}): ${result.command}`);
+    }
   };
 
   const onCreate = async (): Promise<ChainResponse> => {
@@ -259,6 +500,8 @@ async function main(): Promise<void> {
     });
     await startReplication();
     await startEnvLoop();
+    await startWorkspaceLoop();
+    await startCron();
     return { t: "chain", chain: created.chainId, node: created.nodeId, invite };
   };
 
@@ -279,7 +522,13 @@ async function main(): Promise<void> {
     // adopt the copy that already exists before it considers publishing its own,
     // or both ends race to write the same first events.
     setTimeout(() => {
-      void startEnvLoop().catch((error: unknown) => log("env: " + String(error)));
+      void (async () => {
+        // A joiner takes the chain's files as its own before it publishes any.
+        await applyChainWorkspace(paths.syncedWorkspace);
+        await startEnvLoop();
+        await startWorkspaceLoop();
+        await startCron();
+      })().catch((error: unknown) => log("join: " + String(error)));
     }, 2_500);
     addPeer({ host: parsed.host, port: parsed.port });
     log("peer: joined " + parsed.host + ":" + String(parsed.port));
@@ -291,6 +540,29 @@ async function main(): Promise<void> {
     store: () => session?.store ?? null,
     state,
     onMessage: runMessage,
+    onCheckpoint: (label?: string) => {
+      if (session === null) return;
+      const current = session;
+      current.store.append(current.identity.chainId, {
+        id: uuid(),
+        node: current.identity.nodeId,
+        type: "checkpoint",
+        data: { label: label ?? "checkpoint", session: resolveSession() },
+      });
+      log("checkpoint: " + (label ?? "checkpoint"));
+    },
+    onRewind: (seq: number) => {
+      const active = resolveSession();
+      if (active === null) return;
+      // Rewinding never deletes: it opens a new conversation that starts from
+      // that point, so the old one stays readable.
+      startSession(`Rewind to #${String(seq)}`, { session: active, seq });
+      log("rewind: new session from " + String(seq));
+    },
+    onNewSession: (title?: string) => {
+      const id = startSession(title);
+      if (id !== null) log("session: started " + id.slice(0, 8));
+    },
     onCreate,
     onJoin,
     log: (message) => process.stderr.write(message + "\n"),

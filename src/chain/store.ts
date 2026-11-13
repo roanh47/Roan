@@ -31,7 +31,10 @@ export type EventType =
   | "error"
   | "turn_start"
   | "turn_end"
-  | "env";
+  | "env"
+  | "session"
+  | "checkpoint"
+  | "workspace";
 
 export interface Event {
   v: 1;
@@ -79,6 +82,9 @@ const EVENT_TYPES: ReadonlySet<string> = new Set<EventType>([
   "turn_start",
   "turn_end",
   "env",
+  "session",
+  "checkpoint",
+  "workspace",
 ]);
 
 const DEFAULT_LIMIT = 1000;

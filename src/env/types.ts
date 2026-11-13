@@ -22,6 +22,8 @@ export const ENV_ROOT_FILES = [
   "USER.md",
   "MEMORY.md",
   "config.json",
+  "cron.json",
+  "hooks.json",
 ] as const;
 
 /** Root directories of the agent home that belong to the env. */
