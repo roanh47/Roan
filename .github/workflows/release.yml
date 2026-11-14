@@ -284,6 +284,11 @@ jobs:
           test -f web/dist/index.html || { echo "::error::web/dist/index.html is missing - the app would open blank"; exit 1; }
           node -e "const c=require('./src-tauri/tauri.conf.json'); if(c.build && c.build.devUrl){console.error('::error::build.devUrl is set; production must use frontendDist only');process.exit(1)}"
 
+      # The Android gradle plugin calls `npm run tauri`, so the root dependencies
+      # (and the tauri CLI they expose) have to be installed, not just web/.
+      - name: Install the app's own dependencies
+        run: npm ci --no-audit --no-fund
+
       - name: Generate the Android project
         run: npx --yes @tauri-apps/cli@^2 android init --ci
 

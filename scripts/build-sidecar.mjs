@@ -20,7 +20,9 @@ const outDir = join(root, "src-tauri", "binaries");
 const work = join(root, ".sidecar");
 const bundle = join(work, "daemon.cjs");
 const blob = join(work, "daemon.blob");
-const target = join(outDir, `roan-daemon-${triple}`);
+// Tauri zoekt op Windows naar hetzelfde pad met .exe erachter.
+const suffix = process.platform === "win32" ? ".exe" : "";
+const target = join(outDir, `roan-daemon-${triple}${suffix}`);
 
 mkdirSync(outDir, { recursive: true });
 mkdirSync(work, { recursive: true });
