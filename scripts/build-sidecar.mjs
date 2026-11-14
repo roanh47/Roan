@@ -25,12 +25,23 @@ const target = join(outDir, `roan-daemon-${triple}`);
 mkdirSync(outDir, { recursive: true });
 mkdirSync(work, { recursive: true });
 
+/**
+ * `npx` is een shell-script op Linux en macOS, maar `npx.cmd` op Windows; Node
+ * kan dat pad niet raden. Daarom praten we esbuild via zijn API aan en starten
+ * we postject als JS-bestand met node — op elk platform hetzelfde.
+ */
+const cli = (name) => join(root, "node_modules", name);
+
 console.log(`bundling the daemon for ${triple}`);
-execFileSync(
-  "npx",
-  ["esbuild", "dist/daemon/main.js", "--bundle", "--platform=node", "--format=cjs", `--outfile=${bundle}`],
-  { cwd: root, stdio: "inherit" },
-);
+const esbuild = await import("esbuild");
+await esbuild.build({
+  entryPoints: [join(root, "dist", "daemon", "main.js")],
+  bundle: true,
+  platform: "node",
+  format: "cjs",
+  outfile: bundle,
+  logLevel: "info",
+});
 
 const seaConfig = join(work, "sea-config.json");
 writeFileSync(
@@ -53,9 +64,9 @@ if (process.platform === "darwin") {
 
 console.log("injecting the blob");
 execFileSync(
-  "npx",
+  process.execPath,
   [
-    "postject",
+    cli("postject/dist/cli.js"),
     target,
     "NODE_SEA_BLOB",
     blob,
