@@ -60,9 +60,17 @@ jobs:
           node -e "const c=require('./src-tauri/tauri.conf.json'); if(c.build && c.build.devUrl){console.error('::error::build.devUrl is set; production must use frontendDist only');process.exit(1)}"
           du -sh web/dist
 
+      - name: Build the agent as one executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+          node scripts/build-sidecar.mjs x86_64-pc-windows-msvc
+
       - name: Build Tauri app and NSIS installer
         shell: bash
-        run: npx --yes @tauri-apps/cli@^2 build --bundles nsis --verbose
+        run: npx --yes @tauri-apps/cli@^2 build --config src-tauri/tauri.desktop.conf.json --bundles nsis --verbose
 
       - name: Collect exactly one artifact
         shell: bash
@@ -121,8 +129,15 @@ jobs:
           test -f web/dist/index.html || { echo "::error::web/dist/index.html is missing - the app would open blank"; exit 1; }
           node -e "const c=require('./src-tauri/tauri.conf.json'); if(c.build && c.build.devUrl){console.error('::error::build.devUrl is set; production must use frontendDist only');process.exit(1)}"
 
+      - name: Build the agent as one executable
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+          node scripts/build-sidecar.mjs aarch64-apple-darwin
+
       - name: Build Tauri app and DMG (unsigned)
-        run: npx --yes @tauri-apps/cli@^2 build --target aarch64-apple-darwin --bundles dmg --verbose
+        run: npx --yes @tauri-apps/cli@^2 build --config src-tauri/tauri.desktop.conf.json --target aarch64-apple-darwin --bundles dmg --verbose
 
       - name: Collect exactly one artifact
         run: |
@@ -181,8 +196,15 @@ jobs:
           test -f web/dist/index.html || { echo "::error::web/dist/index.html is missing - the app would open blank"; exit 1; }
           node -e "const c=require('./src-tauri/tauri.conf.json'); if(c.build && c.build.devUrl){console.error('::error::build.devUrl is set; production must use frontendDist only');process.exit(1)}"
 
+      - name: Build the agent as one executable
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+          node scripts/build-sidecar.mjs x86_64-unknown-linux-gnu
+
       - name: Build Tauri app and AppImage
-        run: npx --yes @tauri-apps/cli@^2 build --bundles appimage --verbose
+        run: npx --yes @tauri-apps/cli@^2 build --config src-tauri/tauri.desktop.conf.json --bundles appimage --verbose
 
       - name: Collect exactly one artifact
         run: |

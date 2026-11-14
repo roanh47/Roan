@@ -333,12 +333,7 @@ export default function App(): ReactElement {
           </ul>
         </div>
 
-        {snapshot.invite !== null ? (
-          <div className="onboarding__invite">
-            <span className="onboarding__label">Code for the next device</span>
-            <code className="onboarding__code">{snapshot.invite}</code>
-          </div>
-        ) : null}
+        {snapshot.invite !== null ? <InviteBlock code={snapshot.invite} /> : null}
         <TurnStatus
           turn={turn}
           status={snapshot.status}
@@ -355,6 +350,40 @@ export default function App(): ReactElement {
       <footer className={view === "chat" ? "dock" : "dock dock--hidden"}>
         <Composer disabled={disabled} placeholder={placeholder} onSend={send} />
       </footer>
+    </div>
+  );
+}
+
+
+/** The invite is a long string that is only interesting once, so it stays shut. */
+function InviteBlock({ code }: { code: string }): ReactElement {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="onboarding__invite">
+      <div className="rail__row">
+        <span className="onboarding__label">Another device</span>
+        <button type="button" className="rail__button" onClick={() => setOpen((value) => !value)}>
+          {open ? "Hide" : "Invite"}
+        </button>
+      </div>
+      {open ? (
+        <>
+          <code className="onboarding__code">{code}</code>
+          <button
+            type="button"
+            className="rail__button"
+            onClick={() => {
+              void navigator.clipboard?.writeText(code).then(
+                () => setCopied(true),
+                () => setCopied(false),
+              );
+            }}
+          >
+            {copied ? "Copied" : "Copy"}
+          </button>
+        </>
+      ) : null}
     </div>
   );
 }

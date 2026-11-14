@@ -1,6 +1,6 @@
 {
   "name": "roan",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "One agent, several machines",
   "type": "module",
   "engines": {
@@ -16,6 +16,8 @@
     "@tauri-apps/cli": "^2.12.4",
     "@types/node": "^26.6.6",
     "@types/ws": "^8.18.2",
+    "esbuild": "^0.28.2",
+    "postject": "^1.0.0-alpha.6",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   },

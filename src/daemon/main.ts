@@ -8,6 +8,7 @@ import { loadSettings } from "./settings.js";
 import { startControlServer } from "./control.js";
 import { ChainNodeStore } from "./peer-store.js";
 import { addPeer, peers as peerList, startPeers, stopPeers } from "./peers.js";
+import { startDiscovery } from "./discovery.js";
 import type { Logger } from "../sync/types.js";
 import { runTurn } from "./turn-runner.js";
 import { builtinTools } from "../tools.js";
@@ -45,8 +46,13 @@ interface Session {
 }
 
 function peerHost(paths: RoanPaths): string {
-  return process.env["ROAN_PEER_HOST"] ?? "127.0.0.1";
+  // Alles wat deze machine heeft: Tailscale, LAN, loopback. De handshake
+  // weigert nog steeds elke peer met een verkeerd token of een andere keten.
+  return process.env["ROAN_PEER_HOST"] ?? "0.0.0.0";
 }
+
+/** Discovery hoort bij het proces, niet bij een sessie: bij afsluiten moet hij stoppen. */
+let stopDiscovery: (() => void) | null = null;
 
 const peerLogger: Logger = {
   debug: () => undefined,
@@ -164,6 +170,21 @@ async function main(): Promise<void> {
     });
     replicating = true;
     log("peer: listening on " + peerHost(paths) + ":" + String(PEER_PORT));
+    // Elke machine zoekt de andere via Tailscale. Zo hoeft niemand een code te
+    // plakken en komt de kluwen ook na een herstart of een nieuw IP terug.
+    if (process.env["ROAN_DISCOVERY"] !== "off" && stopDiscovery === null) {
+      stopDiscovery = startDiscovery({
+        port: PEER_PORT,
+        logger: peerLogger,
+        onCandidate: (host) => {
+          try {
+            addPeer(`${host}:${String(PEER_PORT)}`);
+          } catch (error: unknown) {
+            log("discovery: kon peer niet toevoegen: " + String(error));
+          }
+        },
+      });
+    }
   };
 
   if (session !== null) await startReplication();
@@ -429,7 +450,11 @@ async function main(): Promise<void> {
       id: uuid(),
       node: current.identity.nodeId,
       type: "session",
-      data: { id, title: title ?? "New conversation", ...(branchOf !== undefined ? { branchOf } : {}) },
+      data: {
+        id,
+        title: title ?? `Conversation ${String(readSessions(current.store.read(current.identity.chainId, 1, 100_000)).sessions.length + 1)}`,
+        ...(branchOf !== undefined ? { branchOf } : {}),
+      },
     });
     return id;
   };
@@ -727,6 +752,8 @@ async function main(): Promise<void> {
 }
 
 const shutdown = (): void => {
+  stopDiscovery?.();
+  stopDiscovery = null;
   void stopPeers()
     .catch(() => undefined)
     .finally(() => process.exit(0));

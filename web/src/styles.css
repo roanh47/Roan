@@ -1123,3 +1123,24 @@ textarea {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+
+.empty {
+  margin: 12vh auto 0;
+  max-width: 560px;
+  text-align: center;
+  padding: 0 8px;
+}
+
+.empty__title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.empty__text {
+  font-size: 13px;
+  line-height: 1.6;
+  opacity: 0.62;
+  margin: 0;
+}

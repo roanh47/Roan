@@ -34,9 +34,6 @@
     "targets": "all",
     "category": "DeveloperTool",
     "shortDescription": "One agent, several machines",
-    "externalBin": [
-      "binaries/roan-daemon"
-    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

@@ -210,9 +210,15 @@ export function Transcript({ events, pending, node }: TranscriptProps): ReactEle
         aria-relevant="additions text"
       >
         {empty ? (
-          <p className="empty">
-            Nothing here yet. Say something — every device on this chain sees it.
-          </p>
+          <div className="empty">
+            <p className="empty__title">This conversation is empty.</p>
+            <p className="empty__text">
+              Ask for something you would otherwise do yourself: change files in the workspace,
+              run a command, look something up, or set up a schedule so it happens while you are
+              away. Everything you type here is answered by the model in the titlebar, and every
+              device on this chain sees the result.
+            </p>
+          </div>
         ) : null}
 
         {rows.map((row) => (
