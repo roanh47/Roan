@@ -17,27 +17,44 @@
 - `delegate`: subagent met eigen context, alleen de samenvatting terug.
 - Checkpoints en rewind: rewind opent een nieuw gesprek vanaf een eerder punt;
   niets wordt verwijderd.
+- Vier release-assets uit CI onder tag `v0.0.1`: `Roan-0.0.1-x64.exe`,
+  `Roan-0.0.1-arm64.dmg`, `Roan-0.0.1-x86_64.AppImage` en `Roan-0.0.1.apk`.
+  De desktop-apps dragen de daemon als sidecar, dus zonder losse installatie
+  starten ze een echte agent.
+- Peers vinden zichzelf via Tailscale: `src/daemon/discovery.ts` leest
+  `tailscale status --json` (ook uit de Docker-container op de server), probeert
+  de peer-poort en koppelt wat antwoordt. De peer-server luistert standaard op
+  alle interfaces. 487 tests groen.
 
 ## Nu
 
-1. **Android-app.** Nog steeds geen project, geen APK. `tauri android init` en
-   een CI-job die echt een APK oplevert.
-2. **Desktop-builds.** exe/dmg/AppImage met de daemon in de bundel; zonder
-   sidecar opent de app en doet hij niets.
-3. **Checkpoints in de UI.** Het kan al via de socket; er is nog geen knop en
+1. **Slankere APK.** De apk uit v0.0.1 is 455 MB: debug, alle vier de
+   architecturen en symbolen. Naar `--release` met ABI-splitsing, mik op 40 tot
+   60 MB, en hem daarna echt op de telefoon installeren en starten.
+2. **Checkpoints in de UI.** Het kan al via de socket; er is nog geen knop en
    geen lijst met punten om naar terug te springen.
-4. **Workspace zichtbaar in de app.** Bestanden reizen, maar je kunt ze niet
+3. **Workspace zichtbaar in de app.** Bestanden reizen, maar je kunt ze niet
    bekijken of openen vanuit de UI.
-5. **MCP-configuratie in de app.** De motor kan MCP; de keten vervoert nog geen
+4. **MCP-configuratie in de app.** De motor kan MCP; de keten vervoert nog geen
    `mcp/`-configuratie met een scherm erbij.
-6. **Peers vinden via Tailscale** in plaats van een invite-code plakken.
-7. **Grote bestanden.** Boven 512 kB reist niets; dat moet een blob-kanaal
+5. **Grote bestanden.** Boven 512 kB reist niets; dat moet een blob-kanaal
    krijgen of bewust geweigerd worden met een melding.
-8. **Tests voor env, relay en workspace-sync tussen twee daemons** — nu met de
+6. **Seq-conflicten met meer dan twee devices.** De keten is één rechte lijn;
+   schrijven twee devices tegelijk, dan botsen ze op hetzelfde seq en gaat die
+   link op `conflicted`. Bij twee devices merk je dat bijna nooit, bij vier die
+   tegelijk werken wel. Takken naast elkaar zetten en later samenvoegen.
+7. **Tests voor env, relay en workspace-sync tussen twee daemons** — nu met de
    hand bewezen, niet in de suite.
+8. **Tweemachine-test van discovery.** Bewezen dat de server Tailscale leest en
+   dat een lege tailnet netjes nul adressen geeft. Nog niet bewezen dat twee
+   online machines elkaar echt koppelen, want de andere nodes stonden offline.
 
 ## Bekend, klein
 
+- Discovery onthoudt gevonden peers niet over een herstart; hij vindt ze elke 20
+  seconden opnieuw, dus dat kost alleen een ronde.
+- De `.exe` en `.dmg` zijn niet ondertekend: SmartScreen en Gatekeeper
+  waarschuwen.
 - Invite-code zegt 127.0.0.1 als `ROAN_PEER_HOST` niet open staat.
 - Oude foutregels blijven in het transcript staan.
 - Een nieuw gesprek krijgt nog de titel "New conversation" tot je hem hernoemt.
