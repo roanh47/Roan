@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Roan",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "identifier": "dev.roan",
   "build": {
     "beforeBuildCommand": "npm --prefix web run build",
@@ -43,6 +43,15 @@
     ],
     "android": {
       "minSdkVersion": 24
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZDNzY2NzNEMEI4MjNEN0IKUldSN1BZSUxQV2QyL0dyaXVzTnR4bURSVkNRZ2RLbjl3UEI5QjlOZEFkb2NiRldITXA3TXB5TlcK",
+      "endpoints": [
+        "https://github.com/roanh47/Roan/releases/latest/download/latest.json"
+      ]
     }
   }
 }

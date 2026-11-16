@@ -7,6 +7,10 @@
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // The updater reads `plugins.updater.endpoints` from the config and
+        // checks the signature against the public key before it installs.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .run(tauri::generate_context!())
         .expect("error while running Roan");
 }

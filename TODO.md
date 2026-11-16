@@ -1,0 +1,121 @@
+# To do
+
+Deze lijst is de takenlijst van het project. `WORK.md` beschrijft wat bewezen is en
+wat de volgende stap is in gewone taal; hier staan de punten als afvinkbare taken
+met de plek waar het werk zit.
+
+Een punt gaat pas op `[x]` als het werkt op een echte machine, niet als de code is
+geschreven.
+
+## v0.0.2
+
+Alles hieronder is lokaal gebouwd en getest, niet gepusht. Een versie gaat pas
+naar GitHub als Roan hem zelf op zijn machines heeft gehad.
+
+- [x] **Updater in de app.** `tauri-plugin-updater` plus een tegel in de
+      instellingen: versie tonen, controleren, downloaden, installeren en
+      herstarten. Kruist de feed op GitHub, dus werkt op Windows, macOS, Linux en
+      Android.
+- [x] **Signeersleutel.** Keypair gegenereerd, publieke sleutel in
+      `tauri.conf.json`, privésleutel en wachtwoord in de CI-secrets
+      (`TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`).
+- [x] **Update-feed als aparte release** met vaste tag `update-feed`, zodat
+      `latest.json` altijd dezelfde URL houdt en de versie-release precies vier
+      bestanden blijft houden.
+- [ ] **Updater echt testen** met een tweede versie: 0.0.1 erop, 0.0.2 publiceren,
+      knop indrukken, kijken of hij bijwerkt en herstart.
+- [x] **RUN THIS FIRST in de dmg.** `scripts/dmg/RUN THIS FIRST.command` zet de
+      app in Applications, haalt de quarantine-vlag weg en opent hem.
+      `scripts/dmg/build-dmg.sh` bouwt de dmg met dat bestand erin.
+- [ ] **Die dmg bouwen en testen op de Mac.** Moet op macOS gebeuren, de server
+      kan geen .app of dmg maken.
+- [ ] **App-icoon van de profielfoto.** Zelfde icoon op alle vier de platforms,
+      inclusief Android-adaptief icoon.
+- [ ] **Alles lokaal leveren** via Filebrowser in plaats van GitHub-releases,
+      zolang een versie nog niet getest is.
+
+## Updates
+
+- [ ] **Updater voor alle vier de installaties.** De app haalt de laatste versie
+      op uit de GitHub-releases en kan zichzelf bijwerken op Windows, macOS,
+      Linux en Android.
+- [ ] **Signeersleutel voor de updater.** Privésleutel in de CI-secrets, publieke
+      sleutel in `tauri.conf.json`, zodat een update alleen van jou kan komen.
+- [ ] **Update-feed.** De `latest.json` en de updatebundels worden per versie
+      gepubliceerd, los van de vier installatiebestanden in de release.
+- [ ] **Knop in de app.** Instellingen toont de versie, kan controleren en kan
+      installeren zonder de terminal.
+- [ ] **Android-update.** De apk downloaden en de installatie starten, met de
+      vraag om onbekende bronnen.
+
+## Releases
+
+- [ ] **Slankere apk.** Nu 455 MB door debug en vier architecturen. Doel: 40 tot
+      60 MB met een release-build en ABI-splitsing per toestel.
+- [ ] **Apk echt installeren** op de telefoon en laten starten.
+- [ ] **Ondertekenen van de desktop-apps.** Zonder certificaat waarschuwen
+      SmartScreen en Gatekeeper bij elke nieuwe gebruiker.
+
+## Keten en sync
+
+- [ ] **Seq-conflicten bij meer dan twee devices.** Twee devices die tegelijk
+      schrijven pakken hetzelfde seq; die link gaat op `conflicted`. Takken apart
+      zetten en later samenvoegen in plaats van de link laten stoppen.
+- [ ] **Discovery op twee online machines bewijzen.** Een machine vindt en koppelt
+      de andere zonder invite-code, heen en terug.
+- [ ] **Bestanden boven 512 kB.** Een blob-kanaal, of een duidelijke weigering in
+      de UI in plaats van stilte.
+- [ ] **Tests voor env, relay en workspace-sync tussen twee daemons** in de suite,
+      nu alleen met de hand bewezen.
+
+## App
+
+- [ ] **Checkpoints in de UI.** Lijst met punten en een knop om terug te springen.
+- [ ] **Workspace bekijken en openen** vanuit de app, niet alleen syncen.
+- [ ] **MCP-configuratie in de app**, met een scherm en de config die over de keten
+      meereist.
+- [ ] **Titel van een nieuw gesprek** meteen goed zetten in plaats van "New
+      conversation" tot je hem hernoemt.
+- [ ] **Oude foutregels** uit het transcript halen zodra een beurt opnieuw lukt.
+
+## Later
+
+- [ ] Android-app als volwaardige node, voor zover het besturingssysteem een
+      achtergrondproces toestaat.
+- [ ] Relay voor een keten waarin niet elk device elk device ziet.
+
+## Uit de GitHub-issues
+
+Deze lijst is overgenomen uit de open issues van `roanh47/Roan` (13 stuks, stand
+november 2026), zodat alles op één plek staat. Het nummer erbij is het issuenummer.
+
+### Geldt nog voor deze app
+
+- [ ] **#18 De basiskennis bijwerken vanaf één plek.** Eén canonieke bron voor wat
+      Roan weet, met een cache lokaal, in plaats van vier losse bestanden die uit
+      elkaar kunnen lopen.
+- [ ] **#17 Zonder API-sleutels dingen bereiken.** Alleen lezen, alleen anonieme
+      webaanroepen: GitHub nu, OneDrive en een publieke URL later. Geen
+      credentials in de keten.
+- [ ] **#11 Sessie exporteren** als markdown of JSON, zodat een gesprek deelbaar is.
+- [ ] **#10 MCP-servers automatisch vinden** in de gebruikelijke configmappen in
+      plaats van ze met de hand aanwijzen.
+
+### Vervallen, hoort bij de oude TUI/Python-versie
+
+Deze zijn geschreven voor de harness met een terminalinterface. Die bestaat niet
+meer, dus ze gaan dicht zodra je zegt dat het mag.
+
+- **#1** Roan meer laten lijken op opencode of claude code: gaat over de TUI, en
+  er is geen TUI meer.
+- **#6** Web UI channel: bestaat al, dat is `scripts/webui.mjs` op poort 6769.
+- **#7** Meer kanalen dan Telegram: de app is het kanaal geworden.
+- **#8** Theme polish voor de vier Catppuccin-varianten in de TUI.
+- **#9** TUI accessibility: toetsenbordhulp en screenreaders in de terminal.
+- **#12** Plugin API-documentatie voor Python-plugins.
+- **#5** PyPI-naam `roan`: inmiddels gepubliceerd als `Roan47`.
+- **#14** Tien jaar zonder update, alles live: de app haalt providers en modellen al
+  live uit models.dev, dus dit is ingelost.
+- **#16** Identiteit en opslag in `~/.Roan` met hoofdletter: de app gebruikt
+  `~/.roan`, kleine letters.
+

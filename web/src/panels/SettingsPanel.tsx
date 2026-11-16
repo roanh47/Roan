@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactElement } from "react";
 import type { ChainClient } from "../chain";
+import { UpdateCard } from "./UpdateCard";
 
 interface ModelRow {
   provider: string;
@@ -61,6 +62,8 @@ export function SettingsPanel({ client, current }: Props): ReactElement {
       </header>
 
       <p className="panel__sub">Model in use: {current}</p>
+
+      <UpdateCard />
 
       <div className="panel__form">
         <span className="panel__sub">Daemon this app talks to</span>

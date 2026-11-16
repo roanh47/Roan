@@ -1,7 +1,7 @@
 {
   "name": "roan-ui",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.0.2",
   "type": "module",
   "description": "Frontend for the Roan desktop and Android shells",
   "scripts": {
@@ -11,6 +11,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.12.5",
+    "@tauri-apps/plugin-process": "^2.4.0",
+    "@tauri-apps/plugin-updater": "^2.14.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

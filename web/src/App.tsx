@@ -86,6 +86,16 @@ export default function App(): ReactElement {
   const [menuOpen, setMenuOpen] = useState(false);
   const [view, setView] = useState<"chat" | "workspace" | "schedules" | "checkpoints" | "settings">("chat");
   const [joinCode, setJoinCode] = useState("");
+  // Op de telefoon staat geen daemon; daar is dit het adres van de machine die
+  // er wel een heeft. Leeg betekent: de daemon op dit toestel.
+  const [daemonUrl, setDaemonUrl] = useState(() => {
+    try {
+      return window.localStorage.getItem("roan.daemon") ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const daemonNow = SOCKET_URL;
 
   useEffect(() => {
     client.connect();
@@ -202,8 +212,46 @@ export default function App(): ReactElement {
           <p className="onboarding__hint">
             {snapshot.status === "open"
               ? "The daemon is running on this machine."
-              : "Waiting for the daemon on this machine to answer."}
+              : "Waiting for a daemon to answer."}
           </p>
+
+          {/*
+            Op een telefoon draait geen daemon, en op een andere machine kan de
+            daemon ergens anders staan. Daarom is het adres hier te zetten: de
+            app onthoudt het en verbindt opnieuw.
+          */}
+          <details className="onboarding__daemon">
+            <summary className="onboarding__label">Where is the daemon?</summary>
+            <p className="onboarding__hint">
+              Leave this empty to use a daemon on this machine.
+            </p>
+            <div className="onboarding__row">
+              <input
+                className="onboarding__input"
+                value={daemonUrl}
+                placeholder="ws://100.64.0.1:7411/ws"
+                onChange={(event) => setDaemonUrl(event.target.value)}
+                spellCheck={false}
+                autoComplete="off"
+              />
+              <button
+                type="button"
+                className="onboarding__secondary"
+                onClick={() => {
+                  try {
+                    if (daemonUrl.trim().length === 0) window.localStorage.removeItem("roan.daemon");
+                    else window.localStorage.setItem("roan.daemon", daemonUrl.trim());
+                  } catch {
+                    // storage blocked: nothing to save
+                  }
+                  window.location.reload();
+                }}
+              >
+                Connect
+              </button>
+            </div>
+            {snapshot.status === "open" ? null : <p className="onboarding__hint">Now: {daemonNow}</p>}
+          </details>
         </main>
       </div>
     );

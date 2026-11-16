@@ -82,6 +82,18 @@ execFileSync(
 
 if (process.platform !== "win32") execFileSync("chmod", ["+x", target]);
 
+/**
+ * Injecting the blob rewrites the Mach-O, which throws away the signature the
+ * node binary carried. On Apple Silicon macOS refuses to start an unsigned
+ * binary and reports the whole app as damaged, so the sidecar gets a fresh
+ * ad-hoc signature here. The app bundle is signed in the same style by the
+ * build step, otherwise Gatekeeper still calls it damaged.
+ */
+if (process.platform === "darwin") {
+  execFileSync("codesign", ["--force", "--sign", "-", target], { stdio: "inherit" });
+  console.log("signed the sidecar ad-hoc");
+}
+
 rmSync(work, { recursive: true, force: true });
 if (!existsSync(target)) throw new Error("no sidecar was produced");
 console.log(`wrote ${target}`);

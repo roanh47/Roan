@@ -136,7 +136,12 @@ jobs:
           npm run build
           node scripts/build-sidecar.mjs aarch64-apple-darwin
 
-      - name: Build Tauri app and DMG (unsigned)
+      # No Apple Developer certificate here, so the bundle is signed ad-hoc ("-").
+      # Without any signature Apple Silicon reports the app as damaged instead of
+      # as an unidentified developer, and the dmg cannot be opened at all.
+      - name: Build Tauri app and DMG (ad-hoc signed)
+        env:
+          APPLE_SIGNING_IDENTITY: "-"
         run: npx --yes @tauri-apps/cli@^2 build --config src-tauri/tauri.desktop.conf.json --target aarch64-apple-darwin --bundles dmg --verbose
 
       - name: Collect exactly one artifact
