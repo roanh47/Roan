@@ -374,7 +374,7 @@ jobs:
         run: |
           set -euo pipefail
           cd release
-          expected="Roan-0.0.1-x64.exe Roan-0.0.1-arm64.dmg Roan-0.0.1-x86_64.AppImage Roan-0.0.1.apk"
+          expected="Roan-${APP_VERSION}-x64.exe Roan-${APP_VERSION}-arm64.dmg Roan-${APP_VERSION}-x86_64.AppImage Roan-${APP_VERSION}.apk"
           for f in *; do
             case " $expected " in
               *" $f "*) ;;
@@ -397,7 +397,7 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: Roan ${{ github.ref_name }}
           body: |
-            Roan 0.0.1 - first public build.
+            Roan ${{ env.APP_VERSION }} — every device is a node: the app starts its own daemon, on the phone in-process on libnode, on the desktop as a sidecar. Model and key travel with the chain.
 
             Unsigned builds: macOS shows a Gatekeeper prompt on first open
             (right click -> Open). The APK is debug-signed and installs with
@@ -406,7 +406,7 @@ jobs:
           prerelease: false
           fail_on_unmatched_files: true
           files: |
-            release/Roan-0.0.1-x64.exe
-            release/Roan-0.0.1-arm64.dmg
-            release/Roan-0.0.1-x86_64.AppImage
-            release/Roan-0.0.1.apk
+            release/Roan-${{ env.APP_VERSION }}-x64.exe
+            release/Roan-${{ env.APP_VERSION }}-arm64.dmg
+            release/Roan-${{ env.APP_VERSION }}-x86_64.AppImage
+            release/Roan-${{ env.APP_VERSION }}.apk
