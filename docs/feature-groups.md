@@ -27,7 +27,7 @@ GEM=Gemini.
 |---|---|---|
 | Session persistence & resume | session resume (CC, CX, GC, OC, QW), threads (AMP), sessions (CRU, GOO, DSH) | DONE — the chain replays events |
 | Cross-surface session continuity | sync across devices (GPT), cross-surface sessions (OCW), shared settings across surfaces (AG) | DONE — the chain syncs every peer |
-| Fork / branch / edit-resend | session branching & forking (CC, CX, OC), tree sessions `/tree` (PI), conversation branching (OH), edit a sent message / regenerate (GPT, CLD, GEM) | BUILD — round 1: regenerate via branch |
+| Fork / branch / edit-resend | session branching & forking (CC, CX, OC), tree sessions `/tree` (PI), conversation branching (OH), edit a sent message / regenerate (GPT, CLD, GEM) | DONE — round 1 proven: regenerate branches via checkpoint, append-only intact; a turn never ends in silence anymore (0.0.14) |
 | Compaction | `/compact` & autocompact (CC, GC, OC, PI, OCW), recap (CX), condenser (OH, ROO), snapcompact (OMP) | BUILD — round 2 territory, first after transcript hygiene |
 | Session search | session search (OCW), chat search (CLD, GEM), history search (GPT) | SOON — one query over the chain DB |
 | Session names / auto-titles | session naming (CC), automatic session names (OCW, DSH) | LATER — rename exists as a known gap |
@@ -159,7 +159,7 @@ GEM=Gemini.
 
 | Concept | Aliases (harness) | Roan |
 |---|---|---|
-| Thinking / progress indicator | streaming status (GPT, GEM), progress card (OCW), transcript viewer (CC) | BUILD — round 1, always visible |
+| Thinking / progress indicator | streaming status (GPT, GEM), progress card (OCW), transcript viewer (CC) | DONE — round 1 proven: the dock shows from turn_start (the lock's events were never broadcast before), plus a stuck report that says so after 2 min silence |
 | Diffs shown in the UI | visual artifacts & unified diffs (AG), diffs (OCW), changes tab (OH, AMP), `/diff` (CC, AID, CX) | LATER |
 | Steering / interrupt mid-turn | steering & interrupts (PI, CX, OH, OCW), safe interrupts (AID) | SOON — stop button + steer |
 | Themes | themes (CC, GC, OC, QW, CRU, GEM, CLD) | DONE — dark mint, one system |
