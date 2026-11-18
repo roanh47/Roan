@@ -8,7 +8,6 @@ import { ProvidersPanel } from "./panels/ProvidersPanel";
 import { CapabilitiesPanel } from "./panels/CapabilitiesPanel";
 import { CheckpointsPanel } from "./panels/CheckpointsPanel";
 import { Transcript } from "./components/Transcript";
-import { TurnStatus } from "./components/TurnStatus";
 
 /**
  * The shell (Tauri / Android) injects this before the bundle runs:
@@ -144,8 +143,8 @@ export default function App(): ReactElement {
               Roan
             </span>
           </div>
-          <span className="titlebar__chain" data-tauri-drag-region>
-            {snapshot.status === "open" ? "no chain yet" : "connecting…"}
+          <span className="titlebar__wait" data-tauri-drag-region>
+            {snapshot.status === "open" ? "" : "waiting for the daemon…"}
           </span>
         </header>
 
@@ -184,7 +183,7 @@ export default function App(): ReactElement {
               id="join-code"
               className="onboarding__input"
               value={joinCode}
-              placeholder="paste the code from the other device"
+              placeholder="code from the other device"
               onChange={(event) => setJoinCode(event.target.value)}
               spellCheck={false}
               autoComplete="off"
@@ -217,8 +216,8 @@ export default function App(): ReactElement {
 
           <p className="onboarding__hint">
             {snapshot.status === "open"
-              ? "The daemon is running on this machine."
-              : "Waiting for a daemon to answer."}
+              ? "The daemon is running on this device."
+              : "Waiting for the daemon to answer."}
           </p>
 
           <details className="onboarding__daemon">
@@ -237,36 +236,36 @@ export default function App(): ReactElement {
   return (
     <div className="app">
       <header className="titlebar" data-tauri-drag-region>
-        <div className="titlebar__brand" data-tauri-drag-region>
-          <span className="titlebar__mark" aria-hidden="true" data-tauri-drag-region />
-          <span className="titlebar__name" data-tauri-drag-region>
-            Roan
-          </span>
-        </div>
+        <button
+          type="button"
+          className="titlebar__menu"
+          aria-label="Menu"
+          aria-expanded={menuOpen}
+          data-tauri-drag-region={undefined}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          ☰
+        </button>
         <span className="titlebar__title" data-tauri-drag-region>
           {view === "chat"
-            ? (snapshot.sessions.find((entry) => entry.id === activeSession)?.title ?? "New conversation")
+            ? (snapshot.sessions.find((entry) => entry.id === activeSession)?.title ?? "New chat")
             : view === "workspace"
               ? "Workspace"
               : view === "schedules"
                 ? "Schedules"
                 : view === "checkpoints"
                   ? "Checkpoints"
-                  : "Settings"}
+                  : view === "agent"
+                    ? "Agent"
+                    : "Settings"}
         </span>
-        {snapshot.model !== undefined ? (
-          <span className="titlebar__model" title={snapshot.chain ?? undefined}>
-            {snapshot.model}
-          </span>
-        ) : null}
         <button
           type="button"
-          className="titlebar__menu"
-          aria-label="Menu"
-          aria-expanded={menuOpen}
-          onClick={() => setMenuOpen((open) => !open)}
+          className="titlebar__model"
+          onClick={() => setView("settings")}
+          title={`${snapshot.provider ?? "no provider"} — tap to switch`}
         >
-          ☰
+          {snapshot.model ?? "Select a model"}
         </button>
       </header>
 
@@ -293,57 +292,37 @@ export default function App(): ReactElement {
         <button
           type="button"
           className="rail__scrim"
-          aria-label="Sluit menu"
+          aria-label="Close menu"
           onClick={() => setMenuOpen(false)}
         />
       ) : null}
 
       <aside className={menuOpen ? "rail rail--open" : "rail"}>
-        <nav className="rail__nav">
-          {(
-            [
-              ["chat", "Conversations"],
-              ["workspace", "Workspace"],
-              ["schedules", "Schedules"],
-              ["checkpoints", "Checkpoints"],
-              ["agent", "Agent"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              className={view === id ? "rail__navitem rail__navitem--active" : "rail__navitem"}
-              onClick={() => {
-                setView(id);
-                setMenuOpen(false);
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </nav>
+        <div className="rail__brand">
+          <span className="rail__mark" aria-hidden="true" />
+          <span className="rail__name">Roan</span>
+        </div>
 
-        <div className="rail__sessions rail__sessions--first">
-          <div className="rail__row">
-            <span className="onboarding__label">Conversations</span>
-            <button
-              type="button"
-              className="rail__button"
-              disabled={disabled}
-              onClick={() => {
-                client.newSession();
-                setMenuOpen(false);
-              }}
-            >
-              New
-            </button>
-          </div>
-          <input
-            className="onboarding__input"
-            placeholder="Search conversations"
-            value={sessionQuery}
-            onChange={(event) => setSessionQuery(event.target.value)}
-          />
+        <button
+          type="button"
+          className="rail__new"
+          disabled={disabled}
+          onClick={() => {
+            client.newSession();
+            setMenuOpen(false);
+          }}
+        >
+          ＋ New chat
+        </button>
+
+        <input
+          className="rail__search"
+          placeholder="Search chats"
+          value={sessionQuery}
+          onChange={(event) => setSessionQuery(event.target.value)}
+        />
+
+        <div className="rail__sessions">
           <ul className="rail__list">
             {snapshot.sessions
               .filter((session) =>
@@ -371,18 +350,39 @@ export default function App(): ReactElement {
           </ul>
         </div>
 
-        {snapshot.invite !== null ? <InviteBlock code={snapshot.invite} /> : null}
-        <TurnStatus
-          turn={turn}
-          status={snapshot.status}
-          chain={snapshot.chain}
-          node={snapshot.node}
-          peer={snapshot.peer}
-          pending={snapshot.pending.length}
-          lastSeq={snapshot.lastSeq}
-          error={snapshot.error}
-          notice={notice}
-        />
+        <div className="rail__more">
+          <span className="rail__label">Panels</span>
+          {(
+            [
+              ["workspace", "Workspace"],
+              ["schedules", "Schedules"],
+              ["checkpoints", "Checkpoints"],
+              ["agent", "Agent"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              className={view === id ? "rail__item rail__item--active" : "rail__item"}
+              onClick={() => {
+                setView(id);
+                setMenuOpen(false);
+              }}
+            >
+              {label}
+            </button>
+          ))}
+          {snapshot.invite !== null ? <InviteBlock code={snapshot.invite} /> : null}
+        </div>
+
+        <p className="rail__sync">
+          <span
+            className={`rail__syncdot${snapshot.status === "open" ? " rail__syncdot--on" : " rail__syncdot--off"}`}
+            aria-hidden="true"
+          />
+          {snapshot.node} · {snapshot.peer !== null ? "syncing" : "this device only"} ·{" "}
+          {snapshot.status === "open" ? "daemon on" : "waiting for daemon"}
+        </p>
 
         <button
           type="button"
@@ -392,19 +392,20 @@ export default function App(): ReactElement {
             setMenuOpen(false);
           }}
         >
-          Settings
+          ⚙ Settings
         </button>
       </aside>
 
       <footer className={view === "chat" ? "dock" : "dock dock--hidden"}>
         {turn !== null ? (
-          <button type="button" className="dock__stop" onClick={() => void client.cancelTurn()}>
-            Stop
-          </button>
+          <div className="dock__state">
+            <span className="dock__dot" aria-hidden="true" />
+            Roan is working
+            <button type="button" className="dock__stop" onClick={() => void client.cancelTurn()}>
+              Stop
+            </button>
+          </div>
         ) : null}
-        <button type="button" className="dock__model" onClick={() => setView("settings")}>
-          {snapshot.provider ?? "no provider"} · {snapshot.model ?? "no model"}
-        </button>
         <Composer disabled={disabled} placeholder={placeholder} onSend={send} />
       </footer>
     </div>
@@ -417,19 +418,16 @@ function InviteBlock({ code }: { code: string }): ReactElement {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   return (
-    <div className="onboarding__invite">
-      <div className="rail__row">
-        <span className="onboarding__label">Another device</span>
-        <button type="button" className="rail__button" onClick={() => setOpen((value) => !value)}>
-          {open ? "Hide" : "Invite"}
-        </button>
-      </div>
+    <div className="rail__invite">
+      <button type="button" className="rail__item" onClick={() => setOpen((value) => !value)}>
+        ＋ Invite a device
+      </button>
       {open ? (
         <>
           <code className="onboarding__code">{code}</code>
           <button
             type="button"
-            className="rail__button"
+            className="rail__invitecopy"
             onClick={() => {
               void navigator.clipboard?.writeText(code).then(
                 () => setCopied(true),

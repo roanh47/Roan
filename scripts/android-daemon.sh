@@ -215,13 +215,43 @@ if "networkSecurityConfig" not in text:
     )
     manifest.write_text(text)
 
-# --- activity: start the daemon before the webview asks for it ---
+# --- theme: dark system bars with light icons ---
+# The app is dark everywhere; Android's default day theme paints dark status
+# bar icons that vanish on the near-black header. Tauri regenerates these
+# files on `tauri android init`, so this patch lives here, not in gen/.
+for theme in (app / "src/main/res/values/themes.xml", app / "src/main/res/values-night/themes.xml"):
+    if not theme.exists():
+        continue
+    text = theme.read_text()
+    if "windowLightStatusBar" not in text:
+        text = text.replace(
+            "        <!-- Customize your theme here. -->",
+            "        <!-- Dark bars, light icons: the app is dark on every platform. -->\n"
+            '        <item name="android:windowLightStatusBar">false</item>\n'
+            '        <item name="android:statusBarColor">#0e1013</item>\n'
+            '        <item name="android:navigationBarColor">#0e1013</item>\n'
+            '        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">false</item>',
+        )
+        theme.write_text(text)
+
+# --- activity: start the daemon before the webview asks for it, dark bars ---
+# enableEdgeToEdge() without arguments picks a day/night style; in day mode
+# that means dark status bar icons, which vanish on the near-black app. An
+# explicit dark SystemBarStyle forces light icons all day.
 activity = app / "src/main/java/dev/roan/MainActivity.kt"
 text = activity.read_text()
 if "RoanNode.ensureStarted" not in text:
     text = text.replace(
         "    enableEdgeToEdge()",
         "    // Every device is a node: the daemon starts with the app.\n    RoanNode.ensureStarted(applicationContext)\n    enableEdgeToEdge()",
+    )
+if "SystemBarStyle" not in text:
+    text = text.replace(
+        "import androidx.activity.enableEdgeToEdge",
+        "import android.graphics.Color\nimport androidx.activity.SystemBarStyle\nimport androidx.activity.enableEdgeToEdge",
+    ).replace(
+        "    enableEdgeToEdge()",
+        "    enableEdgeToEdge(\n      statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),\n      navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),\n    )",
     )
     activity.write_text(text)
 PY

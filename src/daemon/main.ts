@@ -600,6 +600,10 @@ async function main(): Promise<void> {
     await startEnvLoop();
     await startWorkspaceLoop();
     await startCron();
+    // The first conversation exists from the start: an empty session list in
+    // the drawer reads as a bug, and every reference app opens a conversation
+    // the moment you create an account/chain.
+    startSession("New chat");
     return { t: "chain", chain: created.chainId, node: created.nodeId, invite };
   };
 

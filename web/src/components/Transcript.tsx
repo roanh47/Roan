@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import type { ReactElement } from "react";
-import type { ChainEvent, PendingMessage } from "../chain";
+import type { ChainEvent, PendingMessage } from "../chain.js";
 
 interface TranscriptProps {
   events: readonly ChainEvent[];
@@ -9,14 +9,25 @@ interface TranscriptProps {
   node: string;
 }
 
+/**
+ * The conversation, drawn the way a person reads a chat: your words in a quiet
+ * bubble on the right, Roan's answer as plain text on the left, a tool as one
+ * small line that opens for the details. Node names, clocks and bookkeeping are
+ * behind the details toggle, never in your face.
+ */
+
 type Row =
-  | { kind: "message"; key: string; node: string; ts: number; text: string }
-  | { kind: "assistant"; key: string; node: string; ts: number; text: string }
-  | { kind: "tool_call"; key: string; name: string; body: string }
-  | { kind: "tool_result"; key: string; name: string; body: string; ok: boolean }
-  | { kind: "error"; key: string; text: string }
-  | { kind: "meta"; key: string; label: string }
-  | { kind: "raw"; key: string; label: string; body: string };
+  | { kind: "user"; key: string; text: string }
+  | { kind: "assistant"; key: string; text: string }
+  | { kind: "tool"; key: string; name: string; args: string; output: string; ok: boolean | null }
+  | { kind: "notice"; key: string; text: string }
+  | { kind: "meta"; key: string; text: string };
+
+interface OpenTool {
+  key: string;
+  name: string;
+  args: string;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -40,7 +51,13 @@ function textOf(data: unknown): string {
 
 function show(value: unknown): string {
   if (value === undefined || value === null) return "";
-  if (typeof value === "string") return value;
+  if (typeof value === "string") {
+    try {
+      return JSON.stringify(JSON.parse(value), null, 2);
+    } catch {
+      return value;
+    }
+  }
   try {
     return JSON.stringify(value, null, 2);
   } catch {
@@ -48,141 +65,116 @@ function show(value: unknown): string {
   }
 }
 
-function toolOf(data: unknown): { name: string; body: string } {
-  if (!isRecord(data)) return { name: "tool", body: show(data) };
-  const fn = isRecord(data.function) ? data.function : null;
+function toolOf(data: unknown): { name: string; args: string } {
+  if (!isRecord(data)) return { name: "tool", args: "" };
+  const fn = isRecord(data["function"]) ? (data["function"] as Record<string, unknown>) : null;
   const name =
     pickString(data, ["name", "tool"]) ?? (fn ? pickString(fn, ["name"]) : null) ?? "tool";
-  const args = data.args ?? data.arguments ?? data.input ?? (fn ? fn.arguments : undefined);
-  return { name, body: show(args) };
+  const args = data["args"] ?? data["arguments"] ?? data["input"] ?? (fn ? fn["arguments"] : undefined);
+  return { name, args: show(args) };
 }
 
 function resultOk(data: unknown): boolean {
   if (!isRecord(data)) return true;
-  if (typeof data.ok === "boolean") return data.ok;
-  return !("error" in data) || data.error === null || data.error === false;
+  if (typeof data["ok"] === "boolean") return data["ok"];
+  return !("error" in data) || data["error"] === null || data["error"] === false;
 }
 
-function labelFor(event: ChainEvent): string {
-  if (event.type === "turn_start") return `turn started · ${event.node}`;
-  if (event.type === "turn_end") {
-    const steps = isRecord(event.data) ? event.data.steps : undefined;
-    return typeof steps === "number"
-      ? `turn ended · ${steps} ${steps === 1 ? "step" : "steps"}`
-      : "turn ended";
-  }
-  return event.type;
-}
-
-function buildRows(events: readonly ChainEvent[]): Row[] {
+function buildRows(events: readonly ChainEvent[], local: string): Row[] {
   const rows: Row[] = [];
+  const open: OpenTool[] = [];
+
+  // A tool call and its answer are one step to a reader, so an open call waits
+  // for its result and they are drawn as one line.
+  const flush = (): void => {
+    for (const tool of open) {
+      rows.push({ kind: "tool", key: tool.key, name: tool.name, args: tool.args, output: "", ok: null });
+    }
+    open.length = 0;
+  };
+
   for (const event of events) {
+    const data = event.data;
     switch (event.type) {
       case "message": {
-        rows.push({
-          kind: "message",
-          key: event.id,
-          node: event.node,
-          ts: event.ts,
-          text: textOf(event.data),
-        });
+        flush();
+        rows.push({ kind: event.node === local ? "user" : "user", key: event.id, text: textOf(data) });
         break;
       }
       case "assistant": {
+        flush();
+        const text = textOf(data);
         const last = rows[rows.length - 1];
-        const text = textOf(event.data);
-        // Streaming arrives as several assistant events in one turn; keep them
-        // as one block so the transcript does not fragment per delta.
-        if (last && last.kind === "assistant" && last.node === event.node) {
+        // Streaming arrives as several assistant events in one turn; one block
+        // reads better than a fragment per delta.
+        if (last !== undefined && last.kind === "assistant") {
           last.text = last.text.length > 0 ? `${last.text}\n${text}` : text;
         } else {
-          rows.push({ kind: "assistant", key: event.id, node: event.node, ts: event.ts, text });
+          rows.push({ kind: "assistant", key: event.id, text });
         }
         break;
       }
       case "tool_call": {
-        const tool = toolOf(event.data);
-        rows.push({ kind: "tool_call", key: event.id, name: tool.name, body: tool.body });
+        const tool = toolOf(data);
+        open.push({ key: event.id, name: tool.name, args: tool.args });
         break;
       }
       case "tool_result": {
-        const tool = toolOf(event.data);
-        const output =
-          isRecord(event.data)
-            ? pickString(event.data, ["output", "result", "text", "content"]) ?? show(event.data)
-            : show(event.data);
-        rows.push({
-          kind: "tool_result",
-          key: event.id,
-          name: tool.name,
-          body: output,
-          ok: resultOk(event.data),
-        });
+        const tool = toolOf(data);
+        const output = isRecord(data)
+          ? show(data["output"] ?? data["result"] ?? data["text"] ?? data["content"])
+          : "";
+        const ok = resultOk(data);
+        const index = open.findIndex((item) => item.name === tool.name);
+        if (index >= 0) {
+          const call = open.splice(index, 1)[0] as OpenTool;
+          rows.push({ kind: "tool", key: call.key, name: call.name, args: call.args, output, ok });
+        } else {
+          rows.push({ kind: "tool", key: event.id, name: tool.name, args: "", output, ok });
+        }
         break;
       }
       case "error": {
-        const message =
-          isRecord(event.data) ? pickString(event.data, ["message", "error", "text"]) : null;
-        const text = message ?? (textOf(event.data) || "Error");
+        flush();
+        const message = isRecord(data) ? pickString(data, ["message", "error", "text"]) : null;
+        const text = message ?? (textOf(data) || "something went wrong");
+        const last = rows[rows.length - 1];
         // A failed turn often writes the same error twice (the adapter and the
-        // loop both report it). One card is the truth; two look like two bugs.
-        const lastRow = rows[rows.length - 1];
-        if (lastRow !== undefined && lastRow.kind === "error" && lastRow.text === text) break;
-        rows.push({ kind: "error", key: event.id, text });
+        // loop both report it). One line is the truth; two look like two bugs.
+        if (last !== undefined && last.kind === "notice" && last.text === text) break;
+        rows.push({ kind: "notice", key: event.id, text });
         break;
       }
       case "session": {
-        const title = isRecord(event.data) ? pickString(event.data, ["title"]) : null;
-        rows.push({ kind: "meta", key: event.id, label: `nieuw gesprek · ${title ?? ""}`.trim() });
+        flush();
+        rows.push({ kind: "meta", key: event.id, text: "new chat" });
         break;
       }
       case "checkpoint": {
-        const label = isRecord(event.data) ? pickString(event.data, ["label"]) : null;
-        rows.push({ kind: "meta", key: event.id, label: `checkpoint · ${label ?? ""}`.trim() });
+        flush();
+        const label = isRecord(data) && typeof data["label"] === "string" ? data["label"] : "";
+        rows.push({
+          kind: "meta",
+          key: event.id,
+          text: label.length > 0 && label !== "checkpoint" ? `checkpoint · ${label}` : "checkpoint",
+        });
         break;
       }
       case "workspace": {
-        const path = isRecord(event.data) ? pickString(event.data, ["path"]) : null;
-        const op = isRecord(event.data) ? pickString(event.data, ["op"]) : null;
-        rows.push({
-          kind: "meta",
-          key: event.id,
-          label: `${op === "delete" ? "verwijderd" : "bijgewerkt"} · ${path ?? ""}`.trim(),
-        });
+        const path = isRecord(data) && typeof data["path"] === "string" ? data["path"] : "";
+        if (path.length > 0) rows.push({ kind: "meta", key: event.id, text: path });
         break;
       }
-      // Bookkeeping the eye should never have to read: the turn spinner in the
-      // status panel already says a turn is running, and the env is not a message.
-      case "env":
-      case "turn_start":
-      case "turn_end": {
+      default:
         break;
-      }
-      default: {
-        rows.push({
-          kind: "meta",
-          key: event.id,
-          label: labelFor(event),
-        });
-      }
     }
   }
+  flush();
   return rows;
 }
 
-function clock(ts: number): string {
-  try {
-    return new Date(ts).toLocaleTimeString(undefined, {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return "";
-  }
-}
-
 export function Transcript({ events, pending, node }: TranscriptProps): ReactElement {
-  const rows = useMemo(() => buildRows(events), [events]);
+  const rows = useMemo(() => buildRows(events, node), [events, node]);
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
 
@@ -203,119 +195,89 @@ export function Transcript({ events, pending, node }: TranscriptProps): ReactEle
 
   return (
     <div className="transcript" ref={scroller} onScroll={onScroll}>
-      <div
-        className="transcript__list"
-        role="log"
-        aria-label="Conversation transcript"
-        aria-live="polite"
-        aria-relevant="additions text"
-      >
+      <div className="transcript__list" role="log" aria-label="Conversation" aria-live="polite">
         {empty ? (
           <div className="empty">
-            <p className="empty__title">This conversation is empty.</p>
+            <div className="empty__mark" aria-hidden="true" />
+            <p className="empty__title">Where should we start?</p>
             <p className="empty__text">
-              Ask for something you would otherwise do yourself: change files in the workspace,
-              run a command, look something up, or set up a schedule so it happens while you are
-              away. Everything you type here is answered by the model in the titlebar, and every
-              device on this chain sees the result.
+              Ask anything, have Roan work in the workspace, or plan something for later. Everything
+              you type here is on every device in the chain.
             </p>
           </div>
         ) : null}
 
         {rows.map((row) => (
-          <RowView key={row.key} row={row} local={node} />
+          <RowView key={row.key} row={row} />
         ))}
 
         {pending.map((item) => (
-          <article className="bubble bubble--out bubble--pending" key={item.id}>
-            <div className="bubble__meta">
-              <span>you</span>
-              <span className="bubble__state">sending…</span>
-            </div>
-            <p className="bubble__text">{item.text}</p>
-          </article>
+          <div className="bubble bubble--out bubble--pending" key={item.id}>
+            {item.text}
+          </div>
         ))}
       </div>
     </div>
   );
 }
 
-function RowView({ row, local }: { row: Row; local: string }): ReactElement {
+function RowView({ row }: { row: Row }): ReactElement {
   switch (row.kind) {
-    case "message": {
-      const mine = row.node === local;
+    case "user":
+      return <div className="bubble bubble--out">{row.text}</div>;
+    case "assistant":
       return (
-        <article className={`bubble ${mine ? "bubble--out" : "bubble--in"}`}>
-          <div className="bubble__meta">
-            <span>{mine ? "you" : row.node}</span>
-            <time dateTime={new Date(row.ts).toISOString()}>{clock(row.ts)}</time>
-          </div>
-          <p className="bubble__text">{row.text || <span className="muted">empty message</span>}</p>
-        </article>
+        <div className="answer">
+          {row.text.length === 0 ? (
+            <span className="answer__caret" aria-label="Roan is aan het antwoorden" />
+          ) : (
+            row.text.split("\n").map((line, index) =>
+              line.trim().length === 0 ? (
+                <span key={String(index)} className="answer__gap" />
+              ) : (
+                <p key={String(index)}>{line}</p>
+              ),
+            )
+          )}
+        </div>
       );
-    }
-    case "assistant": {
+    case "tool":
       return (
-        <article className="bubble bubble--assistant">
-          <div className="bubble__meta">
-            <span>Roan</span>
-            <span>{row.node}</span>
-          </div>
-          <p className="bubble__text">{row.text}</p>
-        </article>
-      );
-    }
-    case "tool_call": {
-      return (
-        <details className="trace">
-          <summary>
-            <span className="trace__kind">tool call</span>
-            <span className="trace__name">{row.name}</span>
-          </summary>
-          <pre className="trace__body">{row.body || "no arguments"}</pre>
-        </details>
-      );
-    }
-    case "tool_result": {
-      return (
-        <details className="trace">
-          <summary>
-            <span className="trace__kind">tool result</span>
-            <span className="trace__name">{row.name}</span>
-            <span className={`trace__flag ${row.ok ? "is-ok" : "is-bad"}`}>
-              {row.ok ? "ok" : "failed"}
+        <details className="tool">
+          <summary className="tool__line">
+            <span className={`tool__dot${row.ok === false ? " tool__dot--bad" : ""}`} aria-hidden="true" />
+            <span className="tool__name">{row.name}</span>
+            <span
+              className={`tool__state${
+                row.ok === true ? " tool__state--ok" : row.ok === false ? " tool__state--bad" : ""
+              }`}
+            >
+              {row.ok === null ? "running" : row.ok === true ? "done" : "failed"}
             </span>
           </summary>
-          <pre className="trace__body">{row.body || "no output"}</pre>
-        </details>
-      );
-    }
-    case "error": {
-      return (
-        <div className="bubble bubble--error" role="alert">
-          <div className="bubble__meta">
-            <span>error</span>
+          <div className="tool__detail">
+            {row.args.length > 0 ? (
+              <>
+                <span className="tool__label">input</span>
+                <pre className="tool__body">{row.args}</pre>
+              </>
+            ) : null}
+            {row.output.length > 0 ? (
+              <>
+                <span className="tool__label">output</span>
+                <pre className="tool__body">{row.output}</pre>
+              </>
+            ) : null}
           </div>
-          <p className="bubble__text">{row.text}</p>
-        </div>
-      );
-    }
-    case "meta": {
-      return (
-        <div className="divider">
-          <span>{row.label}</span>
-        </div>
-      );
-    }
-    case "raw": {
-      return (
-        <details className="trace trace--raw">
-          <summary>
-            <span className="trace__kind">{row.label}</span>
-          </summary>
-          <pre className="trace__body">{row.body}</pre>
         </details>
       );
-    }
+    case "notice":
+      return (
+        <p className="notice" role="alert">
+          {row.text}
+        </p>
+      );
+    case "meta":
+      return <p className="chatmeta">{row.text}</p>;
   }
 }
