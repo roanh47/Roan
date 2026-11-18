@@ -82,7 +82,7 @@ These exist in mainstream agents and are **deliberately out**:
 | Persistent memory across sessions | HM, GPT, CL | ✅ `src/context/memory.ts` + auto-memory step | done — but must become **invisible** in the transcript (see §1) |
 | Project instructions file (AGENTS.md / CLAUDE.md) | CC, CX, OC, GC | ✅ AGENTS.md travels with the env | done |
 | Skills (task-shaped instructions) | CC, HM | partial — `skills.ts` + `skills_list`, no real skill loading into turns yet | **BUILD** — load skills like Hermes does, selectable, traveling with the chain |
-| Writing style baked in (his own voice, hardcore) | — (unique wish) | TODO.md records the wish, no enforcement | **BUILD** — style rules in the prompt env, measurable, not a suggestion |
+| Writing style baked in (his own voice, hardcore) | — (unique wish) | TODO.md records the wish, no enforcement | **BUILD** — the style skill lives **cloned inside this repo** (`skills/writing-style/`, git remote `upstream` → `github.com/roanh47/Roans-Writing-Style-Skill`), so it ships with every clone and stays updatable from upstream; the turn prompt loads it as a rule you can measure answers against, not a suggestion |
 | Personalization from history | GPT, CL | ✅ memory step | done |
 
 ## 6. Tools & permissions
@@ -112,7 +112,8 @@ These exist in mainstream agents and are **deliberately out**:
 | Feature | Mainstream | Roan now | Verdict |
 |---|---|---|---|
 | Scheduled tasks / cron | GPT (tasks), HM | ✅ `cron/` + schedules panel | done (UI polish SOON) |
-| Background turns (app closed) | HM, OC | ❌ on phone — daemon is a thread in the app process | **BUILD** — Android foreground service; this is *his* "daemon runs without the app open" wish |
+| Workspace folder = the agent's home (OpenClaw-style), twice | OC (workspace home) | ✅ two folders exist under `~/.roan/`: `workspace/` (local) and `synced-workspace/` (syncs via chain events) — but `workspace/` currently holds only the DB + cron state, not an agent home | **BUILD** — `workspace/` becomes the agent's *local* home (exec cwd, scratch, device-private files), `synced-workspace/` the *synced* home; both in the same parent; DB/state move to their own dir |
+| Background turns (app closed) | HM, OC | ❌ on phone — daemon is a thread in the app process | **BUILD** — Android foreground service; this is *his* "daemon runs without the app open" wish. On desktop the daemon already runs as a systemd user service (`docs/webui.md`), independent of any app window |
 | Notification when a turn finishes | GPT, CL, HM | ❌ | **BUILD** — otherwise you stare at a spinner |
 | Hooks (lifecycle events → script) | CC | partial — `src/hooks/run.ts` exists | LATER (surface later) |
 
@@ -123,6 +124,7 @@ These exist in mainstream agents and are **deliberately out**:
 | Phone app with its own daemon | — (unique) | ✅ libnode in-apk | done |
 | Desktop app (Win/Mac/Linux) | GPT, CL, CC (desktop) | ✅ Tauri sidecar | done |
 | Web UI served by the daemon itself (gateway style) | HM (dashboard), OC (server) | ✅ `scripts/webui.mjs` port 6769 — **must be verified to serve the 0.0.12 UI** | **BUILD (verify + promote)** — one frontend, three shells, daemon-first |
+| One scalable frontend on every surface | GPT, CL (one app per form factor) | ✅ one web frontend embedded by every shell | **BUILD (keep it honest)** — phone, tablet, desktop and the 6769 web UI render the *same* frontend, scaled by viewport; no per-platform fork of the UI |
 | Cross-device sync | GPT, CL (cloud) | ✅ chain (no cloud) | done |
 | Push notifications | GPT, CL | ❌ | **SOON** (after in-app notification) |
 | Updater | CC, HM | partial — Tauri updater plugin configured for desktop | **SOON** — releases + `latest.json` already exist in CI |
