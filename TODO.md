@@ -7,6 +7,29 @@ met de plek waar het werk zit.
 Een punt gaat pas op `[x]` als het werkt op een echte machine, niet als de code is
 geschreven.
 
+## Schrijfstijl
+
+- [ ] **Mijn schrijfstijl, hardcore.** Roan antwoordt in mijn eigen stijl, niet in
+      standaard AI-proza: kort, direct, geen managementtaal, geen "zeker, ik kan je
+      helpen"-opening. De gids staat in `~/.roan` (`SOUL.md` / `AGENTS.md`) en reist
+      als env mee, zodat elke instance hetzelfde schrijft. Niet als suggestie in de
+      prompt, maar als regel die je aan een antwoord kunt afmeten.
+
+## Telefoon is een node
+
+- [ ] **Daemon in de apk.** `libnode.so` in `jniLibs`, de JNI-brug
+      (`src-tauri/android/`) en de gebundelde daemon in `assets`, gewired door
+      `scripts/android-daemon.sh` (ook in `build-local.sh` en de Android-CI-job).
+      De bundel is bewezen op gewone Node: lege `ROAN_HOME` geeft
+      `onboarding:true`, `create_chain` maakt een echte keten. Nog niet op het
+      toestel zelf.
+- [ ] **Installeren en een keten beginnen op de telefoon.** Apk erop, app open,
+      create a chain, en `roan-daemon.log` in de app-data laten zien dat de
+      daemon daar draait.
+- [ ] **Foreground service** zodat de daemon blijft draaien als de app weg is.
+- [ ] **Sync tussen telefoon en server bewijzen** met beide online.
+- [ ] **Share-sheet** en de notificatiechannel zoals in `docs/mobile.md`.
+
 ## v0.0.2
 
 Alles hieronder is lokaal gebouwd en getest, niet gepusht. Een versie gaat pas
@@ -29,8 +52,11 @@ naar GitHub als Roan hem zelf op zijn machines heeft gehad.
       `scripts/dmg/build-dmg.sh` bouwt de dmg met dat bestand erin.
 - [ ] **Die dmg bouwen en testen op de Mac.** Moet op macOS gebeuren, de server
       kan geen .app of dmg maken.
-- [ ] **App-icoon van de profielfoto.** Zelfde icoon op alle vier de platforms,
-      inclusief Android-adaptief icoon.
+- [ ] **App-icoon van de profielfoto.** De set is gegenereerd uit
+      `src-tauri/icons/icon-source.jpg` met `scripts/make-icons.py`: de foto zelf
+      op Windows/Linux/Android, en op macOS dezelfde foto in de gewone
+      afgeronde-vierkantvorm (824 van 1024, radius 185), niet bijgesneden. Nog
+      niet gezien op alle vier de platforms.
 - [ ] **Alles lokaal leveren** via Filebrowser in plaats van GitHub-releases,
       zolang een versie nog niet getest is.
 

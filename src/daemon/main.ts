@@ -8,7 +8,10 @@ import { loadSettings } from "./settings.js";
 import { startControlServer } from "./control.js";
 import { ChainNodeStore } from "./peer-store.js";
 import { addPeer, peers as peerList, startPeers, stopPeers } from "./peers.js";
-import { startDiscovery } from "./discovery.js";
+import { probe, startDiscovery, tailscaleHosts } from "./discovery.js";
+import { findNode, readNodes } from "../chain/nodes.js";
+import os from "node:os";
+import { createHash } from "node:crypto";
 import type { Logger } from "../sync/types.js";
 import { runTurn } from "./turn-runner.js";
 import { builtinTools } from "../tools.js";
@@ -26,8 +29,9 @@ import { randomUUID as uuid } from "node:crypto";
 import { mkdir, readFile as readFileAsync, writeFile as writeFileAsync } from "node:fs/promises";
 import { runHooks, type HookConfig } from "../hooks/run.js";
 import { dueJobs, loadCron } from "../cron/jobs.js";
-import { runHermesTurn } from "../engine/hermes.js";
-import { CATALOG } from "../providers/catalog.js";
+import { engineAvailable, runHermesTurn } from "../engine/hermes.js";
+import { catalogSource, loadCatalog } from "../providers/live.js";
+import { PRESETS, fetchModels, loadProviders, saveProviders, upsertAccount, type ProviderAccount } from "./providers.js";
 import { saveSettings } from "./settings-write.js";
 
 const CONTROL_PORT = Number(process.env["ROAN_CONTROL_PORT"] ?? 7411);
@@ -76,7 +80,17 @@ interface AgentContext {
 async function main(): Promise<void> {
   const paths = resolvePaths();
   await ensurePaths(paths);
-  const settings = await loadSettings(paths);
+  // Reassigned when a snapshot from the chain lands: the key and the model
+  // travel in `config.json`, so a device that joins mid-run has to pick them up
+  // without a restart.
+  let settings = await loadSettings(paths);
+  // A packaged app on a machine without the hermes binary must still answer:
+  // erroring on every turn would make it a dead window. The in-process loop is
+  // the fallback, and the log says which one is running.
+  if (settings.engine === "hermes" && !(await engineAvailable().catch(() => false))) {
+    settings = { ...settings, engine: "builtin" };
+    log("engine: no hermes binary on this machine, using the builtin loop");
+  }
 
   // Everything this device knows before the first token: its own memory files
   // and the skills on its own disk. Both are copies, never a fetch from a peer.
@@ -102,6 +116,7 @@ async function main(): Promise<void> {
 
   const state = (): DaemonState => ({
     model: settings.model,
+    provider: settings.provider,
     onboarding: session === null,
     sessions:
       session === null
@@ -132,6 +147,8 @@ async function main(): Promise<void> {
   });
 
   let control: Awaited<ReturnType<typeof startControlServer>> | null = null;
+  /** The turn in flight, so "stop" has something to abort. */
+  let activeTurn: AbortController | null = null;
   let replicating = false;
 
   /**
@@ -194,6 +211,29 @@ async function main(): Promise<void> {
    * what changed here. Runs on start and then quietly on a timer, so editing a
    * skill is enough — no command, no restart.
    */
+  /**
+   * Tells the chain who this machine is: a name a person would say, and the
+   * address a peer can dial. One event per change, so a moved address shows up
+   * and a restart does not fill the chain with the same announcement.
+   */
+  const announceNode = async (): Promise<void> => {
+    if (session === null) return;
+    const current = session;
+    const chain = current.identity.chainId;
+    const explicit = process.env["ROAN_PEER_ADVERTISE"] ?? "";
+    let host = explicit;
+    if (host.length === 0) {
+      const found = await tailscaleHosts().catch(() => ({ self: null, hosts: [] as string[] }));
+      host = found.self ?? "";
+    }
+    const data = { node: current.identity.nodeId, name: os.hostname(), host, port: PEER_PORT };
+    const id = `node-${createHash("sha256").update(JSON.stringify(data)).digest("hex")}`;
+    if (current.store.read(chain, 1, 100_000).some((event) => event.id === id)) return;
+    const event = current.store.append(chain, { id, node: current.identity.nodeId, type: "node", data });
+    control?.broadcast({ t: "append", event });
+    log(`node: announced ${data.name}${host.length > 0 ? " at " + host : " without an address"}`);
+  };
+
   const syncEnv = async (): Promise<void> => {
     if (session === null) return;
     const current = session;
@@ -204,8 +244,15 @@ async function main(): Promise<void> {
     // peer's snapshot is allowed to overwrite what is here.
     if (known !== null && known.nodeId !== current.identity.nodeId) {
       const result = await adoptEnv(known, paths.home);
-      if (result.applied) log("env: adopted the chain's copy");
+      if (result.applied) {
+        log("env: adopted the chain's copy");
+        // `config.json` arrived with the chain, so the provider, the model and
+        // the key it carries have to work from now on — not after a restart.
+        settings = await loadSettings(paths);
+        log("env: settings reloaded from the chain");
+      }
     }
+    await announceNode().catch((error: unknown) => log("node: " + String(error)));
     const result = await publishEnv({
       store: current.store,
       chain,
@@ -399,7 +446,11 @@ async function main(): Promise<void> {
     if (relayNow === null) return tools;
     return [
       ...tools,
-      createRunOnNodeTool(relayNow, () => peerList()),
+      createRunOnNodeTool(relayNow, () => {
+        if (session === null) return [];
+        const current = session;
+        return readNodes(current.store.read(current.identity.chainId, 1, 100_000));
+      }),
       {
         name: "delegate",
         description:
@@ -480,8 +531,11 @@ async function main(): Promise<void> {
     for (const result of started) {
       if (result.exitCode !== 0) log(`hook turn_start failed (${String(result.exitCode)}): ${result.command}`);
     }
+    const controller = new AbortController();
+    activeTurn = controller;
     await runTurn(
       {
+        signal: controller.signal,
         store: current.store,
         chain: current.identity.chainId,
         node: current.identity.nodeId,
@@ -504,6 +558,7 @@ async function main(): Promise<void> {
       },
       text,
     );
+    activeTurn = null;
     const ended = await runHooks(hooks, "turn_end", {
       cwd: paths.syncedWorkspace,
       extra: { ROAN_CHAIN: current.identity.chainId, ROAN_SESSION: sessionId },
@@ -580,6 +635,10 @@ async function main(): Promise<void> {
 
   control = await startControlServer({
     port: CONTROL_PORT,
+    // Standaard alleen loopback: de app op dit toestel is de enige die er iets
+    // te zoeken heeft. Zet ROAN_CONTROL_HOST alleen op een adres als de app er
+    // bewust van een andere machine bij moet kunnen.
+    host: process.env["ROAN_CONTROL_HOST"] ?? "127.0.0.1",
     store: () => session?.store ?? null,
     state,
     onMessage: runMessage,
@@ -651,10 +710,177 @@ async function main(): Promise<void> {
           reply({ ok: true });
           return;
         }
+        if (kind === "cancel_turn") {
+          if (activeTurn === null) {
+            reply({ ok: false, error: "no turn is running" });
+            return;
+          }
+          activeTurn.abort();
+          activeTurn = null;
+          reply({ ok: true });
+          return;
+        }
+        if (kind === "skills_list") {
+          const all = await skills.list();
+          reply({
+            skills: all.map((skill) => ({
+              name: skill.name,
+              description: skill.description,
+              files: skill.files.length,
+            })),
+            root: join(paths.home, "skills"),
+          });
+          return;
+        }
+        if (kind === "tools_list") {
+          reply({
+            tools: toolsForTurn().map((tool) => ({ name: tool.name, description: tool.description })),
+            engine: settings.engine,
+          });
+          return;
+        }
+        if (kind === "mcp_list") {
+          // The file is what travels; the builtin engine does not start servers
+          // yet, and the screen says so instead of implying it does.
+          const file = join(paths.home, "mcp.json");
+          let text = "";
+          try {
+            text = await readFileAsync(file, "utf8");
+          } catch {
+            text = "{\n  \"servers\": {}\n}\n";
+          }
+          reply({ path: file, text, started: false });
+          return;
+        }
+        if (kind === "mcp_save") {
+          const text = typeof data["text"] === "string" ? data["text"] : "";
+          const parsed: unknown = (() => {
+            try {
+              return JSON.parse(text);
+            } catch {
+              return null;
+            }
+          })();
+          if (typeof parsed !== "object" || parsed === null) {
+            reply({ error: "that is not valid JSON" });
+            return;
+          }
+          await writeFileAsync(join(paths.home, "mcp.json"), `${JSON.stringify(parsed, null, 2)}\n`, { mode: 0o600 });
+          if (session !== null) {
+            const current = session;
+            void publishEnv({
+              store: current.store,
+              chain: current.identity.chainId,
+              node: current.identity.nodeId,
+              home: paths.home,
+            }).catch(() => undefined);
+          }
+          reply({ ok: true });
+          return;
+        }
+        if (kind === "providers_list") {
+          const file = await loadProviders(paths);
+          reply({
+            presets: PRESETS,
+            active: file.active,
+            accounts: file.accounts.map((account) => ({
+              id: account.id,
+              label: account.label,
+              baseUrl: account.baseUrl,
+              keySet: account.apiKey.length > 0,
+              preset: account.preset ?? null,
+            })),
+          });
+          return;
+        }
+        if (kind === "provider_save") {
+          // A preset, or anything with a URL. Several customs can exist at once;
+          // the id is what the rest of the app addresses.
+          const label = typeof data["label"] === "string" ? data["label"].trim() : "";
+          const baseUrl = typeof data["baseUrl"] === "string" ? data["baseUrl"].trim() : "";
+          const apiKey = typeof data["apiKey"] === "string" ? data["apiKey"] : "";
+          const preset = typeof data["preset"] === "string" ? data["preset"] : undefined;
+          const wanted = typeof data["id"] === "string" ? data["id"] : "";
+          if (baseUrl.length === 0 || label.length === 0) {
+            reply({ error: "a provider needs a name and a URL" });
+            return;
+          }
+          if (!/^https?:\/\//.test(baseUrl)) {
+            reply({ error: "the URL has to start with http:// or https://" });
+            return;
+          }
+          const file = await loadProviders(paths);
+          const id = wanted.length > 0 ? wanted : `prov-${String(Date.now())}`;
+          const existing = file.accounts.find((account) => account.id === id);
+          const account: ProviderAccount = {
+            id,
+            label,
+            baseUrl,
+            apiKey: apiKey.length > 0 ? apiKey : (existing?.apiKey ?? ""),
+            ...(preset !== undefined ? { preset } : {}),
+          };
+          await saveProviders(paths, upsertAccount(file, account));
+          reply({ ok: true, id, keySet: account.apiKey.length > 0 });
+          return;
+        }
+        if (kind === "provider_remove") {
+          const id = typeof data["id"] === "string" ? data["id"] : "";
+          const file = await loadProviders(paths);
+          await saveProviders(paths, {
+            accounts: file.accounts.filter((account) => account.id !== id),
+            active: file.active === id ? null : file.active,
+          });
+          reply({ ok: true });
+          return;
+        }
+        if (kind === "provider_pick") {
+          const id = typeof data["id"] === "string" ? data["id"] : "";
+          const model = typeof data["model"] === "string" ? data["model"] : "";
+          const file = await loadProviders(paths);
+          const account = file.accounts.find((item) => item.id === id);
+          if (account === undefined) {
+            reply({ error: "unknown provider" });
+            return;
+          }
+          await saveProviders(paths, { accounts: file.accounts, active: id });
+          await saveSettings(paths, {
+            provider: account.id,
+            baseUrl: account.baseUrl,
+            ...(account.apiKey.length > 0 ? { apiKey: account.apiKey } : {}),
+            ...(model.length > 0 ? { model } : {}),
+          });
+          settings = await loadSettings(paths);
+          if (session !== null) {
+            const current = session;
+            void publishEnv({
+              store: current.store,
+              chain: current.identity.chainId,
+              node: current.identity.nodeId,
+              home: paths.home,
+            }).catch(() => undefined);
+          }
+          reply({ ok: true, provider: account.id, model: settings.model });
+          return;
+        }
+        if (kind === "models_list") {
+          const id = typeof data["id"] === "string" ? data["id"] : "";
+          const file = await loadProviders(paths);
+          const account = file.accounts.find((item) => item.id === id);
+          if (account === undefined) {
+            reply({ error: "unknown provider" });
+            return;
+          }
+          const live = await fetchModels(account);
+          reply({ models: live.models, ...(live.error !== undefined ? { error: live.error } : {}) });
+          return;
+        }
         if (kind === "models_search") {
+          // models.dev is the registry; the bundled snapshot only covers an
+          // offline machine.
+          const catalog = await loadCatalog();
           const query = (typeof data["query"] === "string" ? data["query"] : "").toLowerCase();
           const out: { provider: string; providerName: string; model: string; modelName: string; context?: number }[] = [];
-          for (const provider of Object.values(CATALOG.providers)) {
+          for (const provider of Object.values(catalog.providers)) {
             for (const model of Object.values(provider.models)) {
               const hay = `${provider.name} ${model.id} ${model.name}`.toLowerCase();
               if (query.length > 0 && !hay.includes(query)) continue;
@@ -669,18 +895,49 @@ async function main(): Promise<void> {
             }
             if (out.length >= 200) break;
           }
-          reply({ models: out, total: Object.keys(CATALOG.providers).length });
+          reply({ models: out, total: Object.keys(catalog.providers).length, source: catalogSource(catalog) });
+          return;
+        }
+        if (kind === "settings_save") {
+          // The key, the base URL and the model, from the app. This is how a
+          // device that created its own chain becomes able to answer at all,
+          // and how a key reaches the other machines: the saved file is part of
+          // the env, so publishing it puts it in the chain.
+          const patch: Record<string, string> = {};
+          for (const field of ["apiKey", "baseUrl", "model", "provider"] as const) {
+            if (typeof data[field] === "string") patch[field] = data[field] as string;
+          }
+          if (Object.keys(patch).length === 0) {
+            reply({ error: "nothing to save" });
+            return;
+          }
+          await saveSettings(paths, patch);
+          settings = await loadSettings(paths);
+          if (session !== null) {
+            const current = session;
+            void publishEnv({
+              store: current.store,
+              chain: current.identity.chainId,
+              node: current.identity.nodeId,
+              home: paths.home,
+            }).catch(() => undefined);
+          }
+          // Never echo the value: a key in a reply is a key in a log.
+          reply({ ok: true, model: settings.model, provider: settings.provider, keySet: settings.apiKey.length > 0 });
           return;
         }
         if (kind === "model_set") {
           const provider = typeof data["provider"] === "string" ? data["provider"] : "";
           const model = typeof data["model"] === "string" ? data["model"] : "";
-          const entry = CATALOG.providers[provider];
+          const entry = (await loadCatalog()).providers[provider];
           if (entry === undefined || model.length === 0) {
             reply({ error: "onbekende provider" });
             return;
           }
           const saved = await saveSettings(paths, { model, baseUrl: entry.api });
+          // Picking a model in the app has to take effect in this process; the
+          // settings were read once at boot.
+          settings = await loadSettings(paths);
           if (session !== null) {
             const current = session;
             void publishEnv({

@@ -57,6 +57,7 @@ const EVENT_TYPES = {
   session: true,
   checkpoint: true,
   workspace: true,
+  node: true,
   env: true,
 } as const satisfies { readonly [K in EventType]: true };
 

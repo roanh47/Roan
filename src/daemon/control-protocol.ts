@@ -29,6 +29,7 @@ export interface DaemonState {
   /** The code another device pastes in; null before there is a chain. */
   readonly invite: string | null;
   readonly model?: string;
+  readonly provider?: string;
   readonly sessions?: readonly { readonly id: string; readonly title: string; readonly messages: number }[];
   readonly activeSession?: string | null;
 }

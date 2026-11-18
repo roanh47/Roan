@@ -3,7 +3,7 @@
  *
  * The joining node never pushes anything: it presents the token from the invite,
  * asks for the chain from `haveSeq`, and applies every event it receives in seq
- * order. Joining adopts (AGENTS.md rule 9), so the store it writes into is the
+ * order. Joining adopts (AGENTS.md rule 10), so the store it writes into is the
  * fresh local one — the caller parks local data before calling here.
  *
  * Two halves live in this file because they must agree on one wire contract:

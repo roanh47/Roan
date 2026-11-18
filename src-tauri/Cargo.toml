@@ -20,6 +20,9 @@ tauri = { version = "2", features = [] }
 # Updates come from the GitHub releases; the signature proves they are ours.
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+# Starts the daemon as a sidecar on desktop; Android runs it in-process on
+# libnode instead (src-tauri/android/).
+tauri-plugin-shell = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

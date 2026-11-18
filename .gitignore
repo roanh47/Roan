@@ -13,3 +13,6 @@ __pycache__/
 
 # build products, never committed
 src-tauri/binaries/
+
+# local hand-out builds, served by Filebrowser
+local/

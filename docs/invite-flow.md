@@ -73,13 +73,14 @@ From `AGENTS.md`, ground rules. Quoted, not paraphrased.
 > **1. No central service.** No node owns a session, and no component may assume
 > it does. There is no gateway, no hub, no dispatcher.
 
-> **2. The session is an event chain.** Ordered events with a sender. A session
-> has an ID, not an address. Nothing may address a session "on machine X".
+> **2. The session is an event chain, and the conversation is everywhere.**
+> Ordered events with a sender. A session has an ID, not an address. Every node
+> holds the whole conversation, so nothing may address a session "on machine X".
 
 > **3. One writer per turn.** Only the node running the turn appends events. The
 > others read and send requests. Two nodes may not run a turn at the same time.
 
-> **9. Joining adopts the chain.** When you join a chain, that chain's data
+> **10. Joining adopts the chain.** When you join a chain, that chain's data
 > becomes yours: its sessions, its env, its skills. Your device does not merge
 > its local state into the chain and does not push it up. The only way local
 > data becomes chain data is **creating a new chain**, and that happens once per

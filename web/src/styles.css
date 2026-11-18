@@ -79,7 +79,12 @@ textarea {
 /* ---------- shell ---------- */
 
 .app {
+  /* Inside the system bars, not under them: Android draws the status bar and
+     the gesture bar over the page, and a header behind them is unreadable. */
   height: 100dvh;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  box-sizing: border-box;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto auto;
@@ -175,11 +180,6 @@ textarea {
 }
 
 /* Pushes short conversations to the bottom without breaking scroll when long. */
-.transcript__list::before {
-  content: "";
-  margin-top: auto;
-}
-
 .empty {
   margin: auto;
   max-width: 28ch;
@@ -394,7 +394,31 @@ textarea {
 .rail {
   grid-area: rail;
   min-width: 0;
-  padding: 0 16px 6px;
+  padding: 0 16px calc(env(safe-area-inset-bottom, 0px) + 8px);
+  box-sizing: border-box;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Settings sits at the bottom of the drawer, where a phone user looks for it. */
+.rail__footer {
+  margin-top: auto;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rail__footer--active,
+.rail__footer:hover {
+  color: var(--text);
 }
 
 .status {
@@ -484,7 +508,7 @@ textarea {
 
 .dock {
   grid-area: dock;
-  padding: 6px 16px calc(10px + env(safe-area-inset-bottom));
+  padding: 6px 16px max(calc(10px + env(safe-area-inset-bottom, 0px)), 12px);
   background: linear-gradient(to top, var(--bg) 65%, rgba(11, 12, 15, 0));
 }
 
@@ -752,6 +776,20 @@ textarea {
   color: #d6d9df;
 }
 
+/* The daemon log: scrollable, wraps, never widens the card. */
+.onboarding__log {
+  max-height: 40vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  background: #13161b;
+  border-radius: 8px;
+  padding: 8px;
+  margin: 8px 0 0;
+}
+
 .onboarding__error {
   margin: 0;
   color: #f87171;
@@ -864,21 +902,27 @@ textarea {
 @media (max-width: 860px) {
   .app {
     grid-template-columns: minmax(0, 1fr);
+    /* Android's WebView reports env(safe-area-inset-*) as 0 even when the app
+       draws edge to edge, so these floors keep the header out of the status
+       bar and the composer off the gesture bar. */
+    padding-top: max(env(safe-area-inset-top, 0px), 30px);
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
   }
 
   .rail {
     position: fixed;
     top: 0;
-    right: 0;
+    left: 0;
     bottom: 0;
     width: min(86vw, 360px);
+    padding-top: max(env(safe-area-inset-top, 0px), 34px);
     z-index: 30;
-    transform: translateX(100%);
+    transform: translateX(-100%);
     transition: transform 180ms ease;
     overflow-y: auto;
     background: #111318;
-    border-left: 1px solid rgba(255, 255, 255, 0.08);
-    padding-bottom: 12px;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 14px);
   }
 
   .rail--open {
@@ -1143,4 +1187,104 @@ textarea {
   line-height: 1.6;
   opacity: 0.62;
   margin: 0;
+}
+
+/* Providers panel: a list inside a list, and the small print labels. */
+.panel__label {
+  display: block;
+  margin: 14px 0 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.panel__secondary {
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.panel__sublist {
+  list-style: none;
+  margin: 2px 0 8px;
+  padding: 0 0 0 12px;
+  border-left: 1px solid var(--line);
+}
+
+.panel__row--sub {
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+/* Capabilities panel: tabs, plain rows, and the MCP editor. */
+.panel__tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.panel__tab {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.panel__tab--active {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.panel__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.panel__textarea {
+  min-height: 180px;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+/* The model line above the composer: where the provider picker lives, one tap
+   from the conversation, like every other mobile assistant. */
+.dock__model {
+  display: block;
+  margin: 0 auto 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(19, 22, 27, 0.9);
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+/* Stop sits where the send button is while a turn runs. */
+.dock__stop {
+  display: block;
+  margin: 0 auto 6px;
+  padding: 6px 18px;
+  border: 1px solid rgba(255, 143, 143, 0.4);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--danger);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
 }

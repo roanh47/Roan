@@ -247,7 +247,7 @@ Rules for every job:
       https url and a 64-char hex sha256, throw naming the bad field.
 - [x] `src/env/diff.ts` + `src/env/diff.test.ts` — pure `diffEnv(local, chain)` telling
       which keys join would adopt from the chain and which local keys are dropped
-      (rule 9: join adopts, never merges); sorted output, no fs, secrets' *names* only.
+      (rule 10: join adopts, never merges); sorted output, no fs, secrets' *names* only.
 - [x] `docs/security.md` — one page: secrets never travel, the tool policy, redaction,
       secrets scanning and the command allowlist, referencing the real files
       (`src/tools/policy.ts`, `src/protocol/redact.ts`, `src/tools/secrets-scan.ts`,

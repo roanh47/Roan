@@ -28,6 +28,8 @@ export interface TurnRunnerOptions {
   readonly session?: string;
   /** Called for every event the run produces, after it is durable. */
   readonly onAppend: (event: Event) => void;
+  /** Aborts the turn; set by the cancel request the app sends. */
+  readonly signal?: AbortSignal;
 }
 
 /** Adapts the event store to the narrower shape the turn lock expects. */
@@ -114,6 +116,7 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
       systemPrompt: options.systemPrompt,
       cwd: options.cwd,
       history,
+      ...(options.signal !== undefined ? { signal: options.signal } : {}),
       onEvent: (event) => {
         switch (event.type) {
           case "assistant_text":
@@ -137,6 +140,11 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
     await agent.send(userText);
     if (answer.trim()) append({ type: "assistant", data: { text: answer } });
   } catch (err) {
+    // A cancelled turn is not a failure: the user stopped it on purpose.
+    if (options.signal?.aborted === true) {
+      append({ type: "error", data: { message: "stopped by you" } });
+      return;
+    }
     const message = err instanceof Error ? err.message : String(err);
     append({ type: "error", data: { message } });
   } finally {

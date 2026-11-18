@@ -21,26 +21,40 @@ even if the tests pass.
 
 1. **No central service.** No node owns a session, and no component may assume it
    does. There is no gateway, no hub, no dispatcher.
-2. **The session is an event chain.** Ordered events with a sender. A session has an
-   ID, not an address. Nothing may address a session "on machine X".
+2. **The session is an event chain, and the conversation is everywhere.** Ordered
+   events with a sender. A session has an ID, not an address. Every node holds the
+   whole conversation, so there is nothing that "lives" on one machine and nothing
+   may address a session "on machine X".
 3. **One writer per turn.** Only the node running the turn appends events. The others
    read and send requests. Two nodes may not run a turn at the same time.
 4. **The turn runs where the user typed.** Never forward a whole turn to another
    machine to "execute it there". Tools are distributed, sessions are not.
-5. **The core is renderer-agnostic.** `src/agent.ts`, `src/provider.ts`, `src/tools.ts`
+5. **Every tool call is addressed.** A tool is not a local function: the call names
+   the machine it runs on, and "here" is only a default. On the phone, "look in the
+   folder on my PC" must reach a tool that runs on the PC with that path — it may
+   never degrade into a local `list_dir` that answers about the phone's own disk.
+   That also means a path implies its machine: `/home/roan/...` belongs to the node
+   that owns it. There is one toolset, executed somewhere; a tool that can only ever
+   run on the machine that defined it is not a tool.
+6. **The core is renderer-agnostic.** `src/agent.ts`, `src/provider.ts`, `src/tools.ts`
    and `src/types.ts` must not import anything that renders. The only way out of the
    core is the `AgentEvent` stream.
-6. **Secrets never travel.** Not in events, not in the session log, not in a commit,
-   not in an error message. A key that appears in a log line is a leaked key.
-7. **Everything happens in the app.** Roan ships as a desktop app (Windows, macOS,
+7. **The config travels, including the model key.** Every instance has to be able to
+   run a turn on its own, so `config.json` — base URL, model, provider and the API
+   key — is part of the env that goes into the chain and every device adopts it. A
+   key that is not in the chain means that device cannot answer. What stays local
+   is `secrets/`: the node id and the peer token are per machine, and never travel.
+   Never put a key in a commit, a log line or an error message — a key in a log
+   line is a leaked key.
+8. **Everything happens in the app.** Roan ships as a desktop app (Windows, macOS,
    Linux) and a phone app (Android), built from one UI codebase. Starting, joining,
    inviting a machine, choosing a provider and a model, and approving a tool call are
    screens in that app. Dev scripts (`npm run build`, `typecheck`) are for us.
-8. **Everything is shared.** Anything that changes how the agent behaves travels in
+9. **Everything is shared.** Anything that changes how the agent behaves travels in
    the chain: config, skills, MCP definitions, identity files, tool settings. Stays
    local only when it physically can't be shared: caches, logs, running processes,
    secrets. "Local" is the exception and it needs a reason.
-9. **Joining adopts the chain.** When you join a chain, that chain's data becomes
+10. **Joining adopts the chain.** When you join a chain, that chain's data becomes
    yours: its sessions, its env, its skills. Your device does not merge its local
    state into the chain and does not push it up. The only way local data becomes
    chain data is **creating a new chain**, and that happens once per person. Before

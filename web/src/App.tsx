@@ -4,7 +4,8 @@ import { ChainClient, openTurn } from "./chain";
 import { Composer } from "./components/Composer";
 import { WorkspacePanel } from "./panels/WorkspacePanel";
 import { SchedulesPanel } from "./panels/SchedulesPanel";
-import { SettingsPanel } from "./panels/SettingsPanel";
+import { ProvidersPanel } from "./panels/ProvidersPanel";
+import { CapabilitiesPanel } from "./panels/CapabilitiesPanel";
 import { CheckpointsPanel } from "./panels/CheckpointsPanel";
 import { Transcript } from "./components/Transcript";
 import { TurnStatus } from "./components/TurnStatus";
@@ -25,18 +26,19 @@ interface HostBridge {
 const host = (globalThis as typeof globalThis & { __ROAN__?: HostBridge }).__ROAN__;
 /**
  * Where the daemon is. On the web build that is the server that served this
- * page; in the desktop app it is this machine; on a phone it is the machine you
- * named yourself, because a phone has no daemon of its own.
+ * page; in a native shell — desktop or phone — it is the daemon on this device,
+ * which every instance runs for itself.
  */
 function resolveSocketUrl(fallback: string | undefined): string {
-  try {
-    const stored = window.localStorage.getItem("roan.daemon");
-    if (stored !== null && stored.trim().length > 0) return stored.trim();
-  } catch {
-    // storage can be blocked; the defaults below still work
-  }
   if (fallback !== undefined) return fallback;
   const { protocol, hostname } = window.location;
+  // The native shell (desktop and phone) loads the bundle from tauri.localhost,
+  // which is the app itself and serves nothing. The daemon on this device is on
+  // loopback, so any page that came out of the shell talks to 127.0.0.1 — never
+  // to the shell's own origin.
+  if (hostname === "tauri.localhost" || protocol === "tauri:" || protocol === "ipc:") {
+    return "ws://127.0.0.1:7411/ws";
+  }
   if ((protocol === "http:" || protocol === "https:") && hostname.includes(".")) {
     return `${protocol === "https:" ? "wss" : "ws"}://${window.location.host}/ws`;
   }
@@ -84,18 +86,22 @@ export default function App(): ReactElement {
 
   const [notice, setNotice] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [view, setView] = useState<"chat" | "workspace" | "schedules" | "checkpoints" | "settings">("chat");
+  const [view, setView] = useState<"chat" | "workspace" | "schedules" | "checkpoints" | "agent" | "settings">("chat");
   const [joinCode, setJoinCode] = useState("");
-  // Op de telefoon staat geen daemon; daar is dit het adres van de machine die
-  // er wel een heeft. Leeg betekent: de daemon op dit toestel.
-  const [daemonUrl, setDaemonUrl] = useState(() => {
+  const [logText, setLogText] = useState<string | null>(null);
+  const [sessionQuery, setSessionQuery] = useState("");
+
+  // The daemon's own output, served by the app shell on loopback. This is the
+  // only way to see why it refused to start when the socket never opens.
+  async function loadLog(): Promise<void> {
     try {
-      return window.localStorage.getItem("roan.daemon") ?? "";
-    } catch {
-      return "";
+      const response = await fetch("http://127.0.0.1:7413/log");
+      const text = await response.text();
+      setLogText(text.trim().length === 0 ? "the daemon wrote nothing yet" : text.slice(-8000));
+    } catch (error) {
+      setLogText(`cannot read the log: ${error instanceof Error ? error.message : String(error)}`);
     }
-  });
-  const daemonNow = SOCKET_URL;
+  }
 
   useEffect(() => {
     client.connect();
@@ -154,7 +160,7 @@ export default function App(): ReactElement {
           <button
             type="button"
             className="onboarding__primary"
-            disabled={snapshot.status !== "open"}
+            disabled={false}
             onClick={() => {
               try {
                 client.createChain();
@@ -186,7 +192,7 @@ export default function App(): ReactElement {
             <button
               type="button"
               className="onboarding__secondary"
-              disabled={snapshot.status !== "open" || joinCode.trim().length === 0}
+              disabled={joinCode.trim().length === 0}
               onClick={() => {
                 try {
                   client.joinChain(joinCode);
@@ -215,43 +221,14 @@ export default function App(): ReactElement {
               : "Waiting for a daemon to answer."}
           </p>
 
-          {/*
-            Op een telefoon draait geen daemon, en op een andere machine kan de
-            daemon ergens anders staan. Daarom is het adres hier te zetten: de
-            app onthoudt het en verbindt opnieuw.
-          */}
           <details className="onboarding__daemon">
-            <summary className="onboarding__label">Where is the daemon?</summary>
-            <p className="onboarding__hint">
-              Leave this empty to use a daemon on this machine.
-            </p>
-            <div className="onboarding__row">
-              <input
-                className="onboarding__input"
-                value={daemonUrl}
-                placeholder="ws://100.64.0.1:7411/ws"
-                onChange={(event) => setDaemonUrl(event.target.value)}
-                spellCheck={false}
-                autoComplete="off"
-              />
-              <button
-                type="button"
-                className="onboarding__secondary"
-                onClick={() => {
-                  try {
-                    if (daemonUrl.trim().length === 0) window.localStorage.removeItem("roan.daemon");
-                    else window.localStorage.setItem("roan.daemon", daemonUrl.trim());
-                  } catch {
-                    // storage blocked: nothing to save
-                  }
-                  window.location.reload();
-                }}
-              >
-                Connect
-              </button>
-            </div>
-            {snapshot.status === "open" ? null : <p className="onboarding__hint">Now: {daemonNow}</p>}
+            <summary className="onboarding__label">Daemon log</summary>
+            <button type="button" className="onboarding__secondary" onClick={() => void loadLog()}>
+              Load log
+            </button>
+            {logText !== null ? <pre className="onboarding__code onboarding__log">{logText}</pre> : null}
           </details>
+
         </main>
       </div>
     );
@@ -308,7 +285,8 @@ export default function App(): ReactElement {
             }}
           />
         ) : null}
-        {view === "settings" ? <SettingsPanel client={client} current={snapshot.model ?? "onbekend"} /> : null}
+        {view === "agent" ? <CapabilitiesPanel client={client} /> : null}
+        {view === "settings" ? <ProvidersPanel client={client} current={snapshot.model ?? "no model"} /> : null}
       </main>
 
       {menuOpen ? (
@@ -328,7 +306,7 @@ export default function App(): ReactElement {
               ["workspace", "Workspace"],
               ["schedules", "Schedules"],
               ["checkpoints", "Checkpoints"],
-              ["settings", "Settings"],
+              ["agent", "Agent"],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -345,7 +323,7 @@ export default function App(): ReactElement {
           ))}
         </nav>
 
-        <div className="rail__sessions">
+        <div className="rail__sessions rail__sessions--first">
           <div className="rail__row">
             <span className="onboarding__label">Conversations</span>
             <button
@@ -360,8 +338,20 @@ export default function App(): ReactElement {
               New
             </button>
           </div>
+          <input
+            className="onboarding__input"
+            placeholder="Search conversations"
+            value={sessionQuery}
+            onChange={(event) => setSessionQuery(event.target.value)}
+          />
           <ul className="rail__list">
-            {snapshot.sessions.map((session) => (
+            {snapshot.sessions
+              .filter((session) =>
+                sessionQuery.trim().length === 0
+                  ? true
+                  : session.title.toLowerCase().includes(sessionQuery.trim().toLowerCase()),
+              )
+              .map((session) => (
               <li key={session.id}>
                 <button
                   type="button"
@@ -377,7 +367,7 @@ export default function App(): ReactElement {
                   {session.title}
                 </button>
               </li>
-            ))}
+              ))}
           </ul>
         </div>
 
@@ -393,9 +383,28 @@ export default function App(): ReactElement {
           error={snapshot.error}
           notice={notice}
         />
+
+        <button
+          type="button"
+          className={view === "settings" ? "rail__footer rail__footer--active" : "rail__footer"}
+          onClick={() => {
+            setView("settings");
+            setMenuOpen(false);
+          }}
+        >
+          Settings
+        </button>
       </aside>
 
       <footer className={view === "chat" ? "dock" : "dock dock--hidden"}>
+        {turn !== null ? (
+          <button type="button" className="dock__stop" onClick={() => void client.cancelTurn()}>
+            Stop
+          </button>
+        ) : null}
+        <button type="button" className="dock__model" onClick={() => setView("settings")}>
+          {snapshot.provider ?? "no provider"} · {snapshot.model ?? "no model"}
+        </button>
         <Composer disabled={disabled} placeholder={placeholder} onSend={send} />
       </footer>
     </div>

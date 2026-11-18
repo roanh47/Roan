@@ -213,7 +213,7 @@ default.
 ## The one rule
 
 A key must never appear in an error message, an event or a log line. That is
-ground rule 6 in `AGENTS.md`, and a key in a log line is a leaked key.
+ground rule 7 in `AGENTS.md`, and a key in a log line is a leaked key.
 
 - Send the key only in the request header. Never in a URL, never in a body.
 - Error text is built from the status, the status text and the response body.

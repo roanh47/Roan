@@ -34,7 +34,8 @@ export type EventType =
   | "env"
   | "session"
   | "checkpoint"
-  | "workspace";
+  | "workspace"
+  | "node";
 
 export interface Event {
   v: 1;
@@ -85,6 +86,7 @@ const EVENT_TYPES: ReadonlySet<string> = new Set<EventType>([
   "session",
   "checkpoint",
   "workspace",
+  "node",
 ]);
 
 const DEFAULT_LIMIT = 1000;

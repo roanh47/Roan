@@ -1,9 +1,73 @@
 # The phone app
 
-The phone is a node, not a window. The Android app carries the agent loop, keeps
-its own copy of the chain and works when the rest is offline. It is built from the
-same UI code in `web/`, bundled in a native shell. Nothing on this page runs yet;
-the last section says what is missing.
+The phone is a node, not a window. It runs the daemon itself: its own identity,
+its own `~/.roan`, its own chain, and it reaches the other machines as a peer
+over Tailscale.
+
+## How the daemon gets onto the phone
+
+Android refuses to start a binary that is not in the apk, and Tauri has no
+`externalBin` there, so the daemon cannot be a sidecar the way it is on desktop.
+It runs inside the app instead.
+
+- **The runtime is a library.** `libnode.so` — Node 24 built from the
+  nodejs-mobile recipe, `arm64-v8a`, 16 kB pages, NDK r27 — goes into
+  `jniLibs/<abi>/`. `System.loadLibrary("node")` loads it; there is no separate
+  `node` executable on the device.
+- **The bridge is small.** `src-tauri/android/start-node.cpp` exposes
+  `RoanNode.startNodeWithArguments` and calls `node::Start(argc, argv)` on a
+  worker thread. It also points stdout/stderr at a log file, because a WebView
+  host has no terminal: `filesDir/roan-daemon.log`.
+- **The daemon is one file.** `src/daemon/main.js` is bundled by esbuild
+  (`scripts/bundle-daemon.mjs`) into `assets/roan-daemon.js`, ~3 MB, CommonJS,
+  with `ws` inside it and `node:sqlite` built into the runtime.
+- **`RoanNode.ensureStarted()`** runs from `MainActivity.onCreate`, copies the
+  bundle to `filesDir`, then sets `ROAN_HOME=filesDir/.roan`,
+  `ROAN_ENGINE=builtin`, `ROAN_CONTROL_HOST=127.0.0.1`,
+  `ROAN_CONTROL_PORT=7411`, `ROAN_PEER_HOST=0.0.0.0`, `ROAN_PEER_PORT=7412` and
+  starts it.
+- **The WebView talks to loopback.** `ws://127.0.0.1:7411/ws`, the same socket
+  the desktop app uses. Cleartext to loopback is allowed by
+  `res/xml/network_security_config.xml` and nowhere else.
+- **The engine is the loop in this repo.** `ROAN_ENGINE=builtin` selects
+  `src/agent.ts`: there is no `hermes` binary on Android and no way to spawn one,
+  so a turn is model → tool → model in-process.
+
+`scripts/android-daemon.sh [abi ...]` does all of it, idempotently, after
+`tauri android init`: it fetches libnode (cached in `~/.cache/roan/libnode`),
+prunes `jniLibs` to the requested ABIs, copies the bridge and headers, bundles
+the daemon, and patches the generated gradle project, manifest and activity.
+`scripts/build-local.sh` calls it, and so does the Android job in
+`release.yml`. Default is `arm64-v8a` only: four unstripped ABIs of the Rust
+shell is what made the 0.0.2 apk 623 MB.
+
+## What the phone does now
+
+- Its own daemon on `127.0.0.1:7411`, from the moment the app opens.
+- Its own identity: the first launch shows **create a chain** or **join one**,
+  and creating works on the device without another machine being up.
+- Every chain feature the daemon has: sessions, checkpoints, workspace sync,
+  cron, env, remote `run_on_node`.
+- Peers over Tailscale: it listens on `0.0.0.0:7412`, and discovery finds the
+  other machines the same way they find it.
+- **Where is the daemon?** in the app is now only for looking at another
+  machine's daemon; empty means the daemon on this device. The value is stored
+  under `roan.daemon.remote`, so an address saved by an older build is ignored
+  rather than quietly pointing the phone at another machine.
+
+## What is still missing
+
+- **A foreground service.** The daemon is a thread in the app process, so it
+  stops when Android kills the app. The design is the section below; it is not
+  implemented.
+- **Background sync of any kind.** Same service; without it a closed app syncs
+  nothing.
+- **The share sheet.** Text and single files into a session's composer.
+- **Signing and the store.** The apk is debug-signed; Play wants a release
+  keystore and an AAB.
+- **A real install test.** The build ships libnode and the daemon inside the apk
+  and the bundle is proven on plain Node, but the daemon has not run on the phone
+  yet. Until it has, this page is the design and the code, not a receipt.
 
 ## Joining a chain
 
@@ -12,21 +76,21 @@ A phone joins by adopting a chain that already exists, never by merging.
 - The inviter gets an invite code: one string, base64url of
   `{ v, chain, token, host, port }`. Whoever holds it can read the chain, so it is
   a secret and is never logged.
-- The phone pastes or scans it. The code names a chain and a peer address, not a
-  session, and the inviting node has no special role afterwards.
+- The phone pastes it. The code names a chain and a peer address, not a session,
+  and the inviting node has no special role afterwards.
 - The phone keeps the chain id and token as its identity, parks its own env aside
   under a timestamped folder so nothing is lost silently, then pulls that chain's
   sessions, env, skills and MCP definitions.
 - Its own conversations and settings are not offered to the chain, not even as a
   diff. The only way local data becomes chain data is creating a new chain, once
   per person.
-- Keys stay on the device, in the Keystore, and never travel in an event.
+- Keys stay on the device and never travel in an event.
 
 This follows the ground rules: no central service, one writer per turn, joining
 adopts the chain. A phone that has pulled the events may read them; it may not
 append until it runs a turn itself.
 
-## The sync service
+## The sync service (design)
 
 Android freezes a background app, so the phone runs a foreground service, started
 by the app, with one ongoing notification that cannot be swiped away. Its type is
@@ -51,7 +115,7 @@ It does not:
 - On Android 15 and later the system caps `dataSync` at roughly six hours in any
   24, so the service must tolerate being stopped and resumed.
 
-## The notification channel
+## The notification channel (design)
 
 One channel, created on first launch:
 
@@ -65,7 +129,7 @@ The ongoing notification uses this channel and shows the chain's short id and
 whether the phone is connected, catching up or offline. Errors that need the user
 are shown in the app, where the detail is readable, not as a second notification.
 
-## Sharing into a session
+## Sharing into a session (design)
 
 The app registers for the share sheet, for plain text and a single file.
 
@@ -81,19 +145,3 @@ The app registers for the share sheet, for plain text and a single file.
    deleted if the user cancels.
 
 Sharing starts a message; it never sends one behind the user's back.
-
-## Not built yet
-
-- There is no Android project in the repository: no Gradle build, no manifest, no
-  share intent filter, no APK, no Play Store listing.
-- There is no foreground service and no notification code. The channel above is a
-  definition, not something the app creates today.
-- There is no background sync of any kind.
-- Joining writes an identity and stops. It does not dial the inviting node or
-  pull sessions, env and skills, so no device could adopt a chain yet; see
-  `docs/invite-flow.md`.
-- The UI has a transcript, composer, turn status and an invite card, but no
-  session list, so the share picker has nothing to show.
-
-Order of work: make join actually pull the chain, add a session list, then the
-shell, then the service and the share target.

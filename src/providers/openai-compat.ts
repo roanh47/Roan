@@ -6,6 +6,7 @@
  * This is what `src/provider.ts` used to do inline; that file is now a thin
  * delegation shim so existing callers keep working.
  */
+import { randomUUID } from "node:crypto";
 import type { ChatMessage, ToolCall } from "../types.js";
 import {
   ProviderError,
@@ -22,6 +23,13 @@ const ADAPTER_ID = "openai-compat";
 
 /** Fallback error text budget, matching the pre-adapter behaviour. */
 const BODY_PREVIEW = 400;
+
+/**
+ * One session id per process, sent to opencode's gateway. Without it the request
+ * is refused with `MissingSessionID` — the id is what lets their router keep a
+ * conversation together, and it never leaves this machine otherwise.
+ */
+const openCodeSession = randomUUID();
 
 /** One streamed tool-call fragment. Only `index` is guaranteed. */
 interface ToolCallDelta {
@@ -174,6 +182,10 @@ export function createOpenAiCompatAdapter(cfg: AdapterConfig): ChatAdapter {
         signal: opts.signal,
         headers: {
           "content-type": "application/json",
+          ...(cfg.headers ?? {}),
+          // opencode's gateway refuses a request without a session header, and
+          // a stable id per process is enough for it to route the turn.
+          ...(cfg.baseUrl.includes("opencode.ai") ? { "x-opencode-session": openCodeSession } : {}),
           ...(cfg.apiKey ? { authorization: `Bearer ${cfg.apiKey}` } : {}),
         },
         body: JSON.stringify(requestBody(cfg, messages, opts)),

@@ -123,11 +123,12 @@ function buildRows(events: readonly ChainEvent[]): Row[] {
       case "error": {
         const message =
           isRecord(event.data) ? pickString(event.data, ["message", "error", "text"]) : null;
-        rows.push({
-          kind: "error",
-          key: event.id,
-          text: message ?? (textOf(event.data) || "Error"),
-        });
+        const text = message ?? (textOf(event.data) || "Error");
+        // A failed turn often writes the same error twice (the adapter and the
+        // loop both report it). One card is the truth; two look like two bugs.
+        const lastRow = rows[rows.length - 1];
+        if (lastRow !== undefined && lastRow.kind === "error" && lastRow.text === text) break;
+        rows.push({ kind: "error", key: event.id, text });
         break;
       }
       case "session": {

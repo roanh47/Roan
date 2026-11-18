@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import type { EventStore } from "../chain/store.js";
 import type { Event } from "../protocol/types.js";
 import type { Tool, ToolContext } from "../types.js";
+import { describeNodes, findNode, type NodeInfo } from "../chain/nodes.js";
+import { probe } from "./discovery.js";
 
 /**
  * Doing something on another machine — without turning the agent into a remote.
@@ -173,27 +175,45 @@ function sleep(ms: number): Promise<void> {
 }
 
 /** The tool the agent calls. One entry point, with the node named explicitly. */
-export function createRunOnNodeTool(options: RelayOptions, nodes: () => readonly string[]): Tool {
+export function createRunOnNodeTool(options: RelayOptions, nodes: () => readonly NodeInfo[]): Tool {
   return {
     name: "run_on_node",
     description:
       "Run one tool on another machine in this chain (run_shell, read_file, write_file, list_dir). " +
-      "Use it when the work belongs on that machine, not on this one.",
+      "Use it when the work belongs on that machine, not on this one. " +
+      "Name the machine the way a person would, for example Roans-Server; the address is looked up in " +
+      "the chain and probed before anything is sent.",
     parameters: {
       type: "object",
       properties: {
-        node: { type: "string", description: "Which machine, e.g. node-1a2b3c4d" },
+        node: { type: "string", description: "Which machine: its name, its address, or its node id" },
         tool: { type: "string", description: "Tool to run there" },
         args: { type: "object", description: "Arguments for that tool" },
       },
       required: ["node", "tool"],
     },
     async run(args) {
-      const node = String(args["node"] ?? "");
+      const wanted = String(args["node"] ?? "");
       const tool = String(args["tool"] ?? "");
       const inner = typeof args["args"] === "object" && args["args"] !== null ? (args["args"] as Record<string, unknown>) : {};
-      if (node.length === 0) throw new Error(`node is required; known: ${nodes().join(", ")}`);
-      return callNode(options, node, tool, inner);
+      const known = nodes();
+      if (wanted.length === 0) throw new Error(`node is required; in this chain: ${describeNodes(known)}`);
+      const target = findNode(known, wanted);
+      if (target === null) {
+        throw new Error(`no machine called "${wanted}" in this chain; known: ${describeNodes(known)}`);
+      }
+      if (target.node === options.node) throw new Error(`${target.name} is this machine; call the tool directly`);
+      if (target.host.length === 0) {
+        throw new Error(`${target.name} has not announced an address, so it cannot be reached from here`);
+      }
+      // Ask the address before writing anything into the chain: an offline
+      // machine would otherwise leave the turn waiting for minutes.
+      if (!(await probe(target.host, target.port))) {
+        throw new Error(
+          `${target.name} is not reachable at ${target.host}:${String(target.port)} — is it on and is Tailscale up?`,
+        );
+      }
+      return callNode(options, target.node, tool, inner);
     },
   };
 }

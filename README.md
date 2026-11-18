@@ -80,8 +80,11 @@ Same paths on all systems:
 LINUX      /home/<user>/.roan/
 MACOS      /Users/<user>/.roan/
 WINDOWS    C:\Users\<user>\.roan\
-ANDROID    /storage/emulated/0/.roan/
+ANDROID    /data/data/dev.roan/files/.roan/   (app-private)
 ```
+
+Where each of these lives, what travels between devices and what stays on the
+machine is in [docs/storage.md](docs/storage.md).
 
 ## Repository layout
 

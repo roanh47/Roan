@@ -39,9 +39,14 @@ export JAVA_HOME="${JAVA_HOME:-$(dirname "$(dirname "$(readlink -f "$(command -v
 if [ ! -d src-tauri/gen/android ]; then
   npx tauri android init --ci
 fi
-npx tauri android build --apk --debug --ci 2>&1 | tail -20
-APK="$(find src-tauri/gen/android/app/build/outputs/apk -name '*.apk' | head -n 1)"
-cp "$APK" "$OUT/Roan-${VERSION}.apk"
+# De telefoon is een node: libnode plus de daemon-bundel erin, anders start er
+# op Android niets en kun je daar geen keten beginnen.
+./scripts/android-daemon.sh ${ROAN_ANDROID_ABIS:-arm64-v8a}
+npx tauri android build --apk --debug --ci --split-per-abi 2>&1 | tail -20
+# Eén apk per ABI; de telefoon is arm64 en dat is de enige met libnode erin.
+APK="$(find src-tauri/gen/android/app/build/outputs/apk -path '*arm64*' -name '*.apk' | head -n 1)"
+[ -n "$APK" ] || APK="$(find src-tauri/gen/android/app/build/outputs/apk -name '*.apk' | head -n 1)"
+cp "$APK" "$OUT/Roan-${VERSION}-arm64.apk"
 [ -f "$APK.sig" ] && cp "$APK.sig" "$OUT/Roan-${VERSION}.apk.sig"
 
 echo

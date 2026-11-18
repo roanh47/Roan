@@ -16,6 +16,8 @@ export interface ProviderConfig {
   readonly apiKey: string;
   /** Model id as the provider spells it. */
   readonly model: string;
+  /** Extra request headers this provider requires beyond the bearer token. */
+  readonly headers?: Readonly<Record<string, string>>;
 }
 
 /** `AdapterConfig` is an alias so adapter files can be read on their own. */

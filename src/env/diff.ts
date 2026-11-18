@@ -1,7 +1,7 @@
 /**
  * Comparing a node's local env values with the chain's, before a join.
  *
- * Joining adopts the chain (AGENTS.md rule 9): where the chain has a value, the
+ * Joining adopts the chain (AGENTS.md rule 10): where the chain has a value, the
  * chain's value wins. Local keys the chain does not have are parked aside and
  * never pushed up. Only key names leave this function — values are compared,
  * never reported, so a secret that slipped into a record cannot end up in a log

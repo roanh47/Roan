@@ -79,6 +79,7 @@ export interface DaemonStateFrame {
     node: string | null;
     invite?: string | null;
     model?: string;
+    provider?: string;
     sessions?: { id: string; title: string; messages: number }[];
     activeSession?: string | null;
   };
@@ -160,6 +161,8 @@ export interface ChainSnapshot {
   error: string | null;
   /** The model this device answers with. */
   model?: string;
+  /** The provider that model belongs to, as the daemon configured it. */
+  provider?: string;
   /** Set after this device created a chain: the code for the next one. */
   invite: string | null;
   /** Conversations in this chain, oldest first. */
@@ -389,6 +392,13 @@ export class ChainClient {
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly seen = new Set<string>();
   private events: readonly ChainEvent[];
+  /**
+   * Frames that were asked for before the socket was open — pressing "create a
+   * chain" the moment the screen appears must not be lost because the daemon was
+   * still coming up. They are sent in order as soon as the socket opens.
+   */
+  private queued: ClientFrame[] = [];
+
   private pendingRequests = new Map<
     string,
     { resolve: (value: unknown) => void; timer: ReturnType<typeof setTimeout> }
@@ -475,15 +485,20 @@ export class ChainClient {
    * Starts a new chain on this device. The answer carries the code the next
    * device pastes in; it is kept in the snapshot so the UI can show it.
    */
+  /** Asks the daemon to stop the turn that is running. */
+  cancelTurn(): Promise<unknown> {
+    return this.request("cancel_turn");
+  }
+
   createChain(): void {
-    this.send({ t: "create_chain" } as unknown as ClientFrame);
+    this.sendOrQueue({ t: "create_chain" } as unknown as ClientFrame);
   }
 
   /** Adopts an existing chain: its events become this device's history. */
   joinChain(code: string): void {
     const trimmed = code.trim();
     if (trimmed.length === 0) throw new Error("a join code is required");
-    this.send({ t: "join_chain", code: trimmed } as unknown as ClientFrame);
+    this.sendOrQueue({ t: "join_chain", code: trimmed } as unknown as ClientFrame);
   }
 
   /** Starts a conversation without touching the one you were in. */
@@ -583,6 +598,7 @@ export class ChainClient {
       this.update({ status: "open", error: null });
       this.send({ t: "state" } as unknown as ClientFrame);
       this.resync();
+      this.flushQueue();
     };
 
     socket.onmessage = (event) => {
@@ -649,6 +665,7 @@ export class ChainClient {
           : {}),
         ...(frame.data.sessions !== undefined ? { sessions: frame.data.sessions } : {}),
         ...(frame.data.model !== undefined ? { model: frame.data.model } : {}),
+        ...(frame.data.provider !== undefined ? { provider: frame.data.provider } : {}),
         // Follow the daemon's newest session only when this device has not
         // chosen one itself.
         ...(this.snapshot.activeSession === null && frame.data.activeSession
@@ -732,6 +749,22 @@ export class ChainClient {
       pending: this.pending,
       lastSeq: last ? last.seq : this.snapshot.lastSeq,
     });
+  }
+
+  /**
+   * Sends now when the socket is open, and otherwise remembers the frame so it
+   * goes out the moment the daemon answers. A button that looks ready must not
+   * throw the tap away because the socket is half a second late.
+   */
+  private sendOrQueue(frame: ClientFrame): void {
+    if (!this.send(frame)) this.queued.push(frame);
+  }
+
+  private flushQueue(): void {
+    if (this.queued.length === 0) return;
+    const pending = this.queued;
+    this.queued = [];
+    for (const frame of pending) this.send(frame);
   }
 
   private send(frame: ClientFrame): boolean {

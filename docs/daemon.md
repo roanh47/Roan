@@ -153,7 +153,7 @@ window only sees them when it reconnects.
 - `tool_req` / `tool_res` are unused: no remote tools, no forwarding.
 - `onJoin` writes the chain id and token from the code but dials nothing and
   pulls nothing. It also overwrites an existing `identity.json` without parking
-  the old state aside (`AGENTS.md` rule 9).
+  the old state aside (`AGENTS.md` rule 10).
 - The client's `hello` / `haveSeq` is ignored; catch-up is always the first
   `10_000` events.
 - No authentication on the control socket.

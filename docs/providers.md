@@ -1,5 +1,14 @@
 # Providers
 
+The catalogue is fetched live from `https://models.dev/api.json` by
+`src/providers/live.ts` and cached for five minutes; the generated snapshot in
+`src/providers/catalog.ts` is only the offline fallback. That is deliberate: a
+provider missing from the catalogue cannot be picked in the app, so a stale copy
+is the same as a missing feature (324 providers live, 235 in the snapshot at the
+time of writing). The fetch sends a browser user agent because models.dev answers
+403 to a default one, and it fails over to the snapshot rather than to an empty
+list. `models_search` reports where the list it just answered with came from.
+
 Two layers, and nothing above them knows a wire format: the **catalog** says who
 a provider is, the **adapter** says how to talk to it. `src/providers/README.md`
 is the working guide; this page describes what `src/providers/` does today and

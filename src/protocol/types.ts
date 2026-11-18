@@ -29,7 +29,9 @@ export type EventType =
   /** A named point you can rewind to without deleting anything after it. */
   | "checkpoint"
   /** One file in the shared workspace, as content rather than as a reference. */
-  | "workspace";
+  | "workspace"
+  /** A machine in this chain: its id, its name and the address peers dial. */
+  | "node";
 
 /**
  * One entry in the append-only chain.

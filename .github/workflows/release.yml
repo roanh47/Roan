@@ -13,7 +13,7 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   NODE_VERSION: "22"
-  APP_VERSION: "0.0.1"
+  APP_VERSION: "0.0.9"
 
 concurrency:
   group: release-${{ github.ref }}
@@ -306,6 +306,12 @@ jobs:
           cp -R src-tauri/icons/mipmap-* "$RES"/ 2>/dev/null || true
           find src-tauri/icons -name ic_launcher_background.xml -exec cp {} "$RES/values/" \; 2>/dev/null || true
           find "$RES" -name 'ic_launcher*' | sort
+
+      - name: Give the phone a daemon (libnode plus the bundle)
+        run: |
+          set -euo pipefail
+          chmod +x scripts/android-daemon.sh
+          ./scripts/android-daemon.sh arm64-v8a
 
       - name: Build debug APK
         run: npx --yes @tauri-apps/cli@^2 android build --apk --debug --ci

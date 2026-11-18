@@ -1,6 +1,6 @@
 {
   "name": "roan",
-  "version": "0.0.2",
+  "version": "0.0.9",
   "description": "One agent, several machines",
   "type": "module",
   "engines": {

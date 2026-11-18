@@ -20,13 +20,10 @@ interface Props {
  * the agent's config, which travels the chain like everything else.
  */
 export function SettingsPanel({ client, current }: Props): ReactElement {
-  const [daemon, setDaemon] = useState(() => {
-    try {
-      return window.localStorage.getItem("roan.daemon") ?? "";
-    } catch {
-      return "";
-    }
-  });
+  // The key and the base URL of the provider. Both travel to the other
+  // machines in the chain, so one device can set them up for all of them.
+  const [apiKey, setApiKey] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
   const [query, setQuery] = useState("");
   const [rows, setRows] = useState<ModelRow[]>([]);
   const [status, setStatus] = useState<string | null>(null);
@@ -55,6 +52,24 @@ export function SettingsPanel({ client, current }: Props): ReactElement {
     setStatus(answer.error ?? `now using ${row.providerName} · ${row.modelName}`);
   }
 
+  async function saveProvider(): Promise<void> {
+    setBusy(true);
+    const patch: Record<string, string> = {};
+    if (apiKey.trim().length > 0) patch["apiKey"] = apiKey.trim();
+    if (baseUrl.trim().length > 0) patch["baseUrl"] = baseUrl.trim();
+    const answer = await client.request<{ ok?: boolean; error?: string; keySet?: boolean }>(
+      "settings_save",
+      patch,
+    );
+    setBusy(false);
+    if (answer.error !== undefined) {
+      setStatus(answer.error);
+      return;
+    }
+    setApiKey("");
+    setStatus(answer.keySet === true ? "saved; the key travels with the chain" : "saved");
+  }
+
   return (
     <section className="panel">
       <header className="panel__head">
@@ -66,28 +81,26 @@ export function SettingsPanel({ client, current }: Props): ReactElement {
       <UpdateCard />
 
       <div className="panel__form">
-        <span className="panel__sub">Daemon this app talks to</span>
+        <span className="panel__sub">Provider key for this chain</span>
         <input
           className="panel__input"
-          placeholder="ws://192.168.0.100:7411/ws"
-          value={daemon}
+          placeholder="API key — empty means keep the current one"
+          value={apiKey}
+          type="password"
           spellCheck={false}
-          onChange={(event) => setDaemon(event.target.value)}
+          autoComplete="off"
+          onChange={(event) => setApiKey(event.target.value)}
         />
-        <button
-          type="button"
-          className="panel__primary"
-          onClick={() => {
-            try {
-              if (daemon.trim().length === 0) window.localStorage.removeItem("roan.daemon");
-              else window.localStorage.setItem("roan.daemon", daemon.trim());
-            } catch {
-              // storage blocked: nothing to save
-            }
-            window.location.reload();
-          }}
-        >
-          Use this daemon
+        <input
+          className="panel__input"
+          placeholder="Base URL (optional), e.g. https://api.example.com/v1"
+          value={baseUrl}
+          spellCheck={false}
+          autoComplete="off"
+          onChange={(event) => setBaseUrl(event.target.value)}
+        />
+        <button type="button" className="panel__primary" disabled={busy} onClick={() => void saveProvider()}>
+          Save
         </button>
       </div>
 
