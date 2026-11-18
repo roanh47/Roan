@@ -418,6 +418,43 @@ pre {
   font-weight: 600;
 }
 
+/* Per-answer actions: Copy on every answer, Regenerate on the newest one.
+   Quiet chips, no chrome — the words are the interface. */
+.answer__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.answer__action {
+  padding: 4px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--faint);
+  font-size: 11.5px;
+}
+
+.answer__action:active {
+  color: var(--fg);
+  border-color: var(--accent);
+}
+
+/* The collapsed block of internal steps: same shape as one tool, so the eye
+   does not have to learn a third element. */
+.tool--steps .tool__detail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.steps__tool {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11.5px;
+}
+
 .answer__caret {
   display: inline-block;
   width: 9px;
@@ -573,6 +610,16 @@ pre {
   border-radius: 999px;
   color: var(--danger);
   font-size: 12px;
+}
+
+/* Silence is reported, not judged: the minutes are a fact, the Stop button
+   stays the only verdict. At five minutes the whole line admits it. */
+.dock__quiet {
+  color: var(--faint);
+}
+
+.dock__state--stuck {
+  color: var(--danger);
 }
 
 .dock--hidden {

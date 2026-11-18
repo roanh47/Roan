@@ -33,7 +33,7 @@ export interface TurnRunnerOptions {
 }
 
 /** Adapts the event store to the narrower shape the turn lock expects. */
-function asTurnStore(store: EventStore): TurnStore {
+function asTurnStore(store: EventStore, options: TurnRunnerOptions): TurnStore {
   const adapter: TurnStore = {
     tail(chain: string, limit: number) {
       const head = store.head(chain);
@@ -45,12 +45,17 @@ function asTurnStore(store: EventStore): TurnStore {
       if (actual !== expectedSeq) {
         throw new SeqConflictError(expectedSeq, actual);
       }
-      return store.append(chain, {
+      const event = store.append(chain, {
         id: randomUUID(),
         node: draft.node,
         type: draft.type,
         data: draft.data,
       }) as unknown as TurnEvent;
+      // The lock's own turn_start/turn_end land in the chain through this
+      // adapter. Without the broadcast the app never learns a turn opened,
+      // and the thinking state — the whole dock — never appears.
+      options.onAppend(event as unknown as Event);
+      return event;
     },
   };
   return adapter;
@@ -67,7 +72,7 @@ export interface AppendInput {
  */
 export async function runTurn(options: TurnRunnerOptions, userText: string): Promise<void> {
   const { store, chain, node } = options;
-  const turns = asTurnStore(store);
+  const turns = asTurnStore(store, options);
   const append = (input: AppendInput): Event => {
     const event = store.append(chain, { id: randomUUID(), node, type: input.type, data: input.data });
     options.onAppend(event);

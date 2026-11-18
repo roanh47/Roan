@@ -362,6 +362,26 @@ export function turnPhase(events: readonly ChainEvent[], turn: OpenTurn | null):
   return "thinking";
 }
 
+/**
+ * How long a running turn has been silent, in ms. The last event within the
+ * turn counts — turn_start itself when nothing has happened yet — so a turn
+ * that is going nowhere can be surfaced instead of spinning forever. A silent
+ * stretch is not a verdict: a reasoning model can legitimately think for
+ * minutes, so the app reports the number and leaves the call to the person.
+ */
+export function turnQuietMs(
+  events: readonly ChainEvent[],
+  turn: OpenTurn | null,
+  now: number,
+): number {
+  if (turn === null) return 0;
+  const start = events.findIndex((event) => event.id === turn.startId);
+  const within = start >= 0 ? events.slice(start) : events;
+  const last = within[within.length - 1];
+  const lastTs = last !== undefined ? last.ts : turn.since;
+  return Math.max(0, now - lastTs);
+}
+
 /** Inserts by seq, keeping equal seq values ordered by id so every node agrees. */
 function insertSorted(events: readonly ChainEvent[], event: ChainEvent): ChainEvent[] {
   let low = 0;
@@ -515,6 +535,15 @@ export class ChainClient {
   /** Asks the daemon to stop the turn that is running. */
   cancelTurn(): Promise<unknown> {
     return this.request("cancel_turn");
+  }
+
+  /**
+   * Asks the daemon to answer again from the question before `seq`: a
+   * checkpoint marks the seam, the same question is asked, and the new answer
+   * lands below the old one. Nothing is deleted.
+   */
+  regenerate(seq: number): Promise<unknown> {
+    return this.request("regenerate", { seq });
   }
 
   createChain(): void {

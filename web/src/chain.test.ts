@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { openTurn, turnPhase } from "./chain.js";
+import { openTurn, turnPhase, turnQuietMs } from "./chain.js";
 import type { ChainEvent, OpenTurn } from "./chain.js";
 
 let seq = 0;
@@ -52,5 +52,35 @@ describe("turnPhase", () => {
 
   test("a closed turn is no phase", () => {
     expect(run([event("turn_start", {}), event("assistant", { text: "x" }), event("turn_end", {})])).toBe("");
+  });
+});
+
+describe("turnQuietMs", () => {
+  test("no open turn is never quiet", () => {
+    expect(turnQuietMs([], null, 5_000)).toBe(0);
+  });
+
+  test("a turn with only its start has been quiet since the start", () => {
+    const start = { ...event("turn_start", {}), ts: 1_000 };
+    const turn = openTurn([start]);
+    expect(turnQuietMs([start], turn, 61_000)).toBe(60_000);
+  });
+
+  test("events inside the turn reset the clock", () => {
+    const events = [
+      { ...event("turn_start", {}), ts: 1_000 },
+      { ...event("tool_call", { name: "read" }), ts: 70_000 },
+    ];
+    const turn = openTurn(events);
+    expect(turnQuietMs(events, turn, 80_000)).toBe(10_000);
+  });
+
+  test("events from before the turn do not count", () => {
+    const events = [
+      { ...event("assistant", { text: "past" }), ts: 900_000 },
+      { ...event("turn_start", {}), ts: 1_000 },
+    ];
+    const turn = openTurn(events);
+    expect(turnQuietMs(events, turn, 2_000)).toBe(1_000);
   });
 });

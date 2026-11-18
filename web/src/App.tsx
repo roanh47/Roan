@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { ReactElement } from "react";
-import { ChainClient, openTurn, turnPhase } from "./chain.js";
+import { ChainClient, openTurn, turnPhase, turnQuietMs } from "./chain.js";
 import type { ChainSnapshot } from "./chain.js";
 import pkg from "../package.json";
 import { Composer } from "./components/Composer.js";
@@ -115,6 +115,15 @@ export default function App(): ReactElement {
   const [joinCode, setJoinCode] = useState("");
   const [logText, setLogText] = useState<string | null>(null);
   const [sessionQuery, setSessionQuery] = useState("");
+  // The dock's clock while a turn is open: the stuck report is a claim about
+  // time, and time does not re-render on its own.
+  const [nowTick, setNowTick] = useState(0);
+
+  useEffect(() => {
+    if (turn === null) return;
+    const timer = setInterval(() => setNowTick(Date.now()), 1_000);
+    return () => clearInterval(timer);
+  }, [turn?.startId, turn === null]);
 
   // The daemon's own output, served by the app shell on loopback. This is the
   // only way to see why it refused to start when the socket never opens.
@@ -156,6 +165,21 @@ export default function App(): ReactElement {
       setNotice(error instanceof Error ? error.message : "The message could not be sent.");
     }
   }
+
+  function regenerate(seq: number): void {
+    void client
+      .regenerate(seq)
+      .then(() => setNotice(null))
+      .catch((error: unknown) => {
+        setNotice(error instanceof Error ? error.message : "could not regenerate");
+      });
+  }
+
+  // How long the running turn has been silent. Reported, not judged: a
+  // reasoning model may think for minutes, so the number is shown and the
+  // Stop button stays the only verdict.
+  const quiet = turnQuietMs(snapshot.events, turn, nowTick === 0 ? Date.now() : nowTick);
+  const quietMinutes = Math.floor(quiet / 60_000);
 
   function openSettings(page: SettingsPage = "menu"): void {
     setView("settings");
@@ -310,7 +334,12 @@ export default function App(): ReactElement {
 
       <main className={view === "chat" ? "conversation" : "conversation conversation--panel"} aria-label="Conversation">
         {view === "chat" ? (
-          <Transcript events={visible} pending={snapshot.pending} node={snapshot.node} />
+          <Transcript
+            events={visible}
+            pending={snapshot.pending}
+            node={snapshot.node}
+            onRegenerate={regenerate}
+          />
         ) : settingsPage === "menu" ? (
           <section className="panel settings">
             {SETTINGS_ROWS.map(([id, label, hint]) => (
@@ -430,9 +459,13 @@ export default function App(): ReactElement {
 
       <footer className={view === "chat" ? "dock" : "dock dock--hidden"}>
         {turn !== null ? (
-          <div className="dock__state">
+          <div className={quiet >= 300_000 ? "dock__state dock__state--stuck" : "dock__state"}>
             <span className="dock__dot" aria-hidden="true" />
             Roan is working · {phase}
+            {quiet >= 120_000 ? (
+              <span className="dock__quiet"> · no updates for {String(quietMinutes)}m</span>
+            ) : null}
+            {quiet >= 300_000 ? <span className="dock__quiet"> · looks stuck</span> : null}
             <button type="button" className="dock__stop" onClick={() => void client.cancelTurn()}>
               Stop
             </button>

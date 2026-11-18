@@ -515,13 +515,15 @@ async function main(): Promise<void> {
     return id;
   };
 
-  const runMessage = async (text: string, wanted?: string): Promise<void> => {
+  const runMessage = async (text: string, wanted?: string, echoId?: string): Promise<void> => {
     if (!session) return;
     const current = session;
     const sessionId = resolveSession(wanted) ?? startSession(text.slice(0, 60));
     if (sessionId === null) return;
     const stored = current.store.append(current.identity.chainId, {
-      id: uuid(),
+      // The app's own event id, when it sent one: its pending bubble clears
+      // the moment this echo arrives, instead of a second copy appearing.
+      id: echoId !== undefined && echoId.length > 0 ? echoId : uuid(),
       node: current.identity.nodeId,
       type: "message",
       data: { text, session: sessionId },
@@ -717,6 +719,46 @@ async function main(): Promise<void> {
             }).catch(() => undefined);
           }
           reply({ ok: true });
+          return;
+        }
+        if (kind === "regenerate") {
+          // Regenerating is a branch, not a delete: a checkpoint marks the
+          // seam, the same question is asked again, and the new answer lands
+          // below the old one. Append-only stays intact.
+          if (activeTurn !== null) {
+            reply({ error: "a turn is running" });
+            return;
+          }
+          const seq = typeof data["seq"] === "number" ? data["seq"] : 0;
+          if (session === null || seq <= 0) {
+            reply({ error: "nothing to regenerate" });
+            return;
+          }
+          const current = session;
+          let text = "";
+          let fromSession: string | undefined;
+          for (const event of current.store.read(current.identity.chainId, 1, 100_000)) {
+            if (event.seq > seq) break;
+            if (event.type !== "message") continue;
+            const payload = event.data as { text?: unknown; session?: unknown };
+            if (typeof payload.text === "string" && payload.text.trim().length > 0) {
+              text = payload.text;
+              if (typeof payload.session === "string") fromSession = payload.session;
+            }
+          }
+          if (text.length === 0) {
+            reply({ error: "no message before that answer" });
+            return;
+          }
+          const marked = current.store.append(current.identity.chainId, {
+            id: uuid(),
+            node: current.identity.nodeId,
+            type: "checkpoint",
+            data: { label: "regenerate", ...(fromSession !== undefined ? { session: fromSession } : {}) },
+          });
+          control?.broadcast({ t: "append", event: marked });
+          reply({ ok: true });
+          void runMessage(text, fromSession);
           return;
         }
         if (kind === "cancel_turn") {

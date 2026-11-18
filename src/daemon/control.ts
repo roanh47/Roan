@@ -9,7 +9,7 @@ export interface ControlServerOptions {
   /** null until a chain exists on this machine. */
   readonly store: () => EventStore | null;
   readonly state: () => DaemonState;
-  readonly onMessage: (text: string, session?: string) => void;
+  onMessage: (text: string, session?: string, echoId?: string) => void;
   /** Starts a new conversation without touching the old one. */
   readonly onNewSession?: (title?: string) => void;
   /** Marks a point in the current conversation you can come back to. */
@@ -107,14 +107,21 @@ export function startControlServer(options: ControlServerOptions): Promise<Contr
         return;
       }
       if (type === "append") {
-        const event = frame["event"] as { data?: unknown } | undefined;
+        const event = frame["event"] as { id?: unknown; data?: unknown } | undefined;
         const data = event?.data as { text?: unknown; session?: unknown } | null | undefined;
         const text = data && typeof data.text === "string" ? data.text : "";
         if (!text.trim()) return;
         // The daemon writes the message, because only it can decide which
-        // session it belongs to and keep that decision in the same order.
+        // session it belongs to and keep that decision in the same order. The
+        // client's event id travels along: the app drops its pending bubble
+        // when the echo with the same id arrives, so the sent message never
+        // shows up twice.
         const session = data && typeof data.session === "string" ? data.session : undefined;
-        options.onMessage(text, session);
+        const echoId =
+          event !== undefined && typeof event.id === "string" && event.id.length > 0
+            ? event.id
+            : undefined;
+        options.onMessage(text, session, echoId);
       }
       if (type === "checkpoint") {
         options.onCheckpoint?.(typeof frame["label"] === "string" ? frame["label"] : undefined);

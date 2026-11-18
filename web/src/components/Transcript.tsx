@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement } from "react";
+import { openTurn } from "../chain.js";
 import type { ChainEvent, PendingMessage } from "../chain.js";
 import { Markdown } from "./Markdown.js";
 
@@ -8,19 +9,33 @@ interface TranscriptProps {
   pending: readonly PendingMessage[];
   /** This device's node name, used to tell "you" from other devices. */
   node: string;
+  /** Regenerate: answer again from the question before this answer. */
+  onRegenerate?: (seq: number) => void;
 }
 
 /**
  * The conversation, drawn the way a person reads a chat: your words in a quiet
  * bubble on the right, Roan's answer as plain text on the left, a tool as one
- * small line that opens for the details. Node names, clocks and bookkeeping are
- * behind the details toggle, never in your face.
+ * small line that opens for the details. Bookkeeping stays out of the way —
+ * three or more tool calls in a row are the agent's internal steps and collapse
+ * into one toggle. Node names, clocks and bookkeeping are behind the details
+ * toggle, never in your face.
  */
+
+type ToolRow = {
+  kind: "tool";
+  key: string;
+  name: string;
+  args: string;
+  output: string;
+  ok: boolean | null;
+};
 
 type Row =
   | { kind: "user"; key: string; text: string }
-  | { kind: "assistant"; key: string; text: string }
-  | { kind: "tool"; key: string; name: string; args: string; output: string; ok: boolean | null }
+  | { kind: "assistant"; key: string; text: string; seq: number; actions: boolean }
+  | ToolRow
+  | { kind: "steps"; key: string; tools: ToolRow[] }
   | { kind: "notice"; key: string; text: string }
   | { kind: "meta"; key: string; text: string };
 
@@ -81,7 +96,46 @@ function resultOk(data: unknown): boolean {
   return !("error" in data) || data["error"] === null || data["error"] === false;
 }
 
-function buildRows(events: readonly ChainEvent[], local: string): Row[] {
+/** Three or more tools in a row are bookkeeping, not news: one toggle. */
+const STEPS_GROUP_MIN = 3;
+
+function groupSteps(rows: Row[]): Row[] {
+  const out: Row[] = [];
+  let run: ToolRow[] = [];
+  const flush = (): void => {
+    if (run.length === 0) return;
+    if (run.length < STEPS_GROUP_MIN) {
+      out.push(...run);
+    } else {
+      out.push({ kind: "steps", key: `steps-${run[0]?.key ?? "0"}`, tools: run });
+    }
+    run = [];
+  };
+  for (const row of rows) {
+    if (row.kind === "tool") {
+      run.push(row);
+      continue;
+    }
+    flush();
+    out.push(row);
+  }
+  flush();
+  return out;
+}
+
+/** Only the last answer of a conversation carries the actions. */
+function markLastAnswer(rows: Row[]): Row[] {
+  let last = -1;
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (row !== undefined && row.kind === "assistant") last = i;
+  }
+  return rows.map((row, index) =>
+    row.kind === "assistant" ? { ...row, actions: index === last } : row,
+  );
+}
+
+export function buildRows(events: readonly ChainEvent[], local: string): Row[] {
   const rows: Row[] = [];
   const open: OpenTool[] = [];
 
@@ -111,7 +165,7 @@ function buildRows(events: readonly ChainEvent[], local: string): Row[] {
         if (last !== undefined && last.kind === "assistant") {
           last.text = last.text.length > 0 ? `${last.text}\n${text}` : text;
         } else {
-          rows.push({ kind: "assistant", key: event.id, text });
+          rows.push({ kind: "assistant", key: event.id, text, seq: event.seq, actions: false });
         }
         break;
       }
@@ -171,11 +225,12 @@ function buildRows(events: readonly ChainEvent[], local: string): Row[] {
     }
   }
   flush();
-  return rows;
+  return markLastAnswer(groupSteps(rows));
 }
 
-export function Transcript({ events, pending, node }: TranscriptProps): ReactElement {
+export function Transcript({ events, pending, node, onRegenerate }: TranscriptProps): ReactElement {
   const rows = useMemo(() => buildRows(events, node), [events, node]);
+  const turn = useMemo(() => openTurn(events), [events]);
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
 
@@ -209,7 +264,7 @@ export function Transcript({ events, pending, node }: TranscriptProps): ReactEle
         ) : null}
 
         {rows.map((row) => (
-          <RowView key={row.key} row={row} />
+          <RowView key={row.key} row={row} turn={turn} onRegenerate={onRegenerate} />
         ))}
 
         {pending.map((item) => (
@@ -222,7 +277,15 @@ export function Transcript({ events, pending, node }: TranscriptProps): ReactEle
   );
 }
 
-function RowView({ row }: { row: Row }): ReactElement {
+function RowView({
+  row,
+  turn,
+  onRegenerate,
+}: {
+  row: Row;
+  turn: ReturnType<typeof openTurn>;
+  onRegenerate?: (seq: number) => void;
+}): ReactElement {
   switch (row.kind) {
     case "user":
       return <div className="bubble bubble--out">{row.text}</div>;
@@ -234,35 +297,44 @@ function RowView({ row }: { row: Row }): ReactElement {
           ) : (
             <Markdown source={row.text} />
           )}
+          {row.text.length > 0 ? (
+            <div className="answer__actions">
+              <CopyChip text={row.text} />
+              {row.actions && turn === null && onRegenerate !== undefined ? (
+                <button
+                  type="button"
+                  className="answer__action"
+                  onClick={() => onRegenerate(row.seq)}
+                >
+                  Regenerate
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       );
     case "tool":
+      return <ToolView tool={row} />;
+    case "steps":
       return (
-        <details className="tool">
+        <details className="tool tool--steps">
           <summary className="tool__line">
-            <span className={`tool__dot${row.ok === false ? " tool__dot--bad" : ""}`} aria-hidden="true" />
-            <span className="tool__name">{row.name}</span>
-            <span
-              className={`tool__state${
-                row.ok === true ? " tool__state--ok" : row.ok === false ? " tool__state--bad" : ""
-              }`}
-            >
-              {row.ok === null ? "running" : row.ok === true ? "done" : "failed"}
-            </span>
+            <span className="tool__dot" aria-hidden="true" />
+            <span className="tool__name">internal steps</span>
+            <span className="tool__state">{String(row.tools.length)}</span>
           </summary>
           <div className="tool__detail">
-            {row.args.length > 0 ? (
-              <>
-                <span className="tool__label">input</span>
-                <pre className="tool__body">{row.args}</pre>
-              </>
-            ) : null}
-            {row.output.length > 0 ? (
-              <>
-                <span className="tool__label">output</span>
-                <pre className="tool__body">{row.output}</pre>
-              </>
-            ) : null}
+            {row.tools.map((tool) => (
+              <div className="steps__tool" key={tool.key}>
+                <span
+                  className={`tool__state${tool.ok === false ? " tool__state--bad" : tool.ok === true ? " tool__state--ok" : ""}`}
+                >
+                  {tool.name} · {tool.ok === null ? "running" : tool.ok === true ? "done" : "failed"}
+                </span>
+                {tool.args.length > 0 ? <pre className="tool__body">{tool.args}</pre> : null}
+                {tool.output.length > 0 ? <pre className="tool__body">{tool.output}</pre> : null}
+              </div>
+            ))}
           </div>
         </details>
       );
@@ -275,4 +347,55 @@ function RowView({ row }: { row: Row }): ReactElement {
     case "meta":
       return <p className="chatmeta">{row.text}</p>;
   }
+}
+
+function ToolView({ tool }: { tool: ToolRow }): ReactElement {
+  return (
+    <details className="tool">
+      <summary className="tool__line">
+        <span className={`tool__dot${tool.ok === false ? " tool__dot--bad" : ""}`} aria-hidden="true" />
+        <span className="tool__name">{tool.name}</span>
+        <span
+          className={`tool__state${tool.ok === true ? " tool__state--ok" : tool.ok === false ? " tool__state--bad" : ""}`}
+        >
+          {tool.ok === null ? "running" : tool.ok === true ? "done" : "failed"}
+        </span>
+      </summary>
+      <div className="tool__detail">
+        {tool.args.length > 0 ? (
+          <>
+            <span className="tool__label">input</span>
+            <pre className="tool__body">{tool.args}</pre>
+          </>
+        ) : null}
+        {tool.output.length > 0 ? (
+          <>
+            <span className="tool__label">output</span>
+            <pre className="tool__body">{tool.output}</pre>
+          </>
+        ) : null}
+      </div>
+    </details>
+  );
+}
+
+function CopyChip({ text }: { text: string }): ReactElement {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className="answer__action"
+      onClick={() => {
+        void navigator.clipboard?.writeText(text).then(
+          () => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1600);
+          },
+          () => setCopied(false),
+        );
+      }}
+    >
+      {copied ? "Copied" : "Copy"}
+    </button>
+  );
 }
