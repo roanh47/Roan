@@ -335,6 +335,29 @@ export function openTurn(events: readonly ChainEvent[]): OpenTurn | null {
   return open;
 }
 
+/**
+ * What a running turn is doing right now, in one honest word for the status
+ * line: thinking, writing, or running a named tool. Only the events after the
+ * turn's own start count — the chain's history is not the turn's business.
+ */
+export function turnPhase(events: readonly ChainEvent[], turn: OpenTurn | null): string {
+  if (turn === null) return "";
+  const start = events.findIndex((event) => event.id === turn.startId);
+  const within = start >= 0 ? events.slice(start) : events;
+  for (let i = within.length - 1; i >= 0; i--) {
+    const event = within[i];
+    if (event === undefined) continue;
+    if (event.type === "tool_call") {
+      const data = event.data as { name?: unknown } | null;
+      const name =
+        data !== null && typeof data.name === "string" && data.name.length > 0 ? data.name : "a tool";
+      return `running ${name}`;
+    }
+    if (event.type === "assistant") return "writing";
+  }
+  return "thinking";
+}
+
 /** Inserts by seq, keeping equal seq values ordered by id so every node agrees. */
 function insertSorted(events: readonly ChainEvent[], event: ChainEvent): ChainEvent[] {
   let low = 0;

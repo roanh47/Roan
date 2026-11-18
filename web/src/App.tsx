@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { ReactElement } from "react";
-import { ChainClient, openTurn } from "./chain";
-import { Composer } from "./components/Composer";
-import { WorkspacePanel } from "./panels/WorkspacePanel";
-import { SchedulesPanel } from "./panels/SchedulesPanel";
-import { ProvidersPanel } from "./panels/ProvidersPanel";
-import { CapabilitiesPanel } from "./panels/CapabilitiesPanel";
-import { CheckpointsPanel } from "./panels/CheckpointsPanel";
-import { Transcript } from "./components/Transcript";
+import { ChainClient, openTurn, turnPhase } from "./chain.js";
+import type { ChainSnapshot } from "./chain.js";
+import pkg from "../package.json";
+import { Composer } from "./components/Composer.js";
+import { WorkspacePanel } from "./panels/WorkspacePanel.js";
+import { SchedulesPanel } from "./panels/SchedulesPanel.js";
+import { ProvidersPanel } from "./panels/ProvidersPanel.js";
+import { CapabilitiesPanel } from "./panels/CapabilitiesPanel.js";
+import { CheckpointsPanel } from "./panels/CheckpointsPanel.js";
+import { Transcript } from "./components/Transcript.js";
+import { ModelSheet } from "./components/ModelSheet.js";
 
 /**
  * The shell (Tauri / Android) injects this before the bundle runs:
@@ -61,11 +64,32 @@ function deviceNode(): string {
 
 const NODE = deviceNode();
 
+/** Settings is a menu, not a drawer full of panels: chat stays the app. */
+type SettingsPage =
+  | "menu"
+  | "providers"
+  | "agent"
+  | "workspace"
+  | "schedules"
+  | "checkpoints"
+  | "devices"
+  | "about";
+
+const SETTINGS_ROWS: readonly [SettingsPage, string, string][] = [
+  ["providers", "Models & keys", "providers and API keys"],
+  ["agent", "Agent", "tools, skills and MCP servers"],
+  ["workspace", "Workspace", "files shared across devices"],
+  ["schedules", "Schedules", "tasks that run later"],
+  ["checkpoints", "Checkpoints", "named points to rewind to"],
+  ["devices", "Devices", "the chain and the nodes in it"],
+  ["about", "About", "chain, node and version"],
+];
 
 export default function App(): ReactElement {
   const client = useMemo(() => new ChainClient({ url: SOCKET_URL, node: NODE }), []);
   const snapshot = useSyncExternalStore(client.subscribe, client.getSnapshot);
   const turn = useMemo(() => openTurn(snapshot.events), [snapshot.events]);
+  const phase = useMemo(() => turnPhase(snapshot.events, turn), [snapshot.events, turn]);
   const activeSession = snapshot.activeSession ?? snapshot.sessions.at(-1)?.id ?? null;
   // Only one conversation is on screen; the rest of the chain stays where it is.
   const visible = useMemo(() => {
@@ -85,7 +109,9 @@ export default function App(): ReactElement {
 
   const [notice, setNotice] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [view, setView] = useState<"chat" | "workspace" | "schedules" | "checkpoints" | "agent" | "settings">("chat");
+  const [view, setView] = useState<"chat" | "settings">("chat");
+  const [settingsPage, setSettingsPage] = useState<SettingsPage>("menu");
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [logText, setLogText] = useState<string | null>(null);
   const [sessionQuery, setSessionQuery] = useState("");
@@ -129,6 +155,12 @@ export default function App(): ReactElement {
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "The message could not be sent.");
     }
+  }
+
+  function openSettings(page: SettingsPage = "menu"): void {
+    setView("settings");
+    setSettingsPage(page);
+    setMenuOpen(false);
   }
 
   const onboarded = snapshot.chain !== null && snapshot.chain !== "";
@@ -227,42 +259,49 @@ export default function App(): ReactElement {
             </button>
             {logText !== null ? <pre className="onboarding__code onboarding__log">{logText}</pre> : null}
           </details>
-
         </main>
       </div>
     );
   }
 
+  const inSettingsSubpage = view === "settings" && settingsPage !== "menu";
+  const pageTitle =
+    view === "chat"
+      ? (snapshot.sessions.find((entry) => entry.id === activeSession)?.title ?? "New chat")
+      : settingsPage === "menu"
+        ? "Settings"
+        : (SETTINGS_ROWS.find(([id]) => id === settingsPage)?.[1] ?? "Settings");
+
   return (
     <div className="app">
       <header className="titlebar" data-tauri-drag-region>
-        <button
-          type="button"
-          className="titlebar__menu"
-          aria-label="Menu"
-          aria-expanded={menuOpen}
-          data-tauri-drag-region={undefined}
-          onClick={() => setMenuOpen((open) => !open)}
-        >
-          ☰
-        </button>
+        {inSettingsSubpage ? (
+          <button
+            type="button"
+            className="titlebar__menu"
+            aria-label="Back"
+            onClick={() => setSettingsPage("menu")}
+          >
+            ‹
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="titlebar__menu"
+            aria-label="Menu"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            ☰
+          </button>
+        )}
         <span className="titlebar__title" data-tauri-drag-region>
-          {view === "chat"
-            ? (snapshot.sessions.find((entry) => entry.id === activeSession)?.title ?? "New chat")
-            : view === "workspace"
-              ? "Workspace"
-              : view === "schedules"
-                ? "Schedules"
-                : view === "checkpoints"
-                  ? "Checkpoints"
-                  : view === "agent"
-                    ? "Agent"
-                    : "Settings"}
+          {pageTitle}
         </span>
         <button
           type="button"
           className="titlebar__model"
-          onClick={() => setView("settings")}
+          onClick={() => setSheetOpen(true)}
           title={`${snapshot.provider ?? "no provider"} — tap to switch`}
         >
           {snapshot.model ?? "Select a model"}
@@ -272,10 +311,36 @@ export default function App(): ReactElement {
       <main className={view === "chat" ? "conversation" : "conversation conversation--panel"} aria-label="Conversation">
         {view === "chat" ? (
           <Transcript events={visible} pending={snapshot.pending} node={snapshot.node} />
-        ) : null}
-        {view === "workspace" ? <WorkspacePanel client={client} /> : null}
-        {view === "schedules" ? <SchedulesPanel client={client} /> : null}
-        {view === "checkpoints" ? (
+        ) : settingsPage === "menu" ? (
+          <section className="panel settings">
+            {SETTINGS_ROWS.map(([id, label, hint]) => (
+              <button key={id} type="button" className="settings__row" onClick={() => setSettingsPage(id)}>
+                <span className="settings__cell">
+                  <span className="settings__label">{label}</span>
+                  <span className="settings__hint">{hint}</span>
+                </span>
+                <span className="settings__chevron" aria-hidden="true">
+                  ›
+                </span>
+              </button>
+            ))}
+          </section>
+        ) : settingsPage === "providers" ? (
+          <ProvidersPanel
+            client={client}
+            current={snapshot.model ?? "no model"}
+            onProviderAdded={() => {
+              setView("chat");
+              setSheetOpen(true);
+            }}
+          />
+        ) : settingsPage === "agent" ? (
+          <CapabilitiesPanel client={client} />
+        ) : settingsPage === "workspace" ? (
+          <WorkspacePanel client={client} />
+        ) : settingsPage === "schedules" ? (
+          <SchedulesPanel client={client} />
+        ) : settingsPage === "checkpoints" ? (
           <CheckpointsPanel
             client={client}
             onRewind={(seq) => {
@@ -283,9 +348,11 @@ export default function App(): ReactElement {
               setView("chat");
             }}
           />
-        ) : null}
-        {view === "agent" ? <CapabilitiesPanel client={client} /> : null}
-        {view === "settings" ? <ProvidersPanel client={client} current={snapshot.model ?? "no model"} /> : null}
+        ) : settingsPage === "devices" ? (
+          <DevicesPage snapshot={snapshot} />
+        ) : (
+          <AboutPage snapshot={snapshot} logText={logText} onLoadLog={() => void loadLog()} />
+        )}
       </main>
 
       {menuOpen ? (
@@ -309,6 +376,7 @@ export default function App(): ReactElement {
           disabled={disabled}
           onClick={() => {
             client.newSession();
+            setView("chat");
             setMenuOpen(false);
           }}
         >
@@ -331,66 +399,30 @@ export default function App(): ReactElement {
                   : session.title.toLowerCase().includes(sessionQuery.trim().toLowerCase()),
               )
               .map((session) => (
-              <li key={session.id}>
-                <button
-                  type="button"
-                  className={
-                    session.id === activeSession ? "rail__session rail__session--active" : "rail__session"
-                  }
-                  onClick={() => {
-                    client.selectSession(session.id);
-                    setMenuOpen(false);
-                  }}
-                  title={`${session.title} — ${String(session.messages)} messages`}
-                >
-                  {session.title}
-                </button>
-              </li>
+                <li key={session.id}>
+                  <button
+                    type="button"
+                    className={
+                      session.id === activeSession ? "rail__session rail__session--active" : "rail__session"
+                    }
+                    onClick={() => {
+                      client.selectSession(session.id);
+                      setView("chat");
+                      setMenuOpen(false);
+                    }}
+                    title={`${session.title} — ${String(session.messages)} messages`}
+                  >
+                    {session.title}
+                  </button>
+                </li>
               ))}
           </ul>
         </div>
 
-        <div className="rail__more">
-          <span className="rail__label">Panels</span>
-          {(
-            [
-              ["workspace", "Workspace"],
-              ["schedules", "Schedules"],
-              ["checkpoints", "Checkpoints"],
-              ["agent", "Agent"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              className={view === id ? "rail__item rail__item--active" : "rail__item"}
-              onClick={() => {
-                setView(id);
-                setMenuOpen(false);
-              }}
-            >
-              {label}
-            </button>
-          ))}
-          {snapshot.invite !== null ? <InviteBlock code={snapshot.invite} /> : null}
-        </div>
-
-        <p className="rail__sync">
-          <span
-            className={`rail__syncdot${snapshot.status === "open" ? " rail__syncdot--on" : " rail__syncdot--off"}`}
-            aria-hidden="true"
-          />
-          {snapshot.node} · {snapshot.peer !== null ? "syncing" : "this device only"} ·{" "}
-          {snapshot.status === "open" ? "daemon on" : "waiting for daemon"}
-        </p>
-
         <button
           type="button"
           className={view === "settings" ? "rail__footer rail__footer--active" : "rail__footer"}
-          onClick={() => {
-            setView("settings");
-            setMenuOpen(false);
-          }}
+          onClick={() => openSettings()}
         >
           ⚙ Settings
         </button>
@@ -400,18 +432,113 @@ export default function App(): ReactElement {
         {turn !== null ? (
           <div className="dock__state">
             <span className="dock__dot" aria-hidden="true" />
-            Roan is working
+            Roan is working · {phase}
             <button type="button" className="dock__stop" onClick={() => void client.cancelTurn()}>
               Stop
             </button>
           </div>
         ) : null}
-        <Composer disabled={disabled} placeholder={placeholder} onSend={send} />
+        <Composer
+          disabled={disabled}
+          placeholder={placeholder}
+          onSend={send}
+          onPickFile={() => setView("chat")}
+          client={client}
+        />
       </footer>
+
+      {sheetOpen ? (
+        <ModelSheet
+          client={client}
+          provider={snapshot.provider ?? null}
+          model={snapshot.model ?? null}
+          onClose={() => setSheetOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }
 
+/** The chain's members and the invite, out of the chat drawer. */
+function DevicesPage({ snapshot }: { snapshot: ChainSnapshot }): ReactElement {
+  return (
+    <section className="panel">
+      <header className="panel__head">
+        <h2 className="panel__title">Devices</h2>
+      </header>
+      <p className="panel__sub">Every device runs its own Roan; the chain keeps them equal.</p>
+      <ul className="panel__list">
+        <li className="panel__item">
+          <span className="panel__path">This device</span>
+          <span className="panel__src">{snapshot.node}</span>
+        </li>
+        <li className="panel__item">
+          <span className="panel__path">Chain</span>
+          <span className="panel__src">{snapshot.chain}</span>
+        </li>
+        <li className="panel__item">
+          <span className="panel__path">Sync</span>
+          <span className="panel__src">
+            {snapshot.peer !== null ? "syncing with a peer" : "this device only"}
+          </span>
+        </li>
+        <li className="panel__item">
+          <span className="panel__path">Daemon</span>
+          <span className="panel__src">{snapshot.status === "open" ? "running" : "waiting"}</span>
+        </li>
+      </ul>
+      {snapshot.invite !== null ? <InviteBlock code={snapshot.invite} /> : null}
+      <p className="panel__hint">
+        The invite turns another device into a member of this chain: it takes the whole history as
+        its own.
+      </p>
+    </section>
+  );
+}
+
+/** The facts about this instance, out of the conversation's way. */
+function AboutPage({
+  snapshot,
+  logText,
+  onLoadLog,
+}: {
+  snapshot: ChainSnapshot;
+  logText: string | null;
+  onLoadLog: () => void;
+}): ReactElement {
+  return (
+    <section className="panel">
+      <header className="panel__head">
+        <h2 className="panel__title">About</h2>
+      </header>
+      <ul className="panel__list">
+        <li className="panel__item">
+          <span className="panel__path">Version</span>
+          <span className="panel__src">{pkg.version}</span>
+        </li>
+        <li className="panel__item">
+          <span className="panel__path">Node</span>
+          <span className="panel__src">{snapshot.node}</span>
+        </li>
+        <li className="panel__item">
+          <span className="panel__path">Chain</span>
+          <span className="panel__src">{snapshot.chain}</span>
+        </li>
+        <li className="panel__item">
+          <span className="panel__path">Daemon</span>
+          <span className="panel__src">{snapshot.status === "open" ? "running" : "waiting"}</span>
+        </li>
+      </ul>
+      <details className="onboarding__daemon">
+        <summary className="panel__label">Daemon log</summary>
+        <button type="button" className="panel__secondary panel__secondary--inline" onClick={onLoadLog}>
+          Load log
+        </button>
+        {logText !== null ? <pre className="onboarding__code onboarding__log">{logText}</pre> : null}
+      </details>
+    </section>
+  );
+}
 
 /** The invite is a long string that is only interesting once, so it stays shut. */
 function InviteBlock({ code }: { code: string }): ReactElement {
@@ -419,8 +546,8 @@ function InviteBlock({ code }: { code: string }): ReactElement {
   const [copied, setCopied] = useState(false);
   return (
     <div className="rail__invite">
-      <button type="button" className="rail__item" onClick={() => setOpen((value) => !value)}>
-        ＋ Invite a device
+      <button type="button" className="panel__secondary" onClick={() => setOpen((value) => !value)}>
+        {open ? "Hide the invite" : "Invite a device"}
       </button>
       {open ? (
         <>

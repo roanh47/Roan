@@ -204,7 +204,7 @@ pre {
 .conversation--panel {
   display: block;
   overflow-y: auto;
-  padding: 16px 16px 40px;
+  padding: 16px 16px calc(56px + env(safe-area-inset-bottom, 0px));
 }
 
 /* ------------------------------------------------------------------ chat */
@@ -910,9 +910,7 @@ pre {
   display: block;
   margin: 16px 0 6px;
   color: var(--faint);
-  font-size: 11.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-size: 12.5px;
 }
 
 .panel__input,
@@ -1057,6 +1055,46 @@ pre {
   border: 1px dashed var(--line);
   border-radius: var(--radius);
   color: var(--muted);
+}
+
+.panel__src {
+  flex: none;
+  max-width: 44%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.panel__key {
+  flex: none;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.panel__key--set {
+  color: var(--accent);
+}
+
+.panel__actionsrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.panel__secondary--inline {
+  width: auto;
+  margin-top: 0;
+  padding: 9px 14px;
+}
+
+.panel__remove {
+  margin-left: auto;
+  padding: 9px 12px;
+  color: var(--danger);
+  font-size: 13px;
 }
 
 .panel__sublist {
@@ -1329,6 +1367,274 @@ pre {
     max-width: 720px;
     margin: 0 auto;
   }
+}
+
+/* ----------------------------------------------------------------- sheet */
+
+/* The model picker: a bottom sheet, one tap from the conversation. */
+.sheet__wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.sheet__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  border: 0;
+}
+
+.sheet {
+  position: relative;
+  max-height: 72dvh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 22px 22px 0 0;
+  background: #12151a;
+  border-top: 1px solid var(--line-soft);
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
+}
+
+.sheet__grip {
+  width: 36px;
+  height: 4px;
+  margin: 10px auto 4px;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 16px 10px;
+}
+
+.sheet__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.sheet__close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.sheet__body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sheet__search {
+  position: sticky;
+  top: 0;
+  padding: 11px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-soft);
+  background: var(--bg);
+  font-size: 14.5px;
+  outline: none;
+}
+
+.sheet__note {
+  margin: 6px 0;
+  color: var(--faint);
+  font-size: 13.5px;
+  text-align: center;
+}
+
+.sheet__note--bad {
+  color: var(--danger);
+}
+
+.sheet__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sheet__row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  text-align: left;
+  padding: 11px 14px;
+  border-radius: 12px;
+}
+
+.sheet__row--active {
+  background: var(--surface-2);
+}
+
+.sheet__model {
+  color: var(--fg);
+  font-size: 14.5px;
+}
+
+.sheet__id {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+/* -------------------------------------------------------------- settings */
+
+/* The settings menu: tall rows with a hint, like the reference apps. */
+.settings {
+  gap: 2px;
+}
+
+.settings__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.settings__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings__label {
+  color: var(--fg);
+  font-size: 15px;
+  font-weight: 550;
+}
+
+.settings__hint {
+  color: var(--faint);
+  font-size: 12.5px;
+}
+
+.settings__chevron {
+  flex: none;
+  color: var(--faint);
+  font-size: 18px;
+}
+
+/* ---------------------------------------------------- composer additions */
+
+.composer__plus,
+.composer__mic {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--muted);
+}
+
+.composer__plus:disabled,
+.composer__mic:disabled {
+  color: var(--faint);
+  cursor: default;
+}
+
+.composer__plus--open {
+  background: var(--surface-2);
+  color: var(--fg);
+}
+
+.composer__mic--on {
+  background: rgba(126, 226, 184, 0.14);
+  color: var(--accent);
+}
+
+.composer__menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 8px);
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--line-soft);
+  border-radius: 16px;
+  background: #12151a;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.composer {
+  position: relative;
+}
+
+.composer__files {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.composer__menulabel {
+  padding: 4px 10px 6px;
+  color: var(--faint);
+  font-size: 12.5px;
+}
+
+.composer__menuitem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+.composer__menuitem:active {
+  background: var(--surface-2);
+}
+
+.composer__menupath {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--fg);
+}
+
+.composer__menusize {
+  flex: none;
+  color: var(--faint);
+  font-size: 11.5px;
+}
+
+.composer__menuempty {
+  padding: 10px 12px;
+  color: var(--faint);
+  font-size: 13px;
 }
 
 @media (prefers-reduced-motion: reduce) {
