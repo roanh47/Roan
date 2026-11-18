@@ -10,17 +10,23 @@ geschreven.
 
 ## Ronde 1 — het gesprek zelf (transcript-hygiëne)
 
-- [ ] **Interne context-stappen onzichtbaar.** De memory/prompt-stappen die nu als
-      `INPUT/OUTPUT`-blokken in de chat staan (de "chat staat er 2×"-melding) zijn
-      standaard verborgen, op te klappen via een details-toggle. Plek:
-      `web/src/components/Transcript.tsx` + eventfilter in `web/src/App.tsx`.
-- [ ] **Denk-status altijd zichtbaar.** "Thinking…" staat er zodra een beurt
-      start — ook als het model geen reasoning-events stuurt (zijn
-      deepseek-screenshot toonde niets). Fase-regel bestaat (`turnPhase`), moet
-      ook zonder events lopen. Plek: `web/src/App.tsx` dock-state.
-- [ ] **Bericht-acties.** Copy op elk antwoord; regenereren via branch van vóór
-      het antwoord (append-only blijft intact). Plek: `Transcript.tsx` +
-      checkpoints-branch in de daemon.
+- [x] **Interne context-stappen onzichtbaar.** ≥3 tools achtereen zijn één
+      uitklapbare "internal steps N"-pilletje; bewezen op de emulator
+      (`local/proof/round-1/steps-toggle-and-actions.png`). De "chat staat
+      er 2×" bleek bovendien geen weergave- maar een echo-bug: de daemon
+      stempelde het bericht met een eigen uuid, dus de pending-bubbel
+      matchte nooit. Het id van de client reist nu mee.
+- [x] **Denk-status altijd zichtbaar.** De turn-lock schreef turn_start/
+      turn_end al in de keten maar de adapter broadcastte ze nooit — de
+      dock bestond dus gewoon niet. Nu wel: bewezen in
+      `thinking-dock-running-memory.png` ("Roan is working · running memory"
+      + Stop). Stuck-melding (2 min stilte gerapporteerd, 5 min bekent)
+      zit erin en is unit-getest; een live vastloper duurt per definitie
+      minuten en is dus niet te screenshotten met een mock die instant is.
+- [x] **Bericht-acties.** Copy op elk antwoord, Regenerate op het laatste:
+      checkpoint markeert de seam, dezelfde vraag opnieuw, nieuw antwoord
+      eronder, niets verwijderd. Bewezen in `regenerate-branch.png` en
+      hard geassert op de host (smoke-round1).
 
 ## Ronde 2 — de agent-home (workspace-verbouwing)
 
