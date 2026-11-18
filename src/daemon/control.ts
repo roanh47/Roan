@@ -133,7 +133,10 @@ export function startControlServer(options: ControlServerOptions): Promise<Contr
         type !== "checkpoint" &&
         type !== "rewind"
       ) {
-        const id = typeof frame["id"] === "string" ? frame["id"] : null;
+        // Correlation rides on `req`: `id` belongs to the request data (a
+        // provider account id, for instance) and must not double as the reply
+        // address.
+        const id = typeof frame["req"] === "string" ? frame["req"] : null;
         let answered = false;
         // Sent straight back to the socket that asked: a reply is not part of
         // the chain protocol, so it must not go through the peer encoder.

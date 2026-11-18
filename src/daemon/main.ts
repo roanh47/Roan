@@ -826,6 +826,7 @@ async function main(): Promise<void> {
             ...(preset !== undefined ? { preset } : {}),
           };
           await saveProviders(paths, upsertAccount(file, account));
+          control?.sendState();
           reply({ ok: true, id, keySet: account.apiKey.length > 0 });
           return;
         }
@@ -865,6 +866,9 @@ async function main(): Promise<void> {
               home: paths.home,
             }).catch(() => undefined);
           }
+          // The model pill on every connected screen follows the state, so a
+          // pick must be announced, not only stored.
+          control?.sendState();
           reply({ ok: true, provider: account.id, model: settings.model });
           return;
         }

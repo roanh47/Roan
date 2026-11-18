@@ -118,6 +118,8 @@ export interface ClientHelloFrame {
 export interface ControlRequestFrame {
   /** Known chain actions plus any request the daemon answers. */
   t: string;
+  /** Correlation id for request/reply; `id` stays free for request data. */
+  req?: string;
   id?: string;
   code?: string;
   title?: string;
@@ -295,6 +297,7 @@ export function parseFrame(raw: unknown): ServerFrame | null {
       : undefined;
     const activeSession = typeof data.activeSession === "string" ? data.activeSession : null;
     const model = typeof data.model === "string" ? data.model : undefined;
+    const provider = typeof data.provider === "string" ? data.provider : undefined;
     return {
       t: "state",
       data: {
@@ -303,6 +306,7 @@ export function parseFrame(raw: unknown): ServerFrame | null {
         invite,
         ...(sessions !== undefined ? { sessions } : {}),
         ...(model !== undefined ? { model } : {}),
+        ...(provider !== undefined ? { provider } : {}),
         activeSession,
       },
     };
@@ -554,7 +558,11 @@ export class ChainClient {
         reject(new Error("no answer from the daemon"));
       }, 15_000);
       this.pendingRequests.set(id, { resolve: (value) => resolve(value as T), timer });
-      if (!this.send({ t: kind, id, ...data })) {
+      // `req`, not `id`: several requests carry an `id` in their data (the
+      // provider account, the file path owner) and overwriting the correlation
+      // id meant those replies never matched — the 15-second "no answer" the
+      // provider screens showed.
+      if (!this.send({ t: kind, req: id, ...data })) {
         clearTimeout(timer);
         this.pendingRequests.delete(id);
         reject(new Error("socket is not open"));
