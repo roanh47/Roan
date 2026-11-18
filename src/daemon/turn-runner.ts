@@ -95,6 +95,10 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
             content: message.text,
           }));
     let answer = "";
+    // A turn that ends without an explanation is a silent bug to a reader.
+    // The error events of this turn say why it went nowhere; when none did,
+    // the turn itself reports that it came back empty.
+    let failed = false;
 
     if (options.engine === "hermes") {
       // The engine keeps its own tool loop; the chain keeps the conversation.
@@ -112,6 +116,7 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
         ...(options.provider.model.length > 0 ? { model: options.provider.model } : {}),
       });
       if (result.text.length > 0) append({ type: "assistant", data: { text: result.text } });
+      else append({ type: "error", data: { message: "the engine returned no answer" } });
       return;
     }
 
@@ -134,6 +139,7 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
             append({ type: "tool_result", data: { name: event.name, ok: event.ok, output: event.output } });
             break;
           case "error":
+            failed = true;
             append({ type: "error", data: { message: event.message } });
             break;
           default:
@@ -144,6 +150,7 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
 
     await agent.send(userText);
     if (answer.trim()) append({ type: "assistant", data: { text: answer } });
+    else if (!failed) append({ type: "error", data: { message: "the turn ended without an answer" } });
   } catch (err) {
     // A cancelled turn is not a failure: the user stopped it on purpose.
     if (options.signal?.aborted === true) {

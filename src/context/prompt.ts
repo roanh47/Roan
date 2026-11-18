@@ -39,5 +39,16 @@ export function buildSystemPrompt(parts: PromptParts): string {
     );
   }
 
+  // Fast models with tools attached will reach for a tool on any message,
+  // including "Hi" — and a tool loop ends a turn in silence. The guard sits in
+  // every prompt, fresh install or not, so small talk stays small talk.
+  blocks.push(
+    `# Tools\n\n` +
+      `Tools are for work, not conversation. A greeting or a simple question gets ` +
+      `a direct answer with no tool call at all. Do not call a tool to acknowledge ` +
+      `or remember small talk; call one when the person asks for something to be ` +
+      `done, read or checked.`,
+  );
+
   return blocks.filter((block) => block.length > 0).join("\n\n");
 }

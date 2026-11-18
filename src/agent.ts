@@ -89,6 +89,15 @@ export class Agent {
           content: output,
         });
       }
+
+      // Running out of budget with tools still queued is the model looping,
+      // not working — silence would read as a bug, so the turn says so.
+      if (stappen >= this.maxSteps) {
+        emit({
+          type: "error",
+          message: `stopped after ${String(this.maxSteps)} steps — the model kept calling tools without finishing`,
+        });
+      }
     }
 
     emit({ type: "turn_end", steps: stappen });
