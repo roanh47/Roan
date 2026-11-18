@@ -24,8 +24,10 @@ geschreven.
 
 ## Ronde 2 — de agent-home (workspace-verbouwing)
 
-- [ ] **`~/.Roan` met hoofdletter.** `src/daemon/paths.ts` + `RoanNode.kt`,
-      eenmalige migratie van `~/.roan` zodat geen device zijn keten verliest.
+- [ ] **`~/.Roan` met hoofdletter.** Code, migratie en docs zitten erin:
+      `paths.ts` hernoemt een bestaand `~/.roan` één keer bij de start,
+      `RoanNode.kt` doet hetzelfde vóór `ROAN_HOME` op Android. Bewijs rijdt
+      mee in de 0.0.13-emulatorronde (verse install start in `.Roan`).
 - [ ] **`state/` nieuw.** chain.db + cron-state verhuizen uit `workspace/`;
       `workspace/` wordt de lokale agent-home (exec-cwd-keuze: privé of synced).
 - [ ] **`storage/`-venster op Android.** Achter de "All files access"-toggle:
@@ -41,7 +43,7 @@ geschreven.
 
 - [ ] **Mijn schrijfstijl, hardcore.** Roan antwoordt in mijn eigen stijl, niet in
       standaard AI-proza: kort, direct, geen managementtaal, geen "zeker, ik kan je
-      helpen"-opening. De gids staat in `~/.roan` (`SOUL.md` / `AGENTS.md`) en reist
+      helpen"-opening. De gids staat in `~/.Roan` (`SOUL.md` / `AGENTS.md`) en reist
       als env mee, zodat elke instance hetzelfde schrijft. Niet als suggestie in de
       prompt, maar als regel die je aan een antwoord kunt afmeten.
 

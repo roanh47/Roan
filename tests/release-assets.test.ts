@@ -16,7 +16,11 @@ import { fileURLToPath } from "node:url";
  *   3. the release publishes exactly four files, by exact name;
  *   4. the publish list contains no globs, so a new bundler output cannot
  *      silently join the release;
- *   5. the asset names agree with APP_VERSION and tauri.conf.json.
+ *   5. the asset names all carry APP_VERSION, and that version agrees with
+ *      tauri.conf.json and package.json — the three move together.
+ *
+ * Asset names are pinned as `${{ env.APP_VERSION }}` patterns, not literals:
+ * a version bump must not turn this suite red for naming something correctly.
  *
  * There is no YAML dependency in this repo, so the workflow is parsed with the
  * subset of YAML it actually uses (indented mappings, sequences, block
@@ -194,15 +198,23 @@ const workflow = parseWorkflow(source) as {
 
 const BUILD_JOBS = ["windows", "macos", "linux", "android"] as const;
 
+/** The version placeholder the workflow uses in artifact and asset names. */
+const VERSION_EXPR = "${{ env.APP_VERSION }}";
+
 /** The four release files, keyed by the job that builds each one. */
 const EXPECTED = {
-  windows: { artifact: "windows-x64", file: "Roan-0.0.1-x64.exe" },
-  macos: { artifact: "macos-arm64", file: "Roan-0.0.1-arm64.dmg" },
-  linux: { artifact: "linux-x86_64", file: "Roan-0.0.1-x86_64.AppImage" },
-  android: { artifact: "android-apk", file: "Roan-0.0.1.apk" },
+  windows: { artifact: "windows-x64", file: `Roan-${VERSION_EXPR}-x64.exe` },
+  macos: { artifact: "macos-arm64", file: `Roan-${VERSION_EXPR}-arm64.dmg` },
+  linux: { artifact: "linux-x86_64", file: `Roan-${VERSION_EXPR}-x86_64.AppImage` },
+  android: { artifact: "android-apk", file: `Roan-${VERSION_EXPR}.apk` },
 } as const;
 
 const EXPECTED_FILES = BUILD_JOBS.map((job) => EXPECTED[job].file);
+
+/** The cleanup step runs in a shell, where the same version is `${APP_VERSION}`. */
+const EXPECTED_SHELL_FILES = EXPECTED_FILES.map(
+  (file) => file.replace(VERSION_EXPR, "${APP_VERSION}"),
+);
 
 function steps(job: any): any[] {
   const value = job?.steps;
@@ -315,7 +327,7 @@ test("a cleanup step strips anything that is not one of the four files", () => {
     .filter((name) => name !== "");
 
   assert.equal(listed.length, 4, "the allow-list must name exactly four files");
-  assert.deepEqual([...listed].sort(), [...EXPECTED_FILES].sort());
+  assert.deepEqual([...listed].sort(), [...EXPECTED_SHELL_FILES].sort());
 
   // The allow-list is only meaningful if strays are actually removed and
   // missing files actually fail the job.
@@ -323,17 +335,26 @@ test("a cleanup step strips anything that is not one of the four files", () => {
   assert.match(run, /missing expected asset/, "a missing file must fail the job");
 });
 
-test("the asset names agree with APP_VERSION and tauri.conf.json", () => {
-  assert.equal(workflow.env?.APP_VERSION, "0.0.1", "workflow APP_VERSION");
+test("every asset name carries APP_VERSION, and the three versions agree", () => {
+  const version = workflow.env?.APP_VERSION;
+  assert.equal(typeof version, "string", "workflow must set APP_VERSION");
+  assert.match(String(version), /^\d+\.\d+\.\d+$/, "APP_VERSION must be a plain semver");
 
-  const confPath = join(dirname(resolveWorkflowPath()), "..", "..", "src-tauri", "tauri.conf.json");
-  const conf = JSON.parse(readFileSync(confPath, "utf8")) as { version?: string };
+  const root = join(dirname(resolveWorkflowPath()), "..", "..");
+  const conf = JSON.parse(
+    readFileSync(join(root, "src-tauri", "tauri.conf.json"), "utf8"),
+  ) as { version?: string };
+  assert.equal(conf.version, version, "tauri.conf.json must match APP_VERSION");
 
-  assert.equal(conf.version, workflow.env.APP_VERSION, "tauri.conf.json must match APP_VERSION");
+  const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
+    version?: string;
+  };
+  assert.equal(pkg.version, version, "package.json must match APP_VERSION");
+
   for (const file of EXPECTED_FILES) {
     assert.ok(
-      file.includes(workflow.env.APP_VERSION as string),
-      `${file} must carry the release version ${workflow.env.APP_VERSION}`,
+      file.includes(VERSION_EXPR),
+      `${file} must carry the version expression, not a literal`,
     );
   }
 });

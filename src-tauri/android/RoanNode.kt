@@ -57,7 +57,19 @@ object RoanNode {
       return
     }
     val root = context.filesDir
-    val home = File(root, ".roan").apply { mkdirs() }
+    // The home is `.Roan`, capital R, on every platform. An install from
+    // before that decision still has its chain in `.roan`: move it once,
+    // before anything opens it, or the upgrade would look like data loss.
+    val legacy = File(root, ".roan")
+    val home = File(root, ".Roan")
+    if (legacy.exists() && !home.exists()) {
+      if (legacy.renameTo(home)) {
+        Log.i(TAG, "home: moved the old .roan to .Roan once")
+      } else {
+        Log.e(TAG, "home: could not move .roan to .Roan")
+      }
+    }
+    home.mkdirs()
     val script = File(root, SCRIPT)
     copyAsset(context, SCRIPT, script)
 

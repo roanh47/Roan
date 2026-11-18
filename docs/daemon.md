@@ -84,17 +84,17 @@ send these frames, including `append`.
 ## 3. Where state lives
 
 All of it hangs off `RoanPaths` in `paths.ts`, rooted at
-`process.env["ROAN_HOME"] ?? join(homedir(), ".roan")`.
+`process.env["ROAN_HOME"] ?? join(homedir(), ".Roan")`.
 
 | `RoanPaths` field | path | written by |
 | --- | --- | --- |
-| `home` | `~/.roan` | `ensurePaths` |
-| `secrets` | `~/.roan/secrets` | `ensurePaths` |
-| `workspace` | `~/.roan/workspace` | `ensurePaths` |
-| `syncedWorkspace` | `~/.roan/synced-workspace` | `ensurePaths`; the turn's `cwd` |
-| `database` | `~/.roan/workspace/chain.db` | `EventStore` — one SQLite file, every chain |
-| `configFile` | `~/.roan/config.json` | `loadSettings` reads `baseUrl`, `model`, `apiKey`, `provider` |
-| `identityFile` | `~/.roan/secrets/identity.json` | `saveIdentity`, mode `0600` |
+| `home` | `~/.Roan` | `ensurePaths` |
+| `secrets` | `~/.Roan/secrets` | `ensurePaths` |
+| `workspace` | `~/.Roan/workspace` | `ensurePaths` |
+| `syncedWorkspace` | `~/.Roan/synced-workspace` | `ensurePaths`; the turn's `cwd` |
+| `database` | `~/.Roan/workspace/chain.db` | `EventStore` — one SQLite file, every chain |
+| `configFile` | `~/.Roan/config.json` | `loadSettings` reads `baseUrl`, `model`, `apiKey`, `provider` |
+| `identityFile` | `~/.Roan/secrets/identity.json` | `saveIdentity`, mode `0600` |
 
 `loadSettings` returns `DEFAULTS` when the file is missing or not JSON, and
 falls back per field when a value is not a string. `loadIdentity` returns

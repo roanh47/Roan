@@ -157,7 +157,7 @@ Choose per service, not globally:
 - **MCP over stdio:** belongs to one node, because it's a process next to the binary.
   **MCP over HTTP:** usable from any node as long as you have the token.
 
-Storage: an age-encrypted file in `~/.roan/secrets/`, with the decryption key in the
+Storage: an age-encrypted file in `~/.Roan/secrets/`, with the decryption key in the
 OS keychain (or the Android Keystore). On Linux, macOS and Windows 0600 would be
 enough, but encrypting costs nothing and makes Android safe, where the filesystem
 isn't a boundary. `roan secrets` shows only *what* is present per node, never the
@@ -167,7 +167,7 @@ value.
 
 ## Folders on every machine
 
-The agent has one home, and it's hidden: `~/.roan/`. Inside it, what it **is** sits
+The agent has one home, and it's hidden: `~/.Roan/`. Inside it, what it **is** sits
 next to where it **works**.
 
 **The env always travels in the chain.** Config, skills, MCP definitions, its
@@ -183,7 +183,7 @@ Two things never enter the chain:
 **The layout:**
 
 ```
-~/.roan/
+~/.Roan/
 ├── config.json
 ├── AGENTS.md            how it behaves
 ├── SOUL.md              tone and boundaries
@@ -198,12 +198,12 @@ Two things never enter the chain:
     └── projects/calculator/
 ```
 
-Everything lowercase, for a hard reason: `.Roan` and `.roan` are the same file on
-Windows and macOS but two different ones on Linux and Android. One machine that
-writes it with a capital somewhere and you have two folders that look identical.
-Unix dotfolders are lowercase anyway, so your `ls -a` stays readable.
+Capital R everywhere — decided 2026-11-18, and the earlier lowercase argument
+(case-insensitive filesystems would blur `.Roan` and `.roan`) lost to the brand:
+the folder is a name, not just a path. One boot migrates a pre-capital `~/.roan`
+into `~/.Roan` with a single rename, so no device loses its chain on upgrade.
 
-The identity files sit in the root of `~/.roan/` and not in the workspace, on
+The identity files sit in the root of `~/.Roan/` and not in the workspace, on
 purpose: `AGENTS.md` and `MEMORY.md` are what the agent *is*, not what it works on.
 They travel in the chain, like its skills. `workspace/` and `synced-workspace/` are
 pure content, with exactly one boundary between them: what's in `workspace/` stays
@@ -229,8 +229,8 @@ macOS do it differently from Linux. The moment the paths differ you've lost the
 consistency.
 
 A separate account *is* right when the machine serves more people: then it runs as a
-service account with the workspace in `/srv/roan` or `/home/roan/.roan`. For a
-machine that's only yours, `~/.roan` is the normal place — like `~/.ssh` and
+service account with the workspace in `/srv/roan` or `/home/roan/.Roan`. For a
+machine that's only yours, `~/.Roan` is the normal place — like `~/.ssh` and
 `~/.config`.
 
 If you still want to limit what it can touch, do it with a sandbox (container or OS
@@ -239,10 +239,10 @@ sandbox) instead of a second user. Same paths, fewer rights.
 ### Paths per system
 
 ```
-LINUX      /home/<user>/.roan/
-MACOS      /Users/<user>/.roan/
-WINDOWS    C:\Users\<user>\.roan\
-ANDROID    /storage/emulated/0/.roan/
+LINUX      /home/<user>/.Roan/
+MACOS      /Users/<user>/.Roan/
+WINDOWS    C:\Users\<user>\.Roan\
+ANDROID    /storage/emulated/0/.Roan/
 ```
 
 On Windows the variable is `%USERPROFILE%`; on Android `/storage/emulated/0` is what
@@ -251,7 +251,7 @@ other three, so everything sits in shared storage — not in `Android/data/`, be
 synchronisation tools can't reliably reach that.
 
 One consequence: on Android the filesystem is not a boundary. Any app with storage
-access can look inside `~/.roan/`, and therefore inside `secrets/`. That's why the
+access can look inside `~/.Roan/`, and therefore inside `secrets/`. That's why the
 latter is encrypted, with the key in app-private storage or the Keystore. On the
 other three systems 0600 is enough, but encrypting works everywhere.
 
@@ -269,7 +269,7 @@ other three systems 0600 is enough, but encrypting works everywhere.
 - **No SQLite, no live databases in `synced-workspace`.** A file synchroniser copies
   a database mid-write and then it's broken. Sessions travel through the chain, not
   through the folder.
-- **No keys in `synced-workspace`.** They live in `~/.roan/secrets/`, per machine.
+- **No keys in `synced-workspace`.** They live in `~/.Roan/secrets/`, per machine.
 
 ### What syncs the workspace
 
@@ -305,7 +305,7 @@ the table. The chain handles the rest of the folder.
 
 **F1 — the chain.** Start with a choice: new chain or join with a code. Numbered
 events with a sender, storage, catch-up protocol ("I have up to N"), and a daemon that
-keeps running when you close the window. `~/.roan` travels in the same chain, except
+keeps running when you close the window. `~/.Roan` travels in the same chain, except
 `workspace/` and `secrets/`. After this your phone and your PC are in the same chain
 and see the same conversation.
 

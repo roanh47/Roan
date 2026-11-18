@@ -106,7 +106,7 @@ which the join handler does not start.
 chain's env: it parks the current env with `parkEnv`, writes the snapshot's
 entries, reads them back and compares hashes — a mismatch is an error, not a
 success; applying the same snapshot twice is a no-op. `parkEnv`
-(`src/env/park.ts`) moves the previous env to `~/.roan/workspace/parked/<timestamp>/`
+(`src/env/park.ts`) moves the previous env to `~/.Roan/workspace/parked/<timestamp>/`
 with a `park.json` manifest; it moves, never deletes, and returns `null` when there
 was nothing to park. Only paths named in `src/env/types.ts` are touched:
 `AGENTS.md`, `SOUL.md`, `USER.md`, `MEMORY.md`, `config.json`, `memory/`, `skills/`

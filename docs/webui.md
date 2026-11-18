@@ -17,8 +17,8 @@ browser ──http──► scripts/webui.mjs ──static──► web/dist
 |---|---|---|
 | daemon | `127.0.0.1:7411` (local socket), `0.0.0.0:7412` (peers) | owns the chain, runs turns, talks to the provider |
 | web UI | `0.0.0.0:6769` | serves `web/dist`, proxies `/ws` to the daemon |
-| config | `~/.roan/config.json` (0600) | provider base URL, model, key |
-| chain | `~/.roan/workspace/chain.db` | the events; this is the conversation |
+| config | `~/.Roan/config.json` (0600) | provider base URL, model, key |
+| chain | `~/.Roan/workspace/chain.db` | the events; this is the conversation |
 
 The page never talks to the daemon directly. It opens `ws://<page host>/ws`,
 which lands on the proxy, which forwards to loopback. That is what makes the
@@ -52,7 +52,7 @@ a reload and after a restart.
 
 ## Configuration
 
-`~/.roan/config.json`, owner-only:
+`~/.Roan/config.json`, owner-only:
 
 ```json
 {
@@ -71,7 +71,7 @@ Missing fields fall back to `http://127.0.0.1:1234/v1` and `local-model` (LM Stu
 ```bash
 curl -s localhost:6769/healthz          # {"ok":true,"daemon":"ws://127.0.0.1:7411"}
 ss -ltn | grep -E ':7411|:7412|:6769'   # all three listening
-sqlite3 ~/.roan/workspace/chain.db 'select seq, type from events order by seq'
+sqlite3 ~/.Roan/workspace/chain.db 'select seq, type from events order by seq'
 ```
 
 A message typed in the page must end as `message → turn_start → assistant →

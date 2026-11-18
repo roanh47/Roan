@@ -53,10 +53,10 @@ it, once per person.
 
 ## Home folder
 
-Everything the agent is lives in `~/.roan/`:
+Everything the agent is lives in `~/.Roan/`:
 
 ```
-~/.roan/
+~/.Roan/
 ├── config.json
 ├── AGENTS.md            how it behaves
 ├── SOUL.md              tone and boundaries
@@ -77,10 +77,10 @@ anything you take out of it disappears there too.
 Same paths on all systems:
 
 ```
-LINUX      /home/<user>/.roan/
-MACOS      /Users/<user>/.roan/
-WINDOWS    C:\Users\<user>\.roan\
-ANDROID    /data/data/dev.roan/files/.roan/   (app-private)
+LINUX      /home/<user>/.Roan/
+MACOS      /Users/<user>/.Roan/
+WINDOWS    C:\Users\<user>\.Roan\
+ANDROID    /data/data/dev.roan/files/.Roan/   (app-private)
 ```
 
 Where each of these lives, what travels between devices and what stays on the

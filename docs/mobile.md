@@ -1,7 +1,7 @@
 # The phone app
 
 The phone is a node, not a window. It runs the daemon itself: its own identity,
-its own `~/.roan`, its own chain, and it reaches the other machines as a peer
+its own `~/.Roan`, its own chain, and it reaches the other machines as a peer
 over Tailscale.
 
 ## How the daemon gets onto the phone
@@ -22,7 +22,7 @@ It runs inside the app instead.
   (`scripts/bundle-daemon.mjs`) into `assets/roan-daemon.js`, ~3 MB, CommonJS,
   with `ws` inside it and `node:sqlite` built into the runtime.
 - **`RoanNode.ensureStarted()`** runs from `MainActivity.onCreate`, copies the
-  bundle to `filesDir`, then sets `ROAN_HOME=filesDir/.roan`,
+  bundle to `filesDir`, then sets `ROAN_HOME=filesDir/.Roan`,
   `ROAN_ENGINE=builtin`, `ROAN_CONTROL_HOST=127.0.0.1`,
   `ROAN_CONTROL_PORT=7411`, `ROAN_PEER_HOST=0.0.0.0`, `ROAN_PEER_PORT=7412` and
   starts it.

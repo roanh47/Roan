@@ -1,19 +1,19 @@
 # Where everything lives
 
 One page for the question "where does this actually go". Every device has its own
-`~/.roan`, keeps a full copy of the chain, and syncs with the others as a peer.
+`~/.Roan`, keeps a full copy of the chain, and syncs with the others as a peer.
 Nothing here points at a server, because there is no server.
 
 ## The home directory, per platform
 
 | Platform | Path | Who makes it |
 | --- | --- | --- |
-| Linux | `/home/<user>/.roan/` | `ensurePaths()` |
-| macOS | `/Users/<user>/.roan/` | `ensurePaths()` |
-| Windows | `C:\Users\<user>\.roan\` | `ensurePaths()` |
-| Android | `/data/data/dev.roan/files/.roan/` | `RoanNode.ensureStarted()` sets `ROAN_HOME` |
+| Linux | `/home/<user>/.Roan/` | `ensurePaths()` |
+| macOS | `/Users/<user>/.Roan/` | `ensurePaths()` |
+| Windows | `C:\Users\<user>\.Roan\` | `ensurePaths()` |
+| Android | `/data/data/dev.roan/files/.Roan/` | `RoanNode.ensureStarted()` sets `ROAN_HOME` |
 
-On Android that path is **app-private storage**, not `/storage/emulated/0/.roan`.
+On Android that path is **app-private storage**, not `/storage/emulated/0/.Roan`.
 The app runs its own daemon inside its own sandbox, so the home is inside the
 sandbox too. Nothing else can read it without root, and that is why the app serves
 its own log on `127.0.0.1:7413` instead of asking you to fetch a file. `ROAN_HOME`
@@ -23,7 +23,7 @@ machine stay apart.
 ## Inside the home
 
 ```
-~/.roan/
+~/.Roan/
 ├── config.json         baseUrl, model, provider, apiKey      ── travels
 ├── AGENTS.md           how the agent behaves                 ── travels
 ├── SOUL.md             tone and boundaries                   ── travels

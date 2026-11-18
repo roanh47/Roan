@@ -3,7 +3,7 @@ import { EventStore } from "../chain/store.js";
 import type { ChainResponse, DaemonState } from "./control-protocol.js";
 import { decodeJoinCode, encodeJoinCode } from "./control-protocol.js";
 import { createIdentity, loadIdentity, type Identity } from "./identity.js";
-import { ensurePaths, resolvePaths, type RoanPaths } from "./paths.js";
+import { ensurePaths, migrateLegacyHome, resolvePaths, type RoanPaths } from "./paths.js";
 import { loadSettings } from "./settings.js";
 import { startControlServer } from "./control.js";
 import { ChainNodeStore } from "./peer-store.js";
@@ -79,6 +79,11 @@ interface AgentContext {
 
 async function main(): Promise<void> {
   const paths = resolvePaths();
+  // The capital-R move happens before anything opens the database, so an
+  // upgrade from a pre-capital install keeps its chain without noticing.
+  const migration = await migrateLegacyHome(paths);
+  if (migration === "moved") log("home: moved the old ~/.roan to ~/.Roan once");
+  else if (migration === "both") log("home: ~/.Roan exists and an old ~/.roan is still there; leaving it alone");
   await ensurePaths(paths);
   // Reassigned when a snapshot from the chain lands: the key and the model
   // travel in `config.json`, so a device that joins mid-run has to pick them up

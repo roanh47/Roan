@@ -94,7 +94,7 @@ pre-existing env is never offered to the chain, not even as a diff.
 
 ## 4. What the joining device discards, and where it is parked
 
-The env is the part of `~/.roan` that travels in the chain: `AGENTS.md`,
+The env is the part of `~/.Roan` that travels in the chain: `AGENTS.md`,
 `SOUL.md`, `USER.md`, `MEMORY.md`, `config.json`, `memory/`, `skills/`, `mcp/`.
 Nothing outside that list is read, written or moved. `secrets/`, `workspace/`
 and `synced-workspace/` stay on the machine and are never touched by a join, so
@@ -102,7 +102,7 @@ a joined node keeps its own keys and gets a new node id while belonging to the
 inviter's chain.
 
 Parking is a move, never a delete. The target is
-`~/.roan/workspace/parked/<UTC timestamp>/` with `:` and `.` replaced by `-`
+`~/.Roan/workspace/parked/<UTC timestamp>/` with `:` and `.` replaced by `-`
 (`2026-11-08T21-46-12-123Z`); a collision appends `-2`, `-3`, up to 100. A
 `park.json` manifest records `createdAt`, `home`, `reason` and every relative
 path moved. On another mount (`EXDEV`) the path is copied first and the source
@@ -113,7 +113,7 @@ machine writes no manifest.
 
 The join discards the local env as a whole, not per file: after a successful
 apply, any managed path the chain's snapshot does not contain is gone from
-`~/.roan`, parked, not merged. Applying the same snapshot twice is a no-op,
+`~/.Roan`, parked, not merged. Applying the same snapshot twice is a no-op,
 decided by a content hash over the entries, so it does not depend on who packed
 it. None of this runs during a join today: it runs when `applyEnvSnapshot` is
 called, and `onJoin` does not call it.

@@ -14,7 +14,7 @@ actually keeps a key out of the chain today is the first section.
 
 ## 1. What travels, and what stays
 
-The env is the part of `~/.roan` that goes into the chain: five root files
+The env is the part of `~/.Roan` that goes into the chain: five root files
 (`AGENTS.md`, `SOUL.md`, `USER.md`, `MEMORY.md`, `config.json`) plus everything
 under `memory/`, `skills/` and `mcp/`. That list is
 `ENV_ROOT_FILES`/`ENV_ROOT_DIRS` in `src/env/types.ts`, and it is exhaustive: the
@@ -23,7 +23,7 @@ read, written or moved by anything in `src/env/`, and `collectEnvEntries` in
 `src/env/pack.ts` walks only those two lists.
 
 `secrets/` is where the per-machine material lives. `src/daemon/paths.ts` puts
-`identity.json` at `~/.roan/secrets/identity.json`, and `saveIdentity` in
+`identity.json` at `~/.Roan/secrets/identity.json`, and `saveIdentity` in
 `src/daemon/identity.ts` writes it with mode `0600` and chmods it to `0600`
 afterwards, so the chain token is not world-readable.
 
@@ -49,7 +49,7 @@ includes file contents, so `read_file` on a key file puts that key in the chain 
 nothing upstream stopped the read. There is no redaction call on this path.
 
 **Session log.** The session log is the chain: append-only rows in
-`~/.roan/workspace/chain.db` (`src/daemon/paths.ts`), written by
+`~/.Roan/workspace/chain.db` (`src/daemon/paths.ts`), written by
 `src/chain/store.ts`. There is no second text log today: nothing in `src/daemon/`
 writes one, and `.gitignore` ignores `*.log` in case one appears.
 
@@ -106,7 +106,7 @@ and a violation returns `deny` even when the policy says `allow` for that tool.
 - it ends in `.pem`.
 
 Resolution is `realpath`-based for the part of the path that exists
-(`resolvePath` in `src/tools/policy.ts`), so a symlink pointing at `~/.roan/secrets`
+(`resolvePath` in `src/tools/policy.ts`), so a symlink pointing at `~/.Roan/secrets`
 resolves to the protected path and is caught. Missing tail segments stay lexical,
 so a path that does not exist yet is still judged by its spelling.
 
@@ -226,7 +226,7 @@ so the list fails closed.
 **Does not cover:** it reads text, not a shell. Obfuscation that is still valid
 bash — `$(printf ...)`, a variable built from pieces, an alias, a script in the
 repo run by `npm test` — is not modelled. The rules match command *text*, not
-arguments, so `cat secrets/identity.json` and `ls ~/.roan/secrets` are `allow`:
+arguments, so `cat secrets/identity.json` and `ls ~/.Roan/secrets` are `allow`:
 the allowlist is not a path guard, and it does not consult `policy.ts`. Its
 `npm test` / `npm run build` allowances execute whatever the workspace's
 `package.json` defines.

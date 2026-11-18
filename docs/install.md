@@ -46,15 +46,15 @@ An AppImage adds nothing to the application menu. The `.desktop` helper in
 `~/.local/share/applications/` — with the absolute path to wherever the
 AppImage sits — is still manual.
 
-## Where `~/.roan` lives
+## Where `~/.Roan` lives
 
 All state hangs off one directory, the same name on every platform:
 
 ```
-Linux     /home/<user>/.roan/
-macOS     /Users/<user>/.roan/
-Windows   C:\Users\<user>\.roan\
-Android   /storage/emulated/0/.roan/
+Linux     /home/<user>/.Roan/
+macOS     /Users/<user>/.Roan/
+Windows   C:\Users\<user>\.Roan\
+Android   /data/data/dev.roan/files/.Roan/   (app-private)
 ```
 
 It holds `config.json`, `secrets/` (identity, mode 0600), `workspace/`

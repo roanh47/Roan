@@ -28,7 +28,7 @@ Both bind `127.0.0.1:7411` and print one stderr line:
 roan daemon: waiting for a chain (control port 7411)
 ```
 
-That means `~/.roan/secrets/identity.json` does not exist; once a chain exists
+That means `~/.Roan/secrets/identity.json` does not exist; once a chain exists
 the line names the chain and node. It runs in the foreground; Ctrl-C stops it.
 
 No flag creates a chain. The app sends `{ t: "create_chain" }`, or
@@ -36,9 +36,9 @@ No flag creates a chain. The app sends `{ t: "create_chain" }`, or
 `state`, then `chain` with an `invite` code, then `hello` and `state`. The socket
 is local and unauthenticated: any process that can open 7411 can run turns.
 
-## Where ~/.roan lives
+## Where ~/.Roan lives
 
-`~/.roan` is the root; `ROAN_HOME` overrides it (meant for tests, not users).
+`~/.Roan` is the root; `ROAN_HOME` overrides it (meant for tests, not users).
 
 | path | contents |
 | --- | --- |
