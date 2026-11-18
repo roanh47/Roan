@@ -142,6 +142,10 @@ meer, dus ze gaan dicht zodra je zegt dat het mag.
 - **#5** PyPI-naam `roan`: inmiddels gepubliceerd als `Roan47`.
 - **#14** Tien jaar zonder update, alles live: de app haalt providers en modellen al
   live uit models.dev, dus dit is ingelost.
-- **#16** Identiteit en opslag in `~/.Roan` met hoofdletter: de app gebruikt
-  `~/.roan`, kleine letters.
+- **#16** Identiteit en opslag in `~/.Roan` met hoofdletter: **besloten
+  2026-11-18 — hoofdletter wint.** De map heet `~/.Roan` op elk platform
+  (Linux/macOS/Windows: `~/.Roan`; Android: binnen de app-privé map). Eerste
+  start hernoemt een bestaand `~/.roan` één keer naar `~/.Roan`, zodat geen
+  device zijn keten kwijtraakt. Nog niet geïmplementeerd; hoort bij de
+  workspace-ronde.
 
