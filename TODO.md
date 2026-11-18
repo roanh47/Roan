@@ -28,6 +28,27 @@ geschreven.
       eronder, niets verwijderd. Bewezen in `regenerate-branch.png` en
       hard geassert op de host (smoke-round1).
 
+## Ronde 1c — schone webversie, veilige sync (zien op de telefoon-web, 18 nov)
+
+- [ ] **Geen statusbalk-ruimte in de webversie.** De safe-area bovenin de
+      titelbalk hoort alléén bij de Android-app (doorzichtig achter de systeembalk).
+      De webversie in een browser krijgt geen dode strook: het shell zet een
+      klasse (`body.app-shell`) die de app meekrijgt, de web niet. Plek:
+      `web/src/styles.css` + de injectie in `MainActivity`/`main.tsx`.
+- [ ] **Icoontje even groot op elk scherm.** `.titlebar__mark`,
+      `.rail__mark` en `.empty__mark` zijn nu drie maten; één maat (of één
+      bewuste schaal), hetzelfde op chat, drawer en lege staat.
+- [ ] **Sync standaard alléén tailscale.** De peer-link luistent nu op
+      `0.0.0.0` (élk LAN-apparaat kan aan de deur rammelen; de handshake
+      weigert, maar de deur hoeft niet open te staan). Nieuw:
+      `ROAN_PEER_BIND` met als default het tailscale-adres, LAN alleen als
+      iemand het bewust aanzet — en de invite draagt dan alleen routes die
+      bij die keuze horen. Plek: `roan-daemon.service` + `peers.ts` + de
+      `advertiseHosts`-volgorde.
+- [ ] **Invite zonder docker-ruis.** De hosts-lijst bevatte 12 bridge-adressen
+      (172.x.0.1). Filter de bridging-ranges uit de advertise, of beperk de
+      lijst tot tailscale + echte LAN-adressen.
+
 ## Ronde 2 — de agent-home (workspace-verbouwing)
 
 - [ ] **`~/.Roan` met hoofdletter.** Code, migratie en docs zitten erin:
