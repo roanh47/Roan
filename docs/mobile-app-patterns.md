@@ -99,3 +99,11 @@ Ordered by what is missing, not by what is easy.
 - **"More" overflow in the drawer** (https://9to5google.com/2026/10/23/gemini-settings-redesign-android/). Four destinations need no disclosure.
 - **App directories and marketplaces** (https://help.openai.com/en/articles/6825453-chatgpt-release-notes). A store implies review, listing and revocation machinery; the Workspace panel is the honest version.
 - **Memory and RAG over past chats** (https://support.claude.com/en/articles/11817273-use-claude-s-chat-search-and-memory-to-build-on-previous-context). The chain already sends full history, so retrieval adds an index to keep in sync for no context gain.
+
+## Sourced backing
+
+The three reference apps now have full sourced inventories in `docs/research/features/`
+(official help-centre URLs per row): `chatgpt.json` (58 features, 2 unverified),
+`claude.json` (45, 1 unverified), `gemini.json` (51, 3 unverified). This document keeps
+only the patterns Roan copies; the JSON files hold the complete checklists to test
+against once a UI round claims parity.

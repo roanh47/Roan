@@ -1,0 +1,296 @@
+{
+  "agent": "chatgpt",
+  "feature_count": 58,
+  "features": [
+    {
+      "feature": "Chat basics",
+      "description": "AI assistant for everyday tasks - writing, studying, planning, math, coding, and image/file analysis - that remembers context within a chat.",
+      "source": "https://help.openai.com/en/articles/12677804-what-is-chatgpt-faq"
+    },
+    {
+      "feature": "Writing blocks & code blocks",
+      "description": "Editable writing blocks for drafts plus code blocks you can read, edit, copy, preview, or run (including Python) inside responses.",
+      "source": "https://help.openai.com/en/articles/20001246-working-with-writing-blocks-and-code-blocks-in-chatgpt"
+    },
+    {
+      "feature": "Message actions (copy, read aloud, try again)",
+      "description": "Buttons under a response can include Copy, Good/Bad response, Read aloud, Share, and Try again (regenerate).",
+      "source": "https://help.openai.com/en/articles/8142208-chatgpt-ios-and-android-app-faq"
+    },
+    {
+      "feature": "Edit a sent message",
+      "description": "Editing a sent prompt and resending is long-standing ChatGPT behavior but is not documented on current help pages (unverified).",
+      "source": "https://help.openai.com/en/articles/8142208-chatgpt-ios-and-android-app-faq"
+    },
+    {
+      "feature": "Streaming status indicators",
+      "description": "ChatGPT shows live working status while it thinks or runs tools; no help page documents the indicator itself (unverified).",
+      "source": "https://help.openai.com/en/articles/6825453-chatgpt-release-notes"
+    },
+    {
+      "feature": "Intelligent UI",
+      "description": "GPT-6 composes answers combining text, visuals, and interactive elements (buttons, forms, charts) directly in the conversation.",
+      "source": "https://help.openai.com/en/articles/20001598-intelligent-ui-in-chatgpt"
+    },
+    {
+      "feature": "Model picker",
+      "description": "Choose among models such as GPT-6 (Sol on Plus/Pro, Luna on Free/Go) and GPT-5.6 variants, depending on plan.",
+      "source": "https://help.openai.com/en/articles/20001354-gpt-6-and-other-models-in-chatgpt"
+    },
+    {
+      "feature": "Thinking levels",
+      "description": "Choose how much ChatGPT thinks per response; the Pro reasoning option uses GPT-6 Astra.",
+      "source": "https://help.openai.com/en/articles/20001354-gpt-6-and-other-models-in-chatgpt"
+    },
+    {
+      "feature": "ChatGPT Voice",
+      "description": "Speak with ChatGPT and hear spoken responses inside a chat; the Live option (GPT-Live) listens and speaks at once and can use web search and memory.",
+      "source": "https://help.openai.com/en/articles/20001274-chatgpt-voice"
+    },
+    {
+      "feature": "Voice retirement (Dec 2026)",
+      "description": "Advanced and Standard voice retire from ChatGPT Voice on December 11, 2026, leaving GPT-Live as the voice model.",
+      "source": "https://help.openai.com/en/articles/20001638-retiring-advanced-and-standard-voice-in-chatgpt"
+    },
+    {
+      "feature": "Voice dictation",
+      "description": "The microphone icon records audio that ChatGPT turns into editable text.",
+      "source": "https://help.openai.com/en/articles/12168547-voice-dictation-faq"
+    },
+    {
+      "feature": "File & audio uploads",
+      "description": "Upload documents, spreadsheets, presentations, images, and audio to analyze, summarize, or transform.",
+      "source": "https://help.openai.com/en/articles/8555545-uploading-files-and-audio-to-chatgpt"
+    },
+    {
+      "feature": "Library (file manager)",
+      "description": "Saved files in one place, organized into folders, with PIN-locked protected files; ask ChatGPT to work across a folder's files; Space replaces Library on eligible accounts.",
+      "source": "https://help.openai.com/en/articles/20001052-using-library-to-manage-files-in-chatgpt"
+    },
+    {
+      "feature": "Space",
+      "description": "Home for pages, uploaded files, and other work: create and edit pages with ChatGPT, organize in spaces, and share to collaborate (Pro/Business/Enterprise; Slides rolling out).",
+      "source": "https://help.openai.com/en/articles/20001549-getting-started-with-space-in-chatgpt"
+    },
+    {
+      "feature": "Images",
+      "description": "Create, edit, save, and manage images with ChatGPT Images.",
+      "source": "https://help.openai.com/en/articles/11084440-images-in-chatgpt"
+    },
+    {
+      "feature": "Data analysis",
+      "description": "Inspect uploaded data, create tables and charts, and review code-backed results.",
+      "source": "https://help.openai.com/en/articles/8437071-data-analysis-with-chatgpt"
+    },
+    {
+      "feature": "Web search",
+      "description": "ChatGPT searches the web, cites sources, and can use location information.",
+      "source": "https://help.openai.com/en/articles/9237897-searching-the-web-with-chatgpt"
+    },
+    {
+      "feature": "Shopping",
+      "description": "Shop from images, virtually try on clothing and accessories, and save products for later.",
+      "source": "https://help.openai.com/en/articles/11128490-shopping-with-chatgpt-search"
+    },
+    {
+      "feature": "Deep research",
+      "description": "Plan, research, and synthesize complex questions into a documented report.",
+      "source": "https://help.openai.com/en/articles/10500283-deep-research-in-chatgpt"
+    },
+    {
+      "feature": "Agent mode",
+      "description": "ChatGPT agent autonomously completes multi-step, browser-based tasks.",
+      "source": "https://help.openai.com/en/articles/11752874-chatgpt-agent"
+    },
+    {
+      "feature": "Scheduled tasks",
+      "description": "One-time or recurring tasks (daily briefs, package or email monitoring) created, reviewed, and shared under the Scheduled tab.",
+      "source": "https://help.openai.com/en/articles/10291617-scheduled-tasks-in-chatgpt"
+    },
+    {
+      "feature": "Notifications",
+      "description": "Settings > Notifications offers push and email notifications, e.g., for scheduled-task completions.",
+      "source": "https://help.openai.com/en/articles/10291617-scheduled-tasks-in-chatgpt"
+    },
+    {
+      "feature": "Projects",
+      "description": "Keep related chats, files, and instructions together so ChatGPT reuses the context; start on one device and continue on another.",
+      "source": "https://help.openai.com/en/articles/10169521-projects-in-chatgpt"
+    },
+    {
+      "feature": "Memory",
+      "description": "Remembers preferences and details from past chats, saved memories, custom instructions, Library/Space files, and connected apps; manage in Settings > Personalization.",
+      "source": "https://help.openai.com/en/articles/8590148-memory-in-chatgpt"
+    },
+    {
+      "feature": "Custom instructions",
+      "description": "Persistent instructions about you and how ChatGPT should respond, applied to every chat.",
+      "source": "https://help.openai.com/en/articles/8096356-chatgpt-custom-instructions"
+    },
+    {
+      "feature": "Personality & characteristics",
+      "description": "Choose a ChatGPT personality and adjust response warmth, enthusiasm, formatting, and emoji use.",
+      "source": "https://help.openai.com/en/articles/11899719-customizing-your-chatgpt-personality"
+    },
+    {
+      "feature": "GPTs (custom assistants)",
+      "description": "Custom versions of ChatGPT with their own instructions, files, and actions, shared via the GPT Store; being retired with creators migrating to plugins (standard retirement December 11, 2026).",
+      "source": "https://help.openai.com/en/articles/8554407-gpts-in-chatgpt"
+    },
+    {
+      "feature": "Plugins",
+      "description": "Reusable bundles of custom instructions, reference files, and connected apps, usable across Chat, Work, and Codex.",
+      "source": "https://help.openai.com/en/articles/20001256-plugins-in-chatgpt"
+    },
+    {
+      "feature": "Connected apps",
+      "description": "Connect services like Google Drive or Slack so ChatGPT can find files, summarize documents, or act in the connected service.",
+      "source": "https://help.openai.com/en/articles/11487775-connected-apps-in-chatgpt"
+    },
+    {
+      "feature": "Custom MCP servers",
+      "description": "Connect and manage custom MCP servers for additional tools.",
+      "source": "https://help.openai.com/en/articles/12584461-connecting-custom-mcp-servers-in-chatgpt"
+    },
+    {
+      "feature": "Canvas (status)",
+      "description": "No standalone Canvas feature is documented in the current help collection; inline drafting and code editing happen via writing blocks, Space pages, and desktop site tools (unverified whether a canvas view persists).",
+      "source": "https://help.openai.com/en/collections/3742473-chatgpt"
+    },
+    {
+      "feature": "Study mode",
+      "description": "Step-by-step tutoring with hints and practice instead of direct answers.",
+      "source": "https://help.openai.com/en/articles/11780217-using-study-mode-in-chatgpt"
+    },
+    {
+      "feature": "Flashcards",
+      "description": "Create, review, and edit flashcards; revisit saved decks in your library.",
+      "source": "https://help.openai.com/en/articles/20001533-flashcards-in-chatgpt"
+    },
+    {
+      "feature": "ChatGPT Record",
+      "description": "Capture and summarize meetings and voice notes.",
+      "source": "https://help.openai.com/en/articles/11487532-chatgpt-record"
+    },
+    {
+      "feature": "dot (always-on agent)",
+      "description": "An always-on agent with its own computer and connected apps that keeps working between conversations; rolling out to Pro users 18+ (not EEA/UK/Switzerland); pausable.",
+      "source": "https://help.openai.com/en/articles/20001530-getting-started-with-your-dot"
+    },
+    {
+      "feature": "1-800-ChatGPT",
+      "description": "Call or message ChatGPT by phone in the US, including WhatsApp messaging.",
+      "source": "https://help.openai.com/en/articles/10193193-1-800-chatgpt-calling-and-messaging-chatgpt-with-your-phone"
+    },
+    {
+      "feature": "Chat history search",
+      "description": "Sidebar search (Ctrl/Cmd+K) finds chats, projects, images, and files, and can include connected Google Drive content.",
+      "source": "https://help.openai.com/en/articles/10056348-finding-your-chats-projects-and-files-in-chatgpt"
+    },
+    {
+      "feature": "Archive & delete chats",
+      "description": "Delete chats permanently or archive them out of the sidebar; archived chats stay in your account and remain searchable.",
+      "source": "https://help.openai.com/en/articles/8809935-deleting-and-archiving-chats-in-chatgpt"
+    },
+    {
+      "feature": "Temporary chats",
+      "description": "Chats that don't appear in history, aren't used to train models, and don't feed memory.",
+      "source": "https://help.openai.com/en/articles/8914046-temporary-chat-faq"
+    },
+    {
+      "feature": "Shared links",
+      "description": "Create a link to a read-only snapshot of a conversation (or share a scheduled task).",
+      "source": "https://help.openai.com/en/articles/7925741-sharing-conversations-and-scheduled-tasks-in-chatgpt"
+    },
+    {
+      "feature": "Data controls",
+      "description": "Manage model-training participation, chat history, and account data settings.",
+      "source": "https://help.openai.com/en/articles/7730893-data-controls-in-chatgpt"
+    },
+    {
+      "feature": "Export & transfer data",
+      "description": "Request a copy of your ChatGPT data and transfer exported conversations between accounts.",
+      "source": "https://help.openai.com/en/articles/7260999-exporting-your-chatgpt-history-and-data"
+    },
+    {
+      "feature": "Sync across devices",
+      "description": "Chat history syncs across web, iOS, Android, and desktop when signed in to the same account.",
+      "source": "https://help.openai.com/en/articles/8142208-chatgpt-ios-and-android-app-faq"
+    },
+    {
+      "feature": "Desktop app",
+      "description": "New unified ChatGPT desktop app for macOS and Windows combining Chat, Work, and Codex.",
+      "source": "https://help.openai.com/en/articles/20001276-moving-to-the-new-chatgpt-desktop-app"
+    },
+    {
+      "feature": "Built-in browser (desktop)",
+      "description": "Browse, sign in, download files, and review pages without leaving the desktop app.",
+      "source": "https://help.openai.com/en/articles/20001277-using-the-built-in-browser-in-the-chatgpt-desktop-app"
+    },
+    {
+      "feature": "Site tools (desktop)",
+      "description": "Search, edit, and complete tasks on supported websites without leaving the app.",
+      "source": "https://help.openai.com/en/articles/20001423-using-site-tools-in-the-chatgpt-desktop-app"
+    },
+    {
+      "feature": "Screenshot tool (macOS)",
+      "description": "Capture screenshots to discuss with ChatGPT on Mac.",
+      "source": "https://help.openai.com/en/articles/9295245-chatgpt-macos-app-screenshot-tool"
+    },
+    {
+      "feature": "CarPlay",
+      "description": "Start or resume voice conversations with ChatGPT from Apple CarPlay.",
+      "source": "https://help.openai.com/en/articles/20001153-using-chatgpt-in-carplay"
+    },
+    {
+      "feature": "Sign in with ChatGPT",
+      "description": "Use your ChatGPT plan in participating third-party apps and sites.",
+      "source": "https://help.openai.com/en/articles/20001542-using-your-chatgpt-plan-in-other-apps-and-sites"
+    },
+    {
+      "feature": "Finances",
+      "description": "Connect financial accounts (US) to review spending, balances, and subscriptions.",
+      "source": "https://help.openai.com/en/articles/20001222-finances-in-chatgpt"
+    },
+    {
+      "feature": "Health",
+      "description": "Health-focused help with dedicated privacy and data controls.",
+      "source": "https://help.openai.com/en/articles/20001036-health-in-chatgpt"
+    },
+    {
+      "feature": "Astra for Law",
+      "description": "Legal research capabilities and legal plugins.",
+      "source": "https://help.openai.com/en/articles/20001528-astra-for-law"
+    },
+    {
+      "feature": "ChatGPT Wallet",
+      "description": "Add a card and review and approve purchases ChatGPT makes for you.",
+      "source": "https://help.openai.com/en/articles/20001654-making-purchases-with-chatgpt-wallet"
+    },
+    {
+      "feature": "Trusted contacts",
+      "description": "Designate a trusted contact who can be alerted and help with account safety.",
+      "source": "https://help.openai.com/en/articles/20001105-trusted-contacts-in-chatgpt"
+    },
+    {
+      "feature": "Parental controls / ChatGPT for Teens",
+      "description": "Link a teen account and manage parental controls in a teen-safe experience.",
+      "source": "https://help.openai.com/en/articles/12315553-managing-parental-controls-in-chatgpt"
+    },
+    {
+      "feature": "Crisis helpline support",
+      "description": "Surfaces crisis-support resources when a conversation suggests someone may be in danger.",
+      "source": "https://help.openai.com/en/articles/12677603-crisis-helpline-support-in-chatgpt"
+    },
+    {
+      "feature": "ChatGPT Sites",
+      "description": "Create, publish, and manage websites and apps with ChatGPT Sites.",
+      "source": "https://help.openai.com/en/collections/20001370-chatgpt-sites"
+    },
+    {
+      "feature": "Office integrations",
+      "description": "ChatGPT for Excel, Google Sheets, Word, and PowerPoint to build, edit, and polish documents and spreadsheets.",
+      "source": "https://help.openai.com/en/articles/20001063-chatgpt-for-excel-and-google-sheets"
+    }
+  ]
+}

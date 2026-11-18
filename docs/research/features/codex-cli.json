@@ -1,0 +1,356 @@
+{
+  "agent": "Codex CLI",
+  "feature_count": 70,
+  "features": [
+    {
+      "feature": "Installation & update",
+      "description": "Standalone curl installer for macOS/Linux and Windows, plus npm and Homebrew; `codex update` applies CLI self-updates when the installed release supports them.",
+      "source": "https://learn.chatgpt.com/docs/codex/cli"
+    },
+    {
+      "feature": "Sign-in methods",
+      "description": "Sign in with ChatGPT (subscription access) or an OpenAI API key (usage-based), or access tokens; `codex login` browser OAuth, `codex logout`, `codex login status`; login on headless devices supported.",
+      "source": "https://learn.chatgpt.com/docs/auth"
+    },
+    {
+      "feature": "Interactive TUI",
+      "description": "Terminal UI with model/directory banner, syntax-highlighted code and diffs, a prompt composer with draft history, and image paste.",
+      "source": "https://learn.chatgpt.com/docs/codex/cli"
+    },
+    {
+      "feature": "Slash commands",
+      "description": "60+ built-in slash commands (/init, /status, /permissions, /model, /review, /compact, /plan, /goal, /fork, /resume …) with fuzzy filtering and Tab-queueing while a chat runs.",
+      "source": "https://learn.chatgpt.com/docs/developer-commands?surface=cli"
+    },
+    {
+      "feature": "Session resume",
+      "description": "`codex resume` reopens the most recent chat (`--last`, `--all`) or the picker; `/resume` in-session; saved-directory prompts controlled by tui.resume_cwd.",
+      "source": "https://learn.chatgpt.com/docs/developer-commands?surface=cli"
+    },
+    {
+      "feature": "Session forking",
+      "description": "`codex fork` / `/fork` copies a saved chat into a new one; Esc+Esc on an empty composer edits a previous user message and forks from that point; `codex exec fork <SESSION_ID>` forks non-interactively, including into a worktree.",
+      "source": "https://learn.chatgpt.com/docs/developer-commands?surface=cli"
+    },
+    {
+      "feature": "Session management",
+      "description": "`/rename` names the chat; `codex archive|unarchive` hides sessions without deleting transcripts (cascades to subagent sessions); `codex delete` removes them permanently.",
+      "source": "https://learn.chatgpt.com/docs/developer-commands?surface=cli"
+    },
+    {
+      "feature": "Queue messages",
+      "description": "`codex queue --thread <SESSION_ID> --message …` queues a text message into an existing session, optionally resuming it first.",
+      "source": "https://learn.chatgpt.com/docs/developer-commands?surface=cli"
+    },
+    {
+      "feature": "Compaction & recap",
+      "description": "`/compact` summarizes the chat to free tokens, `/recap` summarizes without compacting, and `/status` shows model, approval policy, writable roots, and remaining context.",
+      "source": "https://learn.chatgpt.com/docs/developer-commands?surface=cli"
+    },
+    {
+      "feature": "Interactive steering",
+      "description": "Tab queues a follow-up for the next turn, Enter injects instructions into the current turn, `!` runs a local shell command under current approvals, `@` searches workspace files, Ctrl+O copies the last response.",
+      "source": "https://learn.chatgpt.com/docs/developer-commands?surface=cli"
+    },
+    {
+      "feature": "Background terminals",
+      "description": "`/ps` lists background terminals with recent output; `/stop` stops them all.",
+      "source": "https://learn.chatgpt.com/docs/developer-commands?surface=cli"
+    },
+    {
+      "feature": "Side chats",
+      "description": "`/side` (alias `/btw`) opens a side chat for focused follow-ups outside the main transcript.",
+      "source": "https://learn.chatgpt.com/docs/developer-commands?surface=cli"
+    },
+    {
+      "feature": "Permission modes",
+      "description": "`/permissions` selects Read Only, Auto (workspace-write with on-request approvals), or Full Access; the desktop/IDE composer also offers Ask for approval vs Approve for me.",
+      "source": "https://learn.chatgpt.com/docs/permission-modes"
+    },
+    {
+      "feature": "Approval policy",
+      "description": "`--ask-for-approval` decides when Codex pauses before crossing the sandbox (on-request in the Auto preset); the retired `untrusted` policy has a documented migration path.",
+      "source": "https://learn.chatgpt.com/docs/agent-approvals-security"
+    },
+    {
+      "feature": "Auto-review",
+      "description": "With approvals_reviewer = auto_review, approval requests route to a reviewer agent that approves or denies with a rationale; `/approve` retries one denial; policy configurable, incl. authorized cyber engagements.",
+      "source": "https://learn.chatgpt.com/docs/sandboxing/auto-review"
+    },
+    {
+      "feature": "Safety monitoring",
+      "description": "Asynchronous monitoring can pause a task on potentially unsafe model behavior; you review findings before resuming.",
+      "source": "https://learn.chatgpt.com/docs/agent-approvals-security"
+    },
+    {
+      "feature": "OS sandbox",
+      "description": "Platform-native sandboxing (macOS Seatbelt, Linux sandboxing, native Windows) limits spawned commands to workspace writes and blocks network by default; `codex sandbox` runs a command under the same policy.",
+      "source": "https://learn.chatgpt.com/docs/sandboxing"
+    },
+    {
+      "feature": "Windows sandbox & WSL",
+      "description": "Elevated native Windows agent sandbox via `/setup-default-sandbox`; legacy sandbox removable with `codex sandbox uninstall`; WSL supported and documented.",
+      "source": "https://learn.chatgpt.com/docs/windows/windows-sandbox"
+    },
+    {
+      "feature": "Permission profiles",
+      "description": "Beta filesystem/network profiles in config define writable roots, network access, and sandbox settings; `--add-dir` extends writable roots without full access.",
+      "source": "https://learn.chatgpt.com/docs/permissions"
+    },
+    {
+      "feature": "Command rules",
+      "description": "Starlark `.rules` files (e.g. ~/.codex/rules/default.rules) control which commands may run outside the sandbox, with prompt/deny decisions; `codex execpolicy check` validates rule files.",
+      "source": "https://learn.chatgpt.com/docs/agent-configuration/rules"
+    },
+    {
+      "feature": "Plan mode",
+      "description": "`/plan` switches to plan mode, optionally with a prompt, so Codex proposes an execution plan before implementation starts.",
+      "source": "https://learn.chatgpt.com/docs/developer-commands?surface=cli"
+    },
+    {
+      "feature": "Goals",
+      "description": "`/goal` sets, edits, pauses, resumes, views, or clears a persistent target Codex keeps working toward across a larger task.",
+      "source": "https://learn.chatgpt.com/docs/developer-commands?surface=cli"
+    },
+    {
+      "feature": "AGENTS.md guidance",
+      "description": "Codex layers global (~/.codex/AGENTS.md or AGENTS.override.md) and project AGENTS.md files root-down at startup, with configurable fallback filenames, a 32KiB default cap, `/init` scaffolding, and Code Review rules sections.",
+      "source": "https://learn.chatgpt.com/docs/agent-configuration/agents-md"
+    },
+    {
+      "feature": "Memories",
+      "description": "Local memory files distilled from eligible prior chats, generated in the background with secret redaction; enable and configure with `/memories`; stored under $CODEX_HOME (v1/v2 stores).",
+      "source": "https://learn.chatgpt.com/docs/customization/memories"
+    },
+    {
+      "feature": "Hooks",
+      "description": "hooks.json or config.toml run scripts or MCP tools on lifecycle events (PreToolUse, PostToolUse, PreCompact, SubagentStart, Stop, session start) from system, user, and trusted-project scopes, with trust gating and managed requirements.toml hooks.",
+      "source": "https://learn.chatgpt.com/docs/hooks"
+    },
+    {
+      "feature": "MCP support",
+      "description": "`codex mcp add` registers stdio or streamable-HTTP MCP servers (OAuth incl. CIMD/DCR, ChatGPT session auth); `/mcp` lists configured tools; server `instructions` become guidance; config shared across CLI, IDE, and desktop.",
+      "source": "https://learn.chatgpt.com/docs/extend/mcp"
+    },
+    {
+      "feature": "Skills",
+      "description": "`/skills` browses and applies local skills; `$` mentions invoke them explicitly or they match by description; skills load from local directories, plugins, and curated sets, and can be disabled.",
+      "source": "https://learn.chatgpt.com/docs/build-skills"
+    },
+    {
+      "feature": "Plugins & marketplaces",
+      "description": "`codex plugin add|list|remove` installs plugins (skills, hooks, MCP servers, apps) from marketplaces including GitHub repos; `/plugins` browses in-session; JSON output for automation.",
+      "source": "https://learn.chatgpt.com/docs/plugins"
+    },
+    {
+      "feature": "Apps (connectors)",
+      "description": "`/apps` browses connector apps (Gmail, Google Calendar, GitHub, Drive…) and inserts one into the prompt as $app-slug; destructive connector calls still require approval.",
+      "source": "https://learn.chatgpt.com/docs/developer-commands?surface=cli"
+    },
+    {
+      "feature": "Subagents",
+      "description": "Ask Codex to spawn parallel subagent threads for divided work; `/subagents` inspects or switches the active subagent thread; custom agents configurable.",
+      "source": "https://learn.chatgpt.com/docs/agent-configuration/subagents"
+    },
+    {
+      "feature": "Model switching & reasoning effort",
+      "description": "`/model` (or `--model`) chooses the active model and reasoning effort; recommended: GPT-6.2 Sol for everyday coding, GPT-6.2 Astra for complex projects, Luna for small automations, Terra for visual reasoning.",
+      "source": "https://learn.chatgpt.com/docs/developer-commands?surface=cli"
+    },
+    {
+      "feature": "Fast & Ultrafast modes",
+      "description": "`/fast` toggles a faster token-generation tier (≈1.5x on supported models) for ChatGPT-signed-in CLI/IDE users; Ultrafast is faster still at higher allowance use.",
+      "source": "https://learn.chatgpt.com/docs/agent-configuration/speed"
+    },
+    {
+      "feature": "Daybreak (cyber access)",
+      "description": "`/daybreak` toggles an approved cybersecurity access program for eligible accounts and models.",
+      "source": "https://learn.chatgpt.com/docs/developer-commands?surface=cli"
+    },
+    {
+      "feature": "Web search",
+      "description": "Built-in web search runs cached (OpenAI-maintained index) by default; `--search` or web_search = \"live\" switches to live browsing; domain filters via config.",
+      "source": "https://learn.chatgpt.com/docs/web-search"
+    },
+    {
+      "feature": "Image inputs",
+      "description": "`--image` attaches screenshots or diagrams to a task; paste images into the interactive composer.",
+      "source": "https://learn.chatgpt.com/docs/image-inputs"
+    },
+    {
+      "feature": "Git worktrees",
+      "description": "`/worktree` starts or continues a chat in a managed Git worktree; `codex fork --worktree` and `codex exec --worktree` fork into one; Handoff moves a chat between Local and Worktree; scheduled tasks run on dedicated worktrees.",
+      "source": "https://learn.chatgpt.com/docs/environments/git-worktrees"
+    },
+    {
+      "feature": "Local environments",
+      "description": "Setup scripts and reusable actions configure a local project for Codex, plus built-in Git tools.",
+      "source": "https://learn.chatgpt.com/docs/environments/local-environment"
+    },
+    {
+      "feature": "Code review (local)",
+      "description": "`/review` or non-interactive `codex review --uncommitted|--base|--commit|PROMPT` reviews changes with presets (PR-style against a base branch) without modifying the working tree; findings support inline comments, staging, and reverting.",
+      "source": "https://learn.chatgpt.com/docs/code-review"
+    },
+    {
+      "feature": "GitHub PR reviews",
+      "description": "Install the Codex GitHub integration, request reviews with `@codex review`, enable automatic PR reviews, and customize findings with Code Review Rules in AGENTS.md; `@codex security review` runs Security Review.",
+      "source": "https://learn.chatgpt.com/docs/third-party/github"
+    },
+    {
+      "feature": "GitLab MR reviews",
+      "description": "Code Review for GitLab merge requests via `@codex review`, with automatic reviews and AGENTS.md review rules (preview).",
+      "source": "https://learn.chatgpt.com/docs/third-party/gitlab"
+    },
+    {
+      "feature": "Linear integration",
+      "description": "Run Codex chats from Linear issues, auto-assign issues to Codex, or connect Linear locally through MCP.",
+      "source": "https://learn.chatgpt.com/docs/third-party/linear"
+    },
+    {
+      "feature": "Slack integration",
+      "description": "Start requests in Slack and delegate repository work to Codex Cloud.",
+      "source": "https://learn.chatgpt.com/docs/third-party/slack"
+    },
+    {
+      "feature": "GitHub Action",
+      "description": "`openai/codex-action@v1` runs codex exec in GitHub Actions workflows, applies patches, and posts reviews from CI.",
+      "source": "https://learn.chatgpt.com/docs/github-action"
+    },
+    {
+      "feature": "Codex Cloud from the CLI",
+      "description": "`codex cloud` browses cloud chats, `codex cloud exec` submits a task directly, `codex cloud list` returns recent chats as text or JSON, and `codex apply` applies a cloud chat's diff to your local repo.",
+      "source": "https://learn.chatgpt.com/docs/cloud"
+    },
+    {
+      "feature": "Cloud environments",
+      "description": "Reusable, publishable cloud environments with setup scripts, cached state, environment variables and network secrets, VPN/private networking, and OIDC access to cloud resources.",
+      "source": "https://learn.chatgpt.com/docs/environments/cloud-environments"
+    },
+    {
+      "feature": "Mobile companion",
+      "description": "Start, guide, approve, and review Codex tasks from the ChatGPT mobile app — in the cloud or on a connected computer.",
+      "source": "https://learn.chatgpt.com/docs/mobile"
+    },
+    {
+      "feature": "Remote connections",
+      "description": "Use Codex on mobile against a connected Mac/Windows PC, connect the desktop app to projects over SSH, and hand off a chat between hosts.",
+      "source": "https://learn.chatgpt.com/docs/remote-connections"
+    },
+    {
+      "feature": "IDE extension",
+      "description": "The Codex VS Code extension works beside your code: open files and selections enter the prompt via `/ide`, edits review in place, and slash commands match the CLI.",
+      "source": "https://learn.chatgpt.com/docs/codex/ide"
+    },
+    {
+      "feature": "Desktop app handoff",
+      "description": "`/app` or `codex app` continues the current session in the ChatGPT desktop app on macOS/Windows, which adds an integrated terminal, computer use, voice, and Codex Micro support.",
+      "source": "https://learn.chatgpt.com/docs/developer-commands?surface=cli"
+    },
+    {
+      "feature": "Integrated terminal (desktop)",
+      "description": "Run commands and inspect output without leaving the chat; turn repeated commands into reusable actions.",
+      "source": "https://learn.chatgpt.com/docs/integrated-terminal"
+    },
+    {
+      "feature": "Computer use (desktop)",
+      "description": "Let ChatGPT/Codex use desktop apps while it works.",
+      "source": "https://learn.chatgpt.com/docs/computer-use"
+    },
+    {
+      "feature": "Codex Micro hardware",
+      "description": "Limited-run Work Louder keyboard for the ChatGPT desktop app: Agent Keys switch chats, customizable Command Keys, dial and analog stick, voice input, and lighting.",
+      "source": "https://learn.chatgpt.com/docs/features/codex-micro"
+    },
+    {
+      "feature": "Agent command center",
+      "description": "`codex agents` (or `/agents`) browses chats and switches between agents on a shared server; `--remote` targets another machine's app-server.",
+      "source": "https://learn.chatgpt.com/docs/developer-commands?surface=cli"
+    },
+    {
+      "feature": "Remote TUI",
+      "description": "`codex --remote ws://host:port` (or unix:// socket) runs the terminal UI against an app-server started elsewhere, with bearer-token auth.",
+      "source": "https://learn.chatgpt.com/docs/developer-commands?surface=cli"
+    },
+    {
+      "feature": "Non-interactive mode",
+      "description": "`codex exec` runs scripted/CI tasks with pre-set sandbox and approvals; `--json` NDJSON events, `--output-schema` JSON-schema results, `--output-last-message`, stdin piping, `exec resume --last|--all`, `--ephemeral` and `--worktree` runs.",
+      "source": "https://learn.chatgpt.com/docs/non-interactive-mode"
+    },
+    {
+      "feature": "Codex SDK",
+      "description": "TypeScript and Python libraries start, continue, and resume local Codex threads for CI pipelines or embedding Codex in your own tools.",
+      "source": "https://learn.chatgpt.com/docs/codex-sdk"
+    },
+    {
+      "feature": "App server protocol",
+      "description": "`codex app-server` exposes the protocol that powers the VS Code extension — threads, turns, approvals, skills, streamed events — for building custom clients; open source in openai/codex.",
+      "source": "https://learn.chatgpt.com/docs/app-server"
+    },
+    {
+      "feature": "Scheduled tasks",
+      "description": "Automations run Codex tasks on schedules or from supported app events, with background-worktree isolation and cleanup; create from the web or by asking in a chat.",
+      "source": "https://learn.chatgpt.com/docs/automations"
+    },
+    {
+      "feature": "Notifications",
+      "description": "TUI notifications when a turn completes, plus an external `notify` program configured via config.toml.",
+      "source": "https://learn.chatgpt.com/docs/notifications"
+    },
+    {
+      "feature": "CLI customization",
+      "description": "`/theme` syntax-highlighting themes (custom .tmTheme), `codex completion` shell completions, Ctrl+G external editor, `/keymap` shortcut remapping, `/vim`, `/statusline` and `/title` footer fields, `/tui` scrollback vs fullscreen, `/raw` raw scrollback.",
+      "source": "https://learn.chatgpt.com/docs/cli-customization"
+    },
+    {
+      "feature": "Presets",
+      "description": "`/presets` saves and recalls frequently used prompts or slash commands.",
+      "source": "https://learn.chatgpt.com/docs/developer-commands?surface=cli"
+    },
+    {
+      "feature": "Import from other agents",
+      "description": "The CLI import flow brings supported setup, projects, and recent work from Claude Code or Cursor into Codex.",
+      "source": "https://learn.chatgpt.com/docs/import"
+    },
+    {
+      "feature": "Record & Replay",
+      "description": "On macOS, demonstrate a workflow once and Codex turns the recording into a reusable skill.",
+      "source": "https://learn.chatgpt.com/docs/extend/record-and-replay"
+    },
+    {
+      "feature": "Project trust",
+      "description": "Project-scoped .codex/ config, hooks, and rules load only from trusted projects; user and system layers always load.",
+      "source": "https://learn.chatgpt.com/docs/config-file/config-advanced"
+    },
+    {
+      "feature": "Config & profiles",
+      "description": "config.toml at system/user/project scopes sets model, sandbox, approvals, and web search; named profiles via `--profile`; feature flags managed with `codex features enable|disable` and `/experimental` (network proxy, prevent sleep).",
+      "source": "https://learn.chatgpt.com/docs/config-file/config-basic"
+    },
+    {
+      "feature": "Alternative model providers",
+      "description": "Route local Codex surfaces to OpenAI models through Amazon Bedrock or Google Cloud Vertex AI, or custom providers via configuration.",
+      "source": "https://learn.chatgpt.com/docs/auth"
+    },
+    {
+      "feature": "Diagnostics",
+      "description": "`codex doctor` generates a local diagnostic report; `codex debug models|prompt-input` inspect the model catalog and prompt input; `/debug-config`, `/warnings`, `/export`, `/diff`, and `/feedback` (with diagnostic ZIP) round out debugging.",
+      "source": "https://learn.chatgpt.com/docs/developer-commands?surface=cli"
+    },
+    {
+      "feature": "Usage tracking",
+      "description": "`/usage` shows daily, weekly, and cumulative ChatGPT token activity and rate-limit resets from inside the TUI.",
+      "source": "https://learn.chatgpt.com/docs/developer-commands?surface=cli"
+    },
+    {
+      "feature": "Codex Security",
+      "description": "Security scans of repositories and pull requests: in-session plugin scans, the Codex Security CLI with GitHub Actions/GitLab CI, findings triage, and verified patches.",
+      "source": "https://learn.chatgpt.com/docs/security"
+    },
+    {
+      "feature": "Open source",
+      "description": "The Codex CLI and app-server are open source in the openai/codex GitHub repository, with community resources documented.",
+      "source": "https://learn.chatgpt.com/docs/open-source"
+    }
+  ]
+}

@@ -1,0 +1,351 @@
+{
+  "agent": "opencode",
+  "feature_count": 69,
+  "features": [
+    {
+      "feature": "Multi-surface product (CLI, Desktop, Web, Mobile)",
+      "description": "OpenCode is one open-source agent available as a terminal TUI, a desktop app, a web client, and a mobile app, all talking to a shared server.",
+      "source": "https://opencode.ai/docs/"
+    },
+    {
+      "feature": "Provider & model catalog (models.dev)",
+      "description": "Ships a provider and model catalog sourced from models.dev so most providers work after just connecting credentials.",
+      "source": "https://opencode.ai/docs/providers/"
+    },
+    {
+      "feature": "Provider sign-in (/connect, opencode auth login)",
+      "description": "Connect providers in the TUI or CLI via API key, OAuth, or command-based auth; each login becomes a saved, switchable account.",
+      "source": "https://opencode.ai/docs/cli/providers/"
+    },
+    {
+      "feature": "Custom providers / BYOK",
+      "description": "Add any OpenAI-compatible provider in opencode.json(c) with credential, runtime package, baseURL endpoint, headers, and merged request-body settings.",
+      "source": "https://opencode.ai/docs/providers/"
+    },
+    {
+      "feature": "ChatGPT Plus/Pro sign-in",
+      "description": "Use a ChatGPT Plus or Pro subscription instead of an OpenAI API key; usage counts against the plan and shows no cost.",
+      "source": "https://opencode.ai/docs/providers/"
+    },
+    {
+      "feature": "GitHub Copilot sign-in",
+      "description": "Connect GitHub Copilot through its device OAuth flow instead of an API key.",
+      "source": "https://opencode.ai/docs/providers/"
+    },
+    {
+      "feature": "Enterprise cloud providers (Azure OpenAI, Bedrock, Vertex)",
+      "description": "First-class auth for Azure (Entra ID + deployment listings), Amazon Bedrock (AWS credential chain incl. SSO), and Google Vertex (Application Default Credentials).",
+      "source": "https://opencode.ai/docs/providers/"
+    },
+    {
+      "feature": "Local models (Ollama, LM Studio, vLLM)",
+      "description": "Auto-discovers models from Ollama, LM Studio, and vLLM at their default local addresses; any OpenAI-compatible server can be configured manually.",
+      "source": "https://opencode.ai/docs/models/"
+    },
+    {
+      "feature": "Model selection & variants",
+      "description": "Pick models per session via /models, per run via --model, or as a config default; variants like #high map to reasoning effort or token budgets.",
+      "source": "https://opencode.ai/docs/models/"
+    },
+    {
+      "feature": "Free models without an account",
+      "description": "OpenCode ships a set of free models usable without creating any account (hideable via OPENCODE_DISABLE_FREE_MODELS).",
+      "source": "https://opencode.ai/docs/models/"
+    },
+    {
+      "feature": "OpenCode Console (team workspace)",
+      "description": "Cloud console with personal/team workspaces that centrally deliver models, policies, shared instructions and skills, members, SSO, SCIM, budgets, and billing to connected clients.",
+      "source": "https://opencode.ai/docs/console/"
+    },
+    {
+      "feature": "OpenCode Go subscription",
+      "description": "Flat subscription (Go/Go Plus/Go Teams) granting access to tested coding models with 5-hour/weekly/monthly usage limits, Extra Usage fallback, and an inference API endpoint.",
+      "source": "https://opencode.ai/docs/console/go/"
+    },
+    {
+      "feature": "Permissions (allow/deny/ask)",
+      "description": "Ordered wildcard rules per tool action and resource resolve to allow, deny, or ask; defaults block sensitive .env reads and let each agent layer narrower rules.",
+      "source": "https://opencode.ai/docs/permissions/"
+    },
+    {
+      "feature": "Approval prompts (once/always)",
+      "description": "Ask-resolution dialogs offer 'Allow once' and 'Allow always', the latter saving the tool's proposed rule for future matching.",
+      "source": "https://opencode.ai/docs/permissions/"
+    },
+    {
+      "feature": "Shell command scanner",
+      "description": "Permission checks for shell commands are decided by a built-in scanner that parses Bash, Zsh, POSIX sh, and PowerShell; unanalyzable commands fail closed.",
+      "source": "https://opencode.ai/docs/permissions/"
+    },
+    {
+      "feature": "Policies (org-level hard deny)",
+      "description": "Ordered policy statements can hard-deny providers, tools, MCP servers, skills, plugins, integrations, and web-search providers, with broader config overriding narrower.",
+      "source": "https://opencode.ai/docs/policies/"
+    },
+    {
+      "feature": "MCP servers (local + remote)",
+      "description": "Add stdio local servers and Streamable HTTP remote servers via `opencode mcp add` or mcp.servers config, with per-server timeouts and headers.",
+      "source": "https://opencode.ai/docs/mcp-servers/"
+    },
+    {
+      "feature": "MCP OAuth",
+      "description": "Remote servers sign in via OAuth with PKCE, discover the authorization server, refresh tokens, support pre-registered clients, and are managed with `opencode mcp auth`.",
+      "source": "https://opencode.ai/docs/mcp-servers/"
+    },
+    {
+      "feature": "MCP shared connections & resources",
+      "description": "Pool one connection and tool list across projects with identical server settings; MCP resources are readable through built-in list/read tools under permission control.",
+      "source": "https://opencode.ai/docs/mcp-servers/"
+    },
+    {
+      "feature": "Agents (custom primary/subagent modes)",
+      "description": "Define agents in Markdown (frontmatter + body prompt) or JSONC with model, permissions, steps, hidden, and color; mode is primary, subagent, or all.",
+      "source": "https://opencode.ai/docs/agents/"
+    },
+    {
+      "feature": "Built-in agents (build, plan, general, explore)",
+      "description": "Ships a default Build primary agent, a read-mostly Plan primary, and General/Explore subagents; built-ins can be overridden or disabled by ID.",
+      "source": "https://opencode.ai/docs/agents/"
+    },
+    {
+      "feature": "Plan mode",
+      "description": "The built-in `plan` agent explores and plans without editing normal project files (writes only OpenCode plan files, shell still permission-gated).",
+      "source": "https://opencode.ai/docs/agents/"
+    },
+    {
+      "feature": "Subagents",
+      "description": "A `subagent` tool starts child sessions with a configured subagent, its own model and permissions; subagent runs appear in the composer and are steerable.",
+      "source": "https://opencode.ai/docs/tools/"
+    },
+    {
+      "feature": "Skills",
+      "description": "Agent Skills (SKILL.md + bundled scripts/references) load from global, project, ~/.claude/skills compat, and HTTP catalog sources; model-triggered with permission rules.",
+      "source": "https://opencode.ai/docs/skills/"
+    },
+    {
+      "feature": "Instructions / memory (AGENTS.md)",
+      "description": "Hierarchical AGENTS.md loading from workspace toward home plus a global file, with CLAUDE.md fallback in directories lacking AGENTS.md and live updates during a session.",
+      "source": "https://opencode.ai/docs/instructions/"
+    },
+    {
+      "feature": "Extra instruction sources",
+      "description": "The `instructions` config array adds extra files, glob patterns, or HTTP(S) URL guidance alongside discovered AGENTS.md files.",
+      "source": "https://opencode.ai/docs/instructions/"
+    },
+    {
+      "feature": "Custom commands (Markdown + JSON)",
+      "description": "Slash commands from ~/.config/opencode/commands or .opencode/commands with $ARGUMENTS/$1..$n placeholders, !`shell` output blocks, and agent/model frontmatter.",
+      "source": "https://opencode.ai/docs/commands/"
+    },
+    {
+      "feature": "Background commands",
+      "description": "A command with `subagent: true` runs in a background child session instead of the current conversation.",
+      "source": "https://opencode.ai/docs/commands/"
+    },
+    {
+      "feature": "Plugins",
+      "description": "Load npm, Git, or local plugins that add tools, hooks, integrations, commands, and agents; managed via `opencode plugin add/list/check/update/remove`.",
+      "source": "https://opencode.ai/docs/plugins/"
+    },
+    {
+      "feature": "Desktop GUI plugins",
+      "description": "Plugins exporting ./gui-experimental add panels, commands, or settings to OpenCode Desktop; desktop plugins can be created, installed, and shared.",
+      "source": "https://opencode.ai/docs/plugins/"
+    },
+    {
+      "feature": "TUI-only plugins",
+      "description": "Terminal plugins are configured separately in cli.json and keep working when the CLI connects to a remote server.",
+      "source": "https://opencode.ai/docs/cli/plugins/"
+    },
+    {
+      "feature": "Snapshots / undo / redo",
+      "description": "Per-step filesystem snapshots stored in an internal Git database power /undo (revert conversation + file changes, prompt returns to composer) and /redo.",
+      "source": "https://opencode.ai/docs/snapshots/"
+    },
+    {
+      "feature": "Session resume",
+      "description": "Continue the last session with -c/--continue (TUI, mini, or run) or pick any session via /sessions, Ctrl+O, or `opencode session list`.",
+      "source": "https://opencode.ai/docs/cli/commands/"
+    },
+    {
+      "feature": "Session fork",
+      "description": "Sessions can be forked from a message (session.fork keybind) and via session/fork over ACP, with a fork-notice plugin on new forks.",
+      "source": "https://opencode.ai/docs/cli/keybinds/"
+    },
+    {
+      "feature": "Session export/import",
+      "description": "`opencode session export` (optionally --sanitize) and `opencode session import` move session data as JSON between machines.",
+      "source": "https://opencode.ai/docs/cli/commands/"
+    },
+    {
+      "feature": "TUI command palette",
+      "description": "Ctrl+P opens a command palette exposing every action; slash commands (/new, /sessions, /models, /agents, /undo, /redo, /edit) are typed with / filtering.",
+      "source": "https://opencode.ai/docs/cli/tui/"
+    },
+    {
+      "feature": "TUI editor features (@context, ! shell, /btw)",
+      "description": "@-search attaches files with line ranges, ! enters shell mode, /btw asks side questions that don't enter the conversation, and prompts can queue while the agent works.",
+      "source": "https://opencode.ai/docs/cli/tui/"
+    },
+    {
+      "feature": "Theming",
+      "description": "30+ built-in themes (opencode, catppuccin, tokyonight, dracula, ...), a system theme derived from the terminal palette, light/dark/system modes, and custom JSON themes.",
+      "source": "https://opencode.ai/docs/themes/"
+    },
+    {
+      "feature": "Remappable keybinds + which-key",
+      "description": "Every keybind is configurable in cli.json with a leader key (default Ctrl+X), a diff viewer (d switches source), stash, tabs, and a which-key hint panel.",
+      "source": "https://opencode.ai/docs/cli/keybinds/"
+    },
+    {
+      "feature": "Session tabs",
+      "description": "Persistent tab strip (Ctrl+Tab/Ctrl+Shift+T) with per-cwd or global scope, shared across clients connected to the same server.",
+      "source": "https://opencode.ai/docs/cli/config/"
+    },
+    {
+      "feature": "Mini interface",
+      "description": "`opencode mini` is a minimal inline interface that prints replies into normal scrollback with its own config group.",
+      "source": "https://opencode.ai/docs/cli/"
+    },
+    {
+      "feature": "One-off runs & scripting",
+      "description": "`opencode run` submits a prompt non-interactively with --model, --continue, --format json (newline-delimited) and --file attachments; documented pattern for CI with API-key secrets.",
+      "source": "https://opencode.ai/docs/cli/commands/"
+    },
+    {
+      "feature": "Auto-approve flag",
+      "description": "Run the CLI with --auto to allow every action you haven't explicitly denied.",
+      "source": "https://opencode.ai/terminal.md"
+    },
+    {
+      "feature": "Background service",
+      "description": "A shared per-user background server owns sessions, config, integrations, permissions, and tool execution; every local client connects to it and it's managed via `opencode service`.",
+      "source": "https://opencode.ai/docs/cli/"
+    },
+    {
+      "feature": "Server mode (opencode serve)",
+      "description": "Runs the API and web server in the foreground with --hostname/--port/CORS control, OPENCODE_PASSWORD basic-auth, and Docker/systemd-friendly standalone deployment.",
+      "source": "https://opencode.ai/docs/cli/web/"
+    },
+    {
+      "feature": "REST API access",
+      "description": "`opencode api` calls server endpoints or operation IDs (e.g. GET /api/session) against the running server for scripting and integrations.",
+      "source": "https://opencode.ai/docs/cli/commands/"
+    },
+    {
+      "feature": "Web client & pairing (opencode pair)",
+      "description": "One-time pairing links plus a QR code sign a browser or app into the server within 5 minutes; over SSH use port forwarding, or `opencode pair --remote` via OpenTunnel from any network.",
+      "source": "https://opencode.ai/docs/cli/web/"
+    },
+    {
+      "feature": "Mobile app & voice",
+      "description": "OpenCode Mobile (iOS TestFlight beta, Google Play) pairs via `opencode pair --remote` QR, lists and steers the computer's live sessions, and supports voice calls where the agent answers out loud.",
+      "source": "https://opencode.ai/mobile"
+    },
+    {
+      "feature": "Desktop app",
+      "description": "Native desktop app for macOS/Windows/Linux with parallel agents in tabs, live app preview in a browser pane, diff viewers, and multi-device session pickup.",
+      "source": "https://opencode.ai/desktop"
+    },
+    {
+      "feature": "Browse (real-browser control)",
+      "description": "OpenCode Browse is a Chrome extension (Chrome, Edge, Brave, Arc, and more) that lets the agent use your real browser with your logins and tabs, incl. handoffs and tab lending; works with OpenCode and other MCP clients.",
+      "source": "https://opencode.ai/product/browse"
+    },
+    {
+      "feature": "ACP editor integration",
+      "description": "`opencode acp` speaks the Agent Client Protocol over stdin/stdout for editor integrations (e.g. Zed), supporting session load/resume/fork, permission prompts, and per-session MCP servers.",
+      "source": "https://opencode.ai/docs/cli/acp/"
+    },
+    {
+      "feature": "VS Code / Cursor IDE extension (v1)",
+      "description": "Marketplace extension for VS Code and forks (Cursor, Windsurf, VSCodium): Cmd+Esc split-terminal launch, selection/tab context sharing, and file-reference shortcuts.",
+      "source": "https://opencode.ai/v1/docs/ide/"
+    },
+    {
+      "feature": "VS Code extension for v2 (OpenCode Beta)",
+      "description": "'OpenCode Beta' (sst-dev.opencode-v2) is the VS Code Marketplace extension for OpenCode 2, published by SST.",
+      "source": "https://marketplace.visualstudio.com/items?itemName=sst-dev.opencode-v2"
+    },
+    {
+      "feature": "Compaction",
+      "description": "Automatic summary compaction near the context limit keeps ~15k recent tokens, writes summaries in the background, supports a separate summary model, and enables provider-native compaction.",
+      "source": "https://opencode.ai/docs/compaction/"
+    },
+    {
+      "feature": "Prompt-cache warming",
+      "description": "Optional warming sends background keep-alive requests just before each model's prompt cache expires to keep caching effective.",
+      "source": "https://opencode.ai/docs/warming/"
+    },
+    {
+      "feature": "Web search tool",
+      "description": "Built-in web search through Exa, Firecrawl, Parallel, or Tavily keys, or 'random' failover on HTTP 429, with per-query permission rules.",
+      "source": "https://opencode.ai/docs/websearch/"
+    },
+    {
+      "feature": "Web fetch & attachments",
+      "description": "Attach local files, directories, or images (auto-resized, up to 20 MiB) via @ references or client pickers; webfetch retrieves URLs as markdown/text/html.",
+      "source": "https://opencode.ai/docs/attachments/"
+    },
+    {
+      "feature": "Formatters",
+      "description": "Files are formatted after write/edit/patch using built-in gofmt/prettier/biome/etc. or custom commands matched by extension.",
+      "source": "https://opencode.ai/docs/formatters/"
+    },
+    {
+      "feature": "References",
+      "description": "Named context sources from local directories or remote Git repositories are auto-cloned and attachable by alias, with descriptions in agent instructions.",
+      "source": "https://opencode.ai/docs/references/"
+    },
+    {
+      "feature": "Code Mode",
+      "description": "Default tool-calling style: the model runs JavaScript via the `execute` tool to call and combine catalog tools (incl. MCP tools) for parallel, cheap orchestration.",
+      "source": "https://opencode.ai/docs/tools/"
+    },
+    {
+      "feature": "Built-in toolset",
+      "description": "Core tools: read, glob, grep, edit, write, patch, shell, webfetch, websearch, question, skill, subagent, execute, plus session rename/move and Git worktree management.",
+      "source": "https://opencode.ai/docs/tools/"
+    },
+    {
+      "feature": "Image generation tool",
+      "description": "Experimental image generate/edit tool appears when a connected provider has an image model, saving results into the project.",
+      "source": "https://opencode.ai/docs/tools/"
+    },
+    {
+      "feature": "Browser control via Desktop",
+      "description": "A browser Code Mode namespace controls the browser attached by the desktop app (open tabs, navigate, capture) for agent-driven browser work.",
+      "source": "https://opencode.ai/docs/tools/"
+    },
+    {
+      "feature": "Git worktree sessions",
+      "description": "Sessions can create, list, and remove Git worktrees for the project, or move into one, isolating parallel agent work.",
+      "source": "https://opencode.ai/docs/tools/"
+    },
+    {
+      "feature": "Config system (opencode.json/jsonc)",
+      "description": "Layered system/global/project JSON(C) config with a published JSON schema for editor validation and autocomplete, covering model, agent, permissions, policies, and more.",
+      "source": "https://opencode.ai/docs/config/"
+    },
+    {
+      "feature": "CLI settings (cli.json)",
+      "description": "One global terminal-client settings file controls theme, animations, tabs, diffs, alerts/notifications, sounds, mouse, keybinds, mini, and TUI plugins.",
+      "source": "https://opencode.ai/docs/cli/config/"
+    },
+    {
+      "feature": "Network & TLS controls",
+      "description": "Proxy/auth env vars for the service, NODE_EXTRA_CA_CERTS for private CAs, and per-provider mutual-TLS client certificates.",
+      "source": "https://opencode.ai/docs/network/"
+    },
+    {
+      "feature": "Docker images",
+      "description": "Official versioned Docker images (ghcr.io/anomalyco/opencode:2.0.0) for running OpenCode as a server in containers.",
+      "source": "https://opencode.ai/docs/"
+    },
+    {
+      "feature": "CLI toolbox",
+      "description": "`opencode stats` (shareable usage statistics), `opencode upgrade` self-updates, `opencode debug` paths/config tooling, `opencode reload` live config reload, and `opencode auth export/import` moves credentials between machines.",
+      "source": "https://opencode.ai/docs/cli/commands/"
+    }
+  ]
+}

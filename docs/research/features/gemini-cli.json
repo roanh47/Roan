@@ -1,0 +1,241 @@
+{
+  "agent": "gemini-cli",
+  "feature_count": 47,
+  "features": [
+    {
+      "feature": "Open-source terminal agent",
+      "description": "Apache-2.0 TypeScript CLI (npm @google/gemini-cli, Node 20+) bringing Gemini models into the terminal for codebase work.",
+      "source": "https://google-gemini.github.io/gemini-cli/"
+    },
+    {
+      "feature": "Login with Google (free tier)",
+      "description": "OAuth login with a personal Google account gives Gemini Code Assist for individuals: 1,000 model requests/day and 60/minute free (model mix limited by the tier).",
+      "source": "https://google-gemini.github.io/gemini-cli/docs/quota-and-pricing.html"
+    },
+    {
+      "feature": "Gemini API key auth",
+      "description": "Set GEMINI_API_KEY from Google AI Studio; unpaid tier allows 250 model requests/user/day (10/min) on Flash models only.",
+      "source": "https://google-gemini.github.io/gemini-cli/docs/quota-and-pricing.html"
+    },
+    {
+      "feature": "Vertex AI auth",
+      "description": "Enterprise path via Application Default Credentials + gcloud, Service Account JSON keys, or Cloud API keys, plus a billing-free Express Mode.",
+      "source": "https://google-gemini.github.io/gemini-cli/docs/get-started/authentication.html"
+    },
+    {
+      "feature": "Paid upgrade paths",
+      "description": "Google AI Pro / AI Ultra subscriptions or pay-as-you-go API billing raise limits when free tiers are exhausted.",
+      "source": "https://google-gemini.github.io/gemini-cli/docs/quota-and-pricing.html"
+    },
+    {
+      "feature": "Model selection",
+      "description": "Choose models via `gemini -m <model>`, the /model command, or model.name in settings.json; Gemini 2.5 Pro offers a 1M-token context window.",
+      "source": "https://google-gemini.github.io/gemini-cli/docs/get-started/configuration.html"
+    },
+    {
+      "feature": "Built-in tools",
+      "description": "Core tools cover file system operations, shell execution, web fetch, Google Search grounding, multi-file reads (read-many-files), and a save-memory tool for cross-session recall.",
+      "source": "https://google-gemini.github.io/gemini-cli/docs/tools/"
+    },
+    {
+      "feature": "Multimodal input",
+      "description": "Accepts images, PDFs, and sketches in prompts; landing page demos generating apps from PDFs/images.",
+      "source": "https://google-gemini.github.io/gemini-cli/"
+    },
+    {
+      "feature": "MCP servers (stdio, SSE, HTTP)",
+      "description": "Configure MCP servers in settings.json mcpServers across Stdio, SSE, and Streamable HTTP transports, with global mcp.allowed/mcp.excluded allowlists.",
+      "source": "https://google-gemini.github.io/gemini-cli/docs/tools/mcp-server.html"
+    },
+    {
+      "feature": "MCP OAuth for remote servers",
+      "description": "OAuth 2.0 for SSE/HTTP MCP servers with automatic discovery, dynamic client registration, /mcp auth management, token refresh, and google_credentials / service-account-impersonation provider types.",
+      "source": "https://google-gemini.github.io/gemini-cli/docs/tools/mcp-server.html"
+    },
+    {
+      "feature": "Custom commands (TOML)",
+      "description": "Reusable /commands as .toml files in ~/.gemini/commands (user) and .gemini/commands (project), with namespaced paths, argument injection, and multimodal embedding.",
+      "source": "https://google-gemini.github.io/gemini-cli/docs/cli/custom-commands.html"
+    },
+    {
+      "feature": "Dynamic command content (!{} and @{})",
+      "description": "Command templates can execute shell commands with !{...} and inject file/directory/image content with @{...} before the prompt is sent.",
+      "source": "https://google-gemini.github.io/gemini-cli/docs/cli/custom-commands.html"
+    },
+    {
+      "feature": "/commands manager",
+      "description": "Slash command to list, reload, and manage custom .toml commands across user, project, and extension sources.",
+      "source": "https://geminicli.com/docs/reference/commands/"
+    },
+    {
+      "feature": "GEMINI.md hierarchical memory",
+      "description": "Context files load from ~/.gemini/GEMINI.md, project root/ancestors, and subdirectories; concatenated into every prompt; filename is configurable (e.g. AGENTS.md).",
+      "source": "https://google-gemini.github.io/gemini-cli/docs/cli/gemini-md.html"
+    },
+    {
+      "feature": "/memory command",
+      "description": "Manage instructional memory in-session: add text to global memory, show/refresh/reload, and list loaded GEMINI.md paths; /init bootstraps a project GEMINI.md.",
+      "source": "https://google-gemini.github.io/gemini-cli/docs/cli/gemini-md.html"
+    },
+    {
+      "feature": "GEMINI.md @imports (MemPort)",
+      "description": "Break memory into modules imported with @./file.md, with nested imports, circular-import detection, path validation, and a max import depth.",
+      "source": "https://google-gemini.github.io/gemini-cli/docs/core/memport.html"
+    },
+    {
+      "feature": "Checkpointing (/restore)",
+      "description": "With --checkpointing or settings, each approved file-modifying tool call creates a shadow-Git checkpoint; /restore lists and rolls back files and conversation.",
+      "source": "https://google-gemini.github.io/gemini-cli/docs/cli/checkpointing.html"
+    },
+    {
+      "feature": "Session auto-save & resume",
+      "description": "Sessions save automatically; resume via --resume/-r (latest or by index), the /resume session browser, --list-sessions, --delete-session, and configurable retention policies.",
+      "source": "https://geminicli.com/docs/cli/session-management/"
+    },
+    {
+      "feature": "Chat checkpoints (branch points)",
+      "description": "/resume save <tag>, /resume list, and /resume resume <tag> create named branch points of conversation state (aliases under /chat).",
+      "source": "https://geminicli.com/docs/cli/session-management/"
+    },
+    {
+      "feature": "/rewind",
+      "description": "Navigate backward through conversation history to revisit or steer away from earlier turns.",
+      "source": "https://geminicli.com/docs/reference/commands/"
+    },
+    {
+      "feature": "Plan Mode",
+      "description": "Read-only mode via /plan or --approval-mode plan (Shift+Tab cycles Default/Auto-Edit/Plan): research and design with only read/search tools, collaborative plan editing, and approval to exit into execution.",
+      "source": "https://geminicli.com/docs/cli/plan-mode/"
+    },
+    {
+      "feature": "Approval modes",
+      "description": "--approval-mode default/auto_edit/yolo (or --yolo) controls tool confirmations; --allowed-tools pre-approves specific tools; YOLO auto-enables sandboxing.",
+      "source": "https://google-gemini.github.io/gemini-cli/docs/get-started/configuration.html"
+    },
+    {
+      "feature": "Policy engine",
+      "description": "TOML policy files in ~/.gemini/policies (and system-managed tiers) decide allow/deny/confirm per tool and argument regex, with mode-scoped rules and a priority tier system.",
+      "source": "https://geminicli.com/docs/reference/policy-engine/"
+    },
+    {
+      "feature": "Sandboxing (Seatbelt / Docker / Podman)",
+      "description": "Isolate shell and file operations via macOS Seatbelt profiles (permissive/restrictive, network on/off) or Docker/Podman containers, enabled with -s, GEMINI_SANDBOX, settings, or custom .gemini/sandbox.Dockerfile.",
+      "source": "https://google-gemini.github.io/gemini-cli/docs/cli/sandbox.html"
+    },
+    {
+      "feature": "Trusted folders",
+      "description": "Folder-trust dialog restricts untrusted workspaces to a safe mode that ignores project settings and blocks risky behavior; trust rules live in ~/.gemini/trustedFolders.json and are managed via /permissions.",
+      "source": "https://google-gemini.github.io/gemini-cli/docs/cli/trusted-folders.html"
+    },
+    {
+      "feature": "Hooks",
+      "description": "Command hooks in settings.json fire on lifecycle events (SessionStart, BeforeTool, AfterTool, ...), can inject context, block or rewrite tool calls, and are managed via /hooks.",
+      "source": "https://geminicli.com/docs/hooks/"
+    },
+    {
+      "feature": "Subagents",
+      "description": "Specialist agents run in their own context windows with custom tools and prompts; built-in ones auto-delegate, @name forces one, and custom agents are Markdown+frontmatter files in ~/.gemini/agents or project .gemini/agents.",
+      "source": "https://geminicli.com/docs/core/subagents/"
+    },
+    {
+      "feature": "/agents manager",
+      "description": "Slash command to list, reload, and manage local and remote subagents.",
+      "source": "https://geminicli.com/docs/reference/commands/"
+    },
+    {
+      "feature": "Agent Skills",
+      "description": "Agent Skills standard folders (SKILL.md + resources) discovered from built-in, extension, user (~/.gemini/skills, .agents/skills), and workspace tiers; installed via `gemini skills install` and managed with /skills.",
+      "source": "https://geminicli.com/docs/cli/skills/"
+    },
+    {
+      "feature": "Extensions",
+      "description": "Installable bundles (gemini extensions install from a GitHub URL or local path) that package MCP servers, context files, custom commands, agents, and excluded tools via gemini-extension.json; enable/disable/update/link per scope.",
+      "source": "https://google-gemini.github.io/gemini-cli/docs/extensions/"
+    },
+    {
+      "feature": "Extension gallery",
+      "description": "Browseable gallery of community extensions at geminicli.com/extensions.",
+      "source": "https://geminicli.com/extensions/"
+    },
+    {
+      "feature": "Git worktrees (experimental)",
+      "description": "`gemini --worktree <name>` (-w) creates an isolated worktree+branch under .gemini/worktrees for parallel sessions; work survives exit and can be resumed.",
+      "source": "https://geminicli.com/docs/cli/git-worktrees/"
+    },
+    {
+      "feature": "Headless / non-interactive mode",
+      "description": "Run with -p/--prompt or stdin pipes, --output-format json for structured responses/stats, consistent exit codes, and file redirection for scripting and CI.",
+      "source": "https://google-gemini.github.io/gemini-cli/docs/cli/headless.html"
+    },
+    {
+      "feature": "Multi-directory workspaces",
+      "description": "Work across extra directories via --include-directories or /directory add; /directory show lists the active workspace roots.",
+      "source": "https://google-gemini.github.io/gemini-cli/docs/cli/commands.html"
+    },
+    {
+      "feature": "IDE integration (VS Code companion)",
+      "description": "Companion extension for VS Code and forks (Open VSX) installed via /ide install; shares recent files, cursor position, and selection, renders diffs natively, and accepts/rejects them from the IDE.",
+      "source": "https://google-gemini.github.io/gemini-cli/docs/ide-integration/"
+    },
+    {
+      "feature": "GitHub Action integration",
+      "description": "Official Gemini CLI GitHub Action (google-github-actions/run-gemini-cli) for PR review, issue triage, and @gemini-cli mentions; /setup-github configures it from the CLI.",
+      "source": "https://google-gemini.github.io/gemini-cli/"
+    },
+    {
+      "feature": "Themes",
+      "description": "/theme switches built-in dark/light themes (ANSI, Atom One, Ayu, Dracula, GitHub, Google Code, Xcode, ...); custom themes via ui.customThemes in settings.json or theme files.",
+      "source": "https://google-gemini.github.io/gemini-cli/docs/cli/themes.html"
+    },
+    {
+      "feature": "Vim mode",
+      "description": "/vim toggles vim keybindings with NORMAL/INSERT editing in the input area.",
+      "source": "https://geminicli.com/docs/reference/commands/"
+    },
+    {
+      "feature": "Keyboard shortcuts & message queueing",
+      "description": "Default and customizable shortcuts (reference table) incl. Tab to queue a message while the agent works, Ctrl+T TODO list, and F12 debug console.",
+      "source": "https://geminicli.com/docs/reference/keyboard-shortcuts/"
+    },
+    {
+      "feature": "Context compression",
+      "description": "/compress replaces the chat with a summary; automatic compression triggers when history crosses a configurable fraction (default 0.7) of the model's token limit.",
+      "source": "https://google-gemini.github.io/gemini-cli/docs/get-started/configuration.html"
+    },
+    {
+      "feature": "Token caching",
+      "description": "Automatic API token caching with API-key auth reuses system instructions/context to cut costs; /stats shows cached-token savings.",
+      "source": "https://google-gemini.github.io/gemini-cli/docs/cli/token-caching.html"
+    },
+    {
+      "feature": "/stats & /settings",
+      "description": "/stats reports session token usage and duration; /settings opens an in-CLI settings editor; /upgrade opens the Code Assist upgrade page.",
+      "source": "https://geminicli.com/docs/reference/commands/"
+    },
+    {
+      "feature": "Enterprise deployment",
+      "description": "System-wide settings files, GEMINI_CLI_SYSTEM_SETTINGS_PATH enforcement wrapper, tools.core allowlists, policy-level YOLO disabling, and GEMINI_CLI_HOME user isolation for shared hosts.",
+      "source": "https://geminicli.com/docs/cli/enterprise/"
+    },
+    {
+      "feature": "Telemetry & privacy controls",
+      "description": "Usage-statistics collection is on by default; /privacy shows the notice and toggles consent; privacy policy is documented separately.",
+      "source": "https://geminicli.com/docs/reference/commands/"
+    },
+    {
+      "feature": "Release channels",
+      "description": "Weekly stable and preview npm tags plus a nightly tag for testing unvetted builds.",
+      "source": "https://google-gemini.github.io/gemini-cli/"
+    },
+    {
+      "feature": "Slash-command toolbox",
+      "description": "Also ships /about, /auth (change auth method), /bug (file GitHub issue from the CLI), /clear, /copy (clipboard), /docs, /editor, /shells (background shell view), /terminal-setup, /mcp (server & tool inspection), /tools, /privacy, /quit.",
+      "source": "https://geminicli.com/docs/reference/commands/"
+    },
+    {
+      "feature": "Status note: Antigravity transition",
+      "description": "Per the official docs banner, unpaid-tier and Google One users were moved from Gemini CLI to the new Antigravity CLI on June 18, 2026; paid Code Assist licenses and API-key auth continue on Gemini CLI.",
+      "source": "https://geminicli.com/docs/"
+    }
+  ]
+}

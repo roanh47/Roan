@@ -1,0 +1,261 @@
+{
+  "agent": "gemini",
+  "feature_count": 51,
+  "features": [
+    {
+      "feature": "Chat basics",
+      "description": "Gemini Apps brainstorm ideas, summarize complex topics, and draft outlines, emails, and posts; usable signed-out, with history saved to a Google Account.",
+      "source": "https://support.google.com/gemini/answer/13275745?hl=en"
+    },
+    {
+      "feature": "Mobile app capabilities",
+      "description": "Chat via text, voice, photos, or camera; summarize Gmail/Drive; generate images on the fly; 'Hey Google' on Android; plan with Maps and Flights.",
+      "source": "https://support.google.com/gemini/answer/14579631?hl=en"
+    },
+    {
+      "feature": "Web app",
+      "description": "gemini.google.com in any browser on computer.",
+      "source": "https://support.google.com/gemini/answer/13575153?hl=en"
+    },
+    {
+      "feature": "Desktop apps",
+      "description": "Native Gemini apps for Mac (Apple Silicon, macOS 15+) and Windows.",
+      "source": "https://support.google.com/gemini/answer/17011627?hl=en"
+    },
+    {
+      "feature": "Gemini Go",
+      "description": "Streamlined Gemini for Android Go devices, replacing Assistant Go.",
+      "source": "https://support.google.com/gemini/answer/17079170?hl=en"
+    },
+    {
+      "feature": "Model picker",
+      "description": "Choose among Gemini models for quick everyday answers or in-depth analysis; some models only come with Google AI plans.",
+      "source": "https://support.google.com/gemini/answer/18648722?hl=en"
+    },
+    {
+      "feature": "Thinking levels",
+      "description": "Access to specific Gemini models, thinking levels, and task features varies by plan; top tiers include models built to reason through long-horizon problems.",
+      "source": "https://support.google.com/gemini/answer/18648722?hl=en"
+    },
+    {
+      "feature": "Streaming status indicators",
+      "description": "Gemini shows working/thinking status while generating; not documented on a dedicated help page (unverified).",
+      "source": "https://support.google.com/gemini/answer/18648722?hl=en"
+    },
+    {
+      "feature": "Gemini Live",
+      "description": "Natural, free-flowing voice conversations with Gemini that you can interrupt mid-sentence.",
+      "source": "https://support.google.com/gemini/answer/15274899?hl=en"
+    },
+    {
+      "feature": "Guided Vision (Live)",
+      "description": "Audio descriptions of what your camera sees, inside Gemini Live.",
+      "source": "https://support.google.com/gemini/answer/18365638?hl=en"
+    },
+    {
+      "feature": "Go Live in Chrome",
+      "description": "Use Live with Gemini in the Chrome browser.",
+      "source": "https://support.google.com/gemini/answer/16363185?hl=en"
+    },
+    {
+      "feature": "Listen & voice selection",
+      "description": "Tap Listen to hear responses read aloud; choose Gemini's voice in the mobile app and it applies across Gemini Apps.",
+      "source": "https://support.google.com/gemini/answer/15277943?hl=en"
+    },
+    {
+      "feature": "Regenerate & modify",
+      "description": "Regenerate the most recent response or ask Gemini to adjust length, simplify language, or change tone; switch between versions.",
+      "source": "https://support.google.com/gemini/answer/14262426?hl=en"
+    },
+    {
+      "feature": "Edit a sent message",
+      "description": "Editing a previously sent prompt is reported by users but not documented in the help center (unverified).",
+      "source": "https://support.google.com/gemini/answer/14262426?hl=en"
+    },
+    {
+      "feature": "Share chats",
+      "description": "Create a public link; anyone with it can read, reshare, and continue the chat on their own.",
+      "source": "https://support.google.com/gemini/answer/13743730?hl=en"
+    },
+    {
+      "feature": "Export responses",
+      "description": "Export responses from Gemini Apps.",
+      "source": "https://support.google.com/gemini/answer/14184041?hl=en"
+    },
+    {
+      "feature": "Attach & analyze files",
+      "description": "Attach documents, spreadsheets, notebooks, photos, and videos for answers, summaries, and insights.",
+      "source": "https://support.google.com/gemini/answer/14903178?hl=en"
+    },
+    {
+      "feature": "Notebooks",
+      "description": "Dedicated focused spaces that remember your sources, instructions, and ongoing discussions; sync with Gemini Notebook.",
+      "source": "https://support.google.com/gemini/answer/16972047?hl=en"
+    },
+    {
+      "feature": "Canvas",
+      "description": "Create or edit docs, apps, slides, or code side-by-side with Gemini; convert results into Audio Overviews or quizzes.",
+      "source": "https://support.google.com/gemini/answer/16047321?hl=en"
+    },
+    {
+      "feature": "Gems",
+      "description": "Custom versions of Gemini with their own instructions and files; shareable by link.",
+      "source": "https://support.google.com/gemini/answer/15146780?hl=en"
+    },
+    {
+      "feature": "Skills (replacing Gems)",
+      "description": "Starting November 2026 Gems transition to skills: reusable, stackable custom instructions invoked with / (soon @) that Gemini can also apply automatically.",
+      "source": "https://support.google.com/gemini/answer/18560919?hl=en"
+    },
+    {
+      "feature": "Deep Research",
+      "description": "Multi-step Deep Research for complex topics.",
+      "source": "https://support.google.com/gemini/answer/15719111?hl=en"
+    },
+    {
+      "feature": "Schedules",
+      "description": "Schedule recurring actions - daily news digest, weekly inspiration, monthly suggestions - prepared in the background for your chosen delivery time.",
+      "source": "https://support.google.com/gemini/answer/16316416?hl=en"
+    },
+    {
+      "feature": "Notifications (status)",
+      "description": "Schedules and tasks deliver prepared content in-app; push notifications are reported by users but not documented (unverified).",
+      "source": "https://support.google.com/gemini/answer/16316416?hl=en"
+    },
+    {
+      "feature": "Tasks & workflows",
+      "description": "Assign Gemini tasks that automate complex workflows using Connected Apps, skills, chats, signed-in sites, and location, with schedules for ongoing tasks.",
+      "source": "https://support.google.com/gemini/answer/17094507?hl=en"
+    },
+    {
+      "feature": "Daily brief",
+      "description": "Proactive personalized updates summarizing Connected Apps like Gmail and Calendar plus your chats.",
+      "source": "https://support.google.com/gemini/answer/17077455?hl=en"
+    },
+    {
+      "feature": "Connected Apps",
+      "description": "Connect apps like Gmail, Google Calendar, YouTube Music, Spotify, or Photos so Gemini can pull in content and take actions with your permission.",
+      "source": "https://support.google.com/gemini/answer/13695044?hl=en"
+    },
+    {
+      "feature": "Custom apps",
+      "description": "Connect and manage custom apps, including importing a GitHub repo to ask about in the web app.",
+      "source": "https://support.google.com/gemini/answer/17209137?hl=en"
+    },
+    {
+      "feature": "Personalization",
+      "description": "Personalization built on memory of past chats, connected Google apps, and your preferences/instructions.",
+      "source": "https://support.google.com/gemini/answer/16598623?hl=en"
+    },
+    {
+      "feature": "Chat memory",
+      "description": "Gemini learns from your past chats to personalize responses (18+, personal accounts, activity on).",
+      "source": "https://support.google.com/gemini/answer/16598469?hl=en"
+    },
+    {
+      "feature": "Images",
+      "description": "Nano Banana models create and refine images with accurate text rendering and subject consistency.",
+      "source": "https://support.google.com/gemini/answer/14286560?hl=en"
+    },
+    {
+      "feature": "Videos",
+      "description": "Generate videos with Gemini Apps.",
+      "source": "https://support.google.com/gemini/answer/16126339?hl=en"
+    },
+    {
+      "feature": "Music",
+      "description": "Generate music with Gemini Apps.",
+      "source": "https://support.google.com/gemini/answer/16901237?hl=en"
+    },
+    {
+      "feature": "Audio Overviews",
+      "description": "Generate Audio Overviews in Gemini Apps.",
+      "source": "https://support.google.com/gemini/answer/16047373?hl=en"
+    },
+    {
+      "feature": "Avatar",
+      "description": "Create and use an avatar in Gemini Apps.",
+      "source": "https://support.google.com/gemini/answer/16984474?hl=en"
+    },
+    {
+      "feature": "Quizzes & learning tools",
+      "description": "Quizzes, flashcards, practice tests, storybooks, and other study tools.",
+      "source": "https://support.google.com/gemini/answer/16275879?hl=en"
+    },
+    {
+      "feature": "Recent chats management",
+      "description": "Find, pin, rename, and delete chats (History must be on).",
+      "source": "https://support.google.com/gemini/answer/13666746?hl=en"
+    },
+    {
+      "feature": "Delete history",
+      "description": "Manage and delete your Gemini Apps history and activity.",
+      "source": "https://support.google.com/gemini/answer/13278892?hl=en"
+    },
+    {
+      "feature": "Download your data",
+      "description": "Download your Gemini Apps data.",
+      "source": "https://support.google.com/gemini/answer/16920332?hl=en"
+    },
+    {
+      "feature": "Import from other AI platforms",
+      "description": "Import your chats from other AI platforms into Gemini Apps.",
+      "source": "https://support.google.com/gemini/answer/16868299?hl=en"
+    },
+    {
+      "feature": "Device assistance (Android)",
+      "description": "Control your Android device and apps with Gemini.",
+      "source": "https://support.google.com/gemini/answer/15235441?hl=en"
+    },
+    {
+      "feature": "Smart home control",
+      "description": "Control smart home devices from the Gemini mobile app.",
+      "source": "https://support.google.com/gemini/answer/15335456?hl=en"
+    },
+    {
+      "feature": "Calls & WhatsApp (Android)",
+      "description": "Make calls and send messages, including via WhatsApp, with the Gemini app.",
+      "source": "https://support.google.com/gemini/answer/15575143?hl=en"
+    },
+    {
+      "feature": "Screen actions",
+      "description": "Share your screen and chat with Gemini about what's on it.",
+      "source": "https://support.google.com/gemini/answer/15850607?hl=en"
+    },
+    {
+      "feature": "In-car access",
+      "description": "Chat with Gemini in your car.",
+      "source": "https://support.google.com/gemini/answer/16735982?hl=en"
+    },
+    {
+      "feature": "Google Messages",
+      "description": "Use Gemini in Google Messages.",
+      "source": "https://support.google.com/gemini/answer/14599070?hl=en"
+    },
+    {
+      "feature": "Gemini in Chrome",
+      "description": "Get answers from the Gemini web app while browsing in Chrome.",
+      "source": "https://support.google.com/gemini/answer/14886647?hl=en"
+    },
+    {
+      "feature": "Purchases & payments",
+      "description": "Make purchases and payments with Gemini Apps.",
+      "source": "https://support.google.com/gemini/answer/18891937?hl=en"
+    },
+    {
+      "feature": "Parental controls",
+      "description": "Guide your child's Gemini Apps experience.",
+      "source": "https://support.google.com/gemini/answer/16109150?hl=en"
+    },
+    {
+      "feature": "Dark theme",
+      "description": "Use Dark theme in Gemini Apps.",
+      "source": "https://support.google.com/gemini/answer/13542227?hl=en"
+    },
+    {
+      "feature": "Language setting",
+      "description": "Change Gemini's language.",
+      "source": "https://support.google.com/gemini/answer/15984485?hl=en"
+    }
+  ]
+}

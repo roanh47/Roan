@@ -1,0 +1,231 @@
+{
+  "agent": "claude",
+  "feature_count": 45,
+  "features": [
+    {
+      "feature": "Chat basics",
+      "description": "Conversational assistant for everything from simple questions to multi-step projects, analysis, and creative writing, on web, desktop, and mobile.",
+      "source": "https://support.claude.com/en/articles/8114491-get-started-with-claude"
+    },
+    {
+      "feature": "Access surfaces",
+      "description": "One Claude account works across claude.ai on the web, Claude for iOS, Claude for Android, and Claude Desktop (macOS/Windows; Linux beta).",
+      "source": "https://support.claude.com/en/articles/8114487-what-interfaces-can-i-use-to-access-claude"
+    },
+    {
+      "feature": "Edit / retry messages",
+      "description": "Editing or retrying prompts mid-conversation is common Claude behavior but is not documented on current help pages (unverified).",
+      "source": "https://support.claude.com/en/collections/18031977-conversation-management"
+    },
+    {
+      "feature": "Delete & rename conversations",
+      "description": "Delete or rename any conversation from your chat list.",
+      "source": "https://support.claude.com/en/articles/8230524-delete-or-rename-a-conversation"
+    },
+    {
+      "feature": "Math & equations",
+      "description": "Claude handles mathematical equations and calculations in chat.",
+      "source": "https://support.claude.com/en/articles/10366421-how-does-claude-handle-mathematical-equations-and-calculations"
+    },
+    {
+      "feature": "Artifacts",
+      "description": "Designs, decks, docs, dashboards, and small interactive apps open beside the conversation; edit, revisit, and share them by link; saved in the Artifacts tab (all plans).",
+      "source": "https://support.claude.com/en/articles/17153992-what-are-artifacts-and-how-do-i-use-them"
+    },
+    {
+      "feature": "Claude Docs",
+      "description": "Living documents Claude drafts with clarifying questions and comments; edit yourself and share by link (all plans).",
+      "source": "https://support.claude.com/en/articles/16923645-get-started-with-claude-docs"
+    },
+    {
+      "feature": "Claude Sheets",
+      "description": "Spreadsheets built into Claude that it creates and edits with you, with import/export and sharing (beta, paid plans).",
+      "source": "https://support.claude.com/en/articles/18324300-get-started-with-claude-sheets"
+    },
+    {
+      "feature": "Claude Whiteboards",
+      "description": "Shared board where talk, typing, or sketch becomes diagrams and flows; usable during calls (beta, paid plans).",
+      "source": "https://support.claude.com/en/articles/18324319-get-started-with-claude-whiteboards"
+    },
+    {
+      "feature": "Claude Design",
+      "description": "Designs, interactive prototypes, and one-pagers via chat, with on-canvas editing and design systems.",
+      "source": "https://support.claude.com/en/articles/14604416-get-started-with-claude-design"
+    },
+    {
+      "feature": "Claude Data",
+      "description": "Turns questions about connected data into dashboards, data stories, and narrated videos (paid plans).",
+      "source": "https://support.claude.com/en/articles/17454700-get-started-with-claude-data"
+    },
+    {
+      "feature": "Claude Science",
+      "description": "Standalone desktop app for scientific research (beta, paid plans).",
+      "source": "https://support.claude.com/en/articles/16563838-get-started-with-claude-science"
+    },
+    {
+      "feature": "Projects",
+      "description": "Self-contained workspaces with their own chat history and knowledge base (free users up to five); new beta version breaks work into parallel cloud threads.",
+      "source": "https://support.claude.com/en/articles/9517075-what-are-projects"
+    },
+    {
+      "feature": "Project knowledge (RAG)",
+      "description": "Upload documents to a project so Claude retrieves and cites them during chats.",
+      "source": "https://support.claude.com/en/articles/11473015-retrieval-augmented-generation-rag-for-projects"
+    },
+    {
+      "feature": "Web search",
+      "description": "Built-in web search for factual queries, with sources.",
+      "source": "https://support.claude.com/en/articles/10684626-enable-and-use-web-search"
+    },
+    {
+      "feature": "Research",
+      "description": "Multi-step research capability for complex, source-heavy questions.",
+      "source": "https://support.claude.com/en/articles/11088861-use-research-on-claude"
+    },
+    {
+      "feature": "Model & thinking controls",
+      "description": "The model menu next to the send button sets which Claude model you use, its effort level, and whether thinking is on; changeable mid-conversation.",
+      "source": "https://support.claude.com/en/articles/8664678-change-the-model-effort-and-thinking-settings"
+    },
+    {
+      "feature": "Extended thinking",
+      "description": "Optional deeper reasoning; official guidance explains when to use web search vs extended thinking vs research.",
+      "source": "https://support.claude.com/en/articles/11095361-when-should-i-use-web-search-extended-thinking-and-research"
+    },
+    {
+      "feature": "Voice mode",
+      "description": "Complete spoken conversations on mobile, desktop, and web (all plans); switch between text and voice; uses web search and connected tools like Gmail, Calendar, Docs, and Slack.",
+      "source": "https://support.claude.com/en/articles/11101966-use-voice-mode"
+    },
+    {
+      "feature": "Dictation (mobile)",
+      "description": "Dictate prompts as text in Claude Mobile.",
+      "source": "https://support.claude.com/en/articles/10065434-use-dictation-on-claude-mobile"
+    },
+    {
+      "feature": "File uploads",
+      "description": "Upload PDF, DOCX, CSV, TXT, HTML, ODT, RTF, EPUB, JSON, XLSX, and images (JPEG/PNG/GIF/WebP) via the + menu or drag-and-drop.",
+      "source": "https://support.claude.com/en/articles/8241126-upload-files-to-claude"
+    },
+    {
+      "feature": "Create & edit files",
+      "description": "Claude creates and edits files in chat (via the code execution and file creation setting).",
+      "source": "https://support.claude.com/en/articles/12111783-create-and-edit-files-with-claude"
+    },
+    {
+      "feature": "Image understanding (no generation)",
+      "description": "Claude analyzes uploaded images but does not generate images.",
+      "source": "https://support.claude.com/en/articles/9002504-can-claude-produce-images"
+    },
+    {
+      "feature": "Visual & interactive content",
+      "description": "Claude renders charts, diagrams, and interactive content in chat.",
+      "source": "https://support.claude.com/en/articles/13641943-visual-and-interactive-content"
+    },
+    {
+      "feature": "Chat search",
+      "description": "Ask Claude to search past conversations and pull relevant details into new chats (paid plans).",
+      "source": "https://support.claude.com/en/articles/11817273-use-claude-s-chat-search-and-memory-to-build-on-previous-context"
+    },
+    {
+      "feature": "Memory",
+      "description": "Claude remembers context across chats and into Cowork tasks; review, edit, import, export, or turn off.",
+      "source": "https://support.claude.com/en/articles/11817273-use-claude-s-chat-search-and-memory-to-build-on-previous-context"
+    },
+    {
+      "feature": "Instructions for Claude",
+      "description": "Account-wide personalization instructions applied to every conversation.",
+      "source": "https://support.claude.com/en/articles/10185728-understanding-claude-s-personalization-features"
+    },
+    {
+      "feature": "Incognito chats",
+      "description": "Temporary chats excluded from history, memory, and model training (all plans).",
+      "source": "https://support.claude.com/en/articles/12260368-use-incognito-chats"
+    },
+    {
+      "feature": "Share chats",
+      "description": "Snapshot share links for chats, plus newer options to share with specific people or via public links.",
+      "source": "https://support.claude.com/en/articles/10593882-share-and-unshare-chats"
+    },
+    {
+      "feature": "Connectors",
+      "description": "Pre-built connectors (Google Workspace, GitHub, Microsoft 365, Slack, 1Password, Personal Finance) plus custom remote-MCP connectors.",
+      "source": "https://support.claude.com/en/articles/11176164-use-connectors-to-extend-claude-s-capabilities"
+    },
+    {
+      "feature": "Skills",
+      "description": "Reusable instructions and workflows; browse, use, and create custom skills.",
+      "source": "https://support.claude.com/en/articles/12512180-use-skills-in-claude"
+    },
+    {
+      "feature": "Plugins",
+      "description": "Browse skills, connectors, and plugins in one directory and manage them from one Plugins page.",
+      "source": "https://support.claude.com/en/articles/13837440-use-plugins-in-claude"
+    },
+    {
+      "feature": "Claude Cowork",
+      "description": "Agentic workspace bringing Claude Code's capabilities to knowledge work (paid plans) on desktop, web, mobile, and the Chrome side panel.",
+      "source": "https://support.claude.com/en/articles/13345190-get-started-with-claude-cowork"
+    },
+    {
+      "feature": "Cowork tasks",
+      "description": "Assign and manage tasks from anywhere in Claude Cowork; no standalone consumer scheduled-task feature is documented (unverified absence).",
+      "source": "https://support.claude.com/en/articles/13947068-assign-tasks-from-anywhere-in-claude-cowork"
+    },
+    {
+      "feature": "Claude in Chrome",
+      "description": "Claude side panel in the Chrome browser (all paid plans).",
+      "source": "https://support.claude.com/en/articles/12012173-get-started-with-claude-in-chrome"
+    },
+    {
+      "feature": "Claude Duet",
+      "description": "Research preview (US, paid plans): message Claude like a person; it works in your connected apps and asks before sending, paying, or signing anything.",
+      "source": "https://support.claude.com/en/articles/17631495-get-started-with-claude-duet"
+    },
+    {
+      "feature": "Cloud browser",
+      "description": "A browser running on Anthropic's servers that you can hand to Claude and take back (beta, Pro/Max/Ultra).",
+      "source": "https://support.claude.com/en/articles/18442783-use-the-cloud-browser-in-claude"
+    },
+    {
+      "feature": "Monthly recap",
+      "description": "A monthly summary of your Claude usage.",
+      "source": "https://support.claude.com/en/articles/15672559-see-your-monthly-recap"
+    },
+    {
+      "feature": "Break reminders & quiet hours",
+      "description": "Wellbeing settings for scheduled breaks and quiet hours.",
+      "source": "https://support.claude.com/en/articles/15672868-set-break-reminders-and-quiet-hours"
+    },
+    {
+      "feature": "Notifications (status)",
+      "description": "No push-notification feature is documented for Claude apps; break reminders and quiet hours are the only related setting (unverified absence).",
+      "source": "https://support.claude.com/en/collections/4078531-claude"
+    },
+    {
+      "feature": "Appearance settings",
+      "description": "Customize Claude's appearance and theme.",
+      "source": "https://support.claude.com/en/articles/8887527-customizing-your-appearance-settings"
+    },
+    {
+      "feature": "Preferred language",
+      "description": "Use Claude in your preferred language.",
+      "source": "https://support.claude.com/en/articles/10769299-how-to-use-claude-in-your-preferred-language"
+    },
+    {
+      "feature": "Claude in Google Docs/Sheets/Slides",
+      "description": "Use Claude inside Google Docs, Sheets, and Slides.",
+      "source": "https://support.claude.com/en/articles/16951679-use-claude-in-google-docs-sheets-and-slides"
+    },
+    {
+      "feature": "Quick entry (Mac desktop)",
+      "description": "Invoke Claude Desktop from anywhere on Mac via quick entry.",
+      "source": "https://support.claude.com/en/articles/12626668-use-quick-entry-with-claude-desktop-on-mac"
+    },
+    {
+      "feature": "Use Claude with Android apps",
+      "description": "Interop that lets Claude work with your Android apps.",
+      "source": "https://support.claude.com/en/articles/11869629-use-claude-with-android-apps"
+    }
+  ]
+}

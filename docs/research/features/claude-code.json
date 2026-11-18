@@ -1,0 +1,451 @@
+{
+  "agent": "Claude Code",
+  "feature_count": 89,
+  "features": [
+    {
+      "feature": "Installation & native binary",
+      "description": "Native installer via curl (macOS/Linux) or PowerShell (Windows), plus `claude update`, `claude install <version>`, release channels, and `claude doctor` for install diagnostics.",
+      "source": "https://code.claude.com/docs/en/setup.md"
+    },
+    {
+      "feature": "Login methods",
+      "description": "Browser OAuth sign-in with Claude Pro/Max/Ultra, Teams/Enterprise, or Claude Console; ANTHROPIC_API_KEY; cloud-provider env vars (Bedrock, Google Agent Platform, Microsoft Foundry) or 3rd-party-platform wizard; Claude apps gateway SSO; multi-account via CLAUDE_CONFIG_DIR; /logout.",
+      "source": "https://code.claude.com/docs/en/authentication.md"
+    },
+    {
+      "feature": "Automation auth token",
+      "description": "`claude setup-token` prints a long-lived OAuth token for CI/scripts; `claude auth login|logout|status` manage credentials from the shell, with `--sso` and `--email` flags.",
+      "source": "https://code.claude.com/docs/en/cli-reference.md"
+    },
+    {
+      "feature": "Session persistence & resume",
+      "description": "Sessions save continuously as local JSONL transcripts; resume via `claude --continue`, `claude --resume <id|name|path>`, `--from-pr <number>` for PR-linked sessions, and the `/resume` picker with search, preview, and worktree/project filters.",
+      "source": "https://code.claude.com/docs/en/sessions.md"
+    },
+    {
+      "feature": "Session naming",
+      "description": "Name a session at launch (`claude -n <name>`), in-session (`/rename`), or from the picker (Ctrl+R); unnamed sessions get AI-generated titles usable as resume handles.",
+      "source": "https://code.claude.com/docs/en/sessions.md"
+    },
+    {
+      "feature": "Session branching/forking",
+      "description": "`/branch` copies the conversation and switches you into the copy; `--fork-session` forks on resume; `/fork` copies the conversation into a separate background session.",
+      "source": "https://code.claude.com/docs/en/sessions.md"
+    },
+    {
+      "feature": "Context management commands",
+      "description": "`/clear` starts a fresh session, `/compact [instructions]` summarizes history to free context, `/autocompact` sets the auto-compaction window, and `/context` visualizes what's consuming the context window.",
+      "source": "https://code.claude.com/docs/en/sessions.md"
+    },
+    {
+      "feature": "Checkpointing & rewind",
+      "description": "Every prompt creates an automatic file-edit checkpoint; `/rewind` (aliases `/undo`, double-Esc) restores code and/or conversation to any earlier point, or summarizes from/up to a message.",
+      "source": "https://code.claude.com/docs/en/checkpointing.md"
+    },
+    {
+      "feature": "Transcript export",
+      "description": "`/export` renders the conversation to clipboard or a file; scripts can capture `claude -p --output-format json` or read the transcript path from hooks/status-line input.",
+      "source": "https://code.claude.com/docs/en/sessions.md"
+    },
+    {
+      "feature": "Background sessions & agent view",
+      "description": "`claude agents` opens agent view to dispatch and monitor background sessions; `/background` (alias `/bg`) detaches the current session; `claude attach|stop|logs|rm|respawn` manage them from the shell; `/tasks` lists in-session background work.",
+      "source": "https://code.claude.com/docs/en/agent-view.md"
+    },
+    {
+      "feature": "Message queueing",
+      "description": "Type while Claude works to queue follow-ups; Ctrl+Enter sends them immediately; Esc interrupts and redirects mid-turn while keeping completed work.",
+      "source": "https://code.claude.com/docs/en/interactive-mode.md"
+    },
+    {
+      "feature": "Background Bash",
+      "description": "Ctrl+B backgrounds running shell commands and agents; `/bashes`/`/tasks` show running and finished background work.",
+      "source": "https://code.claude.com/docs/en/interactive-mode.md"
+    },
+    {
+      "feature": "Task list",
+      "description": "Ctrl+T toggles Claude's live to-do checklist in the status area.",
+      "source": "https://code.claude.com/docs/en/interactive-mode.md"
+    },
+    {
+      "feature": "Side questions",
+      "description": "`/btw [question]` asks a side question about the session without adding it to the conversation Claude sees.",
+      "source": "https://code.claude.com/docs/en/interactive-mode.md"
+    },
+    {
+      "feature": "Session recap",
+      "description": "Automatic one-line recap after you've been away, plus `/recap` on demand.",
+      "source": "https://code.claude.com/docs/en/interactive-mode.md"
+    },
+    {
+      "feature": "Usage-limit handling",
+      "description": "`/rate-limit-options` offers wait-and-auto-continue when a claude.ai limit resets, adding usage credits, or upgrading the plan.",
+      "source": "https://code.claude.com/docs/en/interactive-mode.md"
+    },
+    {
+      "feature": "Transcript viewer",
+      "description": "Ctrl+O toggles a detailed transcript view with tool usage, timestamps, the model per message, and expanded collapsed calls.",
+      "source": "https://code.claude.com/docs/en/interactive-mode.md"
+    },
+    {
+      "feature": "Input aids",
+      "description": "Clipboard image paste (Ctrl+V) with positional [Image #N] chips, `@` file-path autocomplete, `:emoji:` shortcodes, spell-check, draft stash (Ctrl+S), and reverse history search (Ctrl+R).",
+      "source": "https://code.claude.com/docs/en/interactive-mode.md"
+    },
+    {
+      "feature": "Multiline, Vim & external editor",
+      "description": "Multiline input via Shift+Enter/\\+Enter/Ctrl+J, Vim editing mode via /config, and Ctrl+G to compose prompts in your $EDITOR; /terminal-setup fixes Shift+Enter in common terminals.",
+      "source": "https://code.claude.com/docs/en/terminal-config.md"
+    },
+    {
+      "feature": "Permission modes",
+      "description": "Shift+Tab cycles Manual (default), acceptEdits, plan, and — where available — auto, dontAsk, and bypassPermissions; each mode sets what Claude runs without asking.",
+      "source": "https://code.claude.com/docs/en/permission-modes.md"
+    },
+    {
+      "feature": "Plan mode",
+      "description": "`/plan [description]` or plan permission mode makes Claude research read-only, then present a plan via ExitPlanMode for your approval before edits; accepting a plan titles the session.",
+      "source": "https://code.claude.com/docs/en/permission-modes.md"
+    },
+    {
+      "feature": "Auto mode",
+      "description": "Permission mode where a background classifier plus trust rules let everything run without prompts; `/auto-mode-setup` drafts trusted repo/bucket/domain entries and `/permissions` reviews denials.",
+      "source": "https://code.claude.com/docs/en/auto-mode-config.md"
+    },
+    {
+      "feature": "Permission rules",
+      "description": "Allow/ask/deny rules per tool (e.g. `Bash(git push:*)`) in settings files, the `/permissions` dialog, and `--allowedTools`/`--disallowedTools` flags; deny rules apply in every mode.",
+      "source": "https://code.claude.com/docs/en/permissions.md"
+    },
+    {
+      "feature": "Workspace trust & extra directories",
+      "description": "First-run workspace-trust dialogs gate a repo's config; `/add-dir` grants file access to more directories; `/cd` moves the session to a new directory.",
+      "source": "https://code.claude.com/docs/en/permissions.md"
+    },
+    {
+      "feature": "Sandboxed Bash tool",
+      "description": "Built-in OS-level sandbox (macOS Seatbelt, Linux/WSL2 Landlock) restricts shell-command filesystem and network access; `/sandbox` toggles it; auto-allow mode pre-approves sandboxed commands.",
+      "source": "https://code.claude.com/docs/en/sandboxing.md"
+    },
+    {
+      "feature": "Sandbox environment choices",
+      "description": "Beyond the Bash sandbox: a sandbox runtime, dev containers, custom Docker containers, VMs, or cloud sessions, with org-wide enforcement.",
+      "source": "https://code.claude.com/docs/en/sandbox-environments.md"
+    },
+    {
+      "feature": "Protected & critical paths",
+      "description": "Writes to protected paths and rm-style critical-path removals always prompt — even in bypassPermissions — with optional blocks on reads/writes outside working directories.",
+      "source": "https://code.claude.com/docs/en/permission-modes.md"
+    },
+    {
+      "feature": "Built-in tool set",
+      "description": "File tools (Read, Write, Edit, NotebookEdit, Glob, Grep), Bash and PowerShell, WebFetch and WebSearch, Task (subagents), AskUserQuestion, EnterWorktree, Monitor, LSP, Agent, SendFeedback, EndConversation.",
+      "source": "https://code.claude.com/docs/en/tools-reference.md"
+    },
+    {
+      "feature": "Approval flow with comments",
+      "description": "Permission prompts offer once/session/always answers, and Tab opens a comment field so your reasoning travels with the decision.",
+      "source": "https://code.claude.com/docs/en/permissions.md"
+    },
+    {
+      "feature": "Model switching",
+      "description": "`/model` picker or Option/Alt+P switches models using aliases (opus, sonnet, haiku, fable, best, opusplan, sonnet[1m]/opus[1m] 1M-context variants); `--model` flag; custom model options and gateway model discovery.",
+      "source": "https://code.claude.com/docs/en/model-config.md"
+    },
+    {
+      "feature": "Effort levels & ultracode",
+      "description": "`/effort` sets adaptive-reasoning effort (low→xhigh, max); `ultracode` makes Claude plan a dynamic workflow for substantive tasks; the `ultrathink` keyword deepens one turn's reasoning.",
+      "source": "https://code.claude.com/docs/en/model-config.md"
+    },
+    {
+      "feature": "Extended thinking toggle",
+      "description": "Option/Alt+T toggles extended thinking per session; current models use adaptive reasoning where effort level is the primary thinking control.",
+      "source": "https://code.claude.com/docs/en/model-config.md"
+    },
+    {
+      "feature": "Fast mode",
+      "description": "`/fast` toggles a high-speed configuration (up to 2.5x faster) for supported Opus/Fable models at higher token cost.",
+      "source": "https://code.claude.com/docs/en/fast-mode.md"
+    },
+    {
+      "feature": "Advisor tool",
+      "description": "`/advisor [model]` pairs a stronger advisor model that Claude consults at key moments — before committing to an approach, when stuck, or before declaring done.",
+      "source": "https://code.claude.com/docs/en/advisor.md"
+    },
+    {
+      "feature": "Code Mode",
+      "description": "Experimental mode (CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1) where Claude writes JavaScript that performs several tool calls in a single step.",
+      "source": "https://code.claude.com/docs/en/code-mode.md"
+    },
+    {
+      "feature": "CLAUDE.md memory",
+      "description": "Persistent instruction files at managed/org, user (~/.claude/CLAUDE.md), project (./CLAUDE.md or .claude/CLAUDE.md), and local (CLAUDE.local.md) scopes, with `@path` imports, on-demand nested loading, `/init` generation, and the `/memory` editor.",
+      "source": "https://code.claude.com/docs/en/memory.md"
+    },
+    {
+      "feature": "AGENTS.md compatibility",
+      "description": "Claude Code can read a repository's AGENTS.md files in place of CLAUDE.md.",
+      "source": "https://code.claude.com/docs/en/memory.md"
+    },
+    {
+      "feature": "Auto memory",
+      "description": "Claude writes MEMORY.md learnings automatically from your corrections; the first 200 lines or 25KB load every session; subagents can keep their own.",
+      "source": "https://code.claude.com/docs/en/memory.md"
+    },
+    {
+      "feature": "Path-scoped rules",
+      "description": "`.claude/rules/` markdown rules with `paths:` frontmatter load only when Claude works with matching files.",
+      "source": "https://code.claude.com/docs/en/memory.md"
+    },
+    {
+      "feature": "Skills",
+      "description": "Bundled skills (/doctor, /code-review, /batch, /loop, /claude-api, /run, /verify, /debug, /design, /slides) plus custom skills in .claude/skills, invoked as slash commands or matched by description; `/skills` manages visibility and context cost.",
+      "source": "https://code.claude.com/docs/en/skills.md"
+    },
+    {
+      "feature": "Hooks",
+      "description": "40+ lifecycle events (SessionStart, UserPromptSubmit, PreToolUse, PermissionRequest, PostToolUse, SubagentStart, PreCompact, Stop, WorktreeCreate, SessionEnd, Elicitation, …) run shell commands, HTTP calls, prompts, or MCP tools; `/hooks` menu to inspect them.",
+      "source": "https://code.claude.com/docs/en/hooks.md"
+    },
+    {
+      "feature": "MCP client",
+      "description": "`claude mcp add` / `--mcp-config` connects stdio and HTTP/SSE MCP servers with OAuth (`claude mcp login`), user/project/local scopes, the `/mcp` manager, MCP tool search, prompts as commands, and elicitation responses.",
+      "source": "https://code.claude.com/docs/en/mcp.md"
+    },
+    {
+      "feature": "Claude Code as MCP server",
+      "description": "Claude Code can expose itself as an MCP server to other clients.",
+      "source": "https://code.claude.com/docs/en/mcp.md"
+    },
+    {
+      "feature": "Plugins & marketplaces",
+      "description": "`/plugin` installs plugins (bundles of skills, hooks, agents, MCP servers) from Anthropic or community marketplaces; `/reload-plugins` applies changes without restarting; mods add panes and UI; plugin evals gate quality.",
+      "source": "https://code.claude.com/docs/en/plugins/overview.md"
+    },
+    {
+      "feature": "Code intelligence plugin",
+      "description": "A language-server plugin gives Claude live type-error diagnostics after edits and symbol navigation, like an editor's LSP.",
+      "source": "https://code.claude.com/docs/en/plugins/code-intelligence.md"
+    },
+    {
+      "feature": "Subagents",
+      "description": "Built-in read-only Explore/Plan subagents plus custom agents in .claude/agents (model, tools, effort, memory frontmatter); run in foreground or background; `/subtask` forks the conversation into a background subagent that reports back.",
+      "source": "https://code.claude.com/docs/en/sub-agents.md"
+    },
+    {
+      "feature": "Dynamic workflows",
+      "description": "JavaScript scripts Claude writes to orchestrate many subagents at once (`/batch` for parallel PR-producing changes, `/deep-research`, `/simplify`); `/workflows` watches, pauses, and resumes runs.",
+      "source": "https://code.claude.com/docs/en/workflows.md"
+    },
+    {
+      "feature": "Agent teams",
+      "description": "Experimental (CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1): a lead session coordinates teammate sessions with shared tasks, inter-agent messaging, and centralized management.",
+      "source": "https://code.claude.com/docs/en/agent-teams.md"
+    },
+    {
+      "feature": "Cross-session messaging",
+      "description": "Claude can list (`/list-agents`) and message your other local, cloud, or teammate sessions — e.g. warn a session about a breaking change.",
+      "source": "https://code.claude.com/docs/en/cross-session-messaging.md"
+    },
+    {
+      "feature": "Output styles",
+      "description": "`/output-style` switches among Default, Proactive (starts work without routine questions), Concise, Explanatory (adds Insight blocks), and Learning, or a custom markdown style.",
+      "source": "https://code.claude.com/docs/en/output-styles.md"
+    },
+    {
+      "feature": "Status line",
+      "description": "`/statusline` configures a custom bottom bar: your shell script receives JSON session data and prints context usage, cost, git status, etc.",
+      "source": "https://code.claude.com/docs/en/statusline.md"
+    },
+    {
+      "feature": "Keybindings",
+      "description": "A keybindings configuration file remaps shortcuts across prompt, transcript viewer, dialogs, and text fields.",
+      "source": "https://code.claude.com/docs/en/keybindings.md"
+    },
+    {
+      "feature": "Themes",
+      "description": "`/theme` offers light/dark/auto, colorblind-safe, and ANSI themes plus custom themes from ~/.claude/themes; `/color` sets the prompt-bar color.",
+      "source": "https://code.claude.com/docs/en/commands.md"
+    },
+    {
+      "feature": "Fullscreen rendering",
+      "description": "`/tui fullscreen` enables a flicker-free alt-screen renderer with mouse support, conversation search, and a diff panel.",
+      "source": "https://code.claude.com/docs/en/fullscreen.md"
+    },
+    {
+      "feature": "Voice dictation",
+      "description": "`/voice` enables hold-to-record or tap-to-record prompt dictation with language selection and key rebinding.",
+      "source": "https://code.claude.com/docs/en/voice-dictation.md"
+    },
+    {
+      "feature": "Accessibility",
+      "description": "Screen-reader mode for VoiceOver/NVDA, magnifier, reduced-motion, and colorblind-friendly theme settings.",
+      "source": "https://code.claude.com/docs/en/accessibility.md"
+    },
+    {
+      "feature": "Terminal integration",
+      "description": "Terminal bell/notification when Claude finishes, tmux configuration, theme matching, and Option-as-Meta setup for macOS shortcuts.",
+      "source": "https://code.claude.com/docs/en/terminal-config.md"
+    },
+    {
+      "feature": "Deep links",
+      "description": "`claude-cli://` URLs open Claude Code in the right repo with a prefilled prompt from runbooks, alerts, or dashboards.",
+      "source": "https://code.claude.com/docs/en/deep-links.md"
+    },
+    {
+      "feature": "Git integration",
+      "description": "Claude stages changes, writes commit messages, creates branches, and opens pull requests (via gh); `/diff` reviews working-tree changes including Claude's edits.",
+      "source": "https://code.claude.com/docs/en/overview.md"
+    },
+    {
+      "feature": "Git worktrees",
+      "description": "`claude --worktree` runs a session in an isolated git worktree; subagents can be isolated per-worktree; non-git VCS supported via WorktreeCreate hooks.",
+      "source": "https://code.claude.com/docs/en/worktrees.md"
+    },
+    {
+      "feature": "Local code review",
+      "description": "`/code-review [level] [pr#|branch|path]` reviews your diff or a PR for correctness bugs at chosen effort levels, with `--fix` to apply findings and `--comment` to post them to GitHub/GitLab.",
+      "source": "https://code.claude.com/docs/en/code-review-local.md"
+    },
+    {
+      "feature": "Ultrareview",
+      "description": "`/code-review ultra` runs a deep multi-agent review in a cloud sandbox, verifies findings, and can post them to the PR.",
+      "source": "https://code.claude.com/docs/en/ultrareview.md"
+    },
+    {
+      "feature": "Code Review (GitHub PRs)",
+      "description": "Org-level automatic review of GitHub pull requests via the Claude GitHub App: inline verified findings, `@claude review` requests, and REVIEW.md customization.",
+      "source": "https://code.claude.com/docs/en/code-review.md"
+    },
+    {
+      "feature": "Security review",
+      "description": "`/security-review` analyzes the branch's diff for injection, auth, and data-exposure risks; the Claude Security plugin scans codebases and turns findings into patches.",
+      "source": "https://code.claude.com/docs/en/commands.md"
+    },
+    {
+      "feature": "GitHub Actions",
+      "description": "The claude-code-action runs Claude Code in CI workflows: @claude mentions implement changes and push commits, and prompts fire on any GitHub event.",
+      "source": "https://code.claude.com/docs/en/github-actions.md"
+    },
+    {
+      "feature": "GitLab CI/CD",
+      "description": "GitLab-maintained beta integration for running Claude Code inside GitLab pipelines.",
+      "source": "https://code.claude.com/docs/en/gitlab-ci-cd.md"
+    },
+    {
+      "feature": "Cloud sessions",
+      "description": "claude.ai/code runs sessions on cloud infrastructure from browser, phone, desktop, or terminal (`claude --cloud` to submit, `/teleport` to pull one into your terminal); GitHub-connected repos and configurable cloud environments.",
+      "source": "https://code.claude.com/docs/en/claude-code-on-the-web.md"
+    },
+    {
+      "feature": "Auto-fix PRs",
+      "description": "`/autofix-pr [prompt]` spawns a cloud session that watches the branch's PR and pushes fixes when CI fails or reviewers comment.",
+      "source": "https://code.claude.com/docs/en/claude-code-on-the-web.md"
+    },
+    {
+      "feature": "Projects",
+      "description": "Public beta: one ongoing conversation where Claude coordinates a stream of tasks as parallel cloud (or Remote Control) threads sharing repositories, instructions, and memory.",
+      "source": "https://code.claude.com/docs/en/claude-projects.md"
+    },
+    {
+      "feature": "Remote Control",
+      "description": "`/remote-control` connects claude.ai/code or the Claude iOS/Android app to the session running on your machine — full local environment, synced across devices, images/files from your phone.",
+      "source": "https://code.claude.com/docs/en/remote-control.md"
+    },
+    {
+      "feature": "Mobile companion",
+      "description": "The Claude iOS/Android app starts, monitors, and steers cloud sessions, Projects, Remote-Control sessions, and Desktop Dispatch.",
+      "source": "https://code.claude.com/docs/en/mobile.md"
+    },
+    {
+      "feature": "Desktop app",
+      "description": "The Claude Desktop Code tab: parallel sessions with git isolation, drag-and-drop panes, integrated terminal and file editor, side chats, computer use, Dispatch from phone, visual diff review, app previews, PR monitoring, connectors, iOS simulator pane.",
+      "source": "https://code.claude.com/docs/en/desktop.md"
+    },
+    {
+      "feature": "VS Code extension",
+      "description": "Native panel with inline diffs, @-mentions, plan review, conversation resume, background work, Jupyter support, a built-in IDE MCP server, and a Claude Code terminal.",
+      "source": "https://code.claude.com/docs/en/vs-code.md"
+    },
+    {
+      "feature": "JetBrains plugin",
+      "description": "Works in IntelliJ, PyCharm, WebStorm and other JetBrains IDEs with interactive diff viewing and selection-context sharing; `/ide` connects CLI sessions to the IDE.",
+      "source": "https://code.claude.com/docs/en/jetbrains.md"
+    },
+    {
+      "feature": "Claude in Chrome",
+      "description": "`claude --chrome` connects the session to your Chrome browser (visible, logged-in) to test web apps, fill forms, read console logs, and extract data.",
+      "source": "https://code.claude.com/docs/en/chrome.md"
+    },
+    {
+      "feature": "Computer use (CLI)",
+      "description": "macOS research preview: Claude opens apps, clicks, types, and screenshots your screen to test native apps and GUI-only tools from the terminal.",
+      "source": "https://code.claude.com/docs/en/computer-use.md"
+    },
+    {
+      "feature": "Slack delegation",
+      "description": "Claude Tag brings Claude into Slack channels for coding tasks; the legacy Slack app answers @claude mentions from Pro/Max/Ultra accounts.",
+      "source": "https://code.claude.com/docs/en/claude-tag.md"
+    },
+    {
+      "feature": "Headless / print mode",
+      "description": "`claude -p` runs non-interactively with `--allowedTools`, `--permission-mode`, `--output-format json|stream-json`, `--max-turns`, `--json-schema` structured output, and `--bare` fast-start mode for CI.",
+      "source": "https://code.claude.com/docs/en/headless.md"
+    },
+    {
+      "feature": "Agent SDK",
+      "description": "TypeScript and Python SDKs build custom agents on Claude Code's tools, agent loop, hooks, skills, sessions, subagents, MCP, and approvals — with streaming and structured outputs.",
+      "source": "https://code.claude.com/docs/en/agent-sdk/overview.md"
+    },
+    {
+      "feature": "In-session scheduling",
+      "description": "`/loop [interval] [prompt]` re-runs a prompt in-session (self-paced, or a loop.md default), one-time reminders, and cron expressions.",
+      "source": "https://code.claude.com/docs/en/scheduled-tasks.md"
+    },
+    {
+      "feature": "Cloud scheduled tasks",
+      "description": "`/schedule` creates cloud tasks (formerly routines) that run on a schedule, on API calls, or on GitHub events.",
+      "source": "https://code.claude.com/docs/en/routines.md"
+    },
+    {
+      "feature": "Goal mode",
+      "description": "`/goal <condition>` keeps Claude working across turns until the condition is met, a model judges it impossible, or you clear it.",
+      "source": "https://code.claude.com/docs/en/goal.md"
+    },
+    {
+      "feature": "Channels",
+      "description": "Research preview: MCP servers push webhooks, alerts, and chat messages into your running session, and Claude can reply back through the channel.",
+      "source": "https://code.claude.com/docs/en/channels.md"
+    },
+    {
+      "feature": "Artifacts",
+      "description": "Sessions publish live interactive pages to claude.ai to keep private, share, or make public — with comment auto-replies, connector data, and file downloads; `/design`, `/slides`, `/dataviz` produce artifacts.",
+      "source": "https://code.claude.com/docs/en/artifacts.md"
+    },
+    {
+      "feature": "Cost & usage tracking",
+      "description": "`/usage` (aliases /cost, /stats) shows session cost and plan-limit breakdowns; usage credits and team spend limits; `/insights` generates an HTML report of your sessions.",
+      "source": "https://code.claude.com/docs/en/costs.md"
+    },
+    {
+      "feature": "OpenTelemetry & analytics",
+      "description": "OTel export of metrics, events, and traces; org-wide usage analytics dashboard and spend monitoring.",
+      "source": "https://code.claude.com/docs/en/monitoring-usage.md"
+    },
+    {
+      "feature": "Self-diagnostics",
+      "description": "`/doctor` setup checkup with fixes, `/doctor prompt-audit` for stale instructions, `/debug` session logging, `/fewer-permission-prompts` allowlist builder, `claude doctor` from the shell.",
+      "source": "https://code.claude.com/docs/en/skills.md"
+    },
+    {
+      "feature": "Import from other agents",
+      "description": "`/import codex|gemini|cursor` brings instruction files, MCP servers, commands, subagents, and skills from other coding agents into Claude Code.",
+      "source": "https://code.claude.com/docs/en/commands.md"
+    },
+    {
+      "feature": "LLM gateway & providers",
+      "description": "ANTHROPIC_BASE_URL routes Claude Code through an organization's LLM gateway; cloud providers (Amazon Bedrock, Google Cloud's Agent Platform, Microsoft Foundry, Claude Platform on AWS) are configured via env vars or setup wizards.",
+      "source": "https://code.claude.com/docs/en/model-config.md"
+    }
+  ]
+}
