@@ -180,7 +180,7 @@ pre {
   width: 11px;
   height: 11px;
   border-radius: 3px;
-  background: linear-gradient(145deg, #b7e9cf, #5faf8c);
+  background: url("/roan.png") center / cover no-repeat;
 }
 
 .titlebar__name {
@@ -241,7 +241,7 @@ pre {
   height: 34px;
   margin: 0 auto 14px;
   border-radius: 11px;
-  background: linear-gradient(135deg, var(--accent), #4cbf94);
+  background: url("/roan.png") center / cover no-repeat;
   box-shadow: 0 6px 20px rgba(126, 226, 184, 0.22);
 }
 
@@ -690,7 +690,8 @@ pre {
   width: 26px;
   height: 26px;
   border-radius: 8px;
-  background: linear-gradient(135deg, var(--accent), #4cbf94);
+  /* The same photo every platform icon is built from. */
+  background: url("/roan.png") center / cover no-repeat;
 }
 
 .rail__name {

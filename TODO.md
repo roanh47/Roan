@@ -2,10 +2,40 @@
 
 Deze lijst is de takenlijst van het project. `WORK.md` beschrijft wat bewezen is en
 wat de volgende stap is in gewone taal; hier staan de punten als afvinkbare taken
-met de plek waar het werk zit.
+met de plek waar het werk zit. De volledige feature-vergelijking met andere agents
+staat in `docs/feature-parity.md` — dit zijn de rondes die daaruit volgen.
 
 Een punt gaat pas op `[x]` als het werkt op een echte machine, niet als de code is
 geschreven.
+
+## Ronde 1 — het gesprek zelf (transcript-hygiëne)
+
+- [ ] **Interne context-stappen onzichtbaar.** De memory/prompt-stappen die nu als
+      `INPUT/OUTPUT`-blokken in de chat staan (de "chat staat er 2×"-melding) zijn
+      standaard verborgen, op te klappen via een details-toggle. Plek:
+      `web/src/components/Transcript.tsx` + eventfilter in `web/src/App.tsx`.
+- [ ] **Denk-status altijd zichtbaar.** "Thinking…" staat er zodra een beurt
+      start — ook als het model geen reasoning-events stuurt (zijn
+      deepseek-screenshot toonde niets). Fase-regel bestaat (`turnPhase`), moet
+      ook zonder events lopen. Plek: `web/src/App.tsx` dock-state.
+- [ ] **Bericht-acties.** Copy op elk antwoord; regenereren via branch van vóór
+      het antwoord (append-only blijft intact). Plek: `Transcript.tsx` +
+      checkpoints-branch in de daemon.
+
+## Ronde 2 — de agent-home (workspace-verbouwing)
+
+- [ ] **`~/.Roan` met hoofdletter.** `src/daemon/paths.ts` + `RoanNode.kt`,
+      eenmalige migratie van `~/.roan` zodat geen device zijn keten verliest.
+- [ ] **`state/` nieuw.** chain.db + cron-state verhuizen uit `workspace/`;
+      `workspace/` wordt de lokale agent-home (exec-cwd-keuze: privé of synced).
+- [ ] **`storage/`-venster op Android.** Achter de "All files access"-toggle:
+      symlink-siblings (`shared/ downloads/ dcim/ documents/ pictures/ music/`)
+      náást `.Roan` in `files/` — het Termux-patroon; `files/` is de user-home.
+- [ ] **Schrijfstijl-skill upstream.** `skills/writing-style/` gecloned in de repo,
+      remote `upstream` → `github.com/roanh47/Roans-Writing-Style-Skill`, als
+      regel geladen in de turn-prompt — zie ook het schrijfstijl-punt boven.
+- [ ] **Foreground service op Android.** Daemon overleeft een gesloten app;
+      daarna pas: notificatie als beurt klaar is.
 
 ## Schrijfstijl
 
