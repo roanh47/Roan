@@ -1,9 +1,14 @@
 # Roan feature parity — what mainstream agents have, and what Roan does with it
 
-Date: 2026-11-18. Sources: the agents' official docs (verification subagents running,
-source URLs will be added where marked), `docs/mobile-app-patterns.md`,
+Date: 2026-11-18. Sources: the agents' official docs (all research delivered — 1,024
+sourced rows in `docs/research/features/`), `docs/mobile-app-patterns.md`,
 `docs/reference-apps-apk-analysis.md` (ChatGPT APK), the Roan repo itself, and Hermes'
 own surface (I am that).
+
+**Start here for the to-do:** `docs/feature-groups.md` — all 23 inventories collapsed
+into ~110 deduplicated concepts (YOLO = Auto Approve = Turbo = one row, aliases shown),
+each with a DONE / BUILD / SOON / LATER / WON'T status, rejected ones included. This
+file keeps the reasoning per verdict; the JSONs keep the raw sourced rows.
 
 Legend — **CC** Claude Code · **CX** Codex CLI · **OC** opencode · **GC** Gemini CLI ·
 **GPT** ChatGPT app · **CL** Claude app · **HM** Hermes.
