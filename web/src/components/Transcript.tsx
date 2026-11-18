@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import type { ReactElement } from "react";
 import type { ChainEvent, PendingMessage } from "../chain.js";
+import { Markdown } from "./Markdown.js";
 
 interface TranscriptProps {
   events: readonly ChainEvent[];
@@ -229,15 +230,9 @@ function RowView({ row }: { row: Row }): ReactElement {
       return (
         <div className="answer">
           {row.text.length === 0 ? (
-            <span className="answer__caret" aria-label="Roan is aan het antwoorden" />
+            <span className="answer__caret" aria-label="Roan is answering" />
           ) : (
-            row.text.split("\n").map((line, index) =>
-              line.trim().length === 0 ? (
-                <span key={String(index)} className="answer__gap" />
-              ) : (
-                <p key={String(index)}>{line}</p>
-              ),
-            )
+            <Markdown source={row.text} />
           )}
         </div>
       );

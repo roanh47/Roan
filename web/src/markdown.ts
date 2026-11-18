@@ -82,8 +82,8 @@ export function parseBlocks(source: string): Block[] {
     if (heading !== null) {
       blocks.push({
         kind: "heading",
-        level: heading[1].length as 1 | 2 | 3,
-        text: heading[2].trim(),
+        level: (heading[1] ?? "#").length as 1 | 2 | 3,
+        text: (heading[2] ?? "").trim(),
       });
       i++;
       continue;
