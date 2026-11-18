@@ -25,6 +25,9 @@ jobs:
   windows:
     name: Windows x64 (.exe)
     runs-on: windows-latest
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -87,7 +90,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: windows-x64
-          path: out/Roan-0.0.1-x64.exe
+          path: out/Roan-${{ env.APP_VERSION }}-x64.exe
           if-no-files-found: error
           retention-days: 7
 
@@ -98,6 +101,9 @@ jobs:
   macos:
     name: macOS Apple Silicon (.dmg)
     runs-on: macos-latest
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -157,7 +163,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: macos-arm64
-          path: out/Roan-0.0.1-arm64.dmg
+          path: out/Roan-${{ env.APP_VERSION }}-arm64.dmg
           if-no-files-found: error
           retention-days: 7
 
@@ -165,6 +171,9 @@ jobs:
   linux:
     name: Linux x86_64 (.AppImage)
     runs-on: ubuntu-22.04
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -225,7 +234,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: linux-x86_64
-          path: out/Roan-0.0.1-x86_64.AppImage
+          path: out/Roan-${{ env.APP_VERSION }}-x86_64.AppImage
           if-no-files-found: error
           retention-days: 7
 
@@ -234,6 +243,9 @@ jobs:
   android:
     name: Android (.apk)
     runs-on: ubuntu-22.04
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -330,7 +342,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: out/Roan-0.0.1.apk
+          path: out/Roan-${{ env.APP_VERSION }}.apk
           if-no-files-found: error
           retention-days: 7
 

@@ -97,8 +97,10 @@ find "$RES" -name 'ic_launcher_foreground.png' -delete
 echo "== launcher icons -> res ($(ls -d "$RES"/mipmap-* 2>/dev/null | wc -l) buckets, adaptive removed)"
 
 if [ ! -f "$ROOT/dist/daemon/main.js" ]; then
-  echo "dist/ is missing — run: npm run build" >&2
-  exit 1
+  # A CI job that never ran tsc still needs the bundle; build it here rather
+  # than failing, so the script is the one thing a job has to call.
+  echo "== dist/ ontbreekt, eerst bouwen"
+  (cd "$ROOT" && npm run build >/dev/null) || { echo "npm run build failed" >&2; exit 1; }
 fi
 node "$ROOT/scripts/bundle-daemon.mjs" "$APP/src/main/assets/roan-daemon.js"
 echo "== daemon bundle -> assets/roan-daemon.js ($(du -h "$APP/src/main/assets/roan-daemon.js" | cut -f1))"
