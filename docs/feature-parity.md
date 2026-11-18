@@ -149,5 +149,46 @@ These exist in mainstream agents and are **deliberately out**:
 6. **Attachments (real upload)** (§2) and **notifications** (§8)
 7. **Compact** (§4), **rename/edit/regenerate via branching** (§1, §4), **MCP servers actually starting** (§7)
 
-*This file is v1 from repo state + known docs; the running source-verification pass will
-append URLs and correct any drift.*
+## Hermes — the full surface, inventoried from the inside
+
+Hermes is the agent writing this file, so this inventory comes from the running
+installation (`/home/roan/.hermes/hermes-agent`) rather than a website: CLI + TUI +
+gateway + desktop + dashboard, 42 platform-adapter files, 263 skills, plugins with
+host isolation. Per row: what Hermes has, and what Roan does with it — several of
+these are deliberately out for Roan even though Hermes has them.
+
+| Hermes feature | What it is | Verdict for Roan |
+|---|---|---|
+| Messaging gateway, ~20 platforms (Telegram, Discord, Slack, IRC, Feishu…) | The agent lives in a process that survives every window; channels are doors | **SOON (one channel)** — Roan's app is the channel; a daemon-fed Telegram door is possible later, never the core |
+| Gateway survives the desktop app | Close the window, the bots keep running | **BUILD** — this is exactly the foreground-service / daemon-alive wish; the daemon is the gateway-equivalent |
+| Persistent memory + user profile | Facts that survive sessions, injected every turn | done (`src/context/memory.ts`) — must stay invisible in the transcript |
+| Skills (263, with curator + auto-update) | Task-shaped instructions loaded when relevant | **BUILD** — same idea, files that travel with the chain; writing-style upstream is the first one |
+| Cron scheduler + background processes with notify-on-exit | Work happens when you are not there | cron done; background-notify **BUILD** (foreground service) |
+| Delegation / subagents with structured output | A fresh context does a subtask and reports back | WON'T — one agent, his rule; `run_on_node` already moves *where* a turn runs |
+| Terminal with background jobs + PTY | Real shell, tracked processes | done (exec + allowlist) |
+| Browser automation + computer use | A real browser driven for logins and scraping | LATER — as a tool behind the same approval flow |
+| Web search / extract | Grounded answers with sources | **SOON** (web-search tool row in §6) |
+| Model catalog + `/model` picker + thinking levels | Live provider catalog, switch mid-session | done (304 presets, sheet); thinking levels SOON |
+| Context compression | Old turns folded so the prompt stays affordable | **BUILD** (the compact row in §4) |
+| Session search / session librarian | Find anything back across sessions | **SOON** — the chain is one database; search is a query |
+| Goals / standing goals | A persistent target the agent keeps working toward | **SOON** — fits the chain model; a goal is an event |
+| Plugin system + catalog + host isolation | Third-party code, isolated | LATER — skills-first; a plugin API is a later decision |
+| MCP client + MCP catalog | External tools through a standard | **BUILD** (mcp.json must actually start servers, §7) |
+| Kanban board | Tracked work items | LATER |
+| Connectors (Gmail, Notion, Linear…) | Hosted app accounts through one auth | LATER |
+| TTS / vision / clarify / todo | Speak, see images, ask instead of guess, track tasks | TTS LATER, vision **SOON** (images in turns), clarify **BUILD** (part of approval cards), todo done |
+| Profiles (one process, several identities) | Several "persons" on one install | WON'T — one agent, one identity |
+| Updater with fleet verification | Updates without breaking running bots | **SOON** (§9 updater row) |
+
+## OpenClaw
+
+Research running now (official docs + GitHub); the user's previous agent — his
+writing-style skill was ported from `~/.openclaw/workspace`, and the workspace-home
+concept (§8) is OpenClaw's. The inventory lands here when the pass returns; what is
+already known from his usage: `~/.openclaw/workspace` as the agent's home with
+AGENTS.md/SOUL-style persona files, a gateway daemon that survives everything, and
+channels rather than an app. Roan keeps the home concept (round 2) and drops the
+multi-channel shape in favour of the chain.
+
+*This file is v1 from repo state + known docs; the running source-verification passes
+(4 subagents) append source URLs and correct any drift.*
