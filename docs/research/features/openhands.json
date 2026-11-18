@@ -1,0 +1,256 @@
+{
+  "agent": "OpenHands",
+  "feature_count": 50,
+  "features": [
+    {
+      "feature": "Agent Canvas",
+      "description": "Open-source browser control surface for agentic work: manage conversations, files, terminals, model configuration, backends and automations in one place.",
+      "source": "https://docs.openhands.dev/openhands/usage/agent-canvas/overview"
+    },
+    {
+      "feature": "Chat panel",
+      "description": "Conversation view where OpenHands explains its actions.",
+      "source": "https://docs.openhands.dev/openhands/usage/key-features"
+    },
+    {
+      "feature": "Changes tab",
+      "description": "Shows the file changes performed by OpenHands.",
+      "source": "https://docs.openhands.dev/openhands/usage/key-features"
+    },
+    {
+      "feature": "Embedded VS Code",
+      "description": "Browse and modify workspace files in an embedded VS Code; also used to upload and download files.",
+      "source": "https://docs.openhands.dev/openhands/usage/key-features"
+    },
+    {
+      "feature": "Terminal tab",
+      "description": "Shared space where OpenHands and the user run terminal commands.",
+      "source": "https://docs.openhands.dev/openhands/usage/key-features"
+    },
+    {
+      "feature": "App tab",
+      "description": "Displays the web server when OpenHands runs an application so users can interact with it.",
+      "source": "https://docs.openhands.dev/openhands/usage/key-features"
+    },
+    {
+      "feature": "Browser tab",
+      "description": "Non-interactive browser used by OpenHands to browse websites.",
+      "source": "https://docs.openhands.dev/openhands/usage/key-features"
+    },
+    {
+      "feature": "Browser automation (BrowserToolSet)",
+      "description": "Automated web page interaction for agents, built on browser control.",
+      "source": "https://docs.openhands.dev/sdk/guides/agent-browser-use"
+    },
+    {
+      "feature": "Browser session recording",
+      "description": "Record and replay agent browser sessions with rrweb.",
+      "source": "https://docs.openhands.dev/sdk/guides/browser-session-recording"
+    },
+    {
+      "feature": "Sandboxed execution (Docker)",
+      "description": "Run the agent server in isolated Docker containers for security and reproducibility; also Apptainer (rootless, HPC) and API-based hosted sandboxes.",
+      "source": "https://docs.openhands.dev/sdk/guides/agent-server/docker-sandbox"
+    },
+    {
+      "feature": "Pluggable backends",
+      "description": "Local, remote Agent Server, OpenHands Cloud, DigitalOcean Managed Agents, VM/self-hosted, per-conversation Docker, Kubernetes (Helm) and Modal backends.",
+      "source": "https://docs.openhands.dev/openhands/usage/agent-canvas/backends"
+    },
+    {
+      "feature": "OpenHands Cloud",
+      "description": "Hosted cloud version at app.all-hands.dev with sandboxed conversations.",
+      "source": "https://docs.openhands.dev/openhands/usage/cloud/openhands-cloud"
+    },
+    {
+      "feature": "Cloud repo integrations",
+      "description": "Install OpenHands Cloud for GitHub, GitLab or Bitbucket repositories and work on them via the Cloud UI or the platform.",
+      "source": "https://docs.openhands.dev/openhands/usage/cloud/github-installation"
+    },
+    {
+      "feature": "Slack integration",
+      "description": "OpenHands Slack app for working with repos from Slack.",
+      "source": "https://docs.openhands.dev/openhands/usage/cloud/slack-installation"
+    },
+    {
+      "feature": "Jira Cloud integration",
+      "description": "Jira integration with service account, API token and webhook configuration.",
+      "source": "https://docs.openhands.dev/openhands/usage/cloud/project-management/jira-integration"
+    },
+    {
+      "feature": "Cloud REST API",
+      "description": "Programmatically start and monitor conversations, read files, get git changes and export trajectories.",
+      "source": "https://docs.openhands.dev/openhands/usage/cloud/cloud-api"
+    },
+    {
+      "feature": "BYOK LLM support (LiteLLM)",
+      "description": "Connect any LiteLLM-supported LLM: OpenAI, Anthropic, Bedrock, Azure, Gemini/Vertex, Groq, OpenRouter, Moonshot, DigitalOcean, LiteLLM proxy and the OpenHands provider.",
+      "source": "https://docs.openhands.dev/openhands/usage/llms/llms"
+    },
+    {
+      "feature": "Local LLMs",
+      "description": "Connect local servers such as LM Studio, Ollama, vLLM and SGLang.",
+      "source": "https://docs.openhands.dev/openhands/usage/llms/local-llms"
+    },
+    {
+      "feature": "LLM profiles",
+      "description": "Save model configurations and switch models mid-conversation via saved LLM profiles.",
+      "source": "https://docs.openhands.dev/openhands/usage/settings/llm-settings"
+    },
+    {
+      "feature": "Confirmation policy and security analyzer",
+      "description": "Confirmation policies (e.g. AlwaysConfirm) control when actions need user approval; pluggable security analyzers evaluate action risk.",
+      "source": "https://docs.openhands.dev/sdk/guides/security"
+    },
+    {
+      "feature": "Skills",
+      "description": "Reusable instructions, domain knowledge and workflows: repo-level skills, keyword-triggered skills, deterministic path-triggered rules, org/user skills and a global registry (github.com/OpenHands/extensions).",
+      "source": "https://docs.openhands.dev/overview/skills"
+    },
+    {
+      "feature": "Repository customization",
+      "description": "A .openhands directory at the repo root customizes skills, hooks and settings for the repository.",
+      "source": "https://docs.openhands.dev/openhands/usage/customization/repository"
+    },
+    {
+      "feature": "Hooks",
+      "description": "Lifecycle shell scripts in .openhands/hooks.json: block dangerous commands, enforce quality checks before stopping, inject context.",
+      "source": "https://docs.openhands.dev/openhands/usage/customization/hooks"
+    },
+    {
+      "feature": "Plugins",
+      "description": "Bundles of skills, hooks, MCP servers, agents and commands in reusable packages; portable Agent Plugins format works across compatible clients; browsable in Agent Canvas.",
+      "source": "https://docs.openhands.dev/overview/plugins"
+    },
+    {
+      "feature": "MCP support",
+      "description": "Model Context Protocol support lets OpenHands use external tool servers for custom tools and data sources.",
+      "source": "https://docs.openhands.dev/overview/model-context-protocol"
+    },
+    {
+      "feature": "Automations",
+      "description": "Scheduled AI-powered tasks (cron) that each run a full OpenHands conversation, plus event-based triggers from custom webhooks (e.g. Linear).",
+      "source": "https://docs.openhands.dev/openhands/usage/automations/overview"
+    },
+    {
+      "feature": "Prebuilt automations",
+      "description": "Ready-made automations: issue-to-PR, GitHub PR review assistant, GitHub repository monitor and Slack channel monitor.",
+      "source": "https://docs.openhands.dev/openhands/usage/agent-canvas/prebuilt-automations"
+    },
+    {
+      "feature": "Automation event sources",
+      "description": "Register custom webhook event sources under Automate then Events and trigger automations from them.",
+      "source": "https://docs.openhands.dev/openhands/usage/agent-canvas/automation-events"
+    },
+    {
+      "feature": "Git-synced automations",
+      "description": "Back up, share and edit Agent Canvas automations through a git repository.",
+      "source": "https://docs.openhands.dev/openhands/usage/agent-canvas/git-sync"
+    },
+    {
+      "feature": "Conversations with branching",
+      "description": "Work with conversations including branching from previous messages; per-conversation agent profile and LLM profile.",
+      "source": "https://docs.openhands.dev/openhands/usage/agent-canvas/conversations"
+    },
+    {
+      "feature": "Conversation fork (SDK)",
+      "description": "Branch off an existing conversation for follow-up exploration without contaminating the original.",
+      "source": "https://docs.openhands.dev/sdk/guides/convo-fork"
+    },
+    {
+      "feature": "Pause, resume and mid-run messaging",
+      "description": "Pause agent execution and resume without losing state; interrupt a running agent with additional context or corrections.",
+      "source": "https://docs.openhands.dev/sdk/guides/convo-pause-and-resume"
+    },
+    {
+      "feature": "Persistent memory",
+      "description": "Opt-in two-tier memory that survives across conversations (root causes, environment quirks, project decisions).",
+      "source": "https://docs.openhands.dev/sdk/guides/persistent-memory"
+    },
+    {
+      "feature": "Context condenser",
+      "description": "Condense conversation history to manage agent memory and save tokens.",
+      "source": "https://docs.openhands.dev/sdk/guides/context-condenser"
+    },
+    {
+      "feature": "Sub-agents (Task Tool Set)",
+      "description": "Delegate complex work to specialized sub-agents that run synchronously and return results to the parent.",
+      "source": "https://docs.openhands.dev/sdk/guides/task-tool-set"
+    },
+    {
+      "feature": "File-based agents",
+      "description": "Define specialized sub-agents as Markdown files with YAML frontmatter, no Python required.",
+      "source": "https://docs.openhands.dev/sdk/guides/agent-file-based"
+    },
+    {
+      "feature": "ACP agents",
+      "description": "Run Claude Code, Codex, Gemini CLI, Pi or OpenCode inside Agent Canvas via the Agent Client Protocol.",
+      "source": "https://docs.openhands.dev/openhands/usage/agent-canvas/acp-agents"
+    },
+    {
+      "feature": "Agent profiles",
+      "description": "Reusable agent configurations for Canvas conversations.",
+      "source": "https://docs.openhands.dev/openhands/usage/agent-canvas/agent-profiles"
+    },
+    {
+      "feature": "Critic",
+      "description": "LLM-based critic evaluates agent actions with built-in iterative refinement.",
+      "source": "https://docs.openhands.dev/openhands/usage/agent-canvas/critic"
+    },
+    {
+      "feature": "Apps (beta)",
+      "description": "Add trusted custom pages and integrated tools to Agent Canvas without forking the app.",
+      "source": "https://docs.openhands.dev/openhands/usage/agent-canvas/canvas-extensions"
+    },
+    {
+      "feature": "Phone and tablet access",
+      "description": "Access Agent Canvas from mobile devices via Tailscale or ngrok.",
+      "source": "https://docs.openhands.dev/openhands/usage/agent-canvas/mobile-access"
+    },
+    {
+      "feature": "Software Agent SDK",
+      "description": "Python SDK for building software agents: built-in and custom tools, structured output, parallel tool execution, metrics and OpenTelemetry tracing.",
+      "source": "https://docs.openhands.dev/sdk"
+    },
+    {
+      "feature": "Agent Server",
+      "description": "Remote agent execution exposing conversations, tools and workspaces over REST and WebSocket APIs, with an OpenAI-compatible endpoint mode.",
+      "source": "https://docs.openhands.dev/sdk/guides/agent-server/overview"
+    },
+    {
+      "feature": "Stuck detector",
+      "description": "Detect and handle stuck agents automatically with timeout mechanisms.",
+      "source": "https://docs.openhands.dev/sdk/guides/agent-stuck-detector"
+    },
+    {
+      "feature": "Ask Oracle",
+      "description": "Let an agent consult a saved Oracle LLM profile for stateless second-opinion advice.",
+      "source": "https://docs.openhands.dev/sdk/guides/agent-ask-oracle"
+    },
+    {
+      "feature": "Theory of Mind agent",
+      "description": "User-modeling agent that personalizes guidance based on inferred intent and preferences.",
+      "source": "https://docs.openhands.dev/sdk/guides/agent-tom-agent"
+    },
+    {
+      "feature": "Interactive terminal tool",
+      "description": "Agents interact with terminal applications like ipython and other interactive CLIs.",
+      "source": "https://docs.openhands.dev/sdk/guides/agent-interactive-terminal"
+    },
+    {
+      "feature": "Secrets management",
+      "description": "Provide environment variables and secrets to agent workspaces securely.",
+      "source": "https://docs.openhands.dev/openhands/usage/settings/secrets-settings"
+    },
+    {
+      "feature": "Image input",
+      "description": "Send images to multimodal agents for vision-based tasks.",
+      "source": "https://docs.openhands.dev/sdk/guides/llm-image-input"
+    },
+    {
+      "feature": "Open-source component ecosystem",
+      "description": "Repo spans Agent Canvas, Software Agent SDK, Agent Server, Automation Server, Sandbox Server and docs, plus OpenHands Enterprise for licensed self-hosting or managed deployment.",
+      "source": "https://docs.openhands.dev/overview/introduction"
+    }
+  ]
+}

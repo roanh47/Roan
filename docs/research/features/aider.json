@@ -1,0 +1,226 @@
+{
+  "agent": "Aider",
+  "feature_count": 44,
+  "features": [
+    {
+      "feature": "Terminal chat interface",
+      "description": "AI pair programming in your terminal: launch aider with the files to edit and request changes at the > prompt.",
+      "source": "https://aider.chat/docs/usage.html"
+    },
+    {
+      "feature": "Experimental browser UI",
+      "description": "aider --browser launches an experimental web UI to collaborate with LLMs and edit code in the local git repo.",
+      "source": "https://aider.chat/docs/usage/browser.html"
+    },
+    {
+      "feature": "Docker images",
+      "description": "Official docker images: paulgauthier/aider core and aider-full with extras such as the browser GUI and Playwright web scraping.",
+      "source": "https://aider.chat/docs/install/docker.html"
+    },
+    {
+      "feature": "Code mode",
+      "description": "Default chat mode in which aider edits your code to satisfy requests.",
+      "source": "https://aider.chat/docs/usage/modes.html"
+    },
+    {
+      "feature": "Ask mode",
+      "description": "Discuss the codebase and get answers without making any file changes.",
+      "source": "https://aider.chat/docs/usage/modes.html"
+    },
+    {
+      "feature": "Architect mode (dual-model)",
+      "description": "A main architect model proposes how to solve the request and a separate editor model turns the proposal into file edits (--editor-model).",
+      "source": "https://aider.chat/docs/usage/modes.html"
+    },
+    {
+      "feature": "Help mode",
+      "description": "Answers questions about aider usage, configuration and troubleshooting.",
+      "source": "https://aider.chat/docs/usage/modes.html"
+    },
+    {
+      "feature": "Mode switching",
+      "description": "Switch mode per message (/code, /architect, /ask) or stickily (/chat-mode, --chat-mode); the prompt shows the active mode.",
+      "source": "https://aider.chat/docs/usage/modes.html"
+    },
+    {
+      "feature": "In-chat commands",
+      "description": "About 50 slash commands including /add, /drop, /diff, /commit, /git, /run, /test, /lint, /tokens, /undo, /paste, /voice and /web.",
+      "source": "https://aider.chat/docs/usage/commands.html"
+    },
+    {
+      "feature": "Git auto-commit",
+      "description": "Aider commits every edit with a descriptive commit message and offers to create a git repo if none exists.",
+      "source": "https://aider.chat/docs/git.html"
+    },
+    {
+      "feature": "Undo AI commits",
+      "description": "/undo instantly undoes the last commit if it was made by aider.",
+      "source": "https://aider.chat/docs/git.html"
+    },
+    {
+      "feature": "Dirty-file isolation",
+      "description": "Pre-existing uncommitted changes are committed first so user edits stay separate from AI edits.",
+      "source": "https://aider.chat/docs/git.html"
+    },
+    {
+      "feature": "Commit attribution",
+      "description": "Aider-authored commits get an (aider) author/committer name suffix, with optional aider: message prefixes and Co-authored-by trailers.",
+      "source": "https://aider.chat/docs/git.html"
+    },
+    {
+      "feature": "Conventional Commits",
+      "description": "Commit messages (written by the weak model) follow Conventional Commits by default; customizable via --commit-prompt.",
+      "source": "https://aider.chat/docs/git.html"
+    },
+    {
+      "feature": "Git control switches",
+      "description": "/diff, /commit and /git in-chat commands plus --no-auto-commits, --no-dirty-commits, --no-git and --git-commit-verify flags.",
+      "source": "https://aider.chat/docs/git.html"
+    },
+    {
+      "feature": "Repository map",
+      "description": "A concise tree-sitter-based map of the whole repo (key classes, functions, signatures) is sent with every request; tunable via /map and --map-tokens.",
+      "source": "https://aider.chat/docs/repomap.html"
+    },
+    {
+      "feature": "Multi-language support + built-in linting",
+      "description": "Repo maps and built-in linters cover most popular languages; edited files are linted automatically and aider offers to fix errors.",
+      "source": "https://aider.chat/docs/languages.html"
+    },
+    {
+      "feature": "BYOK model support",
+      "description": "Connects to most LLMs: OpenAI, Anthropic, Gemini, DeepSeek, GROQ, xAI, Cohere, Azure, Vertex, Bedrock, OpenRouter, GitHub Copilot, LM Studio, Ollama and OpenAI-compatible APIs.",
+      "source": "https://aider.chat/docs/llms.html"
+    },
+    {
+      "feature": "Main/weak/editor model roles",
+      "description": "Separate models for editing, commit messages and summaries, switchable in chat via /model, /weak-model and /editor-model.",
+      "source": "https://aider.chat/docs/usage/commands.html"
+    },
+    {
+      "feature": "Model aliases",
+      "description": "--alias fast:gpt-4o-mini style shorthand names for frequently used models, defined on the CLI or in config files.",
+      "source": "https://aider.chat/docs/config/model-aliases.html"
+    },
+    {
+      "feature": "Reasoning controls",
+      "description": "/reasoning-effort and /think-tokens tune reasoning effort and thinking budgets; popular reasoning models work out of the box.",
+      "source": "https://aider.chat/docs/config/reasoning.html"
+    },
+    {
+      "feature": "Prompt caching",
+      "description": "--cache-prompts organizes the system prompt, read-only files, repo map and chat for Anthropic and DeepSeek prompt caching.",
+      "source": "https://aider.chat/docs/usage/caching.html"
+    },
+    {
+      "feature": "Voice-to-code",
+      "description": "/voice records and transcribes spoken coding instructions so you can fluidly mix voice and text chat.",
+      "source": "https://aider.chat/docs/usage/voice.html"
+    },
+    {
+      "feature": "Images and web pages",
+      "description": "Add images for vision-capable models via /add, /paste or CLI args; /web scrapes a URL to markdown and sends it in the chat.",
+      "source": "https://aider.chat/docs/usage/images-urls.html"
+    },
+    {
+      "feature": "IDE watch mode (AI comments)",
+      "description": "--watch-files scans the repo for one-line AI, AI! or AI? comments written in any IDE or editor and acts on them.",
+      "source": "https://aider.chat/docs/usage/watch.html"
+    },
+    {
+      "feature": "Linting hooks",
+      "description": "Built-in or custom linters (--lint-cmd, per-language) run after edits; --no-auto-lint disables; /lint lints in-chat or dirty files.",
+      "source": "https://aider.chat/docs/usage/lint-test.html"
+    },
+    {
+      "feature": "Testing hooks",
+      "description": "--test-cmd with --auto-test runs tests after changes; /test adds failing output to the chat so aider can fix it.",
+      "source": "https://aider.chat/docs/usage/lint-test.html"
+    },
+    {
+      "feature": "Scripting / one-shot automation",
+      "description": "--message and --message-file run a single instruction then exit; --yes auto-confirms, enabling scripted CLI and Python automation.",
+      "source": "https://aider.chat/docs/scripting.html"
+    },
+    {
+      "feature": ".aider.conf.yml",
+      "description": "YAML config file loaded from the home directory, git repo root or cwd, with a --config override.",
+      "source": "https://aider.chat/docs/config/aider_conf.html"
+    },
+    {
+      "feature": ".env configuration",
+      "description": "API keys and settings stored in .env files (home directory, repo root, cwd or --env-file).",
+      "source": "https://aider.chat/docs/config/dotenv.html"
+    },
+    {
+      "feature": "Coding conventions file",
+      "description": "A markdown file like CONVENTIONS.md loaded read-only via --read or /read-only sets style and library preferences.",
+      "source": "https://aider.chat/docs/usage/conventions.html"
+    },
+    {
+      "feature": "Read-only files",
+      "description": "/read-only adds reference files the model can see but never edit; kept stable so they can be prompt-cached.",
+      "source": "https://aider.chat/docs/usage/commands.html"
+    },
+    {
+      "feature": "Token reporting",
+      "description": "/tokens reports token usage of the current chat context.",
+      "source": "https://aider.chat/docs/usage/commands.html"
+    },
+    {
+      "feature": "External editor prompt",
+      "description": "/editor (Ctrl-X Ctrl-E) composes the next prompt in your configured external editor.",
+      "source": "https://aider.chat/docs/usage/commands.html"
+    },
+    {
+      "feature": "Multiline input and keybindings",
+      "description": "{...} brace blocks, Meta-Enter, /multiline-mode and /paste for long messages; prompt-toolkit Emacs keybindings plus --vim Vi mode.",
+      "source": "https://aider.chat/docs/usage/commands.html"
+    },
+    {
+      "feature": "Safe interrupts",
+      "description": "Control-C always safely interrupts aider; the partial response stays in the conversation for follow-up.",
+      "source": "https://aider.chat/docs/usage/commands.html"
+    },
+    {
+      "feature": "Session save/load",
+      "description": "/save and /load write and replay files that reconstruct the current chat session file set.",
+      "source": "https://aider.chat/docs/usage/commands.html"
+    },
+    {
+      "feature": "Shell and git in chat",
+      "description": "/run executes a shell command (alias !) and can add output to the chat; /git runs raw git commands.",
+      "source": "https://aider.chat/docs/usage/commands.html"
+    },
+    {
+      "feature": "Notifications",
+      "description": "--notifications sends OS notifications (terminal-notifier, notify-send, PowerShell) when aider is waiting for input.",
+      "source": "https://aider.chat/docs/usage/notifications.html"
+    },
+    {
+      "feature": "Copy/paste web-chat mode",
+      "description": "--copy-paste and /copy-context let you pair aider with LLM web chat UIs when APIs are unavailable or restricted.",
+      "source": "https://aider.chat/docs/usage/copypaste.html"
+    },
+    {
+      "feature": "Edit formats",
+      "description": "Multiple LLM edit formats (whole, diff, diff-fenced, udiff and editor variants) selectable via --edit-format / --editor-edit-format.",
+      "source": "https://aider.chat/docs/more/edit-formats.html"
+    },
+    {
+      "feature": "Infinite output",
+      "description": "Prefills the assistant response so models supporting prefill can continue past provider output token limits.",
+      "source": "https://aider.chat/docs/more/infinite-output.html"
+    },
+    {
+      "feature": "Non-code text editing",
+      "description": "Edits almost any text file: shell and ssh configs, Dockerfiles, documentation and other config formats.",
+      "source": "https://aider.chat/docs/usage/not-code.html"
+    },
+    {
+      "feature": "Opt-in analytics",
+      "description": "Anonymous, opt-in analytics collection with no personal information.",
+      "source": "https://aider.chat/docs/more/analytics.html"
+    }
+  ]
+}

@@ -1,0 +1,216 @@
+{
+  "agent": "Roo Code",
+  "feature_count": 42,
+  "features": [
+    {
+      "feature": "VS Code extension",
+      "description": "Open-source AI coding agent for VS Code (Cline fork) with file system access, terminal control and multi-step workflows; also on Open VSX.",
+      "source": "https://docs.roocode.com/"
+    },
+    {
+      "feature": "Extension shutdown (May 2026)",
+      "description": "The Roo Code extension was shut down on May 15, 2026; the docs direct users to the community fork ZooCode and to Cline, from which Roo Code originated.",
+      "source": "https://docs.roocode.com/"
+    },
+    {
+      "feature": "Built-in modes",
+      "description": "Specialized personas: Code (default), Architect, Ask, Debug and Orchestrator, each with different capabilities and access levels.",
+      "source": "https://docs.roocode.com/Roo-Code/basic-usage/using-modes"
+    },
+    {
+      "feature": "Sticky models per mode",
+      "description": "Each mode remembers its last-used model and persists between sessions; Roo switches models automatically when you change modes.",
+      "source": "https://docs.roocode.com/Roo-Code/basic-usage/using-modes"
+    },
+    {
+      "feature": "Mode switching",
+      "description": "Four ways to switch: dropdown, /architect /ask /debug /code /orchestrator slash commands, Cmd/Ctrl+. shortcut, and Roo-suggested mode switches.",
+      "source": "https://docs.roocode.com/Roo-Code/basic-usage/using-modes"
+    },
+    {
+      "feature": "Custom modes",
+      "description": "Create your own modes with slug, name, description, prompts and tool access groups (YAML or UI).",
+      "source": "https://docs.roocode.com/Roo-Code/features/custom-modes"
+    },
+    {
+      "feature": "Boomerang tasks / Orchestrator",
+      "description": "Break complex projects into subtasks; each subtask runs in its own context, often in a tailored mode, and reports back to the orchestrator.",
+      "source": "https://docs.roocode.com/Roo-Code/features/boomerang-tasks"
+    },
+    {
+      "feature": "Auto-approve",
+      "description": "Per-action permission tiles with All/None chips and a global Enabled toggle; Cmd/Ctrl+Alt+A shortcut and command-palette toggle.",
+      "source": "https://docs.roocode.com/Roo-Code/features/auto-approving-actions"
+    },
+    {
+      "feature": "Checkpoints",
+      "description": "Shadow-git snapshots before file modifications; View Differences and Restore (files only, or files plus task); enabled by default and needs no GitHub account.",
+      "source": "https://docs.roocode.com/Roo-Code/features/checkpoints"
+    },
+    {
+      "feature": "Codebase indexing",
+      "description": "Embeddings-based semantic code search across the project; supports Google Gemini, OpenAI, Ollama, OpenRouter, Mistral, Vercel AI Gateway and Bedrock providers.",
+      "source": "https://docs.roocode.com/Roo-Code/features/codebase-indexing"
+    },
+    {
+      "feature": "Context mentions",
+      "description": "@-mentions bring files, folders, problems and git commits into the conversation.",
+      "source": "https://docs.roocode.com/Roo-Code/basic-usage/context-mentions"
+    },
+    {
+      "feature": "Built-in tool set",
+      "description": "Tools include read_file, write_to_file, apply_diff, search_replace, list_files, search_files, execute_command, codebase_search, use_mcp_tool, access_mcp_resource, new_task, run_slash_command, switch_mode, generate_image, update_todo_list, ask_followup_question and attempt_completion.",
+      "source": "https://docs.roocode.com/Roo-Code/advanced-usage/available-tools/tool-use-overview"
+    },
+    {
+      "feature": "Custom instructions",
+      "description": "Persistent behaviors, preferences and constraints via workspace and global rules directories such as ~/.roo/rules.",
+      "source": "https://docs.roocode.com/Roo-Code/features/custom-instructions"
+    },
+    {
+      "feature": "Skills",
+      "description": "Task-specific instruction packages loaded on demand when your request matches the skill purpose.",
+      "source": "https://docs.roocode.com/Roo-Code/features/skills"
+    },
+    {
+      "feature": "Custom slash commands",
+      "description": "Automate repetitive tasks with markdown command files in .roo/commands/ (project) or ~/.roo/commands/ (global), manageable in Settings.",
+      "source": "https://docs.roocode.com/Roo-Code/features/slash-commands"
+    },
+    {
+      "feature": "MCP support",
+      "description": "Connect MCP servers for extra tools and resources (stdio and SSE transports documented).",
+      "source": "https://docs.roocode.com/Roo-Code/features/mcp/overview"
+    },
+    {
+      "feature": "Marketplace",
+      "description": "Central hub for discovering and installing extensions: MCP servers and custom modes.",
+      "source": "https://docs.roocode.com/Roo-Code/features/marketplace"
+    },
+    {
+      "feature": "Git worktrees",
+      "description": "Work multiple branches of the same repo simultaneously; each worktree opens its own VS Code window with Roo Code.",
+      "source": "https://docs.roocode.com/Roo-Code/features/worktrees"
+    },
+    {
+      "feature": "Intelligent context condensing",
+      "description": "AI summarization of earlier conversation parts while retaining key information and preserving slash commands.",
+      "source": "https://docs.roocode.com/Roo-Code/features/intelligent-context-condensing"
+    },
+    {
+      "feature": ".rooignore",
+      "description": "Specify files and directories Roo cannot access or modify, like .gitignore for the agent.",
+      "source": "https://docs.roocode.com/Roo-Code/features/rooignore"
+    },
+    {
+      "feature": "Model-agnostic providers",
+      "description": "Dozens of providers: Anthropic, OpenAI (including ChatGPT Plus/Pro), Gemini, DeepSeek, Ollama, LM Studio, OpenRouter, Bedrock, Vertex, LiteLLM, Mistral, Moonshot, MiniMax, Qwen Code, Requesty, SambaNova, Fireworks, Baseten, Vercel AI Gateway, VS Code LM, xAI and Z AI.",
+      "source": "https://docs.roocode.com/Roo-Code/providers"
+    },
+    {
+      "feature": "Local models",
+      "description": "Run models locally on Ollama or LM Studio for privacy, offline use and cost savings.",
+      "source": "https://docs.roocode.com/Roo-Code/advanced-usage/local-models"
+    },
+    {
+      "feature": "API configuration profiles",
+      "description": "Create and switch between sets of AI settings, with different configurations per mode.",
+      "source": "https://docs.roocode.com/Roo-Code/features/api-configuration-profiles"
+    },
+    {
+      "feature": "Task todo list",
+      "description": "Interactive, persistent checklists in the chat that track progress through multi-step workflows.",
+      "source": "https://docs.roocode.com/Roo-Code/features/task-todo-list"
+    },
+    {
+      "feature": "Shell integration",
+      "description": "Executes commands in your terminal and intelligently processes their output for bidirectional automation.",
+      "source": "https://docs.roocode.com/Roo-Code/features/shell-integration"
+    },
+    {
+      "feature": "Code Actions",
+      "description": "AI quick-fixes from the VS Code lightbulb menu, context-aware without switching to chat.",
+      "source": "https://docs.roocode.com/Roo-Code/features/code-actions"
+    },
+    {
+      "feature": "Diagnostics integration",
+      "description": "The agent sees and can fix VS Code Problems-panel errors, warnings and other diagnostics.",
+      "source": "https://docs.roocode.com/Roo-Code/features/diagnostics-integration"
+    },
+    {
+      "feature": "Enhance Prompt",
+      "description": "Wand icon in the chat input refines your prompt to be clearer and more specific before sending.",
+      "source": "https://docs.roocode.com/Roo-Code/features/enhance-prompt"
+    },
+    {
+      "feature": "Image generation",
+      "description": "Generate or edit images from text prompts and save them to the project (experimental; requires OpenRouter).",
+      "source": "https://docs.roocode.com/Roo-Code/features/image-generation"
+    },
+    {
+      "feature": "Message queueing",
+      "description": "Queue multiple follow-up messages while Roo is working; they are processed sequentially.",
+      "source": "https://docs.roocode.com/Roo-Code/features/message-queueing"
+    },
+    {
+      "feature": "Suggested responses",
+      "description": "One-click suggested answers to Roo follow-up questions, shown as buttons under the chat input.",
+      "source": "https://docs.roocode.com/Roo-Code/features/suggested-responses"
+    },
+    {
+      "feature": "Text-to-speech",
+      "description": "Reads AI responses aloud via a speaker icon next to each response (settings toggle).",
+      "source": "https://docs.roocode.com/Roo-Code/features/more-features"
+    },
+    {
+      "feature": "18 UI languages",
+      "description": "Interface localized in 18 languages including English, Chinese, Spanish, Hindi, French, German, Japanese and more.",
+      "source": "https://docs.roocode.com/Roo-Code/features/more-features"
+    },
+    {
+      "feature": "Concurrent file reads",
+      "description": "Reads multiple workspace files in a single step instead of one by one.",
+      "source": "https://docs.roocode.com/Roo-Code/features/concurrent-file-reads"
+    },
+    {
+      "feature": "Multi-file edits",
+      "description": "Edits multiple files in a single operation; graduated from experimental and enabled by default.",
+      "source": "https://docs.roocode.com/Roo-Code/features/experimental/concurrent-file-edits"
+    },
+    {
+      "feature": "Background editing (experimental)",
+      "description": "Applies file edits in the background without interrupting you with automatic diff views.",
+      "source": "https://docs.roocode.com/Roo-Code/features/experimental/background-editing"
+    },
+    {
+      "feature": "Custom tools (experimental)",
+      "description": "Define TypeScript or JavaScript tools Roo can call like built-ins; automatically approved when enabled.",
+      "source": "https://docs.roocode.com/Roo-Code/features/experimental/custom-tools"
+    },
+    {
+      "feature": "Keyboard shortcuts",
+      "description": "Keyboard navigation including mode cycling (Cmd/Ctrl+.) and an auto-approve toggle (Cmd/Ctrl+Alt+A).",
+      "source": "https://docs.roocode.com/Roo-Code/features/keyboard-shortcuts"
+    },
+    {
+      "feature": "Settings export/import/reset",
+      "description": "Back up, share or restore configuration via export, import and reset options.",
+      "source": "https://docs.roocode.com/Roo-Code/features/settings-management"
+    },
+    {
+      "feature": "Model temperature",
+      "description": "Per-mode temperature tuning to trade precision against creativity.",
+      "source": "https://docs.roocode.com/Roo-Code/features/model-temperature"
+    },
+    {
+      "feature": "Nightly builds",
+      "description": "Roo Code nightly release channel for pre-release features.",
+      "source": "https://docs.roocode.com/Roo-Code/advanced-usage/roo-code-nightly"
+    },
+    {
+      "feature": "Community Memory Bank",
+      "description": "Third-party custom-mode system (GreatScottyMac) that maintains persistent project context in markdown memory files; not part of Roo core docs.",
+      "source": "https://github.com/GreatScottyMac/roo-code-memory-bank"
+    }
+  ]
+}

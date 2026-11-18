@@ -1,0 +1,141 @@
+{
+  "agent": "Cursor",
+  "feature_count": 27,
+  "features": [
+    {
+      "feature": "Editor agent",
+      "description": "Chat agent in the IDE sidepane (Cmd+I) that edits files, runs terminal commands, and calls tools with no tool-call limit.",
+      "source": "https://cursor.com/docs/agent/overview"
+    },
+    {
+      "feature": "Agents Window",
+      "description": "Agent-first interface unifying local, cloud, and remote-SSH agents across repos; runs beside or instead of the classic IDE.",
+      "source": "https://cursor.com/docs/agent/agents-window.md"
+    },
+    {
+      "feature": "Cursor CLI",
+      "description": "Terminal agent with Agent, Plan, and Ask modes (Shift+Tab or --mode), headless output for scripts/CI, ACP, and a GitHub Actions integration.",
+      "source": "https://cursor.com/docs/cli/overview.md"
+    },
+    {
+      "feature": "Cursor for iOS",
+      "description": "Native iPhone/iPad app to start agents, follow them live, and review/merge their pull requests; shares a backend with cursor.com/agents and the desktop Agents Window.",
+      "source": "https://cursor.com/docs/cloud-agent/mobile.md"
+    },
+    {
+      "feature": "Web dashboard",
+      "description": "Start and manage agents on the web at cursor.com/agents, with secrets, automations, and usage at cursor.com/dashboard.",
+      "source": "https://cursor.com/docs/cloud-agent/mobile.md"
+    },
+    {
+      "feature": "Projects",
+      "description": "A coordinator agent plans a feature or migration, delegates the code to worker agents, and brings the finished work back for review.",
+      "source": "https://cursor.com/docs/agent/projects.md"
+    },
+    {
+      "feature": "Subagents",
+      "description": "Delegated specialists with their own context window (built-in Explore and Browser subagents); usable in the editor, CLI, and Cloud Agents.",
+      "source": "https://cursor.com/docs/subagents.md"
+    },
+    {
+      "feature": "Plan Mode",
+      "description": "Shift+Tab mode that researches the codebase, asks clarifying questions, and produces an editable plan saved to your workspace.",
+      "source": "https://cursor.com/docs/agent/plan-mode.md"
+    },
+    {
+      "feature": "Run Modes & sandboxing",
+      "description": "Auto-review (sandboxed shell + cloud-side safety classifier), Allowlist, or Run Everything; sandboxed execution is a layer under the run mode.",
+      "source": "https://cursor.com/docs/agent/security/run-modes.md"
+    },
+    {
+      "feature": "Cloud Agents",
+      "description": "Agents running in isolated cloud VMs with full dev environments: parallel execution, MCP, computer use, multi-repo changes, secrets, and private connectivity.",
+      "source": "https://cursor.com/docs/cloud-agent"
+    },
+    {
+      "feature": "Self-hosted cloud runtimes",
+      "description": "Run Cloud Agents on self-hosted machines and pools; choose your own runtime.",
+      "source": "https://cursor.com/docs/cloud-agent"
+    },
+    {
+      "feature": "Automations",
+      "description": "Cloud agents triggered on cron schedules or GitHub/GitLab/Bitbucket/Slack/webhook/Linear/Sentry/PagerDuty events, runnable as service accounts and managed via a Terraform provider.",
+      "source": "https://cursor.com/docs/cloud-agent/automations.md"
+    },
+    {
+      "feature": "Bugbot",
+      "description": "GitHub PR review automation that flags bugs and security issues on every PR update; manually triggerable by commenting `cursor review`.",
+      "source": "https://cursor.com/docs/bugbot.md"
+    },
+    {
+      "feature": "Origin",
+      "description": "Cursor's early-beta git forge: create repos, push/pull, mirror from GitHub, browse code, open and merge pull requests, and share with your team.",
+      "source": "https://cursor.com/docs/origin.md"
+    },
+    {
+      "feature": "Voice chat",
+      "description": "Realtime voice calls with agents powered by Grok Voice in the Agents Window, IDE, web, and iOS; dictation is a separate feature; zero data retention with Privacy Mode.",
+      "source": "https://cursor.com/changelog/voice-chat"
+    },
+    {
+      "feature": "Build live apps",
+      "description": "Describe an app and Cursor builds it with database, auth, and deployment, then shares it via a link.",
+      "source": "https://cursor.com/changelog/build-live-apps"
+    },
+    {
+      "feature": "Models",
+      "description": "Cursor models (Grok 4.7/4.6/4.5 and Composer 2.5) included in weekly plan pools; third-party Claude/GPT/Gemini models at API list price on Premium and above.",
+      "source": "https://cursor.com/docs/models-and-pricing.md"
+    },
+    {
+      "feature": "BYOK",
+      "description": "Add your own OpenAI/Anthropic/Google/Azure/Bedrock API keys for unlimited use at your own cost (not available on the Plus tier).",
+      "source": "https://cursor.com/help/models-and-usage/api-keys.md"
+    },
+    {
+      "feature": "Auto (Cursor Router)",
+      "description": "Balances intelligence, cost, and reliability by routing each request across Cursor and third-party models.",
+      "source": "https://cursor.com/help/account-and-billing/pricing.md"
+    },
+    {
+      "feature": "Rules",
+      "description": "Four instruction types: Project (.cursor/rules), User, Team (dashboard-managed), and AGENTS.md.",
+      "source": "https://cursor.com/docs/rules.md"
+    },
+    {
+      "feature": "Skills",
+      "description": "Portable SKILL.md packages; built-ins include /automate, /autopilot, /canvas, and /create-hook.",
+      "source": "https://cursor.com/docs/skills.md"
+    },
+    {
+      "feature": "Hooks",
+      "description": "hooks.json scripts at project/user level (or via plugins) that observe, block, or modify stages of the agent loop over stdio JSON.",
+      "source": "https://cursor.com/docs/hooks.md"
+    },
+    {
+      "feature": "MCP",
+      "description": "Install and manage MCP servers from Settings to connect external tools and data sources.",
+      "source": "https://cursor.com/docs/mcp.md"
+    },
+    {
+      "feature": "Privacy Mode",
+      "description": "Ensures your code is never used for training; enabled by default for teams and enforceable organization-wide from the dashboard.",
+      "source": "https://cursor.com/help/security-and-privacy/privacy.md"
+    },
+    {
+      "feature": "Pricing (The X Subscription)",
+      "description": "One subscription for Grok, Cursor, and X: Free, Plus $8/mo, Premium $30/mo, Super $100/mo, Ultra $200/mo, Teams $30-$200/seat, Enterprise custom; weekly shared usage pools; legacy Cursor plans keep working.",
+      "source": "https://cursor.com/help/account-and-billing/pricing.md"
+    },
+    {
+      "feature": "Integrations & Agent SDK",
+      "description": "Slack, Microsoft Teams, Jira, Linear, Notion, GitHub/GitLab/Azure DevOps/Bitbucket, JetBrains, Xcode, and Tailscale integrations, plus TypeScript/Python Agent SDKs.",
+      "source": "https://cursor.com/docs/cloud-agent"
+    },
+    {
+      "feature": "Tab (autocomplete)",
+      "description": "AI code completions accepted with the Tab key; free plans carry a limited Tab allowance that resets.",
+      "source": "https://cursor.com/help/troubleshooting/tab-issues.md"
+    }
+  ]
+}

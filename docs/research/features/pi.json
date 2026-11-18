@@ -1,0 +1,131 @@
+{
+  "agent": "Pi",
+  "feature_count": 25,
+  "features": [
+    {
+      "feature": "Identity and philosophy",
+      "description": "Minimal, extensible agent harness (MIT, by Mario Zechner / Earendil Works): ships powerful defaults but deliberately skips sub-agents and plan mode — ask Pi to build them or install a package that does it your way.",
+      "source": "https://github.com/earendil-works/pi"
+    },
+    {
+      "feature": "Interfaces",
+      "description": "Four modes: interactive terminal UI, print mode (one-shot), JSON event-stream mode, and RPC control; plus a TypeScript SDK for building apps on Pi.",
+      "source": "https://github.com/earendil-works/pi"
+    },
+    {
+      "feature": "Built-in tools",
+      "description": "Built-in file/command tools — read, write, edit, bash, plus grep, find, ls (the official isolation doc lists these as the overridable built-ins) — driven by a minimal system prompt.",
+      "source": "https://docs.pi.dev/latest/containerization"
+    },
+    {
+      "feature": "Model support",
+      "description": "15+ providers (Anthropic, OpenAI, Google, Azure, Bedrock, Mistral, Groq, Cerebras, xAI, Hugging Face, Kimi For Coding, MiniMax, NVIDIA, OpenRouter, Ollama, and more) via API key or OAuth; switch mid-session with /model or Ctrl+L, cycle favorites with Ctrl+P; add custom providers/models via models.json or extensions.",
+      "source": "https://pi.dev/"
+    },
+    {
+      "feature": "Thinking levels",
+      "description": "/thinking (Shift+Tab cycles) selects how much reasoning the current model uses; the editor border shows the active level.",
+      "source": "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/docs/usage.md"
+    },
+    {
+      "feature": "Tree-structured sessions",
+      "description": "Sessions auto-save as JSONL trees; /tree navigates and branches from any earlier entry, /fork and /clone copy history into new session files, /resume reopens a saved session, /new starts fresh.",
+      "source": "https://pi.dev/"
+    },
+    {
+      "feature": "Session export and sharing",
+      "description": "/export renders a session to HTML; /share uploads it to a GitHub gist and returns a shareable URL.",
+      "source": "https://pi.dev/"
+    },
+    {
+      "feature": "Compaction",
+      "description": "Auto-summarizes older messages when approaching the context limit (summary entry replaces older messages in requests; originals stay in the tree); fully customizable via extensions — topic-based, code-aware, or different summarizer models.",
+      "source": "https://pi.dev/"
+    },
+    {
+      "feature": "Context engineering files",
+      "description": "AGENTS.md project instructions load from ~/.pi/agent/, parent directories, and the current directory; SYSTEM.md replaces or appends to the default system prompt per project.",
+      "source": "https://pi.dev/"
+    },
+    {
+      "feature": "Skills",
+      "description": "Implements the Agent Skills spec: SKILL.md directories with scripts/references/assets, advertised by name+description and loaded on demand (progressive disclosure that preserves the prompt cache); /skill:name forces loading; honors ~/.agents/skills/ and project .agents/skills/.",
+      "source": "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/docs/skills.md"
+    },
+    {
+      "feature": "Extensions",
+      "description": "TypeScript modules running inside the Pi process: register custom tools and commands, intercept events (block/modify tool calls, inject context, custom compaction), custom TUI components, session persistence, and register providers and MCP servers; auto-discovered in ~/.pi/agent/extensions/ or .pi/extensions/ with hot reload via /reload.",
+      "source": "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/docs/extensions.md"
+    },
+    {
+      "feature": "MCP support",
+      "description": "First-class MCP CLI (pi mcp add/remove/list/login/logout) plus project MCP servers declared in .pi/mcp.json (gated by project trust); extensions can also register MCP servers.",
+      "source": "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/docs/cli.md"
+    },
+    {
+      "feature": "Pi packages",
+      "description": "Bundle extensions, skills, prompt templates, and themes as Pi packages shared via npm or git; pi install/remove/update/list manages them.",
+      "source": "https://github.com/earendil-works/pi"
+    },
+    {
+      "feature": "Prompt templates and themes",
+      "description": "Reusable prompt templates expand editor input before it becomes a message; themes restyle the terminal UI — both also distributable as packages.",
+      "source": "https://github.com/earendil-works/pi"
+    },
+    {
+      "feature": "Permissions stance",
+      "description": "No built-in permission system: Pi runs with the launching user/process permissions and does not ask before every tool call; review commands and changed files, and sandbox untrusted or unattended work.",
+      "source": "https://docs.pi.dev/latest/security"
+    },
+    {
+      "feature": "Project trust",
+      "description": "Trust decision gates loading project resources (.pi/settings.json, .pi/mcp.json, .pi extensions/skills/prompts/themes, SYSTEM.md, .agents/skills); defaultProjectTrust ask/always/never, --approve/--no-approve overrides, /trust saves decisions to ~/.pi/agent/trust.json.",
+      "source": "https://docs.pi.dev/latest/security"
+    },
+    {
+      "feature": "Containerization and sandboxing patterns",
+      "description": "Four documented isolation options: plain Docker (whole process), Docker Sandboxes (managed sandbox with host credential proxying), NVIDIA OpenShell (local/remote sandboxes with filesystem/process/network/credential policies), and Gondolin (local Linux micro-VM that runs Pi on the host while routing built-in tools and ! commands inside).",
+      "source": "https://docs.pi.dev/latest/containerization"
+    },
+    {
+      "feature": "Steering and interrupts",
+      "description": "Mid-run steering with Enter, follow-ups queued after the current task with Alt+Enter, Alt+Up returns queued messages, Escape aborts the run.",
+      "source": "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/docs/usage.md"
+    },
+    {
+      "feature": "@ file mentions and images",
+      "description": "Type @ to search and attach files to the prompt (Tab path completion); paste or drag images into the terminal to include them.",
+      "source": "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/docs/usage.md"
+    },
+    {
+      "feature": "Auth CLI",
+      "description": "pi auth login/logout per provider (--api-key or OAuth without browser), plus /login inside the TUI to connect a subscription or store an API key.",
+      "source": "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/docs/cli.md"
+    },
+    {
+      "feature": "Install and platforms",
+      "description": "curl/PowerShell installers that pin all dependencies (pi update), npm @earendil-works/pi-coding-agent (Node 22.19+), Nix flake; runs on macOS, Linux, Windows, and Android via Termux.",
+      "source": "https://pi.dev/docs/latest/quickstart"
+    },
+    {
+      "feature": "OpenClaw integration",
+      "description": "Official README cites OpenClaw as a real-world integration — OpenClaw builds its agent runtime on Pi.",
+      "source": "https://github.com/earendil-works/pi"
+    },
+    {
+      "feature": "Building-block packages",
+      "description": "Monorepo libraries: pi-ai (unified multi-provider LLM API), pi-agent-core (agent runtime with tool calling/state), pi-durable (durable conversation/task/document runtime), pi-tui, pi-telemetry, and chord; pi-chat (separate repo) adds Slack/chat automation.",
+      "source": "https://github.com/earendil-works/pi"
+    },
+    {
+      "feature": "Supply-chain hardening",
+      "description": "Pinned exact dependency versions, two-day min-release-age on npm resolution, install lock with an explicit lifecycle-script allowlist, npm audit CI, and --ignore-scripts installs.",
+      "source": "https://github.com/earendil-works/pi"
+    },
+    {
+      "feature": "Pricing",
+      "description": "Free, MIT-licensed open source; you bring model access — a subscription, an API key, or a local model — with no vendor pricing tier.",
+      "source": "https://pi.dev/docs/latest/quickstart"
+    }
+  ]
+}

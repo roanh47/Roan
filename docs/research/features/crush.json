@@ -1,0 +1,76 @@
+{
+  "agent": "Crush",
+  "feature_count": 14,
+  "features": [
+    {
+      "feature": "TUI coding agent",
+      "description": "Terminal-native coding agent with first-class support on macOS, Linux, Windows (PowerShell/WSL), Android, FreeBSD, OpenBSD, and NetBSD.",
+      "source": "https://github.com/charmbracelet/crush"
+    },
+    {
+      "feature": "Multi-provider BYOK",
+      "description": "Choose from a wide range of LLMs or add your own via OpenAI- or Anthropic-compatible APIs, Charm's hosted Hyper models, or the Catwalk community registry.",
+      "source": "https://github.com/charmbracelet/crush"
+    },
+    {
+      "feature": "Mid-session model switching",
+      "description": "Switch LLMs mid-session while preserving context.",
+      "source": "https://github.com/charmbracelet/crush"
+    },
+    {
+      "feature": "Sessions",
+      "description": "Maintain multiple saved work sessions and contexts per project.",
+      "source": "https://github.com/charmbracelet/crush"
+    },
+    {
+      "feature": "LSP integration",
+      "description": "Uses language servers for additional context, like an IDE does.",
+      "source": "https://github.com/charmbracelet/crush"
+    },
+    {
+      "feature": "MCP",
+      "description": "http, stdio, and SSE MCP servers with OAuth (including pre-registered clients) and per-server timeout, env, and disabled-tools options.",
+      "source": "https://raw.githubusercontent.com/charmbracelet/crush/main/docs/config/README.md"
+    },
+    {
+      "feature": "Tool permissions",
+      "description": "Auto-approve specific tools with `permissions allow` rules in the config.",
+      "source": "https://raw.githubusercontent.com/charmbracelet/crush/main/docs/config/README.md"
+    },
+    {
+      "feature": "Yolo mode",
+      "description": "Broad auto-approve mode that still blocks dangerous commands.",
+      "source": "https://github.com/charmbracelet/crush/releases/tag/v0.101.0"
+    },
+    {
+      "feature": "Plan mode",
+      "description": "Introduced in v0.95.0 ('Hello, Plan Mode'); plan/normal mode badges shown in the TUI.",
+      "source": "https://github.com/charmbracelet/crush/releases/tag/v0.95.0"
+    },
+    {
+      "feature": "Skills",
+      "description": "On-demand skill files, toggleable on/off from the command palette (v0.101.0).",
+      "source": "https://github.com/charmbracelet/crush/releases/tag/v0.101.0"
+    },
+    {
+      "feature": "Hooks",
+      "description": "User-defined scripts (any executable) triggered on agent lifecycle events such as PreToolUse, receiving JSON on stdin.",
+      "source": "https://raw.githubusercontent.com/charmbracelet/crush/main/docs/hooks/README.md"
+    },
+    {
+      "feature": "Natural-language config",
+      "description": "Built-in config skill lets you configure Crush by asking; crushrc and JSON config files with a published schema.",
+      "source": "https://raw.githubusercontent.com/charmbracelet/crush/main/docs/config/README.md"
+    },
+    {
+      "feature": "Cross-platform installs",
+      "description": "Homebrew, npm, winget, scoop, nix, Arch, and FreeBSD packages.",
+      "source": "https://github.com/charmbracelet/crush"
+    },
+    {
+      "feature": "Pricing",
+      "description": "Free and open-source; you bring your own models/keys, with Charm's hosted Hyper models as the quick-start default.",
+      "source": "https://github.com/charmbracelet/crush"
+    }
+  ]
+}

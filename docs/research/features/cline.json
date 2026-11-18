@@ -1,0 +1,251 @@
+{
+  "agent": "Cline",
+  "feature_count": 49,
+  "features": [
+    {
+      "feature": "VS Code IDE extension",
+      "description": "AI agent living in the editor: reads and writes files, runs terminal commands, uses a browser; every action requires explicit approval.",
+      "source": "https://docs.cline.bot/cline-overview"
+    },
+    {
+      "feature": "Multi-IDE support",
+      "description": "Works across VS Code, Cursor, Windsurf, JetBrains (IntelliJ, PyCharm, WebStorm), Antigravity and Zed; Neovim via ACP mode.",
+      "source": "https://docs.cline.bot/cline-overview"
+    },
+    {
+      "feature": "Cline Desktop",
+      "description": "Open-source desktop app for open-weight models with parallel sessions, scheduled tasks, Marketplace discovery, and session imports from other coding agents (macOS; Windows in beta).",
+      "source": "https://docs.cline.bot/usage/cline-desktop"
+    },
+    {
+      "feature": "Desktop remote development over SSH",
+      "description": "Run Cline Desktop against a dev box, build server or cloud VM over SSH; the agent, tools and code live on the remote machine.",
+      "source": "https://docs.cline.bot/usage/cline-desktop-ssh"
+    },
+    {
+      "feature": "Local models in Desktop",
+      "description": "Set up Ollama or LM Studio, download, load and switch local models, and manage their memory and disk usage from Cline Desktop.",
+      "source": "https://docs.cline.bot/usage/cline-desktop-local-models"
+    },
+    {
+      "feature": "Cline Cloud Agents",
+      "description": "Run agents straight from the browser on your GitHub repos in a secure cloud sandbox; work is handed back as a branch and pull request and keeps running with the tab closed.",
+      "source": "https://docs.cline.bot/usage/cloud-agents"
+    },
+    {
+      "feature": "TUI",
+      "description": "Interactive terminal UI for conversational, in-terminal coding workflows.",
+      "source": "https://docs.cline.bot/usage/tui"
+    },
+    {
+      "feature": "CLI",
+      "description": "Interactive terminal sessions plus automated headless workflows; installed via npm i -g cline with cline auth for providers.",
+      "source": "https://docs.cline.bot/usage/cli-overview"
+    },
+    {
+      "feature": "CLI command reference",
+      "description": "Complete command, flag and configuration reference for the Cline CLI.",
+      "source": "https://docs.cline.bot/cli/cli-reference"
+    },
+    {
+      "feature": "ACP mode",
+      "description": "Cline CLI speaks the Agent Client Protocol so Zed, JetBrains IDEs, Neovim, Emacs and other ACP-capable clients can drive it.",
+      "source": "https://docs.cline.bot/usage/acp"
+    },
+    {
+      "feature": "Kanban",
+      "description": "Run multiple coding agents in parallel with isolated git worktrees on a kanban board (research preview), with remote access via tunnels or VPNs.",
+      "source": "https://docs.cline.bot/usage/kanban"
+    },
+    {
+      "feature": "Plan and Act modes",
+      "description": "Dual-mode system: Plan mode explores and strategizes without changing files; Act mode executes against the plan.",
+      "source": "https://docs.cline.bot/core-workflows/plan-and-act"
+    },
+    {
+      "feature": "Human-in-the-loop approvals",
+      "description": "Every file edit, command and browser action is shown for explicit approval before running; you are always in control.",
+      "source": "https://docs.cline.bot/cline-overview"
+    },
+    {
+      "feature": "Auto Approve",
+      "description": "Per-category auto-approval: read/edit project or all files, execute safe or all commands (model-flagged requires_approval), use the browser, use MCP servers; optional OS notifications.",
+      "source": "https://docs.cline.bot/features/auto-approve"
+    },
+    {
+      "feature": "YOLO mode",
+      "description": "Autonomous operation with all auto-approve categories enabled; enterprise deployments can centrally control it.",
+      "source": "https://docs.cline.bot/features/auto-approve"
+    },
+    {
+      "feature": "Checkpoints",
+      "description": "Shadow-git snapshots after each tool use; compare or restore code at any point while keeping the conversation; enabled by default and captures untracked files.",
+      "source": "https://docs.cline.bot/core-workflows/checkpoints"
+    },
+    {
+      "feature": "Built-in tool set",
+      "description": "ClineCore built-ins: read_files, search_codebase, run_commands, fetch_web_content, editor or apply_patch, skills, ask_question, submit_and_exit, with per-model tool routing.",
+      "source": "https://docs.cline.bot/tools-reference/all-cline-tools"
+    },
+    {
+      "feature": "Browser tool",
+      "description": "Browser tool for web fetching and searching, gated by its own Use the browser auto-approve permission.",
+      "source": "https://docs.cline.bot/features/auto-approve"
+    },
+    {
+      "feature": "Context mentions",
+      "description": "@-mentions and drag-and-drop bring files and folders into the conversation.",
+      "source": "https://docs.cline.bot/core-workflows/working-with-files"
+    },
+    {
+      "feature": "Slash commands",
+      "description": "Built-in chat commands to manage context, plan implementations and trigger reusable skills.",
+      "source": "https://docs.cline.bot/core-workflows/using-commands"
+    },
+    {
+      "feature": "Rules",
+      "description": "Persistent instructions in .clinerules/ or .cline/rules/ (workspace and global); auto-detects .cursorrules, .windsurfrules and AGENTS.md, with a toggleable Rules panel.",
+      "source": "https://docs.cline.bot/customization/cline-rules"
+    },
+    {
+      "feature": "Skills",
+      "description": "Modular instruction sets that extend capabilities for specific tasks, loaded on demand.",
+      "source": "https://docs.cline.bot/customization/skills"
+    },
+    {
+      "feature": "Plugins",
+      "description": "Installable packages that extend Cline with custom tools, hooks and capabilities.",
+      "source": "https://docs.cline.bot/customization/plugins"
+    },
+    {
+      "feature": "Custom tools",
+      "description": "Define, register and test your own tools with type-safe schemas and execution handlers (SDK, CLI and Kanban).",
+      "source": "https://docs.cline.bot/sdk/guides/creating-custom-tools"
+    },
+    {
+      "feature": "Hooks",
+      "description": "Lifecycle hooks that extend or observe agent behavior, delivered via SDK plugins.",
+      "source": "https://docs.cline.bot/customization/hooks"
+    },
+    {
+      "feature": "MCP support",
+      "description": "Add, configure and use MCP servers; tools are loaded from cline_mcp_settings.json alongside built-ins.",
+      "source": "https://docs.cline.bot/mcp/mcp-overview"
+    },
+    {
+      "feature": "Scheduling",
+      "description": "Run agents on cron schedules for recurring automations such as daily summaries and code reviews (SDK, CLI, Kanban).",
+      "source": "https://docs.cline.bot/cli/scheduling"
+    },
+    {
+      "feature": "Connectors",
+      "description": "Chat with your agent from Telegram, Slack, Discord, Google Chat, WhatsApp and other messengers (Cline CLI).",
+      "source": "https://docs.cline.bot/cli/connectors"
+    },
+    {
+      "feature": "Subagents",
+      "description": "Parallel research agents that explore the codebase without filling the main agent context window (Cline CLI and Desktop).",
+      "source": "https://docs.cline.bot/features/subagents"
+    },
+    {
+      "feature": "Agent Teams",
+      "description": "Coordinate multiple agents working together on complex tasks from the CLI.",
+      "source": "https://docs.cline.bot/cli/agent-teams"
+    },
+    {
+      "feature": "Memory Bank",
+      "description": "Documented best-practice methodology: a structured set of markdown files that keeps context across sessions.",
+      "source": "https://docs.cline.bot/best-practices/memory-bank"
+    },
+    {
+      "feature": "Jupyter notebook editing",
+      "description": "AI-assisted editing of .ipynb notebooks with cell-level context awareness.",
+      "source": "https://docs.cline.bot/features/jupyter-notebooks"
+    },
+    {
+      "feature": "Multi-root workspaces",
+      "description": "Read, write and run commands across multiple project folders or repos in one VS Code window.",
+      "source": "https://docs.cline.bot/features/multiroot-workspace"
+    },
+    {
+      "feature": ".clineignore",
+      "description": "Controls which files and directories Cline can access; slated for deprecation.",
+      "source": "https://docs.cline.bot/customization/clineignore"
+    },
+    {
+      "feature": "BYOK providers",
+      "description": "Bring your own keys: Anthropic (API or Claude Code subscription), OpenAI (API or Codex OAuth), OpenRouter, DeepSeek, Google Gemini, AWS Bedrock (API key, IAM or SSO), Alibaba Qwen, MiniMax, Z AI, Poolside, OpenAI-compatible endpoints and 30+ other providers.",
+      "source": "https://docs.cline.bot/provider-config/other-30-plus-providers"
+    },
+    {
+      "feature": "Local models",
+      "description": "Run Cline with local models via Ollama, LM Studio or Atomic Chat.",
+      "source": "https://docs.cline.bot/running-models-locally/overview"
+    },
+    {
+      "feature": "Cline usage-billing provider",
+      "description": "Pay-as-you-go model access with built-in authentication and Cline credits.",
+      "source": "https://docs.cline.bot/getting-started/cline-provider"
+    },
+    {
+      "feature": "ClinePass",
+      "description": "9.99 USD per month subscription for popular open coding models with 2-5x standard API rate limits.",
+      "source": "https://docs.cline.bot/getting-started/clinepass"
+    },
+    {
+      "feature": "Cline Free Models",
+      "description": "Limited-time free model promotions for users with a Cline account.",
+      "source": "https://docs.cline.bot/getting-started/free-models"
+    },
+    {
+      "feature": "GitHub issue triage automation",
+      "description": "Mention @cline in GitHub issue comments via Cline CLI in GitHub Actions for automated root-cause analysis and responses.",
+      "source": "https://docs.cline.bot/cli/samples/github-integration"
+    },
+    {
+      "feature": "GitHub PR review automation",
+      "description": "Automatically review pull requests with AI using the Cline CLI in GitHub Actions.",
+      "source": "https://docs.cline.bot/cli/samples/github-pr-review"
+    },
+    {
+      "feature": "Model orchestration",
+      "description": "Documented workflow for using multiple models strategically to optimize cost, reduce bias and leverage model strengths.",
+      "source": "https://docs.cline.bot/cli/samples/model-orchestration"
+    },
+    {
+      "feature": "Cline SDK",
+      "description": "TypeScript packages embedding the Cline agent runtime; ClineCore provides the full harness: built-in tools, sessions, approvals, scheduling and hub support.",
+      "source": "https://docs.cline.bot/sdk/overview"
+    },
+    {
+      "feature": "Hub-spoke architecture",
+      "description": "A local daemon coordinates sessions across clients while spoke workers handle agent execution.",
+      "source": "https://docs.cline.bot/sdk/architecture/hub-spoke"
+    },
+    {
+      "feature": "Config system",
+      "description": "Global and project configuration with documented storage locations and precedence.",
+      "source": "https://docs.cline.bot/getting-started/config"
+    },
+    {
+      "feature": "Enterprise: SSO and team management",
+      "description": "SSO provisioning via WorkOS AuthKit plus member, role and permission management.",
+      "source": "https://docs.cline.bot/enterprise-solutions/sso-setup"
+    },
+    {
+      "feature": "Enterprise: remote provider configuration",
+      "description": "Admins configure org-wide providers (AWS Bedrock, Google Vertex, Anthropic, OpenAI-compatible, LiteLLM) in a hosted console for members.",
+      "source": "https://docs.cline.bot/enterprise-solutions/configuration/remote-configuration/overview"
+    },
+    {
+      "feature": "Enterprise: monitoring",
+      "description": "Optional telemetry with OpenTelemetry export, prompt storage backups to S3 or Cloudflare R2, and enterprise controls for YOLO mode and MCP server allowlisting.",
+      "source": "https://docs.cline.bot/enterprise-solutions/monitoring/overview"
+    },
+    {
+      "feature": "Cline API",
+      "description": "OpenAI-compatible Chat Completions API for programmatic access to Cline-hosted models.",
+      "source": "https://docs.cline.bot/api/overview"
+    }
+  ]
+}

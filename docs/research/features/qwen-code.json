@@ -1,0 +1,136 @@
+{
+  "agent": "Qwen Code",
+  "feature_count": 26,
+  "features": [
+    {
+      "feature": "Terminal CLI agent",
+      "description": "Open-source agentic coding tool that lives in your terminal; installed via standalone script or npm.",
+      "source": "https://github.com/QwenLM/qwen-code"
+    },
+    {
+      "feature": "IDE integrations",
+      "description": "Official extensions for VS Code, JetBrains IDEs, and the Zed editor.",
+      "source": "https://qwenlm.github.io/qwen-code-docs/llms.txt"
+    },
+    {
+      "feature": "Desktop app",
+      "description": "Official desktop app for macOS, Windows, and Linux.",
+      "source": "https://github.com/QwenLM/qwen-code"
+    },
+    {
+      "feature": "Web UI + daemon",
+      "description": "`qwen serve`/`qwen daemon` runs a browser Web Shell, an HTTP + SSE API, multiple workspaces, and session reconnect.",
+      "source": "https://github.com/QwenLM/qwen-code"
+    },
+    {
+      "feature": "Chat channels",
+      "description": "Runs as a bot in Telegram, DingTalk, WeChat, or Feishu via `qwen channel start`.",
+      "source": "https://github.com/QwenLM/qwen-code"
+    },
+    {
+      "feature": "Headless mode",
+      "description": "Non-interactive `qwen -p` prompt mode for automation and custom integrations.",
+      "source": "https://github.com/QwenLM/qwen-code"
+    },
+    {
+      "feature": "ACP support",
+      "description": "Other agents (Claude, Codex, etc.) can delegate coding tasks to Qwen Code over the Agent Client Protocol ('Qwen Code Claw'); a voice frontend runs over ACP.",
+      "source": "https://github.com/QwenLM/qwen-code"
+    },
+    {
+      "feature": "Qwen Code 1.0 Preview",
+      "description": "Next-generation harness (co-developed with Qoder) with Terminal TUI, Headless, and ACP entry points, a persistent AppServer runtime, task orchestration, and permission control.",
+      "source": "https://qwen.ai/qwencode"
+    },
+    {
+      "feature": "GitHub Actions integration",
+      "description": "Documented CI/CD automation with Qwen Code in GitHub Actions.",
+      "source": "https://qwenlm.github.io/qwen-code-docs/llms.txt"
+    },
+    {
+      "feature": "Model auth options",
+      "description": "Qwen Account (Plus/Pro subscription), QwenCloud token plans or pay-as-you-go keys, Alibaba ModelStudio coding/token plans, third-party providers (DeepSeek, Grok, MiniMax, Z.AI, Kimi, OpenRouter, Requesty), or a custom local server.",
+      "source": "https://qwenlm.github.io/qwen-code-docs/en/users/configuration/auth/"
+    },
+    {
+      "feature": "Multi-protocol model support",
+      "description": "Works with OpenAI-, Anthropic-, Gemini-, and Qwen-compatible APIs; third-party providers and local models (Ollama/vLLM), switchable at runtime.",
+      "source": "https://github.com/QwenLM/qwen-code"
+    },
+    {
+      "feature": "Approval modes",
+      "description": "Five permission modes: Plan, Ask Permissions, Auto-Edit, Auto (classifier-evaluated), and YOLO.",
+      "source": "https://qwenlm.github.io/qwen-code-docs/en/users/features/approval-mode/"
+    },
+    {
+      "feature": "Plan mode",
+      "description": "Read-only permission mode for code exploration and planning complex changes; no edits or shell execution.",
+      "source": "https://qwenlm.github.io/qwen-code-docs/en/users/features/approval-mode/"
+    },
+    {
+      "feature": "Tool-execution sandbox",
+      "description": "Linux sandboxing via Bubblewrap/Landlock with filesystem and network profiles, plus whole-CLI sandbox methods.",
+      "source": "https://qwenlm.github.io/qwen-code-docs/en/users/features/sandbox/"
+    },
+    {
+      "feature": "Memory",
+      "description": "QWEN.md instruction files, self-written auto-memory notes, and optional external memory (Mem0 or a local session index via the context_search MCP tool).",
+      "source": "https://qwenlm.github.io/qwen-code-docs/en/users/features/memory/"
+    },
+    {
+      "feature": "Checkpointing",
+      "description": "Automatic shadow-git snapshots before every file modification, restorable with `/restore` (files + conversation).",
+      "source": "https://qwenlm.github.io/qwen-code-docs/en/users/features/checkpointing/"
+    },
+    {
+      "feature": "Agent skills",
+      "description": "SKILL.md-based skills with optional scripts/resources that the model invokes on demand.",
+      "source": "https://qwenlm.github.io/qwen-code-docs/en/users/features/skills/"
+    },
+    {
+      "feature": "Subagents",
+      "description": "Task-specific agents with their own context and tool access; built-ins delegate to separately installed Claude Code and Codex.",
+      "source": "https://qwenlm.github.io/qwen-code-docs/en/users/features/sub-agents/"
+    },
+    {
+      "feature": "Agent Teams / Agent Board",
+      "description": "Agent Teams for collaboration plus an experimental file-based Agent Board (`qwen board`) where independently started agents claim and complete shared tasks.",
+      "source": "https://qwenlm.github.io/qwen-code-docs/en/users/features/agent-board/"
+    },
+    {
+      "feature": "MCP support",
+      "description": "Connect Model Context Protocol servers for additional tools and context.",
+      "source": "https://qwenlm.github.io/qwen-code-docs/llms.txt"
+    },
+    {
+      "feature": "Code review",
+      "description": "`/review` for local diffs or GitHub PRs with inline comments, auto-fix, resume, and effort levels.",
+      "source": "https://qwenlm.github.io/qwen-code-docs/en/users/features/code-review/"
+    },
+    {
+      "feature": "Scheduled tasks",
+      "description": "`/loop` and cron-style scheduling for repeating prompts, polling, and reminders, with a persistent scheduler for chat channels.",
+      "source": "https://qwenlm.github.io/qwen-code-docs/en/users/features/scheduled-tasks/"
+    },
+    {
+      "feature": "Built-in web search",
+      "description": "web_search tool enabled automatically when authenticating with QwenCloud or Alibaba ModelStudio.",
+      "source": "https://qwenlm.github.io/qwen-code-docs/en/users/configuration/auth/"
+    },
+    {
+      "feature": "Token caching",
+      "description": "Prompt caching to reduce cost on repeated context.",
+      "source": "https://qwenlm.github.io/qwen-code-docs/llms.txt"
+    },
+    {
+      "feature": "Themes & QwenIgnore",
+      "description": "TUI theme customization and QwenIgnore file-exclusion rules.",
+      "source": "https://qwenlm.github.io/qwen-code-docs/llms.txt"
+    },
+    {
+      "feature": "Pricing",
+      "description": "The CLI is free open-source; model usage is billed via Qwen Plus/Pro subscriptions, QwenCloud, or Alibaba ModelStudio API plans.",
+      "source": "https://qwenlm.github.io/qwen-code-docs/en/users/configuration/auth/"
+    }
+  ]
+}

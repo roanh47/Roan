@@ -1,0 +1,111 @@
+{
+  "agent": "GitHub Copilot CLI",
+  "feature_count": 21,
+  "features": [
+    {
+      "feature": "Terminal agent",
+      "description": "Agentic CLI for questions, coding, and GitHub work; interactive TUI plus programmatic `-p`/`--prompt` mode on Linux, macOS, and Windows (PowerShell/WSL).",
+      "source": "https://docs.github.com/en/copilot/concepts/copilot-surfaces/copilot-cli"
+    },
+    {
+      "feature": "Plan mode",
+      "description": "Shift+Tab mode where Copilot asks clarifying questions and builds a structured implementation plan before writing any code.",
+      "source": "https://docs.github.com/en/copilot/concepts/copilot-surfaces/copilot-cli"
+    },
+    {
+      "feature": "Tool approvals",
+      "description": "Read-only operations run automatically; destructive shell commands, file edits, and URL fetches require approval, grantable once or for the whole session (persisted permissions).",
+      "source": "https://docs.github.com/en/copilot/how-tos/copilot-cli/use-copilot-cli/allowing-tools"
+    },
+    {
+      "feature": "Auto-approval flags",
+      "description": "`--allow-tool 'shell(git)'` and `--allow-all-tools` skip manual approval for programmatic runs.",
+      "source": "https://docs.github.com/en/copilot/concepts/copilot-surfaces/copilot-cli"
+    },
+    {
+      "feature": "Trusted directories",
+      "description": "Prompts you to confirm you trust a folder before Copilot may read, modify, or execute files in it; choices are rememberable per folder.",
+      "source": "https://docs.github.com/en/copilot/how-tos/copilot-cli/use-copilot-cli/overview"
+    },
+    {
+      "feature": "Local sandboxing",
+      "description": "`/sandbox enable` restricts Copilot's filesystem, network, and system access within a session.",
+      "source": "https://docs.github.com/en/copilot/concepts/copilot-surfaces/copilot-cli"
+    },
+    {
+      "feature": "Cloud sandboxing",
+      "description": "Run an entire Copilot CLI session in an isolated cloud environment.",
+      "source": "https://docs.github.com/en/copilot/concepts/copilot-surfaces/copilot-cli"
+    },
+    {
+      "feature": "GitHub integration",
+      "description": "Works with your repositories, issues, and pull requests in natural language under your GitHub account, e.g. making changes and creating a pull request.",
+      "source": "https://docs.github.com/en/copilot/concepts/copilot-surfaces/copilot-cli"
+    },
+    {
+      "feature": "Browser & computer use",
+      "description": "Documented use cases for driving a browser and full computer use from the CLI.",
+      "source": "https://docs.github.com/en/copilot/concepts/copilot-surfaces/copilot-cli"
+    },
+    {
+      "feature": "ACP support",
+      "description": "Copilot CLI can be used via the Agent Client Protocol from supporting editors.",
+      "source": "https://docs.github.com/en/copilot/concepts/copilot-surfaces/copilot-cli"
+    },
+    {
+      "feature": "Model lineup",
+      "description": "Copilot's supported models with 1M-token extended context and configurable reasoning levels in the CLI; Auto model selection with GPT-5.3-Codex as the long-term-support fallback.",
+      "source": "https://docs.github.com/en/copilot/reference/ai-models/supported-models"
+    },
+    {
+      "feature": "Custom models (BYOK/local)",
+      "description": "Auto-discovers local Ollama models, supports manually configured BYOK providers, and can install MAI Code 1.1 Flash locally on Windows.",
+      "source": "https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-llm-models"
+    },
+    {
+      "feature": "MCP",
+      "description": "Ships with GitHub's MCP server by default and supports custom MCP servers for extra tools.",
+      "source": "https://github.com/github/copilot-cli"
+    },
+    {
+      "feature": "Agent skills",
+      "description": "SKILL.md folders of instructions, scripts, and resources loaded when relevant, at project or user level.",
+      "source": "https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-skills"
+    },
+    {
+      "feature": "Custom instructions",
+      "description": "User-level ~/.copilot/copilot-instructions.md, modular *.instructions.md files, and repo .github/copilot-instructions.md; `copilot init` scaffolds repo instructions.",
+      "source": "https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-custom-instructions"
+    },
+    {
+      "feature": "LSP servers",
+      "description": "Add language servers for precise navigation, find-references, and renames.",
+      "source": "https://docs.github.com/en/copilot/how-tos/copilot-cli"
+    },
+    {
+      "feature": "Voice input",
+      "description": "Dictate prompts with speech-to-text that runs entirely on your machine; audio is never sent over the network.",
+      "source": "https://docs.github.com/en/copilot/how-tos/copilot-cli/use-copilot-cli/voice-input"
+    },
+    {
+      "feature": "CLI commands & config",
+      "description": "`copilot config`, `copilot init`, `copilot completion`, `/login` and other slash commands, plus a documented command and shortcut reference.",
+      "source": "https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference"
+    },
+    {
+      "feature": "Desktop app deep link",
+      "description": "`copilot app` opens the GitHub Copilot desktop app in the current directory.",
+      "source": "https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference"
+    },
+    {
+      "feature": "Enterprise administration",
+      "description": "Organization admins enable or disable Copilot CLI via policy settings.",
+      "source": "https://docs.github.com/en/copilot/how-tos/copilot-cli"
+    },
+    {
+      "feature": "Pricing",
+      "description": "Available with all Copilot plans (the Free plan supports the CLI with limited usage); usage metered via GitHub AI Credits on Pro ($10/mo), Pro+ ($39/mo), and Max ($100/mo) plans.",
+      "source": "https://github.com/features/copilot/plans"
+    }
+  ]
+}

@@ -1,0 +1,101 @@
+{
+  "agent": "Oh My Pi (omp)",
+  "feature_count": 19,
+  "features": [
+    {
+      "feature": "Identity",
+      "description": "Fork of Pi created 2025-12-31 by Can Bölük / Stencil Labs — a coding agent with the IDE wired in: batteries-included coding surface on Pi's TypeScript core, MIT, with an ~80k-line native Rust core; 60+ providers, 31 built-in tools, 14 LSP ops, 28 DAP ops.",
+      "source": "https://github.com/can1357/oh-my-pi"
+    },
+    {
+      "feature": "Entry points",
+      "description": "Same engine, four wrappers: interactive TUI (omp), one-shot (omp -p), RPC mode (omp --mode rpc), and ACP for editors (omp acp — Agent Client Protocol over JSON-RPC, tool I/O routed through the editor, writes gated by session/request_permission); plus a Node SDK (@oh-my-pi/pi-coding-agent).",
+      "source": "https://github.com/can1357/oh-my-pi"
+    },
+    {
+      "feature": "Built-in tools (31)",
+      "description": "read (files, dirs, archives, SQLite, PDFs, notebooks, URLs, ssh:// paths), write, hashline edit, ast_edit (ast-grep structural rewrites with preview), ast_grep (50+ tree-sitter grammars), browser (Puppeteer tabs over headless Chromium, CDP-attached apps, or your own Chrome via relay), computer (desktop control: windows, screenshots, native input, AX tree, clipboard), web_search (multi-provider answers with citations), github (repo/PR/issues/code search/Actions run-watch), and code execution with tool-calling.",
+      "source": "https://github.com/can1357/oh-my-pi"
+    },
+    {
+      "feature": "Hashline edits",
+      "description": "Edit tool anchors patches with short per-line content hashes and stale-anchor recovery instead of exact-text matching.",
+      "source": "https://github.com/can1357/oh-my-pi"
+    },
+    {
+      "feature": "Reported edit-reliability gains",
+      "description": "Third-party benchmark reports hashline raised Grok Code Fast 1 from 6.7% to 68.3% success (~15 points on average across 16 models) with the model unchanged.",
+      "source": "https://composio.dev/content/pi-vs-omp"
+    },
+    {
+      "feature": "Debugger and LSP",
+      "description": "Drives real DAP debuggers on live processes — lldb (C segfaults), dlv (Go), debugpy (Python) — with breakpoints, stepping, and frame inspection; 28 DAP ops plus 14 LSP ops for diagnostics and semantic edits.",
+      "source": "https://github.com/can1357/oh-my-pi"
+    },
+    {
+      "feature": "Native shell",
+      "description": "Own embedded bash 5.3 engine with sessions that survive across calls and 58+ command-line utilities (coreutils, findutils, sed, sort, xargs, jq, ripgrep-backed grep, fd, diff) ported into the builtins crate and run in-process — zero fork/exec, same binary natively on macOS, Linux, and Windows (no WSL bridge).",
+      "source": "https://github.com/can1357/oh-my-pi"
+    },
+    {
+      "feature": "Providers and model routing",
+      "description": "60+ providers, ~1,000 models behind one /model; four routing knobs — --model, --smol (small tasks), --slow, --plan (planning) — for role-based routing per task type; full reference at omp.sh/docs/providers.",
+      "source": "https://github.com/can1357/oh-my-pi"
+    },
+    {
+      "feature": "Subagents, sessions, slash commands",
+      "description": "Batteries-included built-ins on Pi's core: sessions with branching, subagents, slash commands, and TypeScript extensions; configurable rather than hidden.",
+      "source": "https://github.com/can1357/oh-my-pi"
+    },
+    {
+      "feature": "Task isolation (pi-iso)",
+      "description": "Per-task workspace isolation backends: APFS clones, btrfs/zfs reflinks, overlayfs, projfs, and rcopy.",
+      "source": "https://github.com/can1357/oh-my-pi"
+    },
+    {
+      "feature": "Memory (pi-mnemopi)",
+      "description": "Local SQLite memory engine for omp agents.",
+      "source": "https://github.com/can1357/oh-my-pi"
+    },
+    {
+      "feature": "Voice (pi-voice)",
+      "description": "Audio capture/playback, Opus codecs, and live WebRTC streaming primitives in the Rust core.",
+      "source": "https://github.com/can1357/oh-my-pi"
+    },
+    {
+      "feature": "Context compression (snapcompact)",
+      "description": "Bitmap-frame rasterization plus PNG encode for context compression, shipped with a SQuAD eval suite.",
+      "source": "https://github.com/can1357/oh-my-pi"
+    },
+    {
+      "feature": "Usage dashboard (omp-stats)",
+      "description": "Local observability dashboard for AI usage statistics.",
+      "source": "https://github.com/can1357/oh-my-pi"
+    },
+    {
+      "feature": "Collab sessions and browser relay",
+      "description": "collab-web live sessions (browser guest client, mock host, local relay) and a Chrome extension (browser-relay) so the browser tool can drive your existing tabs.",
+      "source": "https://github.com/can1357/oh-my-pi"
+    },
+    {
+      "feature": "Install and completions",
+      "description": "curl omp.sh/install (SHA-256-checked prebuilt binary), Homebrew tap can1357/tap/omp, bun @oh-my-pi/pi-coding-agent, Nix with Home Manager module, Windows PowerShell, mise; self-generating bash/zsh/fish completions (model names and sessions complete live).",
+      "source": "https://github.com/can1357/oh-my-pi"
+    },
+    {
+      "feature": "Config import",
+      "description": "Auto-imports existing Claude, Cursor, Codex, and Gemini configs on first run (per third-party review).",
+      "source": "https://composio.dev/content/pi-vs-omp"
+    },
+    {
+      "feature": "MCP",
+      "description": "Keeps Pi's TypeScript extension system, hooks, and full runtime access; MCP via Pi-compatible extensions is likely but not stated in the OMP README (unverified).",
+      "source": "https://composio.dev/content/pi-vs-omp"
+    },
+    {
+      "feature": "Pricing and license",
+      "description": "Free and MIT-licensed, open all the way down; bring your own provider keys/subscriptions; omp² announced as coming soon on omp.sh.",
+      "source": "https://omp.sh/"
+    }
+  ]
+}

@@ -1,0 +1,221 @@
+{
+  "agent": "Google Antigravity",
+  "feature_count": 43,
+  "features": [
+    {
+      "feature": "Product identity (Antigravity 2.0)",
+      "description": "Agent-first development platform with a shared agent harness co-trained with Gemini models; evolved from the Nov 2025 Antigravity IDE's Agent Manager into a standalone desktop app with no IDE.",
+      "source": "https://antigravity.google/blog/introducing-google-antigravity-2-0"
+    },
+    {
+      "feature": "Desktop app (Antigravity App)",
+      "description": "Standalone agent-first desktop application on macOS, Linux, and Windows (v2.5+); synchronous and asynchronous agent work, artifact viewing, and multi-agent management.",
+      "source": "https://antigravity.google/blog/introducing-google-antigravity-2-0"
+    },
+    {
+      "feature": "Antigravity CLI (agy)",
+      "description": "Terminal-first TUI client for invoking, monitoring, and interacting with Antigravity agents; shares the same agent harness and settings as the desktop app and imports CLI conversations into the App via the @conversation dropdown.",
+      "source": "https://antigravity.google/blog/introducing-google-antigravity-cli/"
+    },
+    {
+      "feature": "Gemini CLI transition and consumer tiers",
+      "description": "Antigravity CLI launched May 19, 2026 (built in Go, asynchronous background workflows); on June 18, 2026 Gemini CLI and Gemini Code Assist stop serving free, Google AI Pro, and Ultra requests — those tiers are served by Antigravity instead (enterprise Gemini Code Assist licenses unchanged).",
+      "source": "https://developers.googleblog.com/an-important-update-transitioning-gemini-cli-to-antigravity-cli/"
+    },
+    {
+      "feature": "IDE extensions + standalone IDE",
+      "description": "Official agent extensions for VS Code, JetBrains IDEs, Android Studio (BYO Agent/ACP), Visual Studio, Zed, Xcode, and Eclipse (Preview), plus the standalone agent-powered Antigravity IDE app.",
+      "source": "https://antigravity.google/docs/getting-started"
+    },
+    {
+      "feature": "Python SDK",
+      "description": "Programmatic runtime (pip install google-antigravity) for building and deploying agents in apps and CI/CD: declarative tool policies (allow/deny/ask_user), system instructions/personas, custom Python tools, and MCP integration.",
+      "source": "https://antigravity.google/docs/getting-started"
+    },
+    {
+      "feature": "Googlebook OS support",
+      "description": "Antigravity App ships pre-installed on Googlebooks, with updates/reinstall via Google Play.",
+      "source": "https://antigravity.google/docs/getting-started"
+    },
+    {
+      "feature": "Role-based onboarding and interface layouts",
+      "description": "First-launch role picker (Software Engineering, Knowledge Work, Data & Analytics, Science, Design, Other) sets the App layout and starter prompts that install paired Marketplace plugins (Google Calendar, Drive, Slides, Figma).",
+      "source": "https://antigravity.google/docs/getting-started"
+    },
+    {
+      "feature": "Setup import from other agentic tools",
+      "description": "Bring over my setup imports MCP servers, skills, rules, and instructions from Claude Code, Codex, Cursor, and Gemini CLI.",
+      "source": "https://antigravity.google/docs/getting-started"
+    },
+    {
+      "feature": "Model support",
+      "description": "Gemini 4 Carbon/Argon/Hydrogen, Gemini 3.8/3.7/3.6 Flash, Gemini 3.1 Pro, plus third-party Claude Sonnet 5.5 / Opus 5.5 / Sonnet 4.6 / Opus 4.6 (Thinking) and GPT-OSS 120B in the model selector (third-party access noted as an Ultra-plan benefit).",
+      "source": "https://antigravity.google/docs/overview?tab=cli"
+    },
+    {
+      "feature": "Dynamic reasoning levels",
+      "description": "Adjust reasoning effort per conversation turn (Low/Medium/High; Hydrogen adds Extra) via the model picker or /model in the CLI.",
+      "source": "https://antigravity.google/docs/overview?tab=cli"
+    },
+    {
+      "feature": "Orchestrator models",
+      "description": "Orchestrator (Carbon)/(Argon) pairs a Gemini 4 planner that explores, plans, and reviews with Gemini 4 Hydrogen doing edits/builds/tests; included with Google AI Ultra, Argon with paid Pro plans.",
+      "source": "https://antigravity.google/docs/features/"
+    },
+    {
+      "feature": "Dynamic subagents",
+      "description": "Main agent invokes concurrent background subagents (invoke_subagent / define_subagent) with clean context, in isolated Git worktrees (branch), inherited, or shared workspaces, monitored via a subagent panel or /agents.",
+      "source": "https://antigravity.google/docs/subagents/"
+    },
+    {
+      "feature": "Built-in subagents",
+      "description": "Ships research (codebase research/navigation), browser (web playtesting, screenshots, console/network inspection), and self (clone of the calling agent) subagents out of the box.",
+      "source": "https://antigravity.google/docs/subagents/"
+    },
+    {
+      "feature": "Custom subagents",
+      "description": "Reusable subagents as .md files with YAML frontmatter (tools, model tier, commandExecutionPolicy, mcpServers, skills/plugins), auto-discovered in .agents/agents/, ~/.gemini/config/agents/, or plugin bundles; lifecycle states running/idle/killed, inter-agent messaging, inherited permissions.",
+      "source": "https://antigravity.google/docs/subagents/"
+    },
+    {
+      "feature": "Multi-agent orchestrators (/boost, /swarm, /teamwork)",
+      "description": "Boost runs an iterative implement-challenge-fix-verify pipeline for hard problems; Swarm splits broad work across named workers plus a verifier on a shared board; Teamwork runs long-horizon multi-milestone teams with a scoping interview and audit gates.",
+      "source": "https://antigravity.google/docs/subagents/"
+    },
+    {
+      "feature": "Dynamic Workflows (/run-workflow)",
+      "description": "Agent writes a short Python script orchestrating many agents (e.g. one reviewer per changed file, test-then-fix pipelines); you approve the script, watch phases live, and save it to rerun; Google AI Pro and Ultra only.",
+      "source": "https://antigravity.google/docs/features/"
+    },
+    {
+      "feature": "Slash commands catalog",
+      "description": "/goal (run autonomously to completion), /grill-me (interview you before implementing), /schedule, /browser, /plugin, /plan, /diff, /tasks, /agents, /usage, /statusline, /resume, /rewind, /fork, /model, /context, /codesearch, /config, /keybindings; /boost, /swarm, /teamwork require a paid plan.",
+      "source": "https://antigravity.google/docs/features/"
+    },
+    {
+      "feature": "Background tasks (/tasks, /btw)",
+      "description": "Track non-agentic background processes (shell commands, test suites, queries started via /btw): view stdout logs and terminate runaway processes; Alt+J teleports to the next subagent awaiting approval, Ctrl+K approves in place.",
+      "source": "https://antigravity.google/docs/subagents/"
+    },
+    {
+      "feature": "Scheduled tasks and cron sidecars",
+      "description": "One-off timers or recurring cron schedules trigger agent invocations via /schedule and Scheduled Tasks, without manual invocation.",
+      "source": "https://antigravity.google/blog/introducing-google-antigravity-2-0"
+    },
+    {
+      "feature": "JSON hooks",
+      "description": "Define hooks in a simple JSON format to intercept and control the Antigravity agent's behavior (lifecycle hooks).",
+      "source": "https://antigravity.google/blog/introducing-google-antigravity-2-0"
+    },
+    {
+      "feature": "Visual artifacts and verification loops",
+      "description": "Structured visual reports — interactive implementation plans, unified multi-file diffs, and browser session recordings — inspected via Ctrl+R Artifact Review.",
+      "source": "https://antigravity.google/docs/overview?tab=cli"
+    },
+    {
+      "feature": "Git-native Review pane",
+      "description": "Compare Uncommitted/Branch/Agent-Edits views, stage/unstage/discard per file, commit with generated messages, amend, push, and comment on diff lines as feedback to the agent.",
+      "source": "https://antigravity.google/docs/features/"
+    },
+    {
+      "feature": "Browser subagent",
+      "description": "Built-in browser automation on personal accounts (v2.30.0+; parallel tabs, live cursor, one-click Stop, pause-and-resume sign-in handoff); CLI and business/enterprise accounts drive local Google Chrome v144+ via Chrome DevTools MCP with screenshots, console/network logs, performance traces, Lighthouse audits, and MP4 session recordings.",
+      "source": "https://antigravity.google/docs/features/"
+    },
+    {
+      "feature": "Permissions engine",
+      "description": "Fine-grained action(target) rules — read_file, write_file, read_url, execute_url, download_url, command (incl. regex:), mcp — evaluated across Deny/Ask/Allow lists, with prefix matching disabled for shell-substitution constructs so they require exact matches.",
+      "source": "https://antigravity.google/docs/permissions/"
+    },
+    {
+      "feature": "Permission presets",
+      "description": "Request Review (always ask, sandbox off), Default (terminal sandbox on; ask outside), Auto (auto-evaluate outside-sandbox commands; safe reversible ones proceed), Turbo (unrestricted commands, full filesystem, MCP/web allowed); set globally, per project, or from the message box.",
+      "source": "https://antigravity.google/docs/permissions/"
+    },
+    {
+      "feature": "Terminal sandbox",
+      "description": "Native OS sandbox for agent commands — sandbox-exec on macOS, kernel namespaces on Linux, process security environments on Windows — restricted to workspace + temp dirs with no network access; outside-sandbox commands prompt or are auto-evaluated.",
+      "source": "https://antigravity.google/docs/cli/modes"
+    },
+    {
+      "feature": "Execution modes (incl. plan mode)",
+      "description": "CLI modes: default (inline diff review before edits), accept-edits (auto-approve workspace edits), auto (edits plus sandboxed/safe commands auto-approved), plan (prepends /plan: read-only analysis then a structured execution outline for approval); cycle with Shift+Tab, --mode, or /config.",
+      "source": "https://antigravity.google/docs/cli/modes"
+    },
+    {
+      "feature": "Projects and Git worktrees",
+      "description": "Agents work in projects defining accessible folders, scoped settings and permissions (multi-folder access), with native Git worktree isolation; CLI uses default-cli-project with --project/--new-project, /resume --conversation, and /fork.",
+      "source": "https://antigravity.google/docs/features/"
+    },
+    {
+      "feature": "Persistent permission grants",
+      "description": "Permissions manually granted during a conversation can persist, letting the agent learn trusted actions over time.",
+      "source": "https://antigravity.google/docs/features/"
+    },
+    {
+      "feature": "Skills and rule files",
+      "description": "Author custom skills as SKILL.md (workspace .agents/skills/; global ~/.gemini/skills/ or ~/.gemini/antigravity-cli/skills/); GEMINI.md/AGENTS.md workspace and global context rules continue to be honored.",
+      "source": "https://antigravity.google/docs/cli/gcli-migration"
+    },
+    {
+      "feature": "Plugins and Marketplace",
+      "description": "/plugin manages installed Marketplace plugins and creates/configures custom plugin bundles; plugins can bundle agents, skills, and slash commands.",
+      "source": "https://antigravity.google/docs/getting-started"
+    },
+    {
+      "feature": "Gemini CLI migration tooling",
+      "description": "First-launch onboarding auto-converts legacy configs, migrates session tokens to the OS keyring, and agy plugin import gemini converts Gemini CLI extensions to native plugins (commands become skills, MCP servers migrate).",
+      "source": "https://antigravity.google/docs/cli/gcli-migration"
+    },
+    {
+      "feature": "MCP client support",
+      "description": "Connect stdio/SSE MCP servers via dedicated mcp_config.json profiles (global ~/.gemini/config/ and workspace .agents/), using the serverUrl schema; per-server/tool mcp() permission rules apply.",
+      "source": "https://antigravity.google/docs/cli/gcli-migration"
+    },
+    {
+      "feature": "Build with Google bundles",
+      "description": "Curated bundles of skills, MCP servers, and extensions built with Google product teams: Firebase, Android, Modern Web, Chrome DevTools, Flutter, Google Cloud Data, Maps, Science, and the Antigravity SDK.",
+      "source": "https://antigravity.google/docs/overview?tab=cli"
+    },
+    {
+      "feature": "Voice input",
+      "description": "Live transcription of spoken prompts via the mic icon next to text input boxes (raw audio no longer passed to the model).",
+      "source": "https://antigravity.google/blog/introducing-google-antigravity-2-0"
+    },
+    {
+      "feature": "Session management",
+      "description": "Conversation search/switch picker (Cmd+K), /resume, /rewind, /fork; CLI sessions use the conversation's project, and agents ask before touching files outside the workspace (allowNonWorkspaceAccess opt-in).",
+      "source": "https://antigravity.google/docs/features/"
+    },
+    {
+      "feature": "Shared settings across surfaces",
+      "description": "Common settings (including agent permissions) are shared between the App and CLI, so permission configuration in one applies to both.",
+      "source": "https://antigravity.google/blog/introducing-google-antigravity-cli/"
+    },
+    {
+      "feature": "Headless mode",
+      "description": "Run agy non-interactively (-p/--print) to script agent tasks, integrate with CI pipelines, and capture machine-readable output.",
+      "source": "https://antigravity.google/docs/features/"
+    },
+    {
+      "feature": "CLI customization",
+      "description": "settings.json (~/.gemini/antigravity-cli/), /keybindings, Vim editor mode, color scheme and Alt-Screen/Inline rendering modes, plus a custom status line and window title driven by piped live agent-metadata JSON.",
+      "source": "https://antigravity.google/docs/features/"
+    },
+    {
+      "feature": "Individual pricing tiers",
+      "description": "Free plan at $0/month with a meaningful weekly quota; Google AI Plus/Pro/Ultra add 5-hour and weekly limits (Ultra highest, with third-party model access); Pro/Ultra can buy AI credits for overage at Gemini Enterprise consumption pricing; no BYOK and no custom-contract org tiers.",
+      "source": "https://antigravity.google/docs/plans/"
+    },
+    {
+      "feature": "Enterprise tier",
+      "description": "Gemini Enterprise: corporate SSO and BYOID via Workforce Identity Federation, US/EU regional data residency, VPC Service Controls, request/response and telemetry logging, license or pay-as-you-go Agent Platform API billing, and a no-model-training guarantee.",
+      "source": "https://antigravity.google/docs/overview?tab=cli"
+    },
+    {
+      "feature": "Remote control and headless execution",
+      "description": "Listed capability across surfaces in the official product comparison; the 2.0 launch blog describes Remote Control as an upcoming launch.",
+      "source": "https://antigravity.google/docs/overview?tab=cli"
+    }
+  ]
+}

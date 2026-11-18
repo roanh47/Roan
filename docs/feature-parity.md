@@ -204,9 +204,10 @@ rows that decide something for Roan.
 
 ## Sourced inventories — delivered
 
-The verification passes came back: 429 features across seven mainstream surfaces,
-every row with an official-doc URL, stored machine-readable under `docs/research/features/`.
-These files are the raw source; this document is the Roan verdict on top of them.
+The verification passes came back: **1,024 sourced features across 23 surfaces** —
+every mainstream harness and consumer app, every row with an official-doc URL, stored
+machine-readable under `docs/research/features/` (index in its README). These files are
+the raw source; this document is the Roan verdict on top of them.
 
 | Inventory | Features | File |
 |---|---|---|
@@ -218,13 +219,48 @@ These files are the raw source; this document is the Roan verdict on top of them
 | Claude (apps + desktop + web) | 45 | `docs/research/features/claude.json` |
 | Gemini (app) | 51 | `docs/research/features/gemini.json` |
 | OpenClaw | 136 | `docs/research/features/openclaw.json` |
-| **Total** | **565** | |
+| Google Antigravity | 43 | `docs/research/features/antigravity.json` |
+| Pi + Oh My Pi | 25+19 | `docs/research/features/pi.json`, `oh-my-pi.json` |
+| DeepSeek Harness | 33 | `docs/research/features/deepseek-harness.json` |
+| Aider | 44 | `docs/research/features/aider.json` |
+| Cline + Roo Code | 49+42 | `docs/research/features/cline.json`, `roo-code.json` |
+| Goose | 26 | `docs/research/features/goose.json` |
+| OpenHands | 50 | `docs/research/features/openhands.json` |
+| Qwen Code | 26 | `docs/research/features/qwen-code.json` |
+| Amp | 19 | `docs/research/features/amp.json` |
+| GitHub Copilot CLI | 21 | `docs/research/features/copilot-cli.json` |
+| Cursor | 27 | `docs/research/features/cursor.json` |
+| Crush | 14 | `docs/research/features/crush.json` |
+| Zed Agent | 21 | `docs/research/features/zed-agent.json` |
+| **Total** | **1,024** | |
 
 Notes from the pass worth keeping: Gemini CLI's unpaid tier moved to the new Antigravity
 CLI on 2026-06-18 (so "gemini-cli" as a reference is partly historical — Antigravity gets
 its own inventory), and opencode ships a per-user background service every client connects
 to — the same daemon-first shape Roan uses, from a second vendor.
 
-Still running: Antigravity, Pi, DeepSeek Harness, Aider, Cline/Roo, Goose, OpenHands,
-Qwen Code, Amp, Copilot CLI, Cursor, Crush, Zed Agent — each lands as its own JSON in
-the same folder and gets a verdict row above.
+## Second wave — the signals that matter for Roan
+
+Fifteen more surfaces delivered (459 features). Most rows confirm decisions already
+made; these are the ones that change or sharpen something:
+
+| Signal | Who has it | Verdict for Roan |
+|---|---|---|
+| Daemon + web shell + channels (`qwen serve`) | Qwen Code | **confirmed again** — fourth vendor after Hermes, opencode, OpenClaw: an always-on local daemon that surfaces plug into is the mainstream shape, not the exception |
+| `/grill-me` — interview the user before implementing | Antigravity | **SOON** — the clarify pattern belongs in Roan's big-work flow: ask before building, not after guessing |
+| Stuck detector — catch a looping agent and handle it | OpenHands | **BUILD (round 1)** — next to the always-visible thinking state: a turn that runs too long surfaces itself, never an eternal spinner |
+| Persistent permission grants | Antigravity, Copilot CLI (trusted dirs) | **SOON** — approvals learn: same allow twice → remember per workspace |
+| Tree sessions with branch UI (`/tree`, fork any entry) | Pi | = the round-1 regenerate/branch row; Pi confirms the UI shape |
+| Checkpoints via shadow-git (files + conversation) | Cline, Qwen Code | = checkpoints row; shadow-git is the cheap implementation pattern |
+| Dirty-file isolation + attributed commits | Aider | LATER — when Roan edits a git repo: user changes and agent changes stay separable |
+| Goals as first-class (`/goal`, `ctx.goals`) | Antigravity, DeepSeek Harness | third and fourth confirmation of the goals row (§5) — SOON stands |
+| Read-only conversation sharing (gist / revocable links) | Pi, OpenClaw | LATER — cheap once transcript export exists |
+| Voice dictation fully on-device | Copilot CLI | **SOON** — matches the mic plan: on-device speech when the WebView offers it, no cloud call |
+| Cloud orbs — agent keeps working, laptop closed | Amp | WON'T — Roan's always-on device is the node; Amp's "idle costs nothing" discipline is how background turns should behave |
+| Everything-is-a-plugin, including the agent loop | DeepSeek Harness | WON'T — Roan keeps one tight core; skills are the extension surface |
+| Configure by asking (natural-language settings) | Crush | LATER — a "tell Roan what to change" path in settings |
+| ACP — editors drive external agents | Zed, Cline, Copilot, Cursor, Antigravity, opencode | WON'T — Roan is not an engine inside an editor; the app is the whole product |
+
+Coverage is now complete for every mainstream harness of November 2026 (consumer chat
+apps live separately in `docs/mobile-app-patterns.md` with their inventories in this
+folder). What remains open: none.

@@ -1,0 +1,111 @@
+{
+  "agent": "Zed Agent",
+  "feature_count": 21,
+  "features": [
+    {
+      "feature": "Agent Panel",
+      "description": "The core AI surface: prompt agents that read, write, and run code in your project, add context, review changes, and manage threads.",
+      "source": "https://zed.dev/docs/ai/agent-panel"
+    },
+    {
+      "feature": "Zed Agent (native)",
+      "description": "Zed's native agent using Zed-configured models with built-in tools, profiles, skills, instructions, and MCP servers.",
+      "source": "https://zed.dev/docs/ai/overview"
+    },
+    {
+      "feature": "External Agents (ACP)",
+      "description": "Run ACP-integrated agents like Claude Code, Codex, OpenCode, Copilot, Cursor, or Pi inside the Agent Panel; the agent owns its runtime and auth, and Zed does not charge for them.",
+      "source": "https://zed.dev/docs/ai/external-agents"
+    },
+    {
+      "feature": "Terminal Threads",
+      "description": "Run any agent CLI/TUI in a terminal-backed thread, organized in the Threads Sidebar.",
+      "source": "https://zed.dev/docs/ai/terminal-threads"
+    },
+    {
+      "feature": "Parallel Agents",
+      "description": "Threads Sidebar (ctrl-alt-j) runs multiple agent threads and Terminal Threads at once, each with its own agent, context, and project.",
+      "source": "https://zed.dev/docs/ai/parallel-agents"
+    },
+    {
+      "feature": "Inline Assistant",
+      "description": "Ctrl-Enter sends a selection to any configured LLM and replaces it in place.",
+      "source": "https://zed.dev/docs/ai/inline-assistant.md"
+    },
+    {
+      "feature": "Edit Prediction",
+      "description": "AI completions as you type, powered by default by Zed's open-source Zeta model; also supports GitHub Copilot, Codestral, and Mercury providers.",
+      "source": "https://zed.dev/docs/ai/edit-prediction.md"
+    },
+    {
+      "feature": "Git commit generation",
+      "description": "Generate commit messages from the Git panel.",
+      "source": "https://zed.dev/docs/ai/overview"
+    },
+    {
+      "feature": "Agent Profiles",
+      "description": "Built-in Write, Ask, and Minimal profiles (or custom ones) set the default model and which built-in/MCP tools are available.",
+      "source": "https://zed.dev/docs/ai/agent-profiles.md"
+    },
+    {
+      "feature": "Tool permissions",
+      "description": "Per-tool rules for allow, deny, or confirm behavior on agent tool calls.",
+      "source": "https://zed.dev/docs/ai/tool-permissions.md"
+    },
+    {
+      "feature": "OS-level sandboxing",
+      "description": "Terminal and fetch tool calls run under OS sandboxes (Bubblewrap on Linux; Windows sandboxes are weaker), restricting filesystem writes and outbound network.",
+      "source": "https://zed.dev/docs/ai/sandboxing.md"
+    },
+    {
+      "feature": "Instructions",
+      "description": "Personal and project AGENTS.md as the primary instruction file, with compatibility for .rules, .cursorrules, .windsurfrules, .clinerules, and .github/copilot-instructions.md.",
+      "source": "https://zed.dev/docs/ai/instructions.md"
+    },
+    {
+      "feature": "Skills",
+      "description": "SKILL.md instruction packages with a built-in /create-skill walkthrough and a Skills Manager (cmd-alt-l).",
+      "source": "https://zed.dev/docs/ai/skills.md"
+    },
+    {
+      "feature": "MCP",
+      "description": "Supports MCP Tools and Prompts; extensions can provide MCP servers.",
+      "source": "https://zed.dev/docs/ai/mcp.md"
+    },
+    {
+      "feature": "LLM providers",
+      "description": "Zed-hosted models, provider API keys, existing subscriptions, gateways (OpenRouter, Vercel AI Gateway, Amazon Bedrock), and local models.",
+      "source": "https://zed.dev/docs/ai/overview"
+    },
+    {
+      "feature": "Local models",
+      "description": "llama.cpp, Ollama, LM Studio, and local OpenAI-compatible servers.",
+      "source": "https://zed.dev/docs/ai/use-a-local-model.md"
+    },
+    {
+      "feature": "Subscription reuse",
+      "description": "Use ChatGPT, Claude, Copilot, OpenCode, Cursor, and other existing subscriptions as model access.",
+      "source": "https://zed.dev/docs/ai/use-an-existing-subscription.md"
+    },
+    {
+      "feature": "Zed-hosted models",
+      "description": "Hosted frontier models included with Pro, e.g. Claude Fable 5.1, Claude Opus 5.5, GPT-6 Astra/Luna, GPT-5.5 pro, GPT-5.4 pro.",
+      "source": "https://zed.dev/docs/llms.txt"
+    },
+    {
+      "feature": "Pricing",
+      "description": "Editor free forever (BYOK/external agents); Pro $10/mo with $5 of tokens included and usage-based billing beyond; Student plan with $10/mo credits; Business $30/seat/mo.",
+      "source": "https://zed.dev/pricing"
+    },
+    {
+      "feature": "Business admin controls",
+      "description": "Org-wide AI model policies, data governance controls, unified spend visibility, and role-based access.",
+      "source": "https://zed.dev/pricing"
+    },
+    {
+      "feature": "Multiplayer collaboration",
+      "description": "Real-time collaborative editing included in all plans.",
+      "source": "https://zed.dev/pricing"
+    }
+  ]
+}

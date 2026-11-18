@@ -1,0 +1,171 @@
+{
+  "agent": "DeepSeek Harness (dsh)",
+  "feature_count": 33,
+  "features": [
+    {
+      "feature": "Identity and architecture",
+      "description": "Open-source (MIT) agent harness from DeepSeek built on the Cordis framework with an everything-is-a-plugin design: the model adapter, tool registry, session log, and the agent loop itself are plugins with no privileged core; developer preview — compatibility-breaking changes expected; in public preview worldwide.",
+      "source": "https://github.com/deepseek-ai/deepseek-harness"
+    },
+    {
+      "feature": "Web UI",
+      "description": "npx @deepseek-ai/dsh web serves the browser app at 127.0.0.1:3080 (publishable behind a reverse proxy, SSH-launch aware); pick a workspace, then the agent reads/edits files, runs commands, delegates work, and maintains a plan, asking before operations that need approval.",
+      "source": "https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/docs/user/guide/index.md"
+    },
+    {
+      "feature": "Desktop app",
+      "description": "Electron desktop application ships the exact dsh production runtime in signed resources under a reserved desktop profile (official macOS build downloadable from the product page).",
+      "source": "https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/docs/architecture.md"
+    },
+    {
+      "feature": "CLI entry modes",
+      "description": "One launcher, named profiles: web (Web UI), headless (one fresh persisted session, prints the final answer, exits), sdk (JSON-RPC stdio server), sdk-minimal (standalone minimal tree), acp (automation-only ACP server over stdio); custom profiles initialize from shipped templates; dsh plugin manages a profile's plugins via pnpm.",
+      "source": "https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/apps/cli/README.md"
+    },
+    {
+      "feature": "Python SDK",
+      "description": "deepseek-harness-sdk ships a native runtime wheel packaging the dsh CLI (no system Node.js needed): run tasks with explicit workspace/home, install plugins, and enable extras (Team mode, str_replace_editor) via ordered YAML patches.",
+      "source": "https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/docs/user/guide/python-sdk.md"
+    },
+    {
+      "feature": "Model support",
+      "description": "DeepSeek API key follows the published model list (auto-refresh ~10 min, built-in fallback); shipped third-party providers include anthropic, openai, moonshotai (Kimi), zai (GLM); custom model APIs speak OpenAI Chat Completions, OpenAI Responses, Anthropic Messages, or Gemini API protocols; changes apply without restart.",
+      "source": "https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/docs/user/guide/providers.md"
+    },
+    {
+      "feature": "Model discovery and ordering",
+      "description": "Fetch available models queries the endpoint's listing into a searchable picker; drag-reorder a provider's models; the selected model becomes the default for new sessions.",
+      "source": "https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/docs/user/guide/providers.md"
+    },
+    {
+      "feature": "Reasoning levels",
+      "description": "Per-model reasoning efforts (the Effort menu; reasoningEfforts config) — e.g. DeepSeek V41 Flash at High in the official demo.",
+      "source": "https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/docs/user/guide/providers.md"
+    },
+    {
+      "feature": "Image input",
+      "description": "Models declare input modalities; image-capable routes (e.g. deepseek-flash) accept attached images in sessions.",
+      "source": "https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/docs/user/guide/providers.md"
+    },
+    {
+      "feature": "Credentials management",
+      "description": "API keys are write-only, stored in $DSH_HOME/.credentials.yaml with settings holding only a reference; masked previews, no reveal, staged whole-key removal, env-variable fallback per provider.",
+      "source": "https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/docs/user/guide/providers.md"
+    },
+    {
+      "feature": "Profiles and bundles composition",
+      "description": "A running dsh is a plugin tree of ordered layers: dsh-base (model adapters, tools, persistence, sandbox/approval policy, settings, credentials, telemetry) plus web-app/headless/sdk-app/acp-app bundles, your cordis.patch.yml, home patch, and --patch overlays; dsh --dump-config prints the composed tree; config HMR recomposes live.",
+      "source": "https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/apps/cli/README.md"
+    },
+    {
+      "feature": "Plugin manager and compatibility gates",
+      "description": "dsh plugin forwards package management to pnpm in the profile directory (records any installed dsh.bundle layer); engines.dsh version ranges are enforced with explicit, acknowledged exact-version exemptions; Plugin Manager serves Web UI and agents.",
+      "source": "https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/apps/cli/README.md"
+    },
+    {
+      "feature": "Creator mode",
+      "description": "Build plugins through chat: the agent loads the cordis-plugin-development skill, writes the plugin (package.json + client code), installs it via plugin_manager install_bundle, and verifies it live in the UI.",
+      "source": "https://www.deepseek.com/en/harness/"
+    },
+    {
+      "feature": "Official plugins",
+      "description": "Plugin manager ships official plugins: Agent teams (experimental), Auto approval review (experimental), Scheduled tasks (experimental), Voice input (experimental), Terminal, Agent loop, and Subagents.",
+      "source": "https://www.deepseek.com/en/harness/"
+    },
+    {
+      "feature": "Community plugin ecosystem",
+      "description": "Third-party plugins extend tools, skills, and the interface; discoverable via the dsh-plugin GitHub topic, with GitHub Discussions and a Discord community.",
+      "source": "https://github.com/deepseek-ai/deepseek-harness"
+    },
+    {
+      "feature": "Approvals",
+      "description": "The Web UI asks before operations that require approval under the active permission policy (approval policy ships in dsh-base); an experimental Auto approval review plugin is also offered.",
+      "source": "https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/docs/user/guide/index.md"
+    },
+    {
+      "feature": "Sandbox backend",
+      "description": "Spawned processes are confined via a swappable ctx.sandbox backend (consumers wrap argv before spawning); filesystem and subprocess providers share one execution world, so pointing them at a remote sandbox moves Bash, PTY, and LSP with them; working directories supply sandbox write roots.",
+      "source": "https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/docs/architecture.md"
+    },
+    {
+      "feature": "Safety posture",
+      "description": "Experimental dev-preview software with no security audit; sandboxing, approval prompts, and permission controls reduce risk but do not guarantee isolation — run least-privileged in disposable VMs/containers and review plugins/commands.",
+      "source": "https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/SAFETY.md"
+    },
+    {
+      "feature": "Sessions",
+      "description": "Append-only SessionEvent log with durable JSONL persistence under $DSH_HOME/sessions; fork at a turn boundary stores the caller-supplied parent prefix; automatic session titles; persistence backends (create/open/stat/list/export) are swappable; replay renders from the log.",
+      "source": "https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/docs/architecture.md"
+    },
+    {
+      "feature": "Subagents and Agent Teams",
+      "description": "Subagent providers vary behind one interface (fresh child agents up to delegated turns in other products); Agent Teams adds task policy and a shared task board to a root session (Team mode via config patch, maxTasks limit; sdk-minimal excludes subagents/Team services).",
+      "source": "https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/docs/architecture.md"
+    },
+    {
+      "feature": "Plan maintenance",
+      "description": "The agent reads/edits workspace files, runs commands, delegates work, and maintains a plan as it works.",
+      "source": "https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/docs/user/guide/index.md"
+    },
+    {
+      "feature": "Goals",
+      "description": "ctx.goals manages a same-session objective the agent continues toward across turns.",
+      "source": "https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/docs/architecture.md"
+    },
+    {
+      "feature": "Scheduled tasks",
+      "description": "One-off or recurring scheduled agent runs (e.g. weekly Fridays at 17:00 Asia/Shanghai) via the schedule_create plugin tool and Scheduled tasks plugin (experimental).",
+      "source": "https://www.deepseek.com/en/harness/"
+    },
+    {
+      "feature": "Voice input",
+      "description": "Voice input plugin (experimental) for prompting the agent by voice.",
+      "source": "https://www.deepseek.com/en/harness/"
+    },
+    {
+      "feature": "Jobs, terminal, and webhooks",
+      "description": "Background jobs with job_* tools to read/stop them; persistent terminal execution backend (ctx.terminals + dsh-tool-terminal); trusted rules on ctx.webhookRuntime can start sessions from external webhooks; human slash commands register on ctx.commands without a model turn.",
+      "source": "https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/docs/architecture.md"
+    },
+    {
+      "feature": "MCP and memory overlays",
+      "description": "Opt-in overlays ship in config/examples for memory MCP servers (plus GitHub review webhooks and runtime Cordis tools) — never part of a default profile.",
+      "source": "https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/apps/cli/README.md"
+    },
+    {
+      "feature": "Skills",
+      "description": "SKILL.md-based skills (e.g. the bundled cordis-plugin-development skill that Creator mode loads) with local instruction discovery in standard profiles.",
+      "source": "https://www.deepseek.com/en/harness/"
+    },
+    {
+      "feature": "Developer tools / trajectory view",
+      "description": "Inspect execution traces: timeline of turns and tool calls with per-call payload/result/schema/timing, durations, and input/model/tools breakdowns for troubleshooting.",
+      "source": "https://www.deepseek.com/en/harness/"
+    },
+    {
+      "feature": "File previews and everyday work",
+      "description": "Works on Word/Excel/PDF/HTML/Markdown/code files with in-UI previews and conversational refinement; positioned for everyday work (docs, data, slides), coding, research with citations, and background scripts/batch processing.",
+      "source": "https://www.deepseek.com/en/harness/"
+    },
+    {
+      "feature": "Default tool set",
+      "description": "Standard profiles run a persistent bash shell (pwsh on Windows) plus file read/grep, read_image, working_directory, and Web tools; sdk-minimal pins danger-full-access with bash/pwsh, read_image, and working_directory (str_replace_editor optional via patch).",
+      "source": "https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/docs/user/guide/python-sdk.md"
+    },
+    {
+      "feature": "Compaction and session-log upload",
+      "description": "Automatic context compaction summarizes older history through an additional model request (preserving the full log); a DeepSeek session-log contributor uploads unaccepted log events with DeepSeek requests by default (max 8 MiB, opt-out via config).",
+      "source": "https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/docs/user/guide/python-sdk.md"
+    },
+    {
+      "feature": "TUI profile",
+      "description": "A terminal-UI mode exists as an installable profile — the official CLI docs show dsh --profile tui --resume <id> as the example (not a shipped default profile).",
+      "source": "https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/apps/cli/README.md"
+    },
+    {
+      "feature": "Pricing",
+      "description": "Free, MIT-licensed open source in public preview; you supply model access (DeepSeek API key, third-party providers, or custom OpenAI-compatible/Anthropic/Gemini endpoints) — no bundled model quota or paid tier advertised.",
+      "source": "https://www.deepseek.com/en/harness/"
+    }
+  ]
+}

@@ -1,0 +1,136 @@
+{
+  "agent": "Goose",
+  "feature_count": 26,
+  "features": [
+    {
+      "feature": "Desktop app",
+      "description": "Native goose Desktop app for macOS, Linux and Windows, installed via download, Homebrew or package managers.",
+      "source": "https://goose-docs.ai/docs/getting-started/installation"
+    },
+    {
+      "feature": "CLI",
+      "description": "Full command-line interface with consistent flags for sessions (--session-id), schedule jobs (--schedule-id), recipes, extensions and configuration.",
+      "source": "https://goose-docs.ai/docs/guides/goose-cli-commands"
+    },
+    {
+      "feature": "goose Development Kit (GDK)",
+      "description": "Rust runtime components behind goose (state machine, operations, providers, tools, context management) to build agents that run in apps, servers and the browser and resume from saved state; Python and Kotlin bindings.",
+      "source": "https://goose-docs.ai/docs/gdk/"
+    },
+    {
+      "feature": "Agentic AI Foundation governance",
+      "description": "Block donated goose to the Linux Foundation Agentic AI Foundation (AAIF), co-founded with Anthropic (MCP) and OpenAI (AGENTS.md) in Dec 2025; repo moved to the aaif-goose org in April 2026; Apache-2.0 licensed, written in Rust.",
+      "source": "https://www.linuxfoundation.org/press/linux-foundation-announces-the-formation-of-the-agentic-ai-foundation"
+    },
+    {
+      "feature": "General-purpose local agent",
+      "description": "Runs on your machine for code plus research, writing, automation and data analysis; 56.8k stars, 700+ contributors.",
+      "source": "https://goose-docs.ai/"
+    },
+    {
+      "feature": "15+ LLM providers",
+      "description": "Anthropic, OpenAI, Google, Ollama, OpenRouter, Azure, Bedrock, AI/ML API, Z.AI and more via API keys, or a custom OpenAI-compatible provider; Ollama models are auto-detected in the model dropdown.",
+      "source": "https://goose-docs.ai/docs/getting-started/providers"
+    },
+    {
+      "feature": "ACP provider subscriptions",
+      "description": "Use existing Claude, ChatGPT or Gemini subscriptions by delegating to ACP agents (Claude Code, Codex, Gemini CLI) running as goose providers, with goose extensions passed through as MCP servers.",
+      "source": "https://goose-docs.ai/docs/guides/acp-providers"
+    },
+    {
+      "feature": "ACP server for editors",
+      "description": "goose works as an ACP server so Zed, JetBrains and VS Code can run it as their coding agent (installable from the Zed ACP Registry).",
+      "source": "https://goose-docs.ai/docs/guides/zed"
+    },
+    {
+      "feature": "MCP extensions",
+      "description": "All tools come via MCP extensions: 70+ documented extensions, configured in YAML or enabled in Desktop/CLI, plus a community extension directory.",
+      "source": "https://goose-docs.ai/docs/getting-started/using-extensions"
+    },
+    {
+      "feature": "MCP Apps",
+      "description": "Extensions can render interactive UIs (buttons, forms, visualizations) directly inside goose Desktop.",
+      "source": "https://goose-docs.ai/"
+    },
+    {
+      "feature": "Analyze codebase tool",
+      "description": "Built-in analyze extension (on by default) tracks symbols, usage and call graphs (incoming and outgoing calls) across many languages.",
+      "source": "https://goose-docs.ai/docs/guides/codebase-analysis"
+    },
+    {
+      "feature": "Permission modes",
+      "description": "Four modes: Completely Autonomous, Smart Approval (risk-based auto-approve of low-risk actions), Manual Approval and Chat Only; set per session via /mode or as the default in Settings, with granular tool permissions.",
+      "source": "https://goose-docs.ai/docs/guides/managing-tools/goose-permissions"
+    },
+    {
+      "feature": "Adversary mode",
+      "description": "A silent independent agent reviewer watches tool calls before execution, catching compromised, injected or off-brief actions with contextual understanding.",
+      "source": "https://goose-docs.ai/docs/guides/security/adversary-mode"
+    },
+    {
+      "feature": "Prompt injection detection",
+      "description": "Pattern-based detection of malicious instructions hidden in content, such as attempts to delete system files.",
+      "source": "https://goose-docs.ai/docs/guides/security/prompt-injection-detection"
+    },
+    {
+      "feature": "Sandbox mode",
+      "description": "Sandboxed execution listed among goose security controls alongside injection detection and permission controls.",
+      "source": "https://goose-docs.ai/"
+    },
+    {
+      "feature": "Sessions",
+      "description": "Start, switch between and resume sessions; the Desktop sidebar lists your 10 most recent sessions and the CLI supports --resume and --session-id.",
+      "source": "https://goose-docs.ai/docs/guides/sessions/session-management"
+    },
+    {
+      "feature": "Smart context management",
+      "description": "Automatic conversation compaction (with manual compaction), context-limit strategies, maximum turns, token usage, credit balance monitoring and cost tracking.",
+      "source": "https://goose-docs.ai/docs/guides/sessions/smart-context-management"
+    },
+    {
+      "feature": "Project instructions (AGENTS.md / .goosehints)",
+      "description": "Supply project context via .goosehints, AGENTS.md or custom filenames so goose understands requirements and executes tasks effectively.",
+      "source": "https://goose-docs.ai/docs/guides/context-engineering/using-goosehints"
+    },
+    {
+      "feature": "Skills",
+      "description": "Reusable instruction and resource packages that teach goose specific tasks, from checklists to detailed workflows with scripts and templates; built-in Skills platform extension is enabled by default.",
+      "source": "https://goose-docs.ai/docs/guides/context-engineering/using-skills"
+    },
+    {
+      "feature": "Subagents",
+      "description": "Spawn independent subagent instances to handle tasks in parallel (code review, research, file processing), keeping the main conversation clean; goose can create them autonomously.",
+      "source": "https://goose-docs.ai/docs/guides/context-engineering/subagents"
+    },
+    {
+      "feature": "Recipes",
+      "description": "Reusable YAML or JSON configs that package instructions, extensions, parameters and subrecipes; create in Desktop, share with a team and run in CI.",
+      "source": "https://goose-docs.ai/docs/guides/recipes/recipe-reference"
+    },
+    {
+      "feature": "Scheduled jobs",
+      "description": "CLI supports schedule job identifiers (e.g. daily-report) for recurring automated runs.",
+      "source": "https://goose-docs.ai/docs/guides/goose-cli-commands"
+    },
+    {
+      "feature": "YAML configuration",
+      "description": "config.yaml (macOS/Linux: ~/.config/goose) sets default behaviors, models, tool permissions and extensions; goose configure wizard and environment variables supported.",
+      "source": "https://goose-docs.ai/docs/guides/config-files"
+    },
+    {
+      "feature": "Observability",
+      "description": "Environment-variable observability configuration including Langfuse integration for tracing goose sessions.",
+      "source": "https://goose-docs.ai/docs/guides/environment-variables"
+    },
+    {
+      "feature": "Custom distributions",
+      "description": "Build your own goose distro with preconfigured providers, extensions and branding.",
+      "source": "https://github.com/aaif-goose/goose"
+    },
+    {
+      "feature": "Live voice conversations (unverified)",
+      "description": "A Sept 2026 repository commit adds live voice conversations to the desktop app; not yet documented in the docs map, so treat as unverified.",
+      "source": "https://github.com/aaif-goose/goose/commit/d213a3b13545b4e85524a572ac695b2181728e3b"
+    }
+  ]
+}

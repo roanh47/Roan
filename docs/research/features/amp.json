@@ -1,0 +1,101 @@
+{
+  "agent": "Amp",
+  "feature_count": 19,
+  "features": [
+    {
+      "feature": "Web app",
+      "description": "Use Amp at ampcode.com with no install; threads run in cloud orbs.",
+      "source": "https://ampcode.com/docs"
+    },
+    {
+      "feature": "Native apps",
+      "description": "Native apps for macOS, Windows, Linux, iPhone, iPad, and Android, adding notifications, dictation, and sharing from other apps.",
+      "source": "https://ampcode.com/docs/apps"
+    },
+    {
+      "feature": "CLI",
+      "description": "Interactive terminal Amp (`amp`) with piped-input mode, shell completions, and multi-account login; macOS, Linux, Windows via WSL.",
+      "source": "https://ampcode.com/docs/cli"
+    },
+    {
+      "feature": "Editor integration",
+      "description": "Connects Amp to VS Code, Cursor, Windsurf, Zed, or Neovim: it sees your open file/selection and edits through the IDE with full undo.",
+      "source": "https://ampcode.com/docs/cli"
+    },
+    {
+      "feature": "Orbs",
+      "description": "Cloud sandboxes created per thread with your code, plugins, and dev tools; agents keep working with your laptop closed, and idle orbs pause and cost nothing.",
+      "source": "https://ampcode.com/docs/orbs"
+    },
+    {
+      "feature": "Executor routing",
+      "description": "`--executor local|orb|runner:ID` chooses where each thread runs: your machine, an Amp-hosted cloud orb, or a connected self-hosted runner.",
+      "source": "https://ampcode.com/docs/cli"
+    },
+    {
+      "feature": "Runners / self-hosted orbs",
+      "description": "`amp --no-tui` turns any machine into a runner serving remote threads; self-hosted orbs and runners are free on every tier.",
+      "source": "https://ampcode.com/docs/cli/runners"
+    },
+    {
+      "feature": "Multi-model lineup",
+      "description": "Frontier models including GPT-6/6.1 (Luna, Sol, Terra), Claude Fable 5/5.1, Claude Opus/Sonnet 4.6, Gemini 4 (Argon/Carbon/Hydrogen), Grok 4.3, and GLM-5.",
+      "source": "https://ampcode.com/models"
+    },
+    {
+      "feature": "BYOK + linked subscriptions",
+      "description": "Bring your own keys or link your ChatGPT/Claude subscriptions; no Amp token fees or limits on Hobby, Individual, or Teams tiers.",
+      "source": "https://ampcode.com/docs/pricing"
+    },
+    {
+      "feature": "Threads",
+      "description": "Saved conversations with a searchable Activity feed (time/status/author/project filters, shareable URLs), a Changes diff view, and Amp-Thread-ID trailers on commits and PRs.",
+      "source": "https://ampcode.com/docs/threads"
+    },
+    {
+      "feature": "Thread sharing",
+      "description": "Share dialog grants access to specific people, the workspace, or anyone via unguessable 'Unlisted' links; public discoverable sharing was removed.",
+      "source": "https://ampcode.com/docs/threads"
+    },
+    {
+      "feature": "Puck",
+      "description": "Built-in personal assistant for starting, monitoring, and messaging agents and projects (Ctrl+/ on web, palette command in the TUI, share-sheet on mobile).",
+      "source": "https://ampcode.com/docs/puck"
+    },
+    {
+      "feature": "Portals",
+      "description": "Authenticated URLs that expose web servers running inside orbs, so you can preview apps and annotate pages with comments sent to the agent.",
+      "source": "https://ampcode.com/docs/orbs/portals"
+    },
+    {
+      "feature": "AGENTS.md guidance",
+      "description": "AGENTS.md files read automatically from the cwd, parents, and subtrees, plus personal, system-wide, and workspace 'Global AGENTS.md' instruction files.",
+      "source": "https://ampcode.com/docs/customize/agents-md"
+    },
+    {
+      "feature": "Plugins & skills",
+      "description": "Plugins and skills that extend Amp agents, shared across workspace members (full docs pages sit behind sign-in).",
+      "source": "https://ampcode.com/pricing"
+    },
+    {
+      "feature": "Image input",
+      "description": "Paste images into the CLI prompt with Ctrl+V or drag-and-drop from the file manager.",
+      "source": "https://ampcode.com/docs/cli"
+    },
+    {
+      "feature": "Pricing tiers",
+      "description": "Hobby free (pay-as-you-go orbs), Individual Megawatt/Gigawatt $20/mo with 45,000 hosted-orb minutes (Megawatt 50 at $50/mo), Teams no extra charge, Enterprise custom, education discount $10/mo.",
+      "source": "https://ampcode.com/pricing"
+    },
+    {
+      "feature": "Usage metering",
+      "description": "Orb minutes billed by size plus Amp credits charged at providers' API prices with no markup; check with `amp usage` or ask Amp to explain your spend.",
+      "source": "https://ampcode.com/docs/pricing"
+    },
+    {
+      "feature": "Enterprise controls",
+      "description": "SAML/OIDC SSO, SCIM directory sync, audit logs, spend limits, MCP registry allowlists, IP allowlisting, zero/minimum data retention, and SOC 2 Type 2 certification.",
+      "source": "https://ampcode.com/pricing"
+    }
+  ]
+}
