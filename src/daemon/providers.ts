@@ -1,6 +1,8 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { RoanPaths } from "./paths.js";
+import { loadCatalog } from "../providers/live.js";
+import type { Catalog } from "../providers/types.js";
 
 /**
  * The providers this person has, and which one is in use.
@@ -24,8 +26,20 @@ export interface ProviderFile {
   readonly active: string | null;
 }
 
-/** Providers that speak the OpenAI wire format, so no adapter work is needed. */
-export const PRESETS: readonly { id: string; label: string; baseUrl: string; keyHint: string }[] = [
+export interface Preset {
+  readonly id: string;
+  readonly label: string;
+  readonly baseUrl: string;
+  readonly keyHint: string;
+}
+
+/**
+ * Providers that speak the OpenAI wire format and have no entry in the
+ * models.dev catalogue with an API URL (the majors ship their own SDKs, so the
+ * registry carries no `api` for them). They are also the offline fallback: the
+ * preset list is the catalogue when it can be had, these ten when it cannot.
+ */
+export const PRESETS: readonly Preset[] = [
   { id: "opencode-go", label: "opencode go", baseUrl: "https://opencode.ai/inference/go/openai/v1", keyHint: "opencode.ai key" },
   { id: "opencode", label: "opencode zen", baseUrl: "https://opencode.ai/inference/openai/v1", keyHint: "opencode.ai key" },
   { id: "openai", label: "OpenAI", baseUrl: "https://api.openai.com/v1", keyHint: "sk-…" },
@@ -37,6 +51,41 @@ export const PRESETS: readonly { id: string; label: string; baseUrl: string; key
   { id: "xai", label: "xAI", baseUrl: "https://api.x.ai/v1", keyHint: "xai-…" },
   { id: "lmstudio", label: "LM Studio (this machine)", baseUrl: "http://127.0.0.1:1234/v1", keyHint: "no key needed" },
 ];
+
+function keyHintFromEnv(env: readonly string[]): string {
+  return env[0] ?? "";
+}
+
+/**
+ * Every provider the catalogue knows that exposes an OpenAI-compatible API —
+ * the `api` field on the models.dev entry — plus the curated list for the
+ * majors the registry has no URL for. A curated entry wins on a clash: its
+ * base URL is the compatibility path (e.g. Google's `/v1beta/openai`), not the
+ * SDK root the registry would give.
+ */
+export function presetsFromCatalog(catalog: Catalog): Preset[] {
+  const byId = new Map<string, Preset>();
+  for (const entry of Object.values(catalog.providers)) {
+    const api = entry.api;
+    if (api === undefined || api.length === 0) continue;
+    const known = PRESETS.find((preset) => preset.id === entry.id);
+    byId.set(entry.id, {
+      id: entry.id,
+      label: known?.label ?? entry.name,
+      baseUrl: known?.baseUrl ?? api,
+      keyHint: known?.keyHint ?? keyHintFromEnv(entry.env),
+    });
+  }
+  for (const preset of PRESETS) {
+    if (!byId.has(preset.id)) byId.set(preset.id, preset);
+  }
+  return [...byId.values()].sort((a, b) => a.label.toLowerCase().localeCompare(b.label.toLowerCase()));
+}
+
+/** The preset list to show: catalogue-derived, falling back to the curated ten. */
+export async function providerPresets(): Promise<Preset[]> {
+  return presetsFromCatalog(await loadCatalog());
+}
 
 function file(paths: RoanPaths): string {
   return join(paths.home, "providers.json");

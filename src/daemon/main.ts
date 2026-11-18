@@ -31,7 +31,7 @@ import { runHooks, type HookConfig } from "../hooks/run.js";
 import { dueJobs, loadCron } from "../cron/jobs.js";
 import { engineAvailable, runHermesTurn } from "../engine/hermes.js";
 import { catalogSource, loadCatalog } from "../providers/live.js";
-import { PRESETS, fetchModels, loadProviders, saveProviders, upsertAccount, type ProviderAccount } from "./providers.js";
+import { presetsFromCatalog, fetchModels, loadProviders, saveProviders, upsertAccount, type ProviderAccount } from "./providers.js";
 import { saveSettings } from "./settings-write.js";
 
 const CONTROL_PORT = Number(process.env["ROAN_CONTROL_PORT"] ?? 7411);
@@ -784,8 +784,10 @@ async function main(): Promise<void> {
         }
         if (kind === "providers_list") {
           const file = await loadProviders(paths);
+          const catalog = await loadCatalog();
           reply({
-            presets: PRESETS,
+            presets: presetsFromCatalog(catalog),
+            source: catalogSource(catalog),
             active: file.active,
             accounts: file.accounts.map((account) => ({
               id: account.id,
