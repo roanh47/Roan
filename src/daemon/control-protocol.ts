@@ -48,12 +48,17 @@ export interface ControlError { readonly t: "control_error"; readonly message: s
 
 export type ControlResponse = StateResponse | ChainResponse | ControlError;
 
-/** A join code carries where to reach the other node and how to prove the chain. */
+/**
+ * A join code carries every way to reach the other node and how to prove the
+ * chain. `hosts` is ordered best-first: the joiner dials them all until one
+ * opens, so whether the two devices meet over Tailscale or the LAN does not
+ * matter — they just have to find each other.
+ */
 export interface JoinCode {
-  readonly v: 1;
+  readonly v: 2;
   readonly chain: string;
   readonly token: string;
-  readonly host: string;
+  readonly hosts: readonly string[];
   readonly port: number;
 }
 
@@ -61,6 +66,10 @@ export function encodeJoinCode(code: JoinCode): string {
   return Buffer.from(JSON.stringify(code), "utf8").toString("base64url");
 }
 
+/**
+ * Decodes v2 codes (a `hosts` list) and the v1 codes that carry one `host`.
+ * Every address an old or new device ever put in a code stays joinable.
+ */
 export function decodeJoinCode(text: string): JoinCode {
   let parsed: unknown;
   try {
@@ -70,16 +79,28 @@ export function decodeJoinCode(text: string): JoinCode {
   }
   if (typeof parsed !== "object" || parsed === null) throw new Error("this is not a Roan invite code");
   const p = parsed as Record<string, unknown>;
-  if (p["v"] !== 1) throw new Error("this invite code is from another version of Roan");
+  if (p["v"] !== 1 && p["v"] !== 2) throw new Error("this invite code is from another version of Roan");
   const chain = p["chain"];
   const token = p["token"];
-  const host = p["host"];
   const port = p["port"];
   if (typeof chain !== "string" || chain.length === 0) throw new Error("invite code has no chain");
   if (typeof token !== "string" || token.length === 0) throw new Error("invite code has no token");
-  if (typeof host !== "string" || host.length === 0) throw new Error("invite code has no address");
   if (typeof port !== "number" || !Number.isInteger(port) || port <= 0 || port > 65535) {
     throw new Error("invite code has no usable port");
   }
-  return { v: 1, chain, token, host, port };
+  const hosts: string[] = [];
+  // A listen-all address is not an address: codes from the broken era that
+  // carry nothing else are refused with a reason instead of joining into
+  // silence.
+  const pushHost = (entry: unknown): void => {
+    if (typeof entry !== "string" || entry.length === 0) return;
+    if (entry === "0.0.0.0" || entry === "::") return;
+    if (!hosts.includes(entry)) hosts.push(entry);
+  };
+  pushHost(p["host"]);
+  if (Array.isArray(p["hosts"])) {
+    for (const entry of p["hosts"]) pushHost(entry);
+  }
+  if (hosts.length === 0) throw new Error("invite code has no address");
+  return { v: 2, chain, token, hosts, port };
 }

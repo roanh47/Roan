@@ -4,6 +4,7 @@ import type { ChainResponse, DaemonState } from "./control-protocol.js";
 import { decodeJoinCode, encodeJoinCode } from "./control-protocol.js";
 import { createIdentity, loadIdentity, type Identity } from "./identity.js";
 import { ensurePaths, migrateLegacyHome, resolvePaths, type RoanPaths } from "./paths.js";
+import { advertiseHosts } from "./advertise.js";
 import { loadSettings } from "./settings.js";
 import { startControlServer } from "./control.js";
 import { ChainNodeStore } from "./peer-store.js";
@@ -53,6 +54,16 @@ function peerHost(paths: RoanPaths): string {
   // Alles wat deze machine heeft: Tailscale, LAN, loopback. De handshake
   // weigert nog steeds elke peer met een verkeerd token of een andere keten.
   return process.env["ROAN_PEER_HOST"] ?? "0.0.0.0";
+}
+
+/**
+ * Elk adres waarop een ander toestel dit toestel kan bellen, best eerst:
+ * tailscale vóór LAN. De joiner belt ze allemaal tot er één opengaat —
+ * de manier boeit niet, ze moeten elkaar vinden. Een code met alleen het
+ * luisteradres (`0.0.0.0`) was de bug: niet te joinen.
+ */
+function dialHosts(paths: RoanPaths): string[] {
+  return advertiseHosts(peerHost(paths), os.networkInterfaces());
 }
 
 /** Discovery hoort bij het proces, niet bij een sessie: bij afsluiten moet hij stoppen. */
@@ -143,10 +154,10 @@ async function main(): Promise<void> {
       session === null
         ? null
         : encodeJoinCode({
-            v: 1,
+            v: 2,
             chain: session.identity.chainId,
             token: session.identity.token,
-            host: peerHost(paths),
+            hosts: dialHosts(paths),
             port: PEER_PORT,
           }),
   });
@@ -225,8 +236,10 @@ async function main(): Promise<void> {
     if (session === null) return;
     const current = session;
     const chain = current.identity.chainId;
-    const explicit = process.env["ROAN_PEER_ADVERTISE"] ?? "";
-    let host = explicit;
+    // One source of truth for "where can you call me": the same address the
+    // invites carry. The tailscale scan stays for the discovery list; the
+    // announcement uses the dialable host, tailnet first.
+    let host = dialHosts(paths)[0] ?? "";
     if (host.length === 0) {
       const found = await tailscaleHosts().catch(() => ({ self: null, hosts: [] as string[] }));
       host = found.self ?? "";
@@ -586,10 +599,10 @@ async function main(): Promise<void> {
         chain: existing.chainId,
         node: existing.nodeId,
         invite: encodeJoinCode({
-          v: 1,
+          v: 2,
           chain: existing.chainId,
           token: existing.token,
-          host: peerHost(paths),
+          hosts: dialHosts(paths),
           port: PEER_PORT,
         }),
       };
@@ -597,10 +610,10 @@ async function main(): Promise<void> {
     const created = await createIdentity(paths);
     session = { identity: created, store: EventStore.open(paths.database) };
     const invite = encodeJoinCode({
-      v: 1,
+      v: 2,
       chain: created.chainId,
       token: created.token,
-      host: peerHost(paths),
+      hosts: dialHosts(paths),
       port: PEER_PORT,
     });
     await startReplication();
@@ -639,8 +652,13 @@ async function main(): Promise<void> {
         await startCron();
       })().catch((error: unknown) => log("join: " + String(error)));
     }, 2_500);
-    addPeer({ host: parsed.host, port: parsed.port });
-    log("peer: joined " + parsed.host + ":" + String(parsed.port));
+    // Every route in the code gets a peer: dead addresses sit idle, the
+    // handshake refuses wrong tokens, and whichever network the two devices
+    // share is the one that opens.
+    for (const host of parsed.hosts) {
+      addPeer({ host, port: parsed.port });
+    }
+    log("peer: joined via " + parsed.hosts.join(", ") + ":" + String(parsed.port));
     return { t: "chain", chain: joined.chainId, node: joined.nodeId };
   };
 
