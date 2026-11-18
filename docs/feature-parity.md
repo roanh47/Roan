@@ -180,15 +180,27 @@ these are deliberately out for Roan even though Hermes has them.
 | Profiles (one process, several identities) | Several "persons" on one install | WON'T — one agent, one identity |
 | Updater with fleet verification | Updates without breaking running bots | **SOON** (§9 updater row) |
 
-## OpenClaw
+## OpenClaw — delivered: 136 sourced features
 
-Research running now (official docs + GitHub); the user's previous agent — his
-writing-style skill was ported from `~/.openclaw/workspace`, and the workspace-home
-concept (§8) is OpenClaw's. The inventory lands here when the pass returns; what is
-already known from his usage: `~/.openclaw/workspace` as the agent's home with
-AGENTS.md/SOUL-style persona files, a gateway daemon that survives everything, and
-channels rather than an app. Roan keeps the home concept (round 2) and drops the
-multi-channel shape in favour of the chain.
+The user's previous agent, and the origin of Roan's home concept. Full inventory in
+`docs/research/features/openclaw.json` (136 rows, docs.openclaw.ai URLs); these are the
+rows that decide something for Roan.
+
+| OpenClaw feature | What it is | Verdict for Roan |
+|---|---|---|
+| Gateway daemon per host | One long-lived process owns sessions/tools/events; every surface is a client of it | **confirmed shape** — third vendor after Hermes and opencode's background service; Roan's daemon is right |
+| Workspace home | `~/.openclaw/workspace` with AGENTS.md, SOUL.md, IDENTITY.md, USER.md, MEMORY.md as editable Markdown | **BUILD (round 2)** — Roan keeps the home; SOUL.md-style persona + IDENTITY file is the part Roan hasn't planned yet: adopt |
+| BOOTSTRAP.md first-run ritual | On a fresh workspace the agent seeds its own files and walks through picking an identity, then deletes the bootstrap file | **BUILD** — Roan's onboarding can seed `.Roan/workspace` the same way; cheap, fits round 2 |
+| Node devices | Companion devices pair as thin nodes: camera, screen recording, location, SMS, notifications via `node.invoke` | **WON'T as-is** — Roan devices are full peers, never thin clients; worth stealing is the device-command set (camera/screenshot/notify between Roan's own instances) — SOON after round 2 |
+| 33 chat channels | Same agent on WhatsApp/Telegram/Discord/iMessage/… simultaneously | WON'T — the app is the channel; a Telegram door can come later, never the core |
+| Markdown memory | MEMORY.md curated facts + `memory/YYYY-MM-DD.md` daily notes distilled over time; no hidden state | **BUILD later** — the distillation pattern (dailies → curated file) fits Roan's memory once the home exists |
+| Skill Workshop 2.0 | Agent saves its own skills with change history and undo | LATER — after skills travel with the chain |
+| Session search / compaction / `/btw` side chats | Recall across transcripts; summarizing long chats; ephemeral side questions | matches existing SOON rows (session search, compaction) |
+| Standing orders | Permanent operating authority injected every session, combinable with automations | = the goals row (§5) — SOON |
+| Public conversation links | Revocable read-only snapshot of a session | LATER |
+| Mermaid diagrams in chat | Rendered across chat surfaces | LATER — markdown renderer first (round 1) |
+| Doctor + triage | Read-only health checks with fixes; a broken install becomes a diagnosis prompt | **SOON** — belongs in the updater round (§9): Roan should be able to say what's wrong with itself |
+| Telemetry: one daily version check | Nothing phones home except a version ping (opt-in stats) | Roan is stricter — zero; keep it that way |
 
 ## Sourced inventories — delivered
 
@@ -205,13 +217,14 @@ These files are the raw source; this document is the Roan verdict on top of them
 | ChatGPT (apps + desktop) | 58 | `docs/research/features/chatgpt.json` |
 | Claude (apps + desktop + web) | 45 | `docs/research/features/claude.json` |
 | Gemini (app) | 51 | `docs/research/features/gemini.json` |
-| **Total** | **429** | |
+| OpenClaw | 136 | `docs/research/features/openclaw.json` |
+| **Total** | **565** | |
 
 Notes from the pass worth keeping: Gemini CLI's unpaid tier moved to the new Antigravity
 CLI on 2026-06-18 (so "gemini-cli" as a reference is partly historical — Antigravity gets
 its own inventory), and opencode ships a per-user background service every client connects
 to — the same daemon-first shape Roan uses, from a second vendor.
 
-Still running: OpenClaw, Antigravity, Pi, DeepSeek Harness, Aider, Cline/Roo, Goose,
-OpenHands, Qwen Code, Amp, Copilot CLI, Cursor, Crush, Zed Agent — each lands as its own
-JSON in the same folder and gets a verdict row above.
+Still running: Antigravity, Pi, DeepSeek Harness, Aider, Cline/Roo, Goose, OpenHands,
+Qwen Code, Amp, Copilot CLI, Cursor, Crush, Zed Agent — each lands as its own JSON in
+the same folder and gets a verdict row above.

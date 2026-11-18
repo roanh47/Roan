@@ -1,0 +1,686 @@
+{
+  "agent": "OpenClaw",
+  "feature_count": 136,
+  "features": [
+    {
+      "feature": "Open-source personal agent gateway",
+      "description": "Self-hosted AI assistant ('the AI that really does things') whose state, memory, and credentials live on your own hardware; stewarded by the OpenClaw Foundation (501(c)(3)) with no paid tier, hosted service, or token.",
+      "source": "https://github.com/openclaw/openclaw"
+    },
+    {
+      "feature": "Gateway daemon",
+      "description": "One long-lived Gateway process per host is the local control plane for sessions, tools, events, and every channel connection; it exposes a typed WebSocket API (JSON-schema-validated frames, server-push events like agent, chat, presence, health, heartbeat, cron) on default 127.0.0.1:18789.",
+      "source": "https://docs.openclaw.ai/concepts/architecture"
+    },
+    {
+      "feature": "One-command install",
+      "description": "Install via curl script (macOS/Linux/WSL2), PowerShell script (Windows), or npx openclaw@latest; requires Node 24.x/26.x (Bun is an explicit opt-in runtime).",
+      "source": "https://docs.openclaw.ai/start/getting-started"
+    },
+    {
+      "feature": "VPS and cloud hosting guides",
+      "description": "Run the always-on Gateway on a VPS or cloud host: Azure, Daytona, EasyRunner, exe.dev, Fly.io, GCP, and Hetzner (Docker), plus a VPS hosting hub and container install paths.",
+      "source": "https://docs.openclaw.ai/platforms"
+    },
+    {
+      "feature": "Gateway background service",
+      "description": "Installs as a LaunchAgent (macOS), systemd user service (Linux/WSL2), or Scheduled Task (Windows) so the agent runs 24/7 and survives reboots; gateway start waits for health and readiness checks.",
+      "source": "https://docs.openclaw.ai/start/getting-started"
+    },
+    {
+      "feature": "Onboarding wizard",
+      "description": "Guided onboarding reuses a detected Claude Code or Codex CLI login or API key (Quick start) or walks a full Custom setup; reopenable via openclaw configure or openclaw onboard --classic.",
+      "source": "https://docs.openclaw.ai/start/getting-started"
+    },
+    {
+      "feature": "Remote access",
+      "description": "Reach the Gateway from anywhere via Tailscale/VPN (recommended) or an SSH tunnel; TLS with optional pinning is available for remote WebSocket setups.",
+      "source": "https://docs.openclaw.ai/concepts/architecture"
+    },
+    {
+      "feature": "Node devices",
+      "description": "Companion devices (macOS, iOS, watchOS, Android, headless) pair to the Gateway as nodes and expose device commands — camera capture, screen recording, location, SMS (Android), notifications, and system info — via node.invoke.",
+      "source": "https://docs.openclaw.ai/nodes"
+    },
+    {
+      "feature": "Native companion apps",
+      "description": "Native apps for macOS (menu bar app), Windows (Windows Hub, with a cross-platform Tauri backup), iOS, Android, and a Linux desktop companion; the core is TypeScript on Node.",
+      "source": "https://github.com/openclaw/openclaw"
+    },
+    {
+      "feature": "Named profiles",
+      "description": "Multiple isolated OpenClaw instances on one machine via OPENCLAW_PROFILE: separate state directories (~/.openclaw-<profile>), workspaces, and per-profile services.",
+      "source": "https://docs.openclaw.ai/platforms"
+    },
+    {
+      "feature": "Personal vs multiplayer shapes",
+      "description": "The same product runs as a personal claw (one person's assistant) or a multiplayer claw (one Gateway shared by a team) — multiplayer is configuration, not a separate edition.",
+      "source": "https://docs.openclaw.ai/start/multiplayer"
+    },
+    {
+      "feature": "Agent workspace",
+      "description": "Each agent's home directory (default ~/.openclaw/workspace) holds instructions, persona, memory, and skills as plain Markdown you can read, edit, and back up; editable via Settings → Agents → Files in the Control UI; separate from ~/.openclaw, which stores config and credentials.",
+      "source": "https://docs.openclaw.ai/concepts/agent-workspace"
+    },
+    {
+      "feature": "AGENTS.md",
+      "description": "Operating instructions and memory policy loaded at the start of every session; the place for rules, priorities, and how-to-behave details, with a default template and a '## Tools' section for local tool conventions.",
+      "source": "https://docs.openclaw.ai/concepts/agent-workspace"
+    },
+    {
+      "feature": "SOUL.md persona file",
+      "description": "Persona, tone, and boundaries loaded every session, with a dedicated personality guide and template in the docs.",
+      "source": "https://docs.openclaw.ai/concepts/agent-workspace"
+    },
+    {
+      "feature": "IDENTITY.md",
+      "description": "The agent's name, vibe, and emoji, created or updated during the first-run bootstrap ritual.",
+      "source": "https://docs.openclaw.ai/concepts/agent-workspace"
+    },
+    {
+      "feature": "USER.md",
+      "description": "Optional directive-based user profile — stable preferences, communication style, relationships, active projects — injected each session with a dedicated 4,000-character budget.",
+      "source": "https://docs.openclaw.ai/concepts/agent-workspace"
+    },
+    {
+      "feature": "BOOTSTRAP.md first-run ritual",
+      "description": "On a brand-new workspace the agent runs a one-time bootstrap that seeds AGENTS.md, SOUL.md, IDENTITY.md, USER.md and walks the agent through picking an identity; BOOTSTRAP.md is deleted once the workspace looks configured.",
+      "source": "https://docs.openclaw.ai/start/bootstrapping"
+    },
+    {
+      "feature": "BOOT.md",
+      "description": "Optional startup checklist executed on Gateway startup via the bundled boot-md hook.",
+      "source": "https://docs.openclaw.ai/concepts/agent-workspace"
+    },
+    {
+      "feature": "Workspace as Git repo",
+      "description": "Keep the workspace and its memory files in a private Git repository; docs cover init, copying per-agent session databases, and moving a workspace to a new machine without rerunning onboarding.",
+      "source": "https://docs.openclaw.ai/concepts/agent-workspace"
+    },
+    {
+      "feature": "Standing orders",
+      "description": "Permanent operating authority for defined programs, kept in workspace files (typically AGENTS.md) and injected into every session automatically; combinable with automations for time-based enforcement.",
+      "source": "https://docs.openclaw.ai/automation/standing-orders"
+    },
+    {
+      "feature": "33 chat channels",
+      "description": "The same agent is reachable on 33 documented channels — WhatsApp, Telegram, Discord, Slack, Signal, iMessage, Google Chat, Microsoft Teams, Matrix, IRC, LINE, Feishu, Mattermost, Nextcloud Talk, Nostr, QQ, Twitch, WeChat, WeCom, Zalo, and more; channels run simultaneously and route per chat.",
+      "source": "https://docs.openclaw.ai/channels"
+    },
+    {
+      "feature": "WhatsApp channel",
+      "description": "Official plugin with QR pairing over a Baileys session, install-on-demand; exactly one WhatsApp session per Gateway host, with access controls and delivery operations.",
+      "source": "https://docs.openclaw.ai/channels/whatsapp"
+    },
+    {
+      "feature": "Telegram channel",
+      "description": "Bundled grammY bot-token channel; the fastest to set up (openclaw channels add --channel telegram).",
+      "source": "https://docs.openclaw.ai/channels/telegram"
+    },
+    {
+      "feature": "iMessage channel",
+      "description": "Native iMessage support via imsg (JSON-RPC over stdio) with replies, tapbacks, effects, polls, attachments, and group management.",
+      "source": "https://docs.openclaw.ai/channels/imessage"
+    },
+    {
+      "feature": "X / Twitter channel",
+      "description": "Bundled plugin for mentions, allowlisted public replies, thread context, and event modes.",
+      "source": "https://docs.openclaw.ai/channels/x"
+    },
+    {
+      "feature": "SMS channel",
+      "description": "Twilio SMS/MMS with webhooks, access controls, and delivery status.",
+      "source": "https://docs.openclaw.ai/channels/sms"
+    },
+    {
+      "feature": "A2A channel",
+      "description": "Connect external agents to OpenClaw through the A2A 1.0 JSON-RPC protocol (bundled plugin).",
+      "source": "https://docs.openclaw.ai/channels/a2a"
+    },
+    {
+      "feature": "Reef channel",
+      "description": "Guarded, end-to-end-encrypted messaging between OpenClaw agents run by different people (bundled plugin).",
+      "source": "https://docs.openclaw.ai/channels/reef"
+    },
+    {
+      "feature": "Group chats",
+      "description": "Per-channel group policy: allowlists, mention gating, and isolated group sessions; Slack MPIMs route as group chats.",
+      "source": "https://docs.openclaw.ai/channels/groups"
+    },
+    {
+      "feature": "Group join introductions",
+      "description": "Discord, LINE, Matrix, Slack, and Telegram bots post one grounded, toolless, 60-second-bounded introduction when joining an allowed group — once per room with a 90-day durable claim.",
+      "source": "https://docs.openclaw.ai/channels"
+    },
+    {
+      "feature": "Ambient room events",
+      "description": "Supported always-on rooms feed unmentioned chatter to the agent as quiet context without triggering replies.",
+      "source": "https://docs.openclaw.ai/channels/ambient-room-events"
+    },
+    {
+      "feature": "Bot loop protection",
+      "description": "Shared protection on bot-authored inbound channels stops bot pairs from replying to each other indefinitely.",
+      "source": "https://docs.openclaw.ai/channels/bot-loop-protection"
+    },
+    {
+      "feature": "DM pairing and allowlists",
+      "description": "Unknown DM senders get a pairing code instead of being processed; per-channel allowFrom lists and mention gates control who can message the agent.",
+      "source": "https://docs.openclaw.ai/channels/pairing"
+    },
+    {
+      "feature": "Voice calls (telephony)",
+      "description": "Voice Call plugin adds phone calls via Plivo, Telnyx, or Twilio: outbound notifications, inbound calls with allowlist policy and per-number routing, full-duplex realtime voice, streaming transcription, and TTS with an ElevenLabs override.",
+      "source": "https://docs.openclaw.ai/plugins/voice-call"
+    },
+    {
+      "feature": "Google Meet plugin",
+      "description": "Google Meet calls, including Twilio sessions delegated through Voice Call.",
+      "source": "https://docs.openclaw.ai/plugins/google-meet"
+    },
+    {
+      "feature": "Sessions",
+      "description": "Every inbound message routes to a session owned by the Gateway: DMs share one rolling main session by default, while groups, rooms, cron runs, and webhooks get isolated sessions.",
+      "source": "https://docs.openclaw.ai/concepts/session"
+    },
+    {
+      "feature": "Session reset and side chats",
+      "description": "/new and /reset (configurable resetTriggers) start a fresh session with daily/idle reset policies; /btw and /side stay ephemeral.",
+      "source": "https://docs.openclaw.ai/start/openclaw"
+    },
+    {
+      "feature": "Compaction and pruning",
+      "description": "Long conversations are summarized (compaction, /compact) and tool results trimmed (session pruning) so prompts stay lean in 24/7 chats.",
+      "source": "https://docs.openclaw.ai/concepts/compaction"
+    },
+    {
+      "feature": "Session search",
+      "description": "Full-text recall across past transcripts.",
+      "source": "https://docs.openclaw.ai/concepts/session-search"
+    },
+    {
+      "feature": "Markdown memory",
+      "description": "Memory is plain Markdown with no hidden state: MEMORY.md (curated long-term facts and decisions), memory/YYYY-MM-DD.md daily notes, and an optional DREAMS.md dream diary; useful material from daily notes is distilled into MEMORY.md over time.",
+      "source": "https://docs.openclaw.ai/concepts/memory"
+    },
+    {
+      "feature": "memory_search / memory_get",
+      "description": "Daily memory files are indexed so the agent can recall past notes via the memory_search and memory_get tools without injecting everything into every prompt.",
+      "source": "https://docs.openclaw.ai/concepts/memory"
+    },
+    {
+      "feature": "Memory provenance trust",
+      "description": "Files recorded as untrusted, or written remotely without valid provenance, are excluded from automatic memory context; openclaw doctor lists each excluded MEMORY.md or USER.md.",
+      "source": "https://docs.openclaw.ai/concepts/memory"
+    },
+    {
+      "feature": "Cross-surface session continuity",
+      "description": "Continue the same Gateway-owned session from the Control UI, the terminal, or a coding harness (session synchronization and attachment).",
+      "source": "https://docs.openclaw.ai/concepts/session-attachment"
+    },
+    {
+      "feature": "Automatic session names",
+      "description": "Interactive sessions generate a topic title in the background when the first message is dispatched.",
+      "source": "https://docs.openclaw.ai/concepts/session"
+    },
+    {
+      "feature": "Public conversation links",
+      "description": "Sessions can be published as revocable public links with an anonymous read-only view and content exclusions (shipped in v2026.10.5).",
+      "source": "https://docs.openclaw.ai/releases"
+    },
+    {
+      "feature": "Personal user files on a shared Gateway",
+      "description": "On multi-user Gateways each authenticated requester keeps a personal USER.md, read and updated through the Gateway via the personal_instructions tool.",
+      "source": "https://docs.openclaw.ai/concepts/user-model"
+    },
+    {
+      "feature": "Skills (SKILL.md)",
+      "description": "Markdown instruction packs (YAML frontmatter plus body) that teach the agent repeatable workflows, loaded with documented precedence from workspace, project, personal, managed, workshop, bundled, and plugin sources.",
+      "source": "https://docs.openclaw.ai/tools/skills"
+    },
+    {
+      "feature": "Per-agent vs shared skills",
+      "description": "Skill visibility scopes by path: per-agent workspace skills, project-agent skills, personal ~/.agents/skills, shared managed skills, workshop skills, and extra dirs.",
+      "source": "https://docs.openclaw.ai/tools/skills"
+    },
+    {
+      "feature": "Skill Workshop",
+      "description": "Agents learn and save their own skills with change history and undo; Skill Workshop 2.0 shipped in v2026.10.5.",
+      "source": "https://docs.openclaw.ai/tools/skill-workshop"
+    },
+    {
+      "feature": "Self-learning skills",
+      "description": "Turn past conversations into reusable skills through a steerable chat (introduced in v2026.9.4).",
+      "source": "https://docs.openclaw.ai/tools/self-learning"
+    },
+    {
+      "feature": "Creating skills",
+      "description": "Step-by-step guide and templates for authoring custom skills, whose slash commands register automatically.",
+      "source": "https://docs.openclaw.ai/tools/creating-skills"
+    },
+    {
+      "feature": "Plugins",
+      "description": "Packages that add tools, skills, channels, model providers, speech, realtime voice, media generation, web search/fetch, and hooks; installed from ClawHub, npm, git, local dirs, or archives and applied to a running Gateway.",
+      "source": "https://docs.openclaw.ai/tools"
+    },
+    {
+      "feature": "Plugin SDK",
+      "description": "Typed SDK for building plugins, including agent-harness plugins that replace the embedded agent executor and in-process tool/prompt/message hooks.",
+      "source": "https://docs.openclaw.ai/plugins/sdk-overview"
+    },
+    {
+      "feature": "Agent-managed plugins",
+      "description": "Agents can inspect, install, enable, disable, remove, and reload plugins from an conversation.",
+      "source": "https://docs.openclaw.ai/plugins/manage-plugins"
+    },
+    {
+      "feature": "ClawHub registry",
+      "description": "Public marketplace (clawhub.ai) for community skills and plugins: search/install/update via the openclaw CLI, publish via the clawhub CLI; semver versions, changelogs, download counts, stars, and security scan summaries on public pages.",
+      "source": "https://docs.openclaw.ai/clawhub"
+    },
+    {
+      "feature": "Node-hosted skills",
+      "description": "A connected node publishes skills installed in its own ~/.openclaw/skills; they appear in the agent skill list while the node is connected and execute with exec host=node.",
+      "source": "https://docs.openclaw.ai/tools/skills"
+    },
+    {
+      "feature": "Personal skill library",
+      "description": "On a shared Gateway, identified operators create and import personal skills (Plugins → Skills) without permission to change shared workspace skills or Gateway config.",
+      "source": "https://docs.openclaw.ai/tools/skills"
+    },
+    {
+      "feature": "Built-in tool suite",
+      "description": "Typed tool categories: runtime (exec, process, terminal, code_execution), files (read, write, edit, apply_patch), human input (ask_user, secrets), web (web_search, x_search, web_fetch), browser, messaging, sessions/agents, automation, gateway/nodes, plugin lifecycle, and media.",
+      "source": "https://docs.openclaw.ai/tools"
+    },
+    {
+      "feature": "Exec tool",
+      "description": "Run shell commands in the workspace — foreground, background, or durable across Gateway restarts — on the Gateway host, in a sandbox, or on a paired node, with an automatic host memory budget on Linux.",
+      "source": "https://docs.openclaw.ai/tools/exec"
+    },
+    {
+      "feature": "Web search and fetch",
+      "description": "Built-in web_search, x_search (X posts), and web_fetch (readable page content) tools.",
+      "source": "https://docs.openclaw.ai/tools/web"
+    },
+    {
+      "feature": "Browser automation",
+      "description": "Agent-driven dedicated Chromium-family profile (Chrome/Brave/Edge) isolated from your personal browser: tab control, click/type/drag/select, snapshots, screenshots, PDFs, page-text Q&A, and downloads, bounded by an SSRF policy; a user profile attaches to your signed-in Chrome via Chrome DevTools MCP.",
+      "source": "https://docs.openclaw.ai/tools/browser"
+    },
+    {
+      "feature": "Remote and hosted browsers",
+      "description": "Offload browsing to Browserless (hosted or Docker), Browserbase, Notte, direct WebSocket CDP providers, or the zero-config node browser proxy.",
+      "source": "https://docs.openclaw.ai/tools/browser/remote"
+    },
+    {
+      "feature": "Browser login",
+      "description": "Sign a browser profile into a site once, before the agent automates it.",
+      "source": "https://docs.openclaw.ai/tools/browser-login"
+    },
+    {
+      "feature": "ask_user tool",
+      "description": "The agent pauses and asks the human a structured question; choices surface as answer cards in chat and the native apps.",
+      "source": "https://docs.openclaw.ai/tools/ask-user"
+    },
+    {
+      "feature": "Secrets tool",
+      "description": "Agents obtain a credential from the user without ever seeing its value.",
+      "source": "https://docs.openclaw.ai/tools/secrets"
+    },
+    {
+      "feature": "Tool policy",
+      "description": "Fine-grained tool allow/deny by profile, agent, provider, channel, and sandbox state — with per-agent restrictions for delegated runs — testable via openclaw policy.",
+      "source": "https://docs.openclaw.ai/gateway/config-tools"
+    },
+    {
+      "feature": "Sandboxing",
+      "description": "Optional sandbox backends — Docker (default), Podman, SSH, OpenShell, and Crabbox cloud boxes — isolate tool execution and the browser from the host, with per-session sandbox workspaces; off by default.",
+      "source": "https://docs.openclaw.ai/gateway/sandboxing"
+    },
+    {
+      "feature": "Elevated exec",
+      "description": "Explicit, per-message escape hatch (/exec, tools.elevated) for authorized senders to run a command outside the sandbox.",
+      "source": "https://docs.openclaw.ai/tools/elevated"
+    },
+    {
+      "feature": "Code Mode",
+      "description": "Compact JavaScript programs that combine many tools in one call against a hidden OpenClaw tool catalog, without sending every tool schema to the model.",
+      "source": "https://docs.openclaw.ai/tools/code-mode"
+    },
+    {
+      "feature": "Tool Search",
+      "description": "tool_search / tool_describe / dispatch_action let the agent search, inspect, and call large tool catalogs without prompt bloat.",
+      "source": "https://docs.openclaw.ai/tools/tool-search"
+    },
+    {
+      "feature": "Progress card",
+      "description": "Durable progress cards update the parent session on long-running work (unavailable to sub-agents).",
+      "source": "https://docs.openclaw.ai/tools/progress-card"
+    },
+    {
+      "feature": "Goals",
+      "description": "get_goal, create_goal, and update_goal tools maintain durable goals for the agent.",
+      "source": "https://docs.openclaw.ai/tools/goal"
+    },
+    {
+      "feature": "Diffs",
+      "description": "Read-only diff viewer and file renderer for agents.",
+      "source": "https://docs.openclaw.ai/tools/diffs"
+    },
+    {
+      "feature": "Slash commands",
+      "description": "Chat command surface: standalone commands (/new, /status), session directives (/think, /fast, /verbose, /model, /queue, /elevated), inline shortcuts (/help), and host-only bang (!) bash commands for authorized senders.",
+      "source": "https://docs.openclaw.ai/tools/slash-commands"
+    },
+    {
+      "feature": "Operator UI tools",
+      "description": "Agents can arrange Control UI panes (screen) and create appearance themes (theme) from chat.",
+      "source": "https://docs.openclaw.ai/tools"
+    },
+    {
+      "feature": "MCP client support",
+      "description": "Connect Model Context Protocol servers (stdio command or streamable-http URL) via openclaw mcp add or Settings; exposed tools pass through the same tool policy as built-in tools, with per-server include filters.",
+      "source": "https://docs.openclaw.ai/tools/mcp"
+    },
+    {
+      "feature": "OpenClaw as an MCP server",
+      "description": "openclaw mcp serve exposes Gateway-backed channel conversations to external MCP clients such as Claude Code over stdio.",
+      "source": "https://docs.openclaw.ai/cli/mcp"
+    },
+    {
+      "feature": "Node-hosted MCP servers",
+      "description": "Paired nodes publish MCP tools and local model inference to Gateway agents.",
+      "source": "https://docs.openclaw.ai/nodes/mcp-and-skills"
+    },
+    {
+      "feature": "MCP Events",
+      "description": "MCP server events trigger Automation runs through subscribed, signed callbacks.",
+      "source": "https://docs.openclaw.ai/automation/mcp-events"
+    },
+    {
+      "feature": "MCP Apps in the Control UI",
+      "description": "MCP App discovery and management surface in the web UI (introduced in v2026.10.1).",
+      "source": "https://docs.openclaw.ai/releases"
+    },
+    {
+      "feature": "Automations (cron and reminders)",
+      "description": "Built-in scheduler for one-shot reminders (--at), recurring intervals, and cron expressions — each job with its own context, delivery policy, quiet hours (activeHours), idleOnly, and run history, editable by both user and agent.",
+      "source": "https://docs.openclaw.ai/automation"
+    },
+    {
+      "feature": "Webhook triggers",
+      "description": "Authenticated HTTP ingress lets external services start agent runs.",
+      "source": "https://docs.openclaw.ai/automation"
+    },
+    {
+      "feature": "Hooks",
+      "description": "Event-driven HOOK.md scripts react to lifecycle events (session /new, /reset, /stop, compaction, gateway startup, message flow), managed with openclaw hooks; plugin hooks intercept tool calls in-process.",
+      "source": "https://docs.openclaw.ai/automation/hooks"
+    },
+    {
+      "feature": "Heartbeat",
+      "description": "Periodic proactive wake-ups; legacy heartbeat monitors migrate into ordinary editable automation jobs with their own execution policies.",
+      "source": "https://docs.openclaw.ai/gateway/heartbeat"
+    },
+    {
+      "feature": "IMAP email trigger",
+      "description": "Sender-gated inbound email triggers isolated reader sessions.",
+      "source": "https://docs.openclaw.ai/automation/imap"
+    },
+    {
+      "feature": "Lobster",
+      "description": "Runs local pipelines with resumable approvals.",
+      "source": "https://docs.openclaw.ai/tools/lobster"
+    },
+    {
+      "feature": "Sub-agents",
+      "description": "Background agent runs spawned from a parent run, each in its own session with isolated tool policy by default, configurable nesting depth, and results announced back to the requester; visible and steerable in the Control UI Subagents panel.",
+      "source": "https://docs.openclaw.ai/tools/subagents"
+    },
+    {
+      "feature": "Swarm",
+      "description": "Structured fan-out and collection of concurrent worker agents, orchestrated from Code Mode.",
+      "source": "https://docs.openclaw.ai/tools/swarm"
+    },
+    {
+      "feature": "ACP harness sessions",
+      "description": "Delegate turns to external coding harnesses (Claude Code, Codex, OpenCode) through Agent Client Protocol sessions, including thread-bound and resumable runs.",
+      "source": "https://docs.openclaw.ai/tools/acp-agents"
+    },
+    {
+      "feature": "Agent send",
+      "description": "Agents send messages across conversations, channels, and to other agents; cross-provider messaging can be restricted.",
+      "source": "https://docs.openclaw.ai/tools/agent-send"
+    },
+    {
+      "feature": "Steer",
+      "description": "Redirect a running agent mid-task; queue or steer follow-ups from chat and the native apps.",
+      "source": "https://docs.openclaw.ai/tools/steer"
+    },
+    {
+      "feature": "Multi-agent routing",
+      "description": "Run multiple isolated agents in one Gateway — each with its own workspace, state directory, model registry, and SQLite session store — with bindings routing channel accounts (e.g., two WhatsApp numbers) to the right agent.",
+      "source": "https://docs.openclaw.ai/concepts/multi-agent"
+    },
+    {
+      "feature": "Agents and Templates",
+      "description": "Give a job its own agent and package it as a Template to share with others.",
+      "source": "https://docs.openclaw.ai/concepts/agents-and-templates"
+    },
+    {
+      "feature": "Teams of specialist agents",
+      "description": "Set up teams of specialist agents (v2026.9.5) and role-scoped parallel specialist lanes for a single job.",
+      "source": "https://docs.openclaw.ai/concepts/parallel-specialist-lanes"
+    },
+    {
+      "feature": "Multiplayer claw (team mode)",
+      "description": "One Gateway shared by a whole team: shared sessions everyone can open and steer in the Control UI, live presence, named operator roles, verified GitHub identity with commit credit, and a production deployment path with Cloudflare Access or Tailscale identity sign-in.",
+      "source": "https://docs.openclaw.ai/start/multiplayer"
+    },
+    {
+      "feature": "Multi-user mode",
+      "description": "Ownership, participants, owner assignment, and DM session isolation for multiple people on one Gateway.",
+      "source": "https://docs.openclaw.ai/concepts/multi-user"
+    },
+    {
+      "feature": "Managed worktrees",
+      "description": "Repository tasks run in managed Git branch/checkouts; publish PRs from a selected GitHub account and follow CI results in the conversation.",
+      "source": "https://docs.openclaw.ai/concepts/managed-worktrees"
+    },
+    {
+      "feature": "BYOK model providers",
+      "description": "Bring your own keys or subscriptions: OpenAI (API or ChatGPT/Codex OAuth), Anthropic, Google Gemini/Vertex, Z.AI GLM, OpenRouter, Kilo Gateway, Vercel AI Gateway, MiniMax, NVIDIA, xAI, Moonshot Kimi, Volcano Engine/BytePlus, and more — with multi-key rotation and defined key priority.",
+      "source": "https://docs.openclaw.ai/concepts/model-providers"
+    },
+    {
+      "feature": "Local model runtimes",
+      "description": "Run models locally via llama.cpp, LM Studio, Ollama, vLLM, SGLang, or local proxies such as LiteLLM through custom base URLs.",
+      "source": "https://docs.openclaw.ai/concepts/model-providers/custom-providers"
+    },
+    {
+      "feature": "models.dev-powered live catalog",
+      "description": "A self-updating model catalog merges models.dev data with OpenClaw manifests and price feeds, publishing every four hours to catalog.openclaw.ai; running Gateways pick up new models without an update or restart.",
+      "source": "https://openclaw.ai/blog/use-new-models-in-openclaw-without-an-update"
+    },
+    {
+      "feature": "Model selection and failover",
+      "description": "Primary plus fallback chains, model aliases, modelPolicy allowlists, auth-profile rotation inside a provider before failing over, and dedicated utility, image, PDF, and decision model slots.",
+      "source": "https://docs.openclaw.ai/concepts/models"
+    },
+    {
+      "feature": "Models CLI",
+      "description": "openclaw models lists, sets, scans, aliases, fallbacks, and authenticates providers (paste-api-key, OAuth login, subscription setup).",
+      "source": "https://docs.openclaw.ai/cli/models"
+    },
+    {
+      "feature": "Sign in with ChatGPT",
+      "description": "Use an existing ChatGPT subscription as model access via OAuth (Beta, v2026.9.7).",
+      "source": "https://docs.openclaw.ai/releases"
+    },
+    {
+      "feature": "Agent runtimes as plugins",
+      "description": "Swap the agent loop itself: embedded OpenClaw runtime, Codex, or the GitHub Copilot agent runtime (always explicit opt-in); models and harnesses are plugins.",
+      "source": "https://docs.openclaw.ai/concepts/agent-runtimes"
+    },
+    {
+      "feature": "Token and cost management",
+      "description": "Usage tracking, prompt-caching controls (cacheRetention), Anthropic 1M-context sizing, image dimension caps, and /compact guidance for reducing token pressure.",
+      "source": "https://docs.openclaw.ai/reference/token-use"
+    },
+    {
+      "feature": "Talk mode",
+      "description": "Live voice conversation on a node with three modes: provider-native realtime, streaming stt-tts, and observe-only transcription.",
+      "source": "https://docs.openclaw.ai/nodes/talk"
+    },
+    {
+      "feature": "Voice wake",
+      "description": "Wake-word capture on a node hands the conversation to the agent.",
+      "source": "https://docs.openclaw.ai/nodes/voicewake"
+    },
+    {
+      "feature": "Voice notes (TTS and STT)",
+      "description": "Inbound voice notes are transcribed via batch STT providers (Deepgram, ElevenLabs, OpenAI, Google, xAI, and more); replies can be spoken aloud via the synchronous tts tool.",
+      "source": "https://docs.openclaw.ai/tools/media-overview"
+    },
+    {
+      "feature": "Image, video, and music generation",
+      "description": "image_generate, video_generate, and music_generate run as async background jobs across 25+ providers (OpenAI, Google, fal, ComfyUI, Runway, PixVerse, MiniMax, and more) and post results to the chat when ready.",
+      "source": "https://docs.openclaw.ai/tools/media-overview"
+    },
+    {
+      "feature": "Media understanding",
+      "description": "Vision-capable providers summarize inbound images, audio, and video, including node-captured photos, clips, and screen recordings.",
+      "source": "https://docs.openclaw.ai/nodes/media-understanding"
+    },
+    {
+      "feature": "Media playback",
+      "description": "Assistant audio and video play inline across the Control UI and native apps.",
+      "source": "https://docs.openclaw.ai/nodes/media-playback"
+    },
+    {
+      "feature": "iOS app",
+      "description": "Official App Store app (iOS/iPadOS 26.2+): Gateway chat over LAN or tailnet, node capabilities (screen snapshot, camera, location, Talk mode, voice wake, opt-in Health summaries), read-only workspace browsing, an offline transcript cache, and a durable outbox queueing messages sent while offline.",
+      "source": "https://docs.openclaw.ai/platforms/ios"
+    },
+    {
+      "feature": "Android app",
+      "description": "Official Google Play (and signed APK) companion-node app: chat, attention indicators for pending questions and approvals, thread snooze, an automations view, and a Gateway settings assistant.",
+      "source": "https://docs.openclaw.ai/platforms/android"
+    },
+    {
+      "feature": "macOS app (menu bar)",
+      "description": "Menu bar app that connects as a node, adding widget-panel (Canvas), camera, screen, notification, and computer-control commands, plus an Instances device UI.",
+      "source": "https://docs.openclaw.ai/nodes"
+    },
+    {
+      "feature": "Windows support",
+      "description": "Native Windows Hub desktop app (recommended), a cross-platform Tauri app as backup, a PowerShell install for terminal-first use, or WSL2 for the most Linux-compatible runtime.",
+      "source": "https://docs.openclaw.ai/platforms"
+    },
+    {
+      "feature": "Computer use",
+      "description": "Desktop control on a paired node (gated), letting the agent operate a real GUI.",
+      "source": "https://docs.openclaw.ai/nodes/computer-use"
+    },
+    {
+      "feature": "Node session hosting",
+      "description": "OpenClaw worker sessions can be hosted on devices with placement, capacity limits, and container isolation.",
+      "source": "https://docs.openclaw.ai/nodes/session-hosting"
+    },
+    {
+      "feature": "Node session catalogs",
+      "description": "Codex, Claude, OpenCode, and Pi sessions and transcripts are discovered on the Gateway and paired nodes.",
+      "source": "https://docs.openclaw.ai/nodes/session-catalogs"
+    },
+    {
+      "feature": "Node file transfers",
+      "description": "Terminal uploads plus a File Transfer plugin for directory listing, fetch, and write between the Gateway host and paired nodes.",
+      "source": "https://docs.openclaw.ai/nodes/file-transfers"
+    },
+    {
+      "feature": "Cross-device networking",
+      "description": "A docs hub for connecting, pairing, and securing devices across localhost, LAN, and tailnet — one Gateway owns all state, so every chat surface and app sees the same sessions.",
+      "source": "https://docs.openclaw.ai/network"
+    },
+    {
+      "feature": "Control UI (web dashboard)",
+      "description": "Gateway-served web app on port 18789: chat and sessions, Settings (models and providers, devices, agents and files, plugins, MCP, appearance themes, language), usage, activity recaps, a meetings page, agent-memory import, and built-in bug-report links; custom UI builds can be mounted.",
+      "source": "https://docs.openclaw.ai/web/control-ui"
+    },
+    {
+      "feature": "TUI",
+      "description": "Terminal user interface via the openclaw command.",
+      "source": "https://docs.openclaw.ai/web/tui"
+    },
+    {
+      "feature": "WebChat",
+      "description": "Browser-based chat over the Gateway WebSocket (included in core).",
+      "source": "https://docs.openclaw.ai/web/webchat"
+    },
+    {
+      "feature": "Session dashboards (widgets)",
+      "description": "Persistent widget boards attached to a session — hosted widget documents with defined sandbox and capability boundaries, presentable natively on the macOS widget panel.",
+      "source": "https://docs.openclaw.ai/web/dashboard-architecture"
+    },
+    {
+      "feature": "Mermaid diagrams in chat",
+      "description": "Agents render Mermaid diagrams across chat surfaces (v2026.9.1).",
+      "source": "https://docs.openclaw.ai/releases"
+    },
+    {
+      "feature": "Security model and audit",
+      "description": "Conservative defaults (loopback bind, DM pairing codes, group allowlists with mention gates) plus openclaw security audit with a severity catalog and auto-fixes, hardened baseline configs, prompt-injection guidance, browser/SSRF risk docs, a secrets storage map, rate limiting, and incident-response runbooks.",
+      "source": "https://docs.openclaw.ai/gateway/security"
+    },
+    {
+      "feature": "Threat model",
+      "description": "Adversarial threats to the OpenClaw platform and ClawHub mapped to MITRE ATLAS.",
+      "source": "https://docs.openclaw.ai/security/THREAT-MODEL-ATLAS"
+    },
+    {
+      "feature": "Device pairing",
+      "description": "Every WebSocket client and node presents a device identity; new device IDs require pairing approval and receive device tokens; connect frames are challenge-signed and pinned to paired metadata.",
+      "source": "https://docs.openclaw.ai/concepts/architecture"
+    },
+    {
+      "feature": "Gateway auth modes",
+      "description": "Shared-secret token or password, Tailscale Serve identity, trusted-proxy operator identity (e.g., Cloudflare Access), or none for private ingress; gateway.auth applies to all connections, local or remote.",
+      "source": "https://docs.openclaw.ai/concepts/architecture"
+    },
+    {
+      "feature": "Operator scopes and roles",
+      "description": "Named operator roles and connection scopes bound what each person can do on a shared Gateway.",
+      "source": "https://docs.openclaw.ai/gateway/operator-scopes"
+    },
+    {
+      "feature": "Telemetry policy",
+      "description": "By default OpenClaw phones home for nothing but a daily version check; anonymous feature statistics are opt-in, and update.checkOnStart: false disables both.",
+      "source": "https://docs.openclaw.ai/gateway/telemetry"
+    },
+    {
+      "feature": "CLI",
+      "description": "Full CLI surface: gateway install/start/status, configure, channels add, models, skills, plugins, mcp, nodes, hooks, sessions, memory, security, policy, automations, infer, and docs search.",
+      "source": "https://docs.openclaw.ai/cli"
+    },
+    {
+      "feature": "Doctor and triage",
+      "description": "openclaw doctor runs read-only health checks with fixes; openclaw triage turns a broken install into a sanitized diagnosis prompt handed to Claude Code, Codex CLI, or the built-in OpenClaw agent.",
+      "source": "https://docs.openclaw.ai/start/getting-started"
+    },
+    {
+      "feature": "Hot reload",
+      "description": "Config and plugin changes apply to the running Gateway without a restart by default.",
+      "source": "https://docs.openclaw.ai/channels"
+    },
+    {
+      "feature": "Backups and recovery",
+      "description": "Backup archives, per-database snapshots, scheduling, and offsite copies of state and workspace, plus update rollback and recovery safeguards.",
+      "source": "https://docs.openclaw.ai/install/backups"
+    },
+    {
+      "feature": "Support and community",
+      "description": "Official support routes and community forums (community.openclaw.ai), plus private security reporting channels.",
+      "source": "https://docs.openclaw.ai/help/support"
+    }
+  ]
+}
