@@ -69,8 +69,13 @@ sectie in `docs/feature-groups.md` voor de volledige basislijst.
       werd door Gboard opgegeten, dus daar reed het bewijs via de
       directe frame-toets.
 - [ ] **Sessies zoeken.** Ctrl-K door de eigen geschiedenis. (ronde 2a: state/ maakt het één query)
-- [ ] **Export/backup-knop.** Al ontworpen, nog geen knop. (ronde 2b)
-- [ ] **Notificatie als beurt klaar is.** (ronde 2b: foreground service)
+- [x] **Export/backup-knop.** ⤓ per gesprek in de drawer (markdown, mét de
+      hernoemde titel) en "Export the whole chain" op de Sync-pagina (JSONL).
+      Beide ook naar de Android download-map als het storage-venster open
+      staat. Bewezen: bestand teruggevonden via adb in
+      /storage/emulated/0/Download. (0.0.19)
+- [x] **Notificatie als beurt klaar is.** De foreground service tailt de
+      log op de "notify:turn-done"-regel en tikt "Roan is done". (0.0.19)
 - [ ] **Midden-beurt sturen.** Stop bestaat; antwoord bijsturen terwijl hij
       denkt nog niet. (SOON)
 - [ ] **Bijlagen buiten de workspace.** Foto's/bestanden uitkiezen die niet
@@ -110,8 +115,12 @@ sectie in `docs/feature-groups.md` voor de volledige basislijst.
 - [ ] **Schrijfstijl-skill upstream.** `skills/writing-style/` gecloned in de repo,
       remote `upstream` → `github.com/roanh47/Roans-Writing-Style-Skill`, als
       regel geladen in de turn-prompt — zie ook het schrijfstijl-punt boven.
-- [ ] **Foreground service op Android.** Daemon overleeft een gesloten app;
-      daarna pas: notificatie als beurt klaar is.
+- [x] **Foreground service op Android.** De service bezit de daemon met een
+      zichtbare notificatie ("Roan is running — One agent, everywhere"); de app
+      dicht op de achtergrond en de node ademt door (bewezen: state via adb
+      forward met de app dicht). Een beurt die klaar is terwijl de app dicht
+      is, meldt "Roan is done" — de daemon markeert het moment met een
+      logregel die de service tailt. (0.0.19)
 
 ## Schrijfstijl
 
