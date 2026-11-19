@@ -436,6 +436,8 @@ export default function App(): ReactElement {
                       className="rail__rename"
                       autoFocus
                       aria-label="Rename chat"
+                      // Typing replaces the old name instead of appending to it.
+                      onFocus={(event) => event.target.select()}
                       value={renaming.draft}
                       onChange={(event) => setRenaming({ id: session.id, draft: event.target.value })}
                       onKeyDown={(event) => {
