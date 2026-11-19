@@ -850,6 +850,72 @@ pre {
   color: var(--accent);
 }
 
+/* The one-line answer to "what is this". */
+.onboarding__slogan {
+  margin: -6px 0 14px;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.panel__slogan {
+  margin: 2px 0 0;
+  color: var(--accent);
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+/* The node roster: one line per machine, the dot says whether it answers. */
+.sync__node {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.sync__dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.sync__dot--live {
+  background: var(--accent);
+}
+
+.sync__name {
+  color: var(--fg);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sync__here {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--faint);
+  font-size: 11px;
+}
+
+.sync__addr {
+  margin-left: auto;
+  color: var(--faint);
+  font-size: 12px;
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Leaving a chain is the one destructive-looking action in the app: red,
  * behind a confirm, and honest about the archive. */
 .panel__leave-open,

@@ -20,6 +20,8 @@ export interface ControlServerOptions {
    * on will drop on the way out.
    */
   readonly onLeaveChain?: () => void;
+  /** Names a node differently; a fresh announcement, so it rides the chain. */
+  readonly onRenameNode?: (node: string, name: string) => void;
   /** Marks a point in the current conversation you can come back to. */
   readonly onCheckpoint?: (label?: string) => void;
   /** Starts a new conversation from an earlier point; nothing is deleted. */
@@ -147,6 +149,7 @@ export function startControlServer(options: ControlServerOptions): Promise<Contr
         type !== "new_session" &&
         type !== "rename_session" &&
         type !== "leave_chain" &&
+        type !== "rename_node" &&
         type !== "checkpoint" &&
         type !== "rewind"
       ) {
@@ -177,6 +180,11 @@ export function startControlServer(options: ControlServerOptions): Promise<Contr
       }
       if (type === "leave_chain") {
         options.onLeaveChain?.();
+      }
+      if (type === "rename_node") {
+        const node = typeof frame["node"] === "string" ? frame["node"] : "";
+        const name = typeof frame["name"] === "string" ? frame["name"].trim() : "";
+        if (node.length > 0 && name.length > 0) options.onRenameNode?.(node, name);
       }
     });
 

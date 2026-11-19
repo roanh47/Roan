@@ -80,6 +80,8 @@ export interface DaemonStateFrame {
     invite?: string | null;
     model?: string;
     provider?: string;
+    peers?: string[];
+    nodes?: { node: string; name: string; host: string; port: number }[];
     sessions?: { id: string; title: string; messages: number }[];
     activeSession?: string | null;
   };
@@ -124,6 +126,8 @@ export interface ControlRequestFrame {
   code?: string;
   title?: string;
   session?: string;
+  node?: string;
+  name?: string;
   label?: string;
   seq?: number;
   path?: string;
@@ -172,6 +176,17 @@ export interface ChainSnapshot {
   sessions: readonly SessionSummary[];
   /** The conversation this device is looking at. */
   activeSession: string | null;
+  /** Nodes currently connected to this daemon. */
+  peers: readonly string[];
+  /** Every node that announced itself in this chain, newest fact per node. */
+  nodes: readonly NodeSummary[];
+}
+
+export interface NodeSummary {
+  readonly node: string;
+  readonly name: string;
+  readonly host: string;
+  readonly port: number;
 }
 
 export interface SessionSummary {
@@ -290,6 +305,20 @@ export function parseFrame(raw: unknown): ServerFrame | null {
     const chain = typeof data.chain === "string" ? data.chain : null;
     const node = typeof data.node === "string" ? data.node : null;
     const invite = typeof data.invite === "string" ? data.invite : null;
+    const peers = Array.isArray(data.peers)
+      ? data.peers.filter((entry): entry is string => typeof entry === "string")
+      : undefined;
+    const nodes = Array.isArray(data.nodes)
+      ? data.nodes
+          .filter(
+            (entry): entry is { node: string; name: string; host: string; port: number } =>
+              typeof entry === "object" &&
+              entry !== null &&
+              typeof (entry as { node?: unknown }).node === "string" &&
+              typeof (entry as { name?: unknown }).name === "string",
+          )
+          .map((entry) => ({ node: entry.node, name: entry.name, host: entry.host ?? "", port: entry.port ?? 0 }))
+      : undefined;
     const sessions = Array.isArray(data.sessions)
       ? data.sessions
           .filter((s): s is { id: string; title: string; messages: number } =>
@@ -305,6 +334,8 @@ export function parseFrame(raw: unknown): ServerFrame | null {
         chain,
         node,
         invite,
+        ...(peers !== undefined ? { peers } : {}),
+        ...(nodes !== undefined ? { nodes } : {}),
         ...(sessions !== undefined ? { sessions } : {}),
         ...(model !== undefined ? { model } : {}),
         ...(provider !== undefined ? { provider } : {}),
@@ -477,6 +508,8 @@ export class ChainClient {
       error: null,
       invite: null,
       sessions: [],
+      peers: [],
+      nodes: [],
       activeSession: null,
     };
   }
@@ -574,6 +607,11 @@ export class ChainClient {
    */
   leaveChain(): void {
     this.send({ t: "leave_chain" });
+  }
+
+  /** Names a node differently; a fresh announcement that rides the chain. */
+  renameNode(node: string, name: string): void {
+    this.send({ t: "rename_node", node, name });
     // The daemon owns the id, so ask again shortly: that answer also carries the
     // refreshed list, which is what puts the new conversation on screen.
     setTimeout(() => this.send({ t: "state" }), 250);
@@ -738,6 +776,8 @@ export class ChainClient {
           ? { invite: frame.data.invite }
           : {}),
         ...(frame.data.sessions !== undefined ? { sessions: frame.data.sessions } : {}),
+        ...(frame.data.peers !== undefined ? { peers: frame.data.peers } : {}),
+        ...(frame.data.nodes !== undefined ? { nodes: frame.data.nodes } : {}),
         ...(frame.data.model !== undefined ? { model: frame.data.model } : {}),
         ...(frame.data.provider !== undefined ? { provider: frame.data.provider } : {}),
         // Follow the daemon's newest session only when this device has not

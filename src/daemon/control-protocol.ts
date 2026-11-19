@@ -26,6 +26,8 @@ export interface DaemonState {
   readonly node: string | null;
   readonly head: number;
   readonly peers: readonly string[];
+  /** Every node that ever announced itself in this chain, newest fact per node. */
+  readonly nodes: readonly { readonly node: string; readonly name: string; readonly host: string; readonly port: number }[];
   /** The code another device pastes in; null before there is a chain. */
   readonly invite: string | null;
   readonly model?: string;

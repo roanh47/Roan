@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { ReactElement } from "react";
 import { ChainClient, openTurn, turnPhase, turnQuietMs } from "./chain.js";
 import type { ChainSnapshot } from "./chain.js";
@@ -81,7 +81,7 @@ const SETTINGS_ROWS: readonly [SettingsPage, string, string][] = [
   ["workspace", "Workspace", "files shared across devices"],
   ["schedules", "Schedules", "tasks that run later"],
   ["checkpoints", "Checkpoints", "named points to rewind to"],
-  ["devices", "Devices", "the chain and the nodes in it"],
+  ["devices", "Sync", "the chain, the nodes, the invite"],
   ["about", "About", "chain, node and version"],
 ];
 
@@ -117,6 +117,34 @@ export default function App(): ReactElement {
   const [sessionQuery, setSessionQuery] = useState("");
   /** The chat being renamed, with its draft title; null when not editing. */
   const [renaming, setRenaming] = useState<{ id: string; draft: string } | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // Ctrl-K opens the drawer on the search field, like every reference app.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setMenuOpen(true);
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  /** Search also finds what was said, not just what a chat is called. */
+  const sessionText = useMemo(() => {
+    const blob = new Map<string, string>();
+    const firstSession = snapshot.sessions[0]?.id ?? "";
+    for (const event of snapshot.events) {
+      const data = event.data as { session?: unknown; text?: unknown } | null;
+      if (data === null || typeof data.text !== "string") continue;
+      const owner = typeof data.session === "string" ? data.session : firstSession;
+      if (owner.length === 0) continue;
+      blob.set(owner, (blob.get(owner) ?? "") + " " + data.text.toLowerCase());
+    }
+    return blob;
+  }, [snapshot.events, snapshot.sessions]);
   // The dock's clock while a turn is open: the stuck report is a claim about
   // time, and time does not re-render on its own.
   const [nowTick, setNowTick] = useState(0);
@@ -208,6 +236,7 @@ export default function App(): ReactElement {
 
         <main className="onboarding">
           <h1 className="onboarding__title">Start on this device</h1>
+          <p className="onboarding__slogan">One agent, everywhere</p>
           <p className="onboarding__text">
             A chain is the conversation and everything around it. Create one here,
             or join one that already exists — joining takes the chain's history as
@@ -415,8 +444,9 @@ export default function App(): ReactElement {
         </button>
 
         <input
+          ref={searchRef}
           className="rail__search"
-          placeholder="Search chats"
+          placeholder="Search chats  ·  Ctrl-K"
           value={sessionQuery}
           onChange={(event) => setSessionQuery(event.target.value)}
         />
@@ -424,11 +454,12 @@ export default function App(): ReactElement {
         <div className="rail__sessions">
           <ul className="rail__list">
             {snapshot.sessions
-              .filter((session) =>
-                sessionQuery.trim().length === 0
-                  ? true
-                  : session.title.toLowerCase().includes(sessionQuery.trim().toLowerCase()),
-              )
+              .filter((session) => {
+                const needle = sessionQuery.trim().toLowerCase();
+                if (needle.length === 0) return true;
+                if (session.title.toLowerCase().includes(needle)) return true;
+                return (sessionText.get(session.id) ?? "").includes(needle);
+              })
               .map((session) => (
                 <li key={session.id}>
                   {renaming !== null && renaming.id === session.id ? (
@@ -537,25 +568,24 @@ function DevicesPage({
   client: ChainClient;
 }): ReactElement {
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [renamingNode, setRenamingNode] = useState<{ id: string; draft: string } | null>(null);
   return (
     <section className="panel">
       <header className="panel__head">
-        <h2 className="panel__title">Devices</h2>
+        <h2 className="panel__title">Sync</h2>
       </header>
       <p className="panel__sub">Every device runs its own Roan; the chain keeps them equal.</p>
       <ul className="panel__list">
-        <li className="panel__item">
-          <span className="panel__path">This device</span>
-          <span className="panel__src">{snapshot.node}</span>
-        </li>
         <li className="panel__item">
           <span className="panel__path">Chain</span>
           <span className="panel__src">{snapshot.chain}</span>
         </li>
         <li className="panel__item">
-          <span className="panel__path">Sync</span>
+          <span className="panel__path">Link</span>
           <span className="panel__src">
-            {snapshot.peer !== null ? "syncing with a peer" : "this device only"}
+            {snapshot.peers.length > 0
+              ? `live with ${String(snapshot.peers.length)} node${snapshot.peers.length === 1 ? "" : "s"}`
+              : "this device only"}
           </span>
         </li>
         <li className="panel__item">
@@ -563,6 +593,54 @@ function DevicesPage({
           <span className="panel__src">{snapshot.status === "open" ? "running" : "waiting"}</span>
         </li>
       </ul>
+
+      <h3 className="panel__label">Nodes in this chain</h3>
+      <ul className="panel__list">
+        {snapshot.nodes.map((entry) => {
+          const live = snapshot.peers.includes(entry.node) || snapshot.peers.includes(entry.name);
+          const here = entry.node === snapshot.node;
+          return (
+            <li key={entry.node} className="sync__node">
+              {renamingNode !== null && renamingNode.id === entry.node ? (
+                <input
+                  className="rail__rename"
+                  autoFocus
+                  aria-label="Rename node"
+                  onFocus={(event) => event.target.select()}
+                  value={renamingNode.draft}
+                  onChange={(event) => setRenamingNode({ id: entry.node, draft: event.target.value })}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      const name = renamingNode.draft.trim();
+                      if (name.length > 0) client.renameNode(entry.node, name);
+                      setRenamingNode(null);
+                    } else if (event.key === "Escape") {
+                      setRenamingNode(null);
+                    }
+                  }}
+                />
+              ) : (
+                <>
+                  <span className={live ? "sync__dot sync__dot--live" : "sync__dot"} aria-hidden="true" />
+                  <span className="sync__name">{entry.name}</span>
+                  {here ? <span className="sync__here">this device</span> : null}
+                  <span className="sync__addr">{entry.host.length > 0 ? `${entry.host}:${String(entry.port)}` : "address unknown"}</span>
+                  <button
+                    type="button"
+                    className="rail__edit"
+                    aria-label={`Rename ${entry.name}`}
+                    title="Rename"
+                    onClick={() => setRenamingNode({ id: entry.node, draft: entry.name })}
+                  >
+                    ✎
+                  </button>
+                </>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <p className="panel__hint">A rename rides the chain: every device shows the same roster.</p>
       {snapshot.invite !== null ? <InviteBlock code={snapshot.invite} /> : null}
       <p className="panel__hint">
         The invite turns another device into a member of this chain: it takes the whole history as
@@ -611,6 +689,7 @@ function AboutPage({
     <section className="panel">
       <header className="panel__head">
         <h2 className="panel__title">About</h2>
+        <p className="panel__slogan">One agent, everywhere</p>
       </header>
       <ul className="panel__list">
         <li className="panel__item">

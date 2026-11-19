@@ -154,6 +154,15 @@ async function main(): Promise<void> {
     node: session?.identity.nodeId ?? null,
     head: session ? session.store.head(session.identity.chainId) : 0,
     peers: peerList(),
+    nodes:
+      session === null
+        ? []
+        : readNodes(session.store.read(session.identity.chainId, 1, 100_000)).map((n) => ({
+            node: n.node,
+            name: n.name,
+            host: n.host,
+            port: n.port,
+          })),
     invite:
       session === null
         ? null
@@ -1076,6 +1085,23 @@ async function main(): Promise<void> {
       // that point, so the old one stays readable.
       startSession(`Rewind to #${String(seq)}`, { session: active, seq });
       log("rewind: new session from " + String(seq));
+    },
+    onRenameNode: (wanted: string, name: string) => {
+      if (session === null) return;
+      const current = session;
+      const roster = readNodes(current.store.read(current.identity.chainId, 1, 100_000));
+      const known = roster.find((entry) => entry.node === wanted);
+      if (known === undefined) return;
+      // The same shape as an announcement, only the name is new: the fold
+      // takes the newest fact per node, so the rename rides the chain and
+      // every device shows the same roster.
+      current.store.append(current.identity.chainId, {
+        id: uuid(),
+        node: current.identity.nodeId,
+        type: "node",
+        data: { node: known.node, name, host: known.host, port: known.port },
+      });
+      control?.sendState();
     },
     onLeaveChain: () => {
       if (session === null) return;

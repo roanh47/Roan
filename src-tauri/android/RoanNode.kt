@@ -87,14 +87,18 @@ object RoanNode {
     setEnvironment("ROAN_PEER_PORT", "7412")
     // Node's interface list does not see Android's VPN tunnel, so the daemon
     // cannot find this phone's tailnet address on its own — its invite would
-    // carry no route. Kotlin sees the tunnel; hand the address over.
+    // carry no route and it would listen on loopback only. Kotlin sees the
+    // tunnel; hand the address over: it listens there, and advertises it.
     try {
       val tailnet = java.net.NetworkInterface.getNetworkInterfaces().asSequence()
         .flatMap { it.inetAddresses.asSequence() }
         .mapNotNull { it as? java.net.Inet4Address }
         .firstOrNull { it.hostAddress?.startsWith("100.64.") == true }
         ?.hostAddress
-      if (tailnet != null) setEnvironment("ROAN_PEER_ADVERTISE", tailnet)
+      if (tailnet != null) {
+        setEnvironment("ROAN_PEER_BIND", tailnet)
+        setEnvironment("ROAN_PEER_ADVERTISE", tailnet)
+      }
     } catch (error: Throwable) {
       // No tunnel up yet: the invite simply carries no route, same as before.
     }
