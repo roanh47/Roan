@@ -176,10 +176,11 @@ pre {
   gap: 9px;
 }
 
+/* One mark, one size — the same icon on every screen, whatever it sits in. */
 .titlebar__mark {
-  width: 11px;
-  height: 11px;
-  border-radius: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
   background: url("/roan.png") center / cover no-repeat;
 }
 
@@ -237,10 +238,10 @@ pre {
 }
 
 .empty__mark {
-  width: 34px;
-  height: 34px;
+  width: 26px;
+  height: 26px;
   margin: 0 auto 14px;
-  border-radius: 11px;
+  border-radius: 8px;
   background: url("/roan.png") center / cover no-repeat;
   box-shadow: 0 6px 20px rgba(126, 226, 184, 0.22);
 }
@@ -814,6 +815,51 @@ pre {
   color: var(--fg);
 }
 
+/* A chat row: the name plus the rename affordance, without the row looking
+   like a form. The active tint lives on the row so the pencil stays quiet. */
+.rail__row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 10px;
+}
+
+.rail__row--active {
+  background: var(--surface-2);
+}
+
+.rail__row .rail__session {
+  flex: 1;
+  min-width: 0;
+}
+
+.rail__edit {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin-right: 2px;
+  border-radius: 8px;
+  color: var(--faint);
+  font-size: 13px;
+}
+
+.rail__edit:active {
+  background: var(--surface-2);
+  color: var(--accent);
+}
+
+.rail__rename {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--fg);
+  font-size: 14px;
+}
+
 /* The lesser-used panels live below the conversations, quiet and grouped. */
 .rail__more {
   flex: none;
@@ -1350,17 +1396,29 @@ pre {
 
 @media (max-width: 860px) {
   .app {
-    padding-top: max(env(safe-area-inset-top, 0px), 30px);
+    padding-top: 0;
     padding-bottom: max(env(safe-area-inset-bottom, 0px), 10px);
   }
 
   .rail {
     width: min(86vw, 360px);
-    padding-top: max(env(safe-area-inset-top, 0px), 34px);
+    padding-top: 14px;
   }
 
   .transcript {
     padding: 16px 12px 6px;
+  }
+
+  /* Only the native shells draw edge to edge under the system bars. Their
+     webview reports the insets as 0, so the floors keep the content below
+     the status bar. A browser sits inside its own chrome already: no dead
+     strip at the top of the page. */
+  .app-shell .app {
+    padding-top: max(env(safe-area-inset-top, 0px), 30px);
+  }
+
+  .app-shell .rail {
+    padding-top: max(env(safe-area-inset-top, 0px), 34px);
   }
 }
 

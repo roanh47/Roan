@@ -24,7 +24,7 @@ It runs inside the app instead.
 - **`RoanNode.ensureStarted()`** runs from `MainActivity.onCreate`, copies the
   bundle to `filesDir`, then sets `ROAN_HOME=filesDir/.Roan`,
   `ROAN_ENGINE=builtin`, `ROAN_CONTROL_HOST=127.0.0.1`,
-  `ROAN_CONTROL_PORT=7411`, `ROAN_PEER_HOST=0.0.0.0`, `ROAN_PEER_PORT=7412` and
+  `ROAN_CONTROL_PORT=7411`, `ROAN_PEER_BIND=lan` (the old `0.0.0.0` listen-all; default is tailscale-only), `ROAN_PEER_PORT=7412` and
   starts it.
 - **The WebView talks to loopback.** `ws://127.0.0.1:7411/ws`, the same socket
   the desktop app uses. Cleartext to loopback is allowed by

@@ -62,7 +62,7 @@ ROAN_HOME=/tmp/roan-scratch node dist/daemon/main.js
 | 7411 | `ROAN_CONTROL_PORT` | the only listener: WebSocket on `127.0.0.1`. The path is not inspected, so `/ws` and `/` both connect. |
 | 7412 | `ROAN_PEER_PORT` | not bound. It only goes into an invite code as the port a peer should dial; `main.ts` never starts the peer server. |
 
-`ROAN_PEER_HOST` (default `127.0.0.1`) fills the same invite. If 7411 is taken
+`ROAN_PEER_BIND` (default the tailscale address; `lan` for every interface) fills the same invite. If 7411 is taken
 the daemon exits 1 with `listen EADDRINUSE ... 127.0.0.1:7411`.
 
 ## Tests

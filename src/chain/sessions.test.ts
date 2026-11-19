@@ -49,3 +49,24 @@ test("a branch remembers where it started", () => {
   const branch = readSessions(events).sessions.at(-1);
   assert.deepEqual(branch?.branchOf, { session: "s1", seq: 3 });
 });
+
+/** A rename is an event after the facts, never a rewrite of history. */
+test("a session_title event renames the session it names", () => {
+  const events = [...chain, event(7, "session_title", { session: "s1", title: "Hernoemd" })];
+  const index = readSessions(events);
+  assert.equal(index.sessions[0]?.title, "Hernoemd");
+  assert.equal(index.sessions[1]?.title, "Tweede");
+  // The rename itself is not a message.
+  assert.equal(index.sessions[0]?.messages, 1);
+  assert.deepEqual(sessionMessages(events, "s1"), [
+    { role: "user", text: "hoi" },
+    { role: "assistant", text: "hey" },
+  ]);
+});
+
+test("a rename for an unknown session is ignored, not fatal", () => {
+  const events = [...chain, event(7, "session_title", { session: "zz", title: "Nergens" })];
+  const index = readSessions(events);
+  assert.equal(index.sessions.length, 2);
+  assert.equal(index.sessions[0]?.title, "Eerste");
+});

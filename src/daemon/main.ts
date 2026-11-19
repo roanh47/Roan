@@ -4,7 +4,7 @@ import type { ChainResponse, DaemonState } from "./control-protocol.js";
 import { decodeJoinCode, encodeJoinCode } from "./control-protocol.js";
 import { createIdentity, loadIdentity, type Identity } from "./identity.js";
 import { ensurePaths, migrateLegacyHome, resolvePaths, type RoanPaths } from "./paths.js";
-import { advertiseHosts } from "./advertise.js";
+import { advertiseHost, advertiseHosts, bindListenHost, resolvePeerBind, type PeerBind } from "./advertise.js";
 import { loadSettings } from "./settings.js";
 import { startControlServer } from "./control.js";
 import { ChainNodeStore } from "./peer-store.js";
@@ -50,20 +50,23 @@ interface Session {
   readonly store: EventStore;
 }
 
-function peerHost(paths: RoanPaths): string {
-  // Alles wat deze machine heeft: Tailscale, LAN, loopback. De handshake
-  // weigert nog steeds elke peer met een verkeerd token of een andere keten.
-  return process.env["ROAN_PEER_HOST"] ?? "0.0.0.0";
+/**
+ * Waar de peer-link luistert. Standaard alléén het tailscale-adres: de
+ * handshake weigert nog steeds elke peer met een verkeerd token of een
+ * andere keten, maar de deur hoeft niet op élk netwerk open te staan.
+ * `ROAN_PEER_BIND=lan` of een adres zet dat bewust om.
+ */
+function peerBind(paths: RoanPaths): PeerBind {
+  return resolvePeerBind(os.networkInterfaces());
 }
 
 /**
- * Elk adres waarop een ander toestel dit toestel kan bellen, best eerst:
- * tailscale vóór LAN. De joiner belt ze allemaal tot er één opengaat —
- * de manier boeit niet, ze moeten elkaar vinden. Een code met alleen het
- * luisteradres (`0.0.0.0`) was de bug: niet te joinen.
+ * Elk adres waarop een ander toestel dit toestel kan bellen, best eerst —
+ * en nooit meer dan de bind blootstelt. De joiner belt ze allemaal tot er
+ * één opengaat: de manier boekt niet, ze moeten elkaar vinden.
  */
 function dialHosts(paths: RoanPaths): string[] {
-  return advertiseHosts(peerHost(paths), os.networkInterfaces());
+  return advertiseHosts(peerBind(paths), os.networkInterfaces());
 }
 
 /** Discovery hoort bij het proces, niet bij een sessie: bij afsluiten moet hij stoppen. */
@@ -178,6 +181,12 @@ async function main(): Promise<void> {
     // A tool request that another device addressed to us arrives as a replicated
     // event; it is carried out here, on this machine, and answered in the chain.
     node.watchApplied((event) => {
+      // Everything a peer appends is as real here as on the device that wrote
+      // it: the app windows on this machine see the message live, and session
+      // metadata (a new conversation, a rename) also refreshes the drawer.
+      const chainEvent = event as unknown as import("../protocol/types.js").Event;
+      control?.broadcast({ t: "append", event: chainEvent });
+      if (chainEvent.type === "session" || chainEvent.type === "session_title") control?.sendState();
       if (event.type === "workspace") {
         void applyWorkspaceEvent(paths.syncedWorkspace, event as never)
           .then((outcome) => {
@@ -193,16 +202,17 @@ async function main(): Promise<void> {
         log("relay: " + String(error)),
       );
     });
+    const bind = peerBind(paths);
     await startPeers({
       store: node,
       token: session.identity.token,
-      host: peerHost(paths),
+      host: bindListenHost(bind),
       port: PEER_PORT,
       logger: peerLogger,
       onError: (error) => log("peer error: " + error.message),
     });
     replicating = true;
-    log("peer: listening on " + peerHost(paths) + ":" + String(PEER_PORT));
+    log("peer: listening on " + bindListenHost(bind) + ":" + String(PEER_PORT) + " (" + bind.kind + ")");
     // Elke machine zoekt de andere via Tailscale. Zo hoeft niemand een code te
     // plakken en komt de kluwen ook na een herstart of een nieuw IP terug.
     if (process.env["ROAN_DISCOVERY"] !== "off" && stopDiscovery === null) {
@@ -239,7 +249,7 @@ async function main(): Promise<void> {
     // One source of truth for "where can you call me": the same address the
     // invites carry. The tailscale scan stays for the discovery list; the
     // announcement uses the dialable host, tailnet first.
-    let host = dialHosts(paths)[0] ?? "";
+    let host = advertiseHost(peerBind(paths), os.networkInterfaces());
     if (host.length === 0) {
       const found = await tailscaleHosts().catch(() => ({ self: null, hosts: [] as string[] }));
       host = found.self ?? "";
@@ -1065,6 +1075,19 @@ async function main(): Promise<void> {
       // that point, so the old one stays readable.
       startSession(`Rewind to #${String(seq)}`, { session: active, seq });
       log("rewind: new session from " + String(seq));
+    },
+    onRenameSession: (wanted: string, title: string) => {
+      if (session === null) return;
+      const current = session;
+      const index = readSessions(current.store.read(current.identity.chainId, 1, 100_000));
+      if (!index.sessions.some((entry) => entry.id === wanted)) return;
+      current.store.append(current.identity.chainId, {
+        id: uuid(),
+        node: current.identity.nodeId,
+        type: "session_title",
+        data: { session: wanted, title },
+      });
+      control?.sendState();
     },
     onNewSession: (title?: string) => {
       const id = startSession(title);

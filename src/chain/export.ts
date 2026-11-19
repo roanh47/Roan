@@ -35,6 +35,7 @@ const EVENT_TYPES: ReadonlySet<string> = new Set<EventType>([
   "turn_end",
   "env",
   "session",
+  "session_title",
   "checkpoint",
   "workspace",
   "node",

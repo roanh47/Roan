@@ -12,6 +12,8 @@ export interface ControlServerOptions {
   onMessage: (text: string, session?: string, echoId?: string) => void;
   /** Starts a new conversation without touching the old one. */
   readonly onNewSession?: (title?: string) => void;
+  /** Names a conversation differently; appended, never rewriting history. */
+  readonly onRenameSession?: (session: string, title: string) => void;
   /** Marks a point in the current conversation you can come back to. */
   readonly onCheckpoint?: (label?: string) => void;
   /** Starts a new conversation from an earlier point; nothing is deleted. */
@@ -159,6 +161,11 @@ export function startControlServer(options: ControlServerOptions): Promise<Contr
       if (type === "new_session") {
         const title = typeof frame["title"] === "string" ? frame["title"] : undefined;
         options.onNewSession?.(title);
+      }
+      if (type === "rename_session") {
+        const session = typeof frame["session"] === "string" ? frame["session"] : "";
+        const title = typeof frame["title"] === "string" ? frame["title"].trim() : "";
+        if (session.length > 0 && title.length > 0) options.onRenameSession?.(session, title);
       }
     });
 

@@ -26,6 +26,8 @@ export type EventType =
   | "env"
   /** A conversation starts or changes; the events after it belong to it. */
   | "session"
+  /** A conversation gets a name it did not start with; append-only rename. */
+  | "session_title"
   /** A named point you can rewind to without deleting anything after it. */
   | "checkpoint"
   /** One file in the shared workspace, as content rather than as a reference. */

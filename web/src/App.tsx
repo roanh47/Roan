@@ -115,6 +115,8 @@ export default function App(): ReactElement {
   const [joinCode, setJoinCode] = useState("");
   const [logText, setLogText] = useState<string | null>(null);
   const [sessionQuery, setSessionQuery] = useState("");
+  /** The chat being renamed, with its draft title; null when not editing. */
+  const [renaming, setRenaming] = useState<{ id: string; draft: string } | null>(null);
   // The dock's clock while a turn is open: the stuck report is a claim about
   // time, and time does not re-render on its own.
   const [nowTick, setNowTick] = useState(0);
@@ -429,20 +431,52 @@ export default function App(): ReactElement {
               )
               .map((session) => (
                 <li key={session.id}>
-                  <button
-                    type="button"
-                    className={
-                      session.id === activeSession ? "rail__session rail__session--active" : "rail__session"
-                    }
-                    onClick={() => {
-                      client.selectSession(session.id);
-                      setView("chat");
-                      setMenuOpen(false);
-                    }}
-                    title={`${session.title} — ${String(session.messages)} messages`}
-                  >
-                    {session.title}
-                  </button>
+                  {renaming !== null && renaming.id === session.id ? (
+                    <input
+                      className="rail__rename"
+                      autoFocus
+                      aria-label="Rename chat"
+                      value={renaming.draft}
+                      onChange={(event) => setRenaming({ id: session.id, draft: event.target.value })}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          const title = renaming.draft.trim();
+                          if (title.length > 0) client.renameSession(session.id, title);
+                          setRenaming(null);
+                        } else if (event.key === "Escape") {
+                          setRenaming(null);
+                        }
+                      }}
+                    />
+                  ) : (
+                    <div
+                      className={
+                        session.id === activeSession ? "rail__row rail__row--active" : "rail__row"
+                      }
+                    >
+                      <button
+                        type="button"
+                        className="rail__session"
+                        onClick={() => {
+                          client.selectSession(session.id);
+                          setView("chat");
+                          setMenuOpen(false);
+                        }}
+                        title={`${session.title} — ${String(session.messages)} messages`}
+                      >
+                        {session.title}
+                      </button>
+                      <button
+                        type="button"
+                        className="rail__edit"
+                        aria-label={`Rename ${session.title}`}
+                        title="Rename"
+                        onClick={() => setRenaming({ id: session.id, draft: session.title })}
+                      >
+                        ✎
+                      </button>
+                    </div>
+                  )}
                 </li>
               ))}
           </ul>

@@ -61,6 +61,22 @@ export function readSessions(events: readonly Event[]): SessionIndex {
       continue;
     }
 
+    if (event.type === "session_title") {
+      // A rename never rewrites history: it is an event after the facts, so
+      // the index folds it into the session it names.
+      const named = str(data?.["session"]);
+      const title = str(data?.["title"]);
+      if (named === null || title === null) continue;
+      const entry = byId.get(named);
+      if (entry === undefined) continue;
+      byId.set(named, {
+        info: { ...entry.info, title },
+        messages: entry.messages,
+        lastSeq: event.seq,
+      });
+      continue;
+    }
+
     if (event.type !== "message" && event.type !== "assistant") continue;
     const named = str(data?.["session"]);
     const target = named ?? order[order.length - 1];

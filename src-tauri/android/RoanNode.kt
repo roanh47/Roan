@@ -82,7 +82,8 @@ object RoanNode {
     // The app talks to the daemon over loopback; peers reach it on the tailnet.
     setEnvironment("ROAN_CONTROL_HOST", "127.0.0.1")
     setEnvironment("ROAN_CONTROL_PORT", "7411")
-    setEnvironment("ROAN_PEER_HOST", "0.0.0.0")
+    // The peer link defaults to the tailscale address (loopback without
+    // one); ROAN_PEER_BIND=lan in the shell turns the old listen-all on.
     setEnvironment("ROAN_PEER_PORT", "7412")
 
     Thread({

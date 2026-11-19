@@ -55,6 +55,7 @@ const EVENT_TYPES = {
   turn_start: true,
   turn_end: true,
   session: true,
+  session_title: true,
   checkpoint: true,
   workspace: true,
   node: true,

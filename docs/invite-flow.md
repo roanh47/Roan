@@ -17,7 +17,7 @@ A single opaque string: base64url of a small JSON object.
 `chain` is the chain's UUID. `token` is 32 random bytes; every peer must present
 it, the peer server compares it in constant time and refuses the connection
 otherwise. The code is a bearer credential: whoever has it can read the chain.
-`host` is `ROAN_PEER_HOST`, default `127.0.0.1`; `port` is `ROAN_PEER_PORT`,
+`hosts` is what the peer bind exposes (see `daemon.md`: `ROAN_PEER_BIND`, default the tailscale address; `lan` for every interface); `port` is `ROAN_PEER_PORT`,
 default `7412`.
 
 It is produced only in the `create_chain` reply, as `invite` on the

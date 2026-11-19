@@ -27,7 +27,7 @@ daemon. The only script in `package.json` that launches it is the dev script
 
 Ports come from the environment: `ROAN_CONTROL_PORT` (default `7411`),
 `ROAN_PEER_PORT` (default `7412`, used only inside an invite code),
-`ROAN_PEER_HOST` (default `127.0.0.1`). `ROAN_HOME` overrides the state root.
+`ROAN_PEER_BIND`: `tailscale` (default — the tailnet address, loopback without one), `lan` (every interface, the old listen-all), `loopback`, or a specific address. `ROAN_PEER_HOST` still works as an address. `ROAN_HOME` overrides the state root.
 Provider settings never come from the environment; they come from `config.json`.
 
 On the other side, `web/src/App.tsx` builds a `ChainClient` against

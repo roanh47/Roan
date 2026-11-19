@@ -123,6 +123,7 @@ export interface ControlRequestFrame {
   id?: string;
   code?: string;
   title?: string;
+  session?: string;
   label?: string;
   seq?: number;
   path?: string;
@@ -560,6 +561,11 @@ export class ChainClient {
   /** Starts a conversation without touching the one you were in. */
   newSession(title?: string): void {
     this.send({ t: "new_session", ...(title !== undefined ? { title } : {}) });
+  }
+
+  /** Names a conversation differently; appended, never rewriting history. */
+  renameSession(id: string, title: string): void {
+    this.send({ t: "rename_session", session: id, title });
     // The daemon owns the id, so ask again shortly: that answer also carries the
     // refreshed list, which is what puts the new conversation on screen.
     setTimeout(() => this.send({ t: "state" }), 250);
