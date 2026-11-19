@@ -139,6 +139,7 @@ export function startControlServer(options: ControlServerOptions): Promise<Contr
         type !== "state" &&
         type !== "append" &&
         type !== "new_session" &&
+        type !== "rename_session" &&
         type !== "checkpoint" &&
         type !== "rewind"
       ) {
