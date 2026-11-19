@@ -96,16 +96,17 @@ sectie in `docs/feature-groups.md` voor de volledige basislijst.
       `paths.ts` hernoemt een bestaand `~/.roan` één keer bij de start,
       `RoanNode.kt` doet hetzelfde vóór `ROAN_HOME` op Android. Bewijs rijdt
       mee in de 0.0.13-emulatorronde (verse install start in `.Roan`).
-- [ ] **`state/` nieuw.** chain.db + cron-state verhuizen uit `workspace/`;
-      `workspace/` wordt de lokale agent-home (exec-cwd-keuze: privé of synced).
-      Rolverdeling wordt dan éénduidig: `workspace/` = wat de agent zelf
-      schrijft en doet (privé per toestel, of als exec-cwd), `synced-workspace/`
-      = de map waarvan de *inhoud* als events over de keten reist — bestanden
-      die op elk toestel hetzelfde zijn. Nu is het grensje vaag omdat chain.db
-      nog in `workspace/` woont; dat is precies wat hier verdwijnt.
-- [ ] **`storage/`-venster op Android.** Achter de "All files access"-toggle:
-      symlink-siblings (`shared/ downloads/ dcim/ documents/ pictures/ music/`)
-      náást `.Roan` in `files/` — het Termux-patroon; `files/` is de user-home.
+- [x] **`state/` nieuw.** chain.db verhuist bij de start naar `~/.Roan/state/`
+      (WAL en SHM mee, één keer, niets gekopieerd). `workspace/` is de agent z'n
+      eigen bureau; `synced-workspace/` blijft de map waarvan de inhoud als
+      events reist. Bewezen: server (keten-id vóór = ná) én Android (zelfde
+      install, keten-id `529f8283` ongewijzigd, workspace daarna leeg).
+- [x] **`storage/`-venster op Android.** Settings → "Storage window" → de
+      daemon zet symlink-siblings (`shared/ downloads/ dcim/ documents/
+      pictures/ music/`) náást `.Roan` in `files/`, het Termux-patroen, en
+      weigert met een duidelijke reden als All files access ontbreekt
+      (MANAGE_EXTERNAL_STORAGE zit in de build). Puur getest; de echte grant
+      test de eigenaar op z'n telefoon.
 - [ ] **Schrijfstijl-skill upstream.** `skills/writing-style/` gecloned in de repo,
       remote `upstream` → `github.com/roanh47/Roans-Writing-Style-Skill`, als
       regel geladen in de turn-prompt — zie ook het schrijfstijl-punt boven.
@@ -114,11 +115,13 @@ sectie in `docs/feature-groups.md` voor de volledige basislijst.
 
 ## Schrijfstijl
 
-- [ ] **Mijn schrijfstijl, hardcore.** Roan antwoordt in mijn eigen stijl, niet in
-      standaard AI-proza: kort, direct, geen managementtaal, geen "zeker, ik kan je
-      helpen"-opening. De gids staat in `~/.Roan` (`SOUL.md` / `AGENTS.md`) en reist
-      als env mee, zodat elke instance hetzelfde schrijft. Niet als suggestie in de
-      prompt, maar als regel die je aan een antwoord kunt afmeten.
+- [x] **Mijn schrijfstijl, hardcore.** SOUL.md, IDENTITY.md en AGENTS.md worden
+      bij de eerste start geschreven (nooit over een eigen bewerking heen) en
+      reizen mee in de env-snapshot. De turn-prompt draagt ze als twee blokken —
+      "Who you are" en "How you write — a rule, not a suggestion" — en het
+      regelbloek zegt zelf: elk antwoord wordt er afgemeten. Bewezen: server
+      publiceerde de snapshot naar de keten, dus de telefoon vouwt dezelfde
+      gids bij de eerstvolgende sync.
 
 ## Telefoon is een node
 
