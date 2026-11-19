@@ -78,11 +78,33 @@ sectie in `docs/feature-groups.md` voor de volledige basislijst.
       log op de "notify:turn-done"-regel en tikt "Roan is done". (0.0.19)
 - [ ] **Midden-beurt sturen.** Stop bestaat; antwoord bijsturen terwijl hij
       denkt nog niet. (SOON)
-- [ ] **Bijlagen buiten de workspace.** Foto's/bestanden uitkiezen die niet
-      in `.Roan` liggen. (na de Android storage-ronde)
+- [x] **Bijlagen buiten de workspace** (foto's). De composer heeft een
+      Photo-knop: de foto wordt vóór verzenden naar 1024px jpeg
+      geschroond, reist als base64 op het bericht-event en verschijnt in
+      de bubbel. Bewezen 0.0.20: emulator-screenshot met de bewijsfoto
+      zichtbaar in de chat. Bestanden (niet-foto's) boven 512 kB blijven
+      open — het blob-kanaal hieronder.
 - [ ] **Gebruik per beurt.** Tokens/kosten zichtbaar onder een antwoord. (SOON)
 - [ ] **Tijdelijke chats** die niet in de historie blijven. (LATER)
 - [ ] **Gesprek delen** als read-only link. (LATER)
+
+## SOON-golf — de agent krijgt handen (0.0.20)
+
+- [x] **Web search als tool.** `web_search` in de toollijst: https-only,
+      antwoorden als citaten-lijst (titel, url, snippet). DuckDuckGo's
+      lite-endpoint is het primaire spoor; vanaf datacenter-IP's muurt
+      DuckDuckGo (202-bot-wall), dus er is een gegarandeerde Wikipedia-
+      fallback (nl, dan en) die altijd citeerbaar antwoordt en dat ook
+      zegt. Bewezen: emulator-beurt waar de agent de tool aanroept en
+      antwoordt mét bron `nl.wikipedia.org/wiki/Hanze`.
+- [x] **Web fetch als tool.** `web_fetch` leest één pagina tot 64 kB in
+      10 s en geeft de leesbare tekst; privé- en loopback-adressen
+      geweigerd, https-only.
+- [ ] **MCP echt starten** en **learned approvals**: een tool-vraag die
+      een keer goedgekeurd wordt, vraagt daarna niet meer (per tool,
+      als keten-event). (SOON-golf deel 2)
+- [ ] **Per-tool regels**: aan/uit per tool en of hij vragen moet
+      stellen, in een scherm, meereizend over de keten. (SOON-golf deel 2)
 
 ## Ronde 2 — de agent-home (workspace-verbouwing)
 
@@ -145,7 +167,13 @@ sectie in `docs/feature-groups.md` voor de volledige basislijst.
       daemon daar draait.
 - [ ] **Foreground service** zodat de daemon blijft draaien als de app weg is.
 - [ ] **Sync tussen telefoon en server bewijzen** met beide online.
-- [ ] **Share-sheet** en de notificatiechannel zoals in `docs/mobile.md`.
+- [x] **Share-sheet** en de notificatiechannel zoals in `docs/mobile.md`.
+      Bewezen 0.0.20: ACTION_SEND text/plain staat in het manifest van de
+      apk, koude én warme bezorging parkeren in de one-slot inbox
+      (logcat `RoanShare: parked`), en de composer toont de tekst als
+      prefill. Onderweg een echte bug gevonden: `onCreate` shadowde de
+      launch-intent met de service-intent, dus een koude share parkeerde
+      niets — `getIntent()` is het geworden (`9eada5e`).
 
 ## v0.0.2
 
@@ -213,7 +241,11 @@ naar GitHub als Roan hem zelf op zijn machines heeft gehad.
 
 ## App
 
-- [ ] **Checkpoints in de UI.** Lijst met punten en een knop om terug te springen.
+- [x] **Checkpoints in de UI.** Lijst met punten en een knop om terug te
+      springen. De chat heeft de 📌-knop per antwoord (de titel van het
+      gesprek als label), het panel onder Settings toont de punten mét
+      "Go back here"-knop. Bewezen 0.0.20: emulator-screenshot van het
+      panel met "Poortvraag bewijs" (#13) en de terugknop.
 - [ ] **Workspace bekijken en openen** vanuit de app, niet alleen syncen.
 - [ ] **MCP-configuratie in de app**, met een scherm en de config die over de keten
       meereist.
