@@ -83,6 +83,7 @@ fi
 
 cp "$SRC/start-node.cpp" "$SRC/CMakeLists.txt" "$APP/src/main/cpp/"
 cp "$SRC/RoanNode.kt" "$APP/src/main/java/dev/roan/RoanNode.kt"
+cp "$SRC/RoanService.kt" "$APP/src/main/java/dev/roan/RoanService.kt"
 
 # The launcher icon is the app's own icon, used as it is. `tauri icon` writes
 # into the generated res and also emits an adaptive icon, whose foreground the
@@ -224,6 +225,27 @@ if "MANAGE_EXTERNAL_STORAGE" not in text:
         "    <uses-permission android:name=\"android.permission.MANAGE_EXTERNAL_STORAGE\" />\n</manifest>",
     )
     manifest.write_text(text)
+
+# --- manifest: the foreground service and its notifications ---
+# A phone is a real node only while Android promises not to kill it: a
+# foreground service with a visible notification, typed as dataSync.
+text = manifest.read_text()
+for permission in (
+    "android.permission.FOREGROUND_SERVICE",
+    "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
+    "android.permission.POST_NOTIFICATIONS",
+):
+    if permission not in text:
+        text = text.replace(
+            "</manifest>",
+            f"    <uses-permission android:name=\"{permission}\" />\n</manifest>",
+        )
+if "RoanService" not in text:
+    text = text.replace(
+        "</application>",
+        "        <service\n            android:name=\".RoanService\"\n            android:exported=\"false\"\n            android:foregroundServiceType=\"dataSync\" />\n    </application>",
+    )
+manifest.write_text(text)
 
 # --- theme: dark system bars with light icons ---
 # The app is dark everywhere; Android's default day theme paints dark status

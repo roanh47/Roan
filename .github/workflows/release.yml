@@ -13,7 +13,7 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   NODE_VERSION: "22"
-  APP_VERSION: "0.0.18"
+  APP_VERSION: "0.0.19"
 
 concurrency:
   group: release-${{ github.ref }}

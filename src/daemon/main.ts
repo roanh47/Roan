@@ -28,10 +28,13 @@ import { adoptEnv, adoptEnvEvent, latestEnv, publishEnv } from "./env-sync.js";
 import { dirname, join, resolve } from "node:path";
 import { createRunOnNodeTool, serveDelegation, type RelayOptions } from "./relay.js";
 import { readSessions } from "../chain/sessions.js";
+import { exportChain } from "../chain/export.js";
+import { sessionMarkdown } from "../chain/export-markdown.js";
 import { diffWorkspace, hashContent, scanWorkspace, type FileEntry } from "../workspace/scan.js";
 import { applyWorkspaceEvent } from "../workspace/sync.js";
 import { randomUUID as uuid } from "node:crypto";
-import { mkdir, readFile as readFileAsync, writeFile as writeFileAsync } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { copyFile, mkdir, readFile as readFileAsync, writeFile as writeFileAsync } from "node:fs/promises";
 import { runHooks, type HookConfig } from "../hooks/run.js";
 import { dueJobs, loadCron } from "../cron/jobs.js";
 import { engineAvailable, runHermesTurn } from "../engine/hermes.js";
@@ -196,6 +199,26 @@ async function main(): Promise<void> {
    * replication layer keeps a single listener, and starting it twice would mean
    * two servers on the same port.
    */
+  /**
+   * The honest way out. On a supervised shell (systemd, the Android service)
+   * exiting is fine; on the Android shell `process.exit` from the node thread
+   * tears down static destructors mid-flight and kills the whole app with a
+   * SIGABRT — the crash from the earlier rounds. There the servers close, the
+   * event loop drains, the thread returns to its supervisor, and the process
+   * stays whole.
+   */
+  const stopDaemon = async (reason: string): Promise<void> => {
+    log("daemon: stopping (" + reason + ")");
+    try {
+      await control?.close();
+    } catch {
+      // already closed or a socket refusing politely; the loop drains either way
+    }
+    await stopPeers().catch(() => undefined);
+    if (process.env["ROAN_SHELL"] === "android") return;
+    process.exit(0);
+  };
+
   const startReplication = async (): Promise<void> => {
     if (session === null || replicating) return;
     const node = new ChainNodeStore(session.store, session.identity.nodeId, session.identity.chainId);
@@ -610,6 +633,9 @@ async function main(): Promise<void> {
       text,
     );
     activeTurn = null;
+    // The Android service tails the log for this line: a closed app still
+    // learns that the turn of its owner is done.
+    log("notify:turn-done");
     const ended = await runHooks(hooks, "turn_end", {
       cwd: paths.syncedWorkspace,
       extra: { ROAN_CHAIN: current.identity.chainId, ROAN_SESSION: sessionId },
@@ -926,6 +952,56 @@ async function main(): Promise<void> {
           reply({ ok: true, id, keySet: account.apiKey.length > 0 });
           return;
         }
+        if (kind === "export") {
+          const current = session;
+          if (current === null) {
+            reply({ ok: false, error: "no chain to export yet" });
+            return;
+          }
+          const what = typeof data["what"] === "string" ? data["what"] : "";
+          const exports = join(paths.home, "exports");
+          await mkdir(exports, { recursive: true });
+          const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+          const allEvents = current.store.read(current.identity.chainId, 1, 100_000);
+          if (what === "chain") {
+            const path = join(exports, `chain-${stamp}.jsonl`);
+            const result = exportChain(current.store, current.identity.chainId, path);
+            // The download window, when the owner opened it: a second copy in
+            // the Android download map, where a phone can share it.
+            const window = join(dirname(paths.home), "downloads");
+            let shared: string | null = null;
+            if (existsSync(window)) {
+              try {
+                shared = join(window, `roan-chain-${stamp}.jsonl`);
+                await copyFile(path, shared);
+              } catch {
+                shared = null;
+              }
+            }
+            reply({ ok: true, path, shared, count: result.count });
+            return;
+          }
+          const known = readSessions(allEvents).sessions.some((entry) => entry.id === what);
+          if (!known) {
+            reply({ ok: false, error: "unknown conversation" });
+            return;
+          }
+          const markdown = sessionMarkdown(allEvents, what);
+          const path = join(exports, `conversation-${stamp}.md`);
+          await writeFileAsync(path, markdown, "utf8");
+          const window = join(dirname(paths.home), "downloads");
+          let shared: string | null = null;
+          if (existsSync(window)) {
+            try {
+              shared = join(window, `roan-conversation-${stamp}.md`);
+              await copyFile(path, shared);
+            } catch {
+              shared = null;
+            }
+          }
+          reply({ ok: true, path, shared, count: 1 });
+          return;
+        }
         if (kind === "storage_window") {
           // The Termux pattern: symlinks next to the home, pointing at the
           // public storages. The daemon lives in the app, so the base is the
@@ -1139,7 +1215,7 @@ async function main(): Promise<void> {
       // The identity is gone; this process is a daemon for a chain it no
       // longer has. The supervisor (systemd, the app shell) restarts it into
       // onboarding, where a new chain can be created or a code joined.
-      setTimeout(() => process.exit(0), 250);
+      setTimeout(() => void stopDaemon("left the chain"), 250);
     },
     onRenameSession: (wanted: string, title: string) => {
       if (session === null) return;

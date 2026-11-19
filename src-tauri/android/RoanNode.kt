@@ -82,6 +82,11 @@ object RoanNode {
     // The app talks to the daemon over loopback; peers reach it on the tailnet.
     setEnvironment("ROAN_CONTROL_HOST", "127.0.0.1")
     setEnvironment("ROAN_CONTROL_PORT", "7411")
+    // The daemon must never call exit() here: a hard exit from the node
+    // thread runs static destructors mid-flight and kills the app with a
+    // SIGABRT. This flag makes it close its servers, drain the loop and
+    // return — the supervisor below decides what happens next.
+    setEnvironment("ROAN_SHELL", "android")
     // The peer link defaults to the tailscale address (loopback without
     // one); ROAN_PEER_BIND=lan in the shell turns the old listen-all on.
     setEnvironment("ROAN_PEER_PORT", "7412")
@@ -104,16 +109,27 @@ object RoanNode {
     }
 
     Thread({
-      // Written into the log itself: when node returns before printing
-      // anything, the exit code is the only diagnosis there is.
-      log.appendText("--- daemon start (${script.absolutePath}) ---\n")
-      try {
-        val code = startNodeWithArguments(arrayOf("node", script.absolutePath))
+      // Supervisor: a clean return (a leave, a drain) restarts immediately —
+      // the owner is waiting on the next screen. A crash backs off, so a
+      // daemon that cannot boot does not spin the CPU into the ground.
+      var backoff = 2_000L
+      while (true) {
+        log.appendText("--- daemon start (${script.absolutePath}) ---\n")
+        val code = try {
+          startNodeWithArguments(arrayOf("node", script.absolutePath))
+        } catch (error: Throwable) {
+          log.appendText("--- daemon threw: ${error::class.java.simpleName}: ${error.message} ---\n")
+          Log.e(TAG, "daemon failed to start", error)
+          -1
+        }
         log.appendText("--- daemon returned, exit code $code ---\n")
-        Log.i(TAG, "daemon stopped with code $code")
-      } catch (error: Throwable) {
-        log.appendText("--- daemon threw: ${error::class.java.simpleName}: ${error.message} ---\n")
-        Log.e(TAG, "daemon failed to start", error)
+        if (code == 0) {
+          backoff = 2_000L
+          Thread.sleep(500L)
+        } else {
+          Thread.sleep(backoff)
+          backoff = minOf(backoff * 2, 30_000L)
+        }
       }
     }, "roan-daemon").start()
     Log.i(TAG, "daemon starting, home ${home.absolutePath}")

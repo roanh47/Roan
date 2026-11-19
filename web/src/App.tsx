@@ -119,6 +119,8 @@ export default function App(): ReactElement {
   const [sessionQuery, setSessionQuery] = useState("");
   /** The chat being renamed, with its draft title; null when not editing. */
   const [renaming, setRenaming] = useState<{ id: string; draft: string } | null>(null);
+  /** Where the last export landed, shown until the next thing happens. */
+  const [exportNote, setExportNote] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Ctrl-K opens the drawer on the search field, like every reference app.
@@ -455,6 +457,7 @@ export default function App(): ReactElement {
           onChange={(event) => setSessionQuery(event.target.value)}
         />
 
+        {exportNote !== null ? <p className="rail__exportnote">{exportNote}</p> : null}
         <div className="rail__sessions">
           <ul className="rail__list">
             {snapshot.sessions
@@ -511,6 +514,26 @@ export default function App(): ReactElement {
                         onClick={() => setRenaming({ id: session.id, draft: session.title })}
                       >
                         ✎
+                      </button>
+                      <button
+                        type="button"
+                        className="rail__edit"
+                        aria-label={`Export ${session.title}`}
+                        title="Export as markdown"
+                        onClick={() => {
+                          void client
+                            .request<{ ok?: boolean; path?: string; shared?: string | null; error?: string }>("export", { what: session.id })
+                            .then((answer) => {
+                              setExportNote(
+                                answer.ok === true && answer.path !== undefined
+                                  ? `Exported to ${answer.path}${answer.shared !== null && answer.shared !== undefined ? ` and ${answer.shared}` : ""}`
+                                  : `Export failed: ${answer.error ?? "the daemon did not answer"}`,
+                              );
+                            })
+                            .catch(() => setExportNote("Export failed: the daemon did not answer"));
+                        }}
+                      >
+                        ⤓
                       </button>
                     </div>
                   )}
@@ -645,6 +668,24 @@ function DevicesPage({
         })}
       </ul>
       <p className="panel__hint">A rename rides the chain: every device shows the same roster.</p>
+      <button
+        type="button"
+        className="panel__leave-open"
+        onClick={() => {
+          void client
+            .request<{ ok?: boolean; path?: string; shared?: string | null; count?: number; error?: string }>("export", { what: "chain" })
+            .then((answer) =>
+              alert(
+                answer.ok === true && answer.path !== undefined
+                  ? `Exported ${String(answer.count ?? 0)} events to ${answer.path}`
+                  : `Export failed: ${answer.error ?? "the daemon did not answer"}`,
+              ),
+            )
+            .catch(() => alert("Export failed: the daemon did not answer"));
+        }}
+      >
+        Export the whole chain (JSONL)
+      </button>
       {snapshot.invite !== null ? <InviteBlock code={snapshot.invite} /> : null}
       <p className="panel__hint">
         The invite turns another device into a member of this chain: it takes the whole history as
