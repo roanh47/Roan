@@ -81,12 +81,25 @@ sectie in `docs/feature-groups.md` voor de volledige basislijst.
 
 ## Ronde 2 — de agent-home (workspace-verbouwing)
 
+- [ ] **Slogan: "One agent, everywhere".** Op het onboarding-scherm en de
+      About-pagina — de ene zin die zegt wat dit is.
+- [ ] **Tab "Devices" heet voortaan "Sync".** En de pagina laat élke node in
+      de keten zien: de naam uit het node-event (nu nog de hostname), en de
+      gebruiker kan ze hernoemen — een naam die meereist op de keten, zodat
+      elk toestel hetzelfde lijstje ziet. Plek: `SETTINGS_ROWS`,
+      `DevicesPage`, `src/chain/nodes.ts`.
+
 - [ ] **`~/.Roan` met hoofdletter.** Code, migratie en docs zitten erin:
       `paths.ts` hernoemt een bestaand `~/.roan` één keer bij de start,
       `RoanNode.kt` doet hetzelfde vóór `ROAN_HOME` op Android. Bewijs rijdt
       mee in de 0.0.13-emulatorronde (verse install start in `.Roan`).
 - [ ] **`state/` nieuw.** chain.db + cron-state verhuizen uit `workspace/`;
       `workspace/` wordt de lokale agent-home (exec-cwd-keuze: privé of synced).
+      Rolverdeling wordt dan éénduidig: `workspace/` = wat de agent zelf
+      schrijft en doet (privé per toestel, of als exec-cwd), `synced-workspace/`
+      = de map waarvan de *inhoud* als events over de keten reist — bestanden
+      die op elk toestel hetzelfde zijn. Nu is het grensje vaag omdat chain.db
+      nog in `workspace/` woont; dat is precies wat hier verdwijnt.
 - [ ] **`storage/`-venster op Android.** Achter de "All files access"-toggle:
       symlink-siblings (`shared/ downloads/ dcim/ documents/ pictures/ music/`)
       náást `.Roan` in `files/` — het Termux-patroon; `files/` is de user-home.
