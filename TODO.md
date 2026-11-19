@@ -81,13 +81,16 @@ sectie in `docs/feature-groups.md` voor de volledige basislijst.
 
 ## Ronde 2 — de agent-home (workspace-verbouwing)
 
-- [ ] **Slogan: "One agent, everywhere".** Op het onboarding-scherm en de
-      About-pagina — de ene zin die zegt wat dit is.
-- [ ] **Tab "Devices" heet voortaan "Sync".** En de pagina laat élke node in
-      de keten zien: de naam uit het node-event (nu nog de hostname), en de
-      gebruiker kan ze hernoemen — een naam die meereist op de keten, zodat
-      elk toestel hetzelfde lijstje ziet. Plek: `SETTINGS_ROWS`,
-      `DevicesPage`, `src/chain/nodes.ts`.
+- [x] **Slogan: "One agent, everywhere".** Op het onboarding-scherm en de
+      About-pagina (0.0.17).
+- [x] **Tab "Devices" heet voortaan "Sync".** De pagina toont élke node in
+      de keten — naam, adres, live-stip, "this device"-tag — en de gebruiker
+      hernoemt met het potlood: de nieuwe naam is het volgende aankondigings-
+      event, dus elk toestel vouwt hetzelfde rooster (bewezen: twee
+      wegwerp-daemons in beide richtingen, en de emulator-drive hernoemde
+      "localhost" → "Emulator-node" door de echte UI). "Node" richting de
+      gebruiker, "daemon" in code en logs. Bonus: Ctrl-K opent de drawer op
+      het zoekveld en zoek vindt ook berichttekst, niet alleen titels.
 
 - [ ] **`~/.Roan` met hoofdletter.** Code, migratie en docs zitten erin:
       `paths.ts` hernoemt een bestaand `~/.roan` één keer bij de start,
