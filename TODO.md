@@ -30,24 +30,25 @@ geschreven.
 
 ## Ronde 1c — schone webversie, veilige sync (zien op de telefoon-web, 18 nov)
 
-- [ ] **Geen statusbalk-ruimte in de webversie.** De safe-area bovenin de
-      titelbalk hoort alléén bij de Android-app (doorzichtig achter de systeembalk).
-      De webversie in een browser krijgt geen dode strook: het shell zet een
-      klasse (`body.app-shell`) die de app meekrijgt, de web niet. Plek:
-      `web/src/styles.css` + de injectie in `MainActivity`/`main.tsx`.
-- [ ] **Icoontje even groot op elk scherm.** `.titlebar__mark`,
-      `.rail__mark` en `.empty__mark` zijn nu drie maten; één maat (of één
-      bewuste schaal), hetzelfde op chat, drawer en lege staat.
-- [ ] **Sync standaard alléén tailscale.** De peer-link luistent nu op
-      `0.0.0.0` (élk LAN-apparaat kan aan de deur rammelen; de handshake
-      weigert, maar de deur hoeft niet open te staan). Nieuw:
-      `ROAN_PEER_BIND` met als default het tailscale-adres, LAN alleen als
-      iemand het bewust aanzet — en de invite draagt dan alleen routes die
-      bij die keuze horen. Plek: `roan-daemon.service` + `peers.ts` + de
-      `advertiseHosts`-volgorde.
-- [ ] **Invite zonder docker-ruis.** De hosts-lijst bevatte 12 bridge-adressen
-      (172.x.0.1). Filter de bridging-ranges uit de advertise, of beperk de
-      lijst tot tailscale + echte LAN-adressen.
+- [x] **Geen statusbalk-ruimte in de webversie.** De vaste vloeren (30/34px)
+      leven alléén onder `.app-shell`, gezet bij boot als een shell
+      wordt gedetecteerd (`main.tsx` + `shell.ts`). Bewezen: headless-Chromium
+      op 412px breed — de header zit tegen de bovenkant, geen strook
+      (`local/proof/round-1c`-reeks; de app op de emulator tekent
+      rand-aan-rand achter de doorzichtige systeembalk).
+- [x] **Icoontje even groot op elk scherm.** Eén maat: 26px voor
+      `.titlebar__mark` en `.rail__mark`. Pixel-exact gemeten met een
+      PNG-scan van twee emulator-schoten: 72×66 tegen 71×66 (1px
+      antialias-ruis) — hetzelfde icoontje. Visie schatte hier eerst scheef;
+      de meetlat won.
+- [x] **Sync standaard alléén tailscale.** `ROAN_PEER_BIND`
+      (tailscale|lan|loopback|adres; legacy `ROAN_PEER_HOST` blijft
+      werken). Zonder tailnet-adres: loopback — de deur staat niet open op
+      elk netwerk. Server-journal: `listening on 100.64.0.1:7412
+      (tailscale)`.
+- [x] **Invite zonder docker-ruis.** Interface-namen `docker*`/`br-*`/`veth*`
+      gaan er nooit in. De verse invite draagt precies één route:
+      `hosts: ["100.64.0.1"]`.
 
 ## Basis-hygiëne — geen features, wel de lat (altijd open)
 
@@ -57,7 +58,16 @@ sectie in `docs/feature-groups.md` voor de volledige basislijst.
 
 - [ ] **Eigen bericht bewerken.** Regenerate zit erin; een tikje op je eigen
       bubbel om te verbeteren en opnieuw te sturen nog niet. (chat-apps, ronde 1-nazorg)
-- [ ] **Sessies hernoemen.** Auto-titels bestaan; handmatig hernoemen niet. (ronde 1c meenemen)
+- [x] **Sessies hernoemen.** Potlood per gesprek in de drawer; een
+      `session_title`-event in de keten (append-only, reist mee, vouwt in
+      de index). Live bewezen op de server met een wegwerp-thuis:
+      voor `["New chat","Oud"]` → na `["New chat","Ronde 1c","Oud"]`.
+      Onderweg een echte protocol-bug gevonden en gedicht: de generieke
+      onRequest-vanger slikte het frame in vóór de eigen handler
+      (`67811a9`, regressietest in `control.test.ts`). Op de emulator
+      rendert invoer en potlood; de Enter via adb's synthetische toets
+      werd door Gboard opgegeten, dus daar reed het bewijs via de
+      directe frame-toets.
 - [ ] **Sessies zoeken.** Ctrl-K door de eigen geschiedenis. (ronde 2a: state/ maakt het één query)
 - [ ] **Export/backup-knop.** Al ontworpen, nog geen knop. (ronde 2b)
 - [ ] **Notificatie als beurt klaar is.** (ronde 2b: foreground service)
