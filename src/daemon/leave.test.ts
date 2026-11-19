@@ -18,17 +18,18 @@ test("leaving archives the identity and the chain, nothing is deleted", () => {
   mkdirSync(paths.secrets, { recursive: true });
   mkdirSync(paths.workspace, { recursive: true });
   writeFileSync(paths.identityFile, '{"chain":"c"}');
-  writeFileSync(join(paths.workspace, "chain.db"), "db");
-  writeFileSync(join(paths.workspace, "chain.db-wal"), "wal");
+  mkdirSync(paths.state, { recursive: true });
+  writeFileSync(join(paths.state, "chain.db"), "db");
+  writeFileSync(join(paths.state, "chain.db-wal"), "wal");
 
   const archive = leaveChain(paths, 1_700_000_000_000);
 
   assert.equal(existsSync(paths.identityFile), false);
   assert.equal(existsSync(archive), true);
-  assert.equal(existsSync(join(paths.workspace, "chain.db")), false);
-  assert.equal(existsSync(join(paths.workspace, "chain.db.left-1700000000000")), true);
-  assert.equal(existsSync(join(paths.workspace, "chain.db-wal.left-1700000000000")), true);
-  assert.deepEqual(readdirSync(paths.workspace).sort(), [
+  assert.equal(existsSync(join(paths.state, "chain.db")), false);
+  assert.equal(existsSync(join(paths.state, "chain.db.left-1700000000000")), true);
+  assert.equal(existsSync(join(paths.state, "chain.db-wal.left-1700000000000")), true);
+  assert.deepEqual(readdirSync(paths.state).sort(), [
     "chain.db-wal.left-1700000000000",
     "chain.db.left-1700000000000",
   ]);

@@ -19,6 +19,7 @@ export const ENV_SNAPSHOT_VERSION = 1;
 export const ENV_ROOT_FILES = [
   "AGENTS.md",
   "SOUL.md",
+  "IDENTITY.md",
   "USER.md",
   "MEMORY.md",
   "config.json",

@@ -22,8 +22,8 @@ export function leaveChain(paths: RoanPaths, now = Date.now()): string {
   // WAL and SHM belong to the database: they move with it or the archive
   // resurrects with a torn tail on a machine that still has them cached.
   for (const suffix of ["", "-wal", "-shm"]) {
-    const live = `${paths.workspace}/chain.db${suffix}`;
-    if (existsSync(live)) renameSync(live, freeName(paths.workspace, `chain.db${suffix}`, "", String(now)));
+    const live = `${paths.state}/chain.db${suffix}`;
+    if (existsSync(live)) renameSync(live, freeName(paths.state, `chain.db${suffix}`, "", String(now)));
   }
   return archive;
 }

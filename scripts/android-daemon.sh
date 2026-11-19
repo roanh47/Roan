@@ -215,6 +215,16 @@ if "networkSecurityConfig" not in text:
     )
     manifest.write_text(text)
 
+# --- manifest: the storage window needs All files access ---
+# The daemon probes /storage/emulated/0 itself and refuses honestly without
+# it; the permission line is what makes the grant possible at all.
+if "MANAGE_EXTERNAL_STORAGE" not in text:
+    text = text.replace(
+        "</manifest>",
+        "    <uses-permission android:name=\"android.permission.MANAGE_EXTERNAL_STORAGE\" />\n</manifest>",
+    )
+    manifest.write_text(text)
+
 # --- theme: dark system bars with light icons ---
 # The app is dark everywhere; Android's default day theme paints dark status
 # bar icons that vanish on the near-black header. Tauri regenerates these

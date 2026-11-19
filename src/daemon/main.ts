@@ -3,9 +3,12 @@ import { EventStore } from "../chain/store.js";
 import type { ChainResponse, DaemonState } from "./control-protocol.js";
 import { decodeJoinCode, encodeJoinCode } from "./control-protocol.js";
 import { createIdentity, loadIdentity, type Identity } from "./identity.js";
-import { ensurePaths, migrateLegacyHome, resolvePaths, type RoanPaths } from "./paths.js";
+import { ensurePaths, migrateLegacyHome, migrateStateSplit, resolvePaths, type RoanPaths } from "./paths.js";
 import { advertiseHost, advertiseHosts, bindListenHost, resolvePeerBind, type PeerBind } from "./advertise.js";
 import { leaveChain } from "./leave.js";
+import { ensureBootstrapFiles, readGuideFile } from "./bootstrap.js";
+import { ANDROID_STORAGE_TARGETS, openStorageWindow, sharedStorageProbe } from "./storage-window.js";
+import { compactMessages } from "../chain/compaction.js";
 import { loadSettings } from "./settings.js";
 import { startControlServer } from "./control.js";
 import { ChainNodeStore } from "./peer-store.js";
@@ -97,6 +100,12 @@ async function main(): Promise<void> {
   // The capital-R move happens before anything opens the database, so an
   // upgrade from a pre-capital install keeps its chain without noticing.
   const migration = await migrateLegacyHome(paths);
+  // The chain database moves into `state/` once, before anything opens it:
+  // `workspace/` becomes the agent's desk instead of a bookkeeping floor.
+  const stateSplit = await migrateStateSplit(paths);
+  if (stateSplit === "moved") log("home: chain database moved to state/");
+  const bootstrapped = await ensureBootstrapFiles(paths);
+  if (bootstrapped.length > 0) log("home: wrote " + bootstrapped.join(", ") + " (first start)");
   if (migration === "moved") log("home: moved the old ~/.roan to ~/.Roan once");
   else if (migration === "both") log("home: ~/.Roan exists and an old ~/.roan is still there; leaving it alone");
   await ensurePaths(paths);
@@ -124,6 +133,8 @@ async function main(): Promise<void> {
     prompt: async () =>
       buildSystemPrompt({
         base: SYSTEM_PROMPT,
+        soul: await readGuideFile(paths, "SOUL.md"),
+        rules: await readGuideFile(paths, "AGENTS.md"),
         user: await memory.render("user"),
         memory: await memory.render("memory"),
         skills: await skills.index(),
@@ -913,6 +924,19 @@ async function main(): Promise<void> {
           await saveProviders(paths, upsertAccount(file, account));
           control?.sendState();
           reply({ ok: true, id, keySet: account.apiKey.length > 0 });
+          return;
+        }
+        if (kind === "storage_window") {
+          // The Termux pattern: symlinks next to the home, pointing at the
+          // public storages. The daemon lives in the app, so the base is the
+          // app's own files dir — on Android. Elsewhere the probe refuses
+          // honestly instead of inventing a window.
+          const result = await openStorageWindow({
+            base: dirname(paths.home),
+            targets: ANDROID_STORAGE_TARGETS,
+            canWriteShared: sharedStorageProbe("/storage/emulated/0"),
+          });
+          reply({ ok: result.refused === null, ...result });
           return;
         }
         if (kind === "provider_remove") {

@@ -8,6 +8,7 @@ import { test } from "node:test";
 import {
   ensurePaths,
   migrateLegacyHome,
+  migrateStateSplit,
   resolvePaths,
 } from "../src/daemon/paths.js";
 
@@ -28,7 +29,46 @@ test("the default home is ~/.Roan, capital R", () => {
   delete process.env["ROAN_HOME"];
   const paths = resolvePaths();
   assert.equal(paths.home, join(homedir(), ".Roan"));
-  assert.equal(paths.database, join(paths.home, "workspace", "chain.db"));
+  assert.equal(paths.database, join(paths.home, "state", "chain.db"));
+});
+
+/** The chain database leaves the agent's desk for the machine's drawer. */
+test("the state split moves chain.db with its WAL and SHM, once", async () => {
+  const root = mkdtempSync(join(tmpdir(), "roan-state-moved-"));
+  try {
+    await mkdir(join(root, ".Roan", "workspace"), { recursive: true });
+    await writeFile(join(root, ".Roan", "workspace", "chain.db"), "db");
+    await writeFile(join(root, ".Roan", "workspace", "chain.db-wal"), "wal");
+    await writeFile(join(root, ".Roan", "workspace", "chain.db-shm"), "shm");
+    const paths = resolvePaths(join(root, ".Roan"));
+
+    assert.equal(await migrateStateSplit(paths), "moved");
+    assert.equal(await readFileOrNull(join(paths.database)), "db");
+    assert.equal(await readFileOrNull(`${paths.database}-wal`), "wal");
+    assert.equal(await readFileOrNull(`${paths.database}-shm`), "shm");
+    assert.equal(await readFileOrNull(join(root, ".Roan", "workspace", "chain.db")), null);
+
+    // The second boot finds state/chain.db and does nothing.
+    assert.equal(await migrateStateSplit(paths), "none");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a home already split leaves its leftovers alone", async () => {
+  const root = mkdtempSync(join(tmpdir(), "roan-state-both-"));
+  try {
+    await mkdir(join(root, ".Roan", "workspace"), { recursive: true });
+    await mkdir(join(root, ".Roan", "state"), { recursive: true });
+    await writeFile(join(root, ".Roan", "workspace", "chain.db"), "old leftover");
+    await writeFile(join(root, ".Roan", "state", "chain.db"), "live");
+    const paths = resolvePaths(join(root, ".Roan"));
+
+    assert.equal(await migrateStateSplit(paths), "both");
+    assert.equal(await readFileOrNull(join(paths.database)), "live");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("a legacy ~/.roan is moved once, contents intact", async () => {

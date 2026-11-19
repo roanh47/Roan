@@ -11,8 +11,12 @@ const LEGACY_HOME_DIR = ".roan";
 export interface RoanPaths {
   readonly home: string;
   readonly secrets: string;
+  /** The agent's own desk: what it writes here stays on this machine. */
   readonly workspace: string;
+  /** The folder whose contents ride the chain as events. */
   readonly syncedWorkspace: string;
+  /** Machine state the agent owns but never reads as content: the chain, the db. */
+  readonly state: string;
   readonly database: string;
   readonly configFile: string;
   readonly identityFile: string;
@@ -24,7 +28,8 @@ export function resolvePaths(home = process.env["ROAN_HOME"] ?? join(homedir(), 
     secrets: join(home, "secrets"),
     workspace: join(home, "workspace"),
     syncedWorkspace: join(home, "synced-workspace"),
-    database: join(home, "workspace", "chain.db"),
+    state: join(home, "state"),
+    database: join(home, "state", "chain.db"),
     configFile: join(home, "config.json"),
     identityFile: join(home, "secrets", "identity.json"),
   };
@@ -62,8 +67,43 @@ export async function migrateLegacyHome(paths: RoanPaths): Promise<
   return "moved";
 }
 
+/**
+ * The workspace used to hold the chain database, which made "what the agent
+ * writes" and "what the machine owns" the same folder. They are not: `state/`
+ * is machine bookkeeping, `workspace/` is the agent's desk. This moves the
+ * database once, before anything opens it — a rename, nothing copied — and
+ * leaves any other workspace content where it is.
+ *
+ * A database already in `state/` means the move happened; the one in
+ * `workspace/` is then a leftover to leave alone.
+ */
+export async function migrateStateSplit(paths: RoanPaths): Promise<"moved" | "none" | "both"> {
+  const exists = async (path: string): Promise<boolean> => {
+    try {
+      await stat(path);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const oldDb = join(paths.workspace, "chain.db");
+  const newDb = paths.database;
+  const oldExists = await exists(oldDb);
+  const newExists = await exists(newDb);
+  if (!oldExists) return "none";
+  if (newExists) return "both";
+  await mkdir(paths.state, { recursive: true });
+  // WAL and SHM belong to the database: they move with it, or the chain comes
+  // back with a torn tail on a machine that still has them cached.
+  for (const suffix of ["", "-wal", "-shm"]) {
+    const live = `${oldDb}${suffix}`;
+    if (await exists(live)) await rename(live, `${newDb}${suffix}`);
+  }
+  return "moved";
+}
+
 export async function ensurePaths(paths: RoanPaths): Promise<void> {
-  for (const dir of [paths.home, paths.secrets, paths.workspace, paths.syncedWorkspace]) {
+  for (const dir of [paths.home, paths.secrets, paths.workspace, paths.syncedWorkspace, paths.state]) {
     await mkdir(dir, { recursive: true });
   }
 }

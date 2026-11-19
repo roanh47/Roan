@@ -8,6 +8,10 @@
  */
 export interface PromptParts {
   readonly base: string;
+  /** SOUL.md: who this agent is. Present from the first start, home-grown. */
+  readonly soul?: string;
+  /** AGENTS.md: how this agent writes — a rule, not a suggestion. */
+  readonly rules?: string;
   readonly user?: string;
   readonly memory?: string;
   readonly skills?: string;
@@ -15,6 +19,21 @@ export interface PromptParts {
 
 export function buildSystemPrompt(parts: PromptParts): string {
   const blocks: string[] = [parts.base.trim()];
+
+  if (parts.soul !== undefined && parts.soul.trim().length > 0) {
+    blocks.push(
+      `# Who you are\n\n${parts.soul.trim()}\n\n` +
+        `This is the same on every device in the chain; it is you, not a costume.`,
+    );
+  }
+
+  if (parts.rules !== undefined && parts.rules.trim().length > 0) {
+    blocks.push(
+      `# How you write — a rule, not a suggestion\n\n${parts.rules.trim()}\n\n` +
+        `Every answer is measured against this block. An answer that breaks it is ` +
+        `wrong even when its facts are right.`,
+    );
+  }
 
   if (parts.user !== undefined && parts.user.trim().length > 0) {
     blocks.push(

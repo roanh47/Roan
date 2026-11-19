@@ -73,6 +73,7 @@ type SettingsPage =
   | "schedules"
   | "checkpoints"
   | "devices"
+  | "storage"
   | "about";
 
 const SETTINGS_ROWS: readonly [SettingsPage, string, string][] = [
@@ -82,6 +83,7 @@ const SETTINGS_ROWS: readonly [SettingsPage, string, string][] = [
   ["schedules", "Schedules", "tasks that run later"],
   ["checkpoints", "Checkpoints", "named points to rewind to"],
   ["devices", "Sync", "the chain, the nodes, the invite"],
+  ["storage", "Storage window", "Android's files, next to the home"],
   ["about", "About", "chain, node and version"],
 ];
 
@@ -410,6 +412,8 @@ export default function App(): ReactElement {
           />
         ) : settingsPage === "devices" ? (
           <DevicesPage snapshot={snapshot} client={client} />
+        ) : settingsPage === "storage" ? (
+          <StorageWindowPage client={client} />
         ) : (
           <AboutPage snapshot={snapshot} logText={logText} onLoadLog={() => void loadLog()} />
         )}
@@ -671,6 +675,45 @@ function DevicesPage({
           Leave this chain
         </button>
       )}
+    </section>
+  );
+}
+
+/** The Android storage window: the shared storages as siblings of the home. */
+function StorageWindowPage({ client }: { client: ChainClient }): ReactElement {
+  const [result, setResult] = useState<{ ok?: boolean; created?: string[]; existed?: string[]; refused?: string | null } | null>(null);
+  const [busy, setBusy] = useState(false);
+  return (
+    <section className="panel">
+      <header className="panel__head">
+        <h2 className="panel__title">Storage window</h2>
+      </header>
+      <p className="panel__sub">
+        The agent's home stays app-private; the shared storages appear next to it as windows —
+        nothing is copied or moved. Android only, and it needs All files access.
+      </p>
+      <button
+        type="button"
+        className="panel__leave-open"
+        disabled={busy}
+        onClick={() => {
+          setBusy(true);
+          void client
+            .request<{ ok?: boolean; created?: string[]; existed?: string[]; refused?: string | null }>("storage_window", {})
+            .then((answer) => setResult(answer))
+            .catch(() => setResult({ ok: false, refused: "the daemon did not answer" }))
+            .finally(() => setBusy(false));
+        }}
+      >
+        {busy ? "Opening…" : "Open the storage window"}
+      </button>
+      {result !== null ? (
+        <p className="panel__hint">
+          {result.refused !== null && result.refused !== undefined
+            ? result.refused
+            : `Windows open: ${[...(result.created ?? []), ...(result.existed ?? [])].join(", ")}`}
+        </p>
+      ) : null}
     </section>
   );
 }

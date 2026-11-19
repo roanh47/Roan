@@ -9,6 +9,7 @@ import type { Event as TurnEvent, TurnEventDraft, TurnStore } from "../turn/type
 import { historyFromEvents } from "./history.js";
 import { runHermesTurn } from "../engine/hermes.js";
 import { sessionMessages } from "../chain/sessions.js";
+import { compactMessages, type ChatMessage } from "../chain/compaction.js";
 
 export interface TurnRunnerOptions {
   readonly store: EventStore;
@@ -94,6 +95,22 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
             role: message.role,
             content: message.text,
           }));
+    // Long conversations stay affordable: past a window the older half leaves
+    // the request as a digest attached to the prompt; the recent half rides
+    // along whole. The hermes engine windows its own history, so this is the
+    // builtin loop only.
+    const asChat = history
+      .filter(
+        (message): message is { role: "user" | "assistant"; content: string } =>
+          (message.role === "user" || message.role === "assistant") &&
+          typeof message.content === "string",
+      )
+      .map((message): ChatMessage => ({ role: message.role, content: message.content }));
+    const compacted = compactMessages(asChat, 40);
+    const turnPrompt =
+      compacted.digest === null
+        ? options.systemPrompt
+        : `${options.systemPrompt}\n\n# Earlier in this conversation (condensed)\n\n${compacted.digest}`;
     let answer = "";
     // A turn that ends without an explanation is a silent bug to a reader.
     // The error events of this turn say why it went nowhere; when none did,
@@ -123,9 +140,9 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
     const agent = new Agent({
       provider: options.provider,
       tools: [...(options.tools ?? builtinTools)],
-      systemPrompt: options.systemPrompt,
+      systemPrompt: turnPrompt,
       cwd: options.cwd,
-      history,
+      history: compacted.recent as typeof history,
       ...(options.signal !== undefined ? { signal: options.signal } : {}),
       onEvent: (event) => {
         switch (event.type) {
