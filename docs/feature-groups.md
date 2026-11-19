@@ -15,6 +15,35 @@ filtered without re-deciding anything:
 - **LATER** — wanted, not scheduled
 - **WON'T** — rejected by design (one agent, local-first, the app is the product)
 
+## Two lanes — basis versus feature
+
+Not every row below is a feature. Half of them are **basis**: things every
+reference product has (a visible thinking state, one message shown once, a
+renameable conversation). Missing one is not "a feature not built yet", it is
+a defect against the bar the reference apps set. The lane decides which todo
+owns it: basis gaps go to the open round or the standing hygiene lane in
+TODO.md, feature gaps go to the roadmap rounds.
+
+**Basis rows (defects when missing):** session persistence, cross-surface
+continuity, fork/branch/edit-resend, compaction, session search, session
+names, transcript export & backup, archive/delete/temporary chats, share a
+conversation, permission modes (the approval flow), protected paths, secrets
+management, thinking/progress indicator, steering mid-turn, notifications
+when done, model picker, BYOK catalog, local models, attachments, voice
+input, all four surfaces (desktop/mobile/web/CLI), config files, onboarding,
+telemetry policy, remote pairing, usage transparency, themes, instruction
+file, persona/identity files (for Roan's mission these are the floor, not
+the ceiling).
+
+**Everything else is a feature:** goals, cron, web search/fetch, browser,
+computer use, images, generation, skills, commands, plugins, hooks, MCP,
+tool search, subagents/teams (WON'T), dual-model roles, caching, data
+analysis, file library, code intelligence, webhooks, recaps, checkpoints,
+git integration, worktrees, code review, CI, deep research, connectors,
+inter-agent protocols, device control, headless, SDK, deep links,
+natural-language config, doctor, updater, accessibility, status line,
+keybinds, artifacts, assistant store, consumer verticals, i18n.
+
 Harness legend: CC=Claude Code, CX=Codex CLI, OC=opencode, GC=gemini-cli,
 AG=Antigravity, PI=Pi, OMP=Oh My Pi, DSH=DeepSeek Harness, AID=Aider, CL=Cline,
 ROO=Roo Code, GOO=Goose, OH=OpenHands, QW=Qwen Code, AMP=Amp, CP=Copilot CLI,

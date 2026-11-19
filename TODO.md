@@ -49,6 +49,26 @@ geschreven.
       (172.x.0.1). Filter de bridging-ranges uit de advertise, of beperk de
       lijst tot tailscale + echte LAN-adressen.
 
+## Basis-hygiëne — geen features, wel de lat (altijd open)
+
+Dingen die elk referentieproduct gewoon heeft. Geen roadmap-werk, maar
+kleine gaten die dicht moeten zodra ze boven komen — zie de "two lanes"
+sectie in `docs/feature-groups.md` voor de volledige basislijst.
+
+- [ ] **Eigen bericht bewerken.** Regenerate zit erin; een tikje op je eigen
+      bubbel om te verbeteren en opnieuw te sturen nog niet. (chat-apps, ronde 1-nazorg)
+- [ ] **Sessies hernoemen.** Auto-titels bestaan; handmatig hernoemen niet. (ronde 1c meenemen)
+- [ ] **Sessies zoeken.** Ctrl-K door de eigen geschiedenis. (ronde 2a: state/ maakt het één query)
+- [ ] **Export/backup-knop.** Al ontworpen, nog geen knop. (ronde 2b)
+- [ ] **Notificatie als beurt klaar is.** (ronde 2b: foreground service)
+- [ ] **Midden-beurt sturen.** Stop bestaat; antwoord bijsturen terwijl hij
+      denkt nog niet. (SOON)
+- [ ] **Bijlagen buiten de workspace.** Foto's/bestanden uitkiezen die niet
+      in `.Roan` liggen. (na de Android storage-ronde)
+- [ ] **Gebruik per beurt.** Tokens/kosten zichtbaar onder een antwoord. (SOON)
+- [ ] **Tijdelijke chats** die niet in de historie blijven. (LATER)
+- [ ] **Gesprek delen** als read-only link. (LATER)
+
 ## Ronde 2 — de agent-home (workspace-verbouwing)
 
 - [ ] **`~/.Roan` met hoofdletter.** Code, migratie en docs zitten erin:
