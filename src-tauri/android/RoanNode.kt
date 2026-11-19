@@ -85,6 +85,19 @@ object RoanNode {
     // The peer link defaults to the tailscale address (loopback without
     // one); ROAN_PEER_BIND=lan in the shell turns the old listen-all on.
     setEnvironment("ROAN_PEER_PORT", "7412")
+    // Node's interface list does not see Android's VPN tunnel, so the daemon
+    // cannot find this phone's tailnet address on its own — its invite would
+    // carry no route. Kotlin sees the tunnel; hand the address over.
+    try {
+      val tailnet = java.net.NetworkInterface.getNetworkInterfaces().asSequence()
+        .flatMap { it.inetAddresses.asSequence() }
+        .mapNotNull { it as? java.net.Inet4Address }
+        .firstOrNull { it.hostAddress?.startsWith("100.64.") == true }
+        ?.hostAddress
+      if (tailnet != null) setEnvironment("ROAN_PEER_ADVERTISE", tailnet)
+    } catch (error: Throwable) {
+      // No tunnel up yet: the invite simply carries no route, same as before.
+    }
 
     Thread({
       // Written into the log itself: when node returns before printing

@@ -15,6 +15,7 @@ test("a rename_session frame reaches onRenameSession, not the generic onRequest"
   const renames: { session: string; title: string }[] = [];
   const requests: string[] = [];
   let pushed = 0;
+  let left = 0;
 
   const server = await startControlServer({
     port: 0,
@@ -24,6 +25,9 @@ test("a rename_session frame reaches onRenameSession, not the generic onRequest"
     onRenameSession: (session, title) => {
       renames.push({ session, title });
       server.sendState();
+    },
+    onLeaveChain: () => {
+      left += 1;
     },
     onRequest: (kind) => {
       requests.push(kind);
@@ -38,7 +42,11 @@ test("a rename_session frame reaches onRenameSession, not the generic onRequest"
     const socket = new WebSocket(`ws://127.0.0.1:${String(server.port)}/ws`);
     socket.on("open", () => {
       socket.send(JSON.stringify({ t: "rename_session", session: "s1", title: "Nieuwe naam" }));
-      resolve();
+      socket.send(JSON.stringify({ t: "leave_chain" }));
+      setTimeout(() => {
+        socket.close();
+        resolve();
+      }, 300);
     });
     socket.on("message", (raw) => events.push(JSON.parse(String(raw)) as { t: string }));
     socket.on("error", reject);
@@ -67,4 +75,5 @@ test("a rename_session frame reaches onRenameSession, not the generic onRequest"
   ]);
   assert.deepEqual(requests, [], "rename_session must not fall into the generic onRequest path");
   assert.ok(pushed >= 1, "a state frame came back after the rename");
+  assert.equal(left, 1, "leave_chain reaches onLeaveChain, not the generic onRequest path");
 });

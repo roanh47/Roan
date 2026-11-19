@@ -14,6 +14,12 @@ export interface ControlServerOptions {
   readonly onNewSession?: (title?: string) => void;
   /** Names a conversation differently; appended, never rewriting history. */
   readonly onRenameSession?: (session: string, title: string) => void;
+  /**
+   * Leaves the chain this node is in. The daemon archives the identity and the
+   * chain and comes back up in onboarding; the connection the frame came in
+   * on will drop on the way out.
+   */
+  readonly onLeaveChain?: () => void;
   /** Marks a point in the current conversation you can come back to. */
   readonly onCheckpoint?: (label?: string) => void;
   /** Starts a new conversation from an earlier point; nothing is deleted. */
@@ -140,6 +146,7 @@ export function startControlServer(options: ControlServerOptions): Promise<Contr
         type !== "append" &&
         type !== "new_session" &&
         type !== "rename_session" &&
+        type !== "leave_chain" &&
         type !== "checkpoint" &&
         type !== "rewind"
       ) {
@@ -167,6 +174,9 @@ export function startControlServer(options: ControlServerOptions): Promise<Contr
         const session = typeof frame["session"] === "string" ? frame["session"] : "";
         const title = typeof frame["title"] === "string" ? frame["title"].trim() : "";
         if (session.length > 0 && title.length > 0) options.onRenameSession?.(session, title);
+      }
+      if (type === "leave_chain") {
+        options.onLeaveChain?.();
       }
     });
 

@@ -5,6 +5,7 @@ import { decodeJoinCode, encodeJoinCode } from "./control-protocol.js";
 import { createIdentity, loadIdentity, type Identity } from "./identity.js";
 import { ensurePaths, migrateLegacyHome, resolvePaths, type RoanPaths } from "./paths.js";
 import { advertiseHost, advertiseHosts, bindListenHost, resolvePeerBind, type PeerBind } from "./advertise.js";
+import { leaveChain } from "./leave.js";
 import { loadSettings } from "./settings.js";
 import { startControlServer } from "./control.js";
 import { ChainNodeStore } from "./peer-store.js";
@@ -1075,6 +1076,20 @@ async function main(): Promise<void> {
       // that point, so the old one stays readable.
       startSession(`Rewind to #${String(seq)}`, { session: active, seq });
       log("rewind: new session from " + String(seq));
+    },
+    onLeaveChain: () => {
+      if (session === null) return;
+      try {
+        const archive = leaveChain(paths);
+        log("chain: left — identity and history archived at " + archive + "; restart into onboarding");
+      } catch (error) {
+        log("chain: leave refused — " + String(error));
+        return;
+      }
+      // The identity is gone; this process is a daemon for a chain it no
+      // longer has. The supervisor (systemd, the app shell) restarts it into
+      // onboarding, where a new chain can be created or a code joined.
+      setTimeout(() => process.exit(0), 250);
     },
     onRenameSession: (wanted: string, title: string) => {
       if (session === null) return;

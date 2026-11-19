@@ -566,6 +566,14 @@ export class ChainClient {
   /** Names a conversation differently; appended, never rewriting history. */
   renameSession(id: string, title: string): void {
     this.send({ t: "rename_session", session: id, title });
+  }
+
+  /**
+   * Leaves the chain: the daemon archives identity and history and comes back
+   * up in onboarding. The socket drops on the way out — that is expected.
+   */
+  leaveChain(): void {
+    this.send({ t: "leave_chain" });
     // The daemon owns the id, so ask again shortly: that answer also carries the
     // refreshed list, which is what puts the new conversation on screen.
     setTimeout(() => this.send({ t: "state" }), 250);

@@ -850,6 +850,54 @@ pre {
   color: var(--accent);
 }
 
+/* Leaving a chain is the one destructive-looking action in the app: red,
+ * behind a confirm, and honest about the archive. */
+.panel__leave-open,
+.panel__leave-cancel,
+.panel__leave-go {
+  display: block;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.panel__leave-open {
+  margin-top: 18px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--danger);
+}
+
+.panel__leave-open:active {
+  background: var(--surface-2);
+}
+
+.panel__leave-text {
+  margin: 18px 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.panel__leave-row {
+  display: flex;
+  gap: 10px;
+}
+
+.panel__leave-cancel {
+  flex: 1;
+  background: var(--surface-2);
+  color: var(--fg);
+}
+
+.panel__leave-go {
+  flex: 1;
+  background: var(--danger);
+  color: #1d0f0f;
+}
+
 .rail__rename {
   width: 100%;
   padding: 9px 12px;

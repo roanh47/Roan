@@ -380,7 +380,7 @@ export default function App(): ReactElement {
             }}
           />
         ) : settingsPage === "devices" ? (
-          <DevicesPage snapshot={snapshot} />
+          <DevicesPage snapshot={snapshot} client={client} />
         ) : (
           <AboutPage snapshot={snapshot} logText={logText} onLoadLog={() => void loadLog()} />
         )}
@@ -529,7 +529,14 @@ export default function App(): ReactElement {
 }
 
 /** The chain's members and the invite, out of the chat drawer. */
-function DevicesPage({ snapshot }: { snapshot: ChainSnapshot }): ReactElement {
+function DevicesPage({
+  snapshot,
+  client,
+}: {
+  snapshot: ChainSnapshot;
+  client: ChainClient;
+}): ReactElement {
+  const [confirmLeave, setConfirmLeave] = useState(false);
   return (
     <section className="panel">
       <header className="panel__head">
@@ -561,6 +568,31 @@ function DevicesPage({ snapshot }: { snapshot: ChainSnapshot }): ReactElement {
         The invite turns another device into a member of this chain: it takes the whole history as
         its own.
       </p>
+      {confirmLeave ? (
+        <div className="panel__leave">
+          <p className="panel__leave-text">
+            Leave this chain? The history stays on this machine under a timestamped archive —
+            nothing is deleted — and Roan comes back as an empty start: create a new chain or join
+            one with a code.
+          </p>
+          <div className="panel__leave-row">
+            <button type="button" className="panel__leave-cancel" onClick={() => setConfirmLeave(false)}>
+              Stay
+            </button>
+            <button
+              type="button"
+              className="panel__leave-go"
+              onClick={() => client.leaveChain()}
+            >
+              Leave
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button type="button" className="panel__leave-open" onClick={() => setConfirmLeave(true)}>
+          Leave this chain
+        </button>
+      )}
     </section>
   );
 }
