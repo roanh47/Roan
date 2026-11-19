@@ -117,10 +117,49 @@ function assertSafeUrl(raw: unknown): string {
   return parsed.toString();
 }
 
+/**
+ * Wikipedia's opensearch endpoint: the guaranteed fallback. It answers from
+ * any network with real, citable links — a search that came back empty (a
+ * bot-wall, a parse miss) is a search the agent cannot pretend succeeded.
+ */
+const WIKI_API = "https://LANG.wikipedia.org/w/api.php?action=opensearch&limit=6&format=json&redirects=resolve&search=";
+
+export async function wikiSearch(query: string, lang: string): Promise<SearchHit[]> {
+  const raw = await fetchText(
+    `${WIKI_API.replace("LANG", lang)}${encodeURIComponent(query)}`,
+    20_000,
+  );
+  return parseWikiOpenSearch(raw);
+}
+
+/** Wikipedia's opensearch answer is [vraag, titels, beschrijvingen, urls]. */
+export function parseWikiOpenSearch(raw: string): SearchHit[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed) || parsed.length < 4) return [];
+  const titles = parsed[1];
+  const descriptions = parsed[2];
+  const urls = parsed[3];
+  if (!Array.isArray(titles) || !Array.isArray(descriptions) || !Array.isArray(urls)) return [];
+  const hits: SearchHit[] = [];
+  for (let index = 0; index < titles.length && hits.length < RESULT_LIMIT; index += 1) {
+    const title = titles[index];
+    const url = urls[index];
+    const snippet = descriptions[index];
+    if (typeof title !== "string" || typeof url !== "string" || !url.startsWith("https://")) continue;
+    hits.push({ title, url, snippet: typeof snippet === "string" ? snippet : "" });
+  }
+  return hits;
+}
+
 export const webSearch: Tool = {
   name: "web_search",
   description:
-    "Zoek live op het web. Gebruik dit voor actuele feiten, prijzen, versies of iets wat je " +
+    "Zoek live op het web. Gebruik dit voor actuele feiten, prijzen, versies of iets dat je " +
     "niet zeker weet. Noem de bronnen uit het antwoord in je eigen antwoord.",
   parameters: {
     type: "object",
@@ -132,8 +171,28 @@ export const webSearch: Tool = {
   async run(args) {
     const query = typeof args["query"] === "string" ? args["query"].trim() : "";
     if (query.length === 0) throw new Error("lege zoekvraag");
-    const html = await fetchText(`${DDG_LITE}${encodeURIComponent(query)}`);
-    return formatHits(parseDuckDuckGoLite(html));
+    // Primary: the open web. Some networks (hosting IPs) get walled off; an
+    // empty answer then falls through to Wikipedia, which never walls.
+    let hits: SearchHit[] = [];
+    try {
+      hits = parseDuckDuckGoLite(await fetchText(`${DDG_LITE}${encodeURIComponent(query)}`));
+    } catch {
+      hits = [];
+    }
+    if (hits.length === 0) {
+      for (const lang of ["nl", "en"]) {
+        try {
+          hits = await wikiSearch(query, lang);
+        } catch {
+          hits = [];
+        }
+        if (hits.length > 0) {
+          return `${formatHits(hits)}\n\n(Wikipedia — de open-web-zoekopdracht gaf geen resultaten op dit netwerk.)`;
+        }
+      }
+      return "geen resultaten gevonden";
+    }
+    return formatHits(hits);
   },
 };
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { parseDuckDuckGoLite } from "./web.js";
+import { parseDuckDuckGoLite, parseWikiOpenSearch } from "./web.js";
 
 const FIXTURE = `<html><body><table>
 <tr><td><a class="result-link" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fvoorbeeld.nl%2Fpoorten&amp;rut=abc">Poorten en <b>adres</b>sen</a></td></tr>
@@ -30,4 +30,43 @@ test("non-https results never make it into a citation", () => {
 test("the limit is honoured", () => {
   const hits = parseDuckDuckGoLite(FIXTURE, 1);
   assert.equal(hits.length, 1);
+});
+
+const WIKI_FIXTURE = JSON.stringify([
+  "poort",
+  ["Poort (netwerk)", "TCP en UDP", "Lijst van poorten"],
+  ["Een netwerkpoort is een getal.", "TCP en UDP zijn transportprotocollen.", "Lijst met bekende poorten."],
+  [
+    "https://nl.wikipedia.org/wiki/Poort_(netwerk)",
+    "https://nl.wikipedia.org/wiki/TCP",
+    "https://nl.wikipedia.org/wiki/Lijst_van_poorten",
+  ],
+]);
+
+test("the wiki fallback turns an opensearch answer into cited hits", () => {
+  const hits = parseWikiOpenSearch(WIKI_FIXTURE);
+  assert.deepEqual(hits, [
+    {
+      title: "Poort (netwerk)",
+      url: "https://nl.wikipedia.org/wiki/Poort_(netwerk)",
+      snippet: "Een netwerkpoort is een getal.",
+    },
+    { title: "TCP en UDP", url: "https://nl.wikipedia.org/wiki/TCP", snippet: "TCP en UDP zijn transportprotocollen." },
+    {
+      title: "Lijst van poorten",
+      url: "https://nl.wikipedia.org/wiki/Lijst_van_poorten",
+      snippet: "Lijst met bekende poorten.",
+    },
+  ]);
+});
+
+test("malformed or short wiki answers stay empty, never throw", () => {
+  assert.deepEqual(parseWikiOpenSearch("geen json"), []);
+  assert.deepEqual(parseWikiOpenSearch('["poort", ["E\u00e9n titel"]]'), []);
+  assert.deepEqual(
+    parseWikiOpenSearch(
+      JSON.stringify(["poort", ["X"], ["Y"], ["http://onveilig.example/X"]]),
+    ),
+    [],
+  );
 });
