@@ -7,11 +7,20 @@ interface WorkspaceFile {
   bytes: number;
 }
 
+export interface AttachedImage {
+  /** Mime type, image/jpeg after the downscale. */
+  mime: string;
+  /** Base64, no data-url prefix. */
+  data: string;
+}
+
 interface ComposerProps {
   /** Locked while a turn is open or the chain is not connected. */
   disabled: boolean;
   placeholder: string;
-  onSend: (text: string) => void;
+  onSend: (text: string, image?: AttachedImage) => void;
+  /** Text handed over by the Android share sheet; the stamp makes it fresh. */
+  prefill?: { text: string; at: number } | null;
   /** Called when a workspace file was picked, so the app returns to chat. */
   onPickFile?: () => void;
   /** With a client the plus menu lists the workspace; without it stays lean. */
@@ -47,14 +56,15 @@ function dictationCtor(): DictationCtor | null {
 
 const DICTATION = dictationCtor();
 
-export function Composer({ disabled, placeholder, onSend, onPickFile, client }: ComposerProps): ReactElement {
-  // Without a workspace and without dictation there is nothing behind the
-  // plus, so the button does not exist.
-  const hasMenu = client !== undefined || DICTATION !== null;
+export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, client }: ComposerProps): ReactElement {
+  // The plus always exists: a photo needs neither workspace nor dictation.
+  const hasMenu = true;
   const [value, setValue] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [files, setFiles] = useState<WorkspaceFile[] | null>(null);
   const [listening, setListening] = useState(false);
+  const [image, setImage] = useState<AttachedImage | null>(null);
+  const photoInput = useRef<HTMLInputElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const recognition = useRef<Dictation | null>(null);
 
@@ -72,13 +82,43 @@ export function Composer({ disabled, placeholder, onSend, onPickFile, client }: 
     };
   }, []);
 
-  const ready = value.trim().length > 0 && !disabled;
+  // A share-sheet hand-over fills the box once, stamp by stamp.
+  useEffect(() => {
+    if (prefill !== null && prefill !== undefined && prefill.text.trim().length > 0) {
+      setValue(prefill.text);
+    }
+  }, [prefill?.at]);
+
+  const ready = (value.trim().length > 0 || image !== null) && !disabled;
 
   function submit(): void {
     const text = value.trim();
-    if (text.length === 0 || disabled) return;
-    onSend(text);
+    if (disabled || (text.length === 0 && image === null)) return;
+    onSend(text.length > 0 ? text : "[afbeelding]", image ?? undefined);
     setValue("");
+    setImage(null);
+  }
+
+  /** Downscale before it ever leaves the phone: a photo is readable at 1024px. */
+  function attachPhoto(event: ChangeEvent<HTMLInputElement>): void {
+    setMenuOpen(false);
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (file === undefined) return;
+    void (async () => {
+      const bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, 1024 / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+      const data = dataUrl.slice(dataUrl.indexOf(",") + 1);
+      setImage({ mime: "image/jpeg", data });
+      input.current?.focus();
+    })().catch(() => {
+      /* not decodable: silently no attachment */
+    });
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>): void {
@@ -178,9 +218,28 @@ export function Composer({ disabled, placeholder, onSend, onPickFile, client }: 
               <span className="composer__menupath">{listening ? "Stop dictation" : "Dictate"}</span>
             </button>
           ) : null}
+          <button type="button" className="composer__menuitem" onClick={() => photoInput.current?.click()}>
+            <span className="composer__menupath">Photo</span>
+          </button>
         </div>
       ) : null}
+      <input
+        ref={photoInput}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        aria-label="Pick a photo"
+        onChange={attachPhoto}
+      />
 
+      {image !== null ? (
+        <span className="composer__photo" aria-label="Photo attached">
+          <img src={`data:${image.mime};base64,${image.data}`} alt="" />
+          <button type="button" aria-label="Remove photo" onClick={() => setImage(null)}>
+            ×
+          </button>
+        </span>
+      ) : null}
       <label className="sr-only" htmlFor="composer-input">
         Message
       </label>

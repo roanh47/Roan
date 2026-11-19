@@ -8,11 +8,16 @@ export interface ToolCall {
 
 export interface ChatMessage {
   role: Role;
-  content: string | null;
+  content: string | ContentPart[] | null;
   tool_calls?: ToolCall[];
   tool_call_id?: string;
   name?: string;
 }
+
+/** One piece of a multimodal message: text, or an image as a data url. */
+export type ContentPart =
+  | { readonly type: "text"; readonly text: string }
+  | { readonly type: "image_url"; readonly image_url: { readonly url: string } };
 
 export interface ToolContext {
   cwd: string;

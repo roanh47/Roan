@@ -11,6 +11,8 @@ interface TranscriptProps {
   node: string;
   /** Regenerate: answer again from the question before this answer. */
   onRegenerate?: (seq: number) => void;
+  /** Mark this answer as a point to come back to. */
+  onCheckpoint?: () => void;
 }
 
 /**
@@ -32,7 +34,7 @@ type ToolRow = {
 };
 
 type Row =
-  | { kind: "user"; key: string; text: string }
+  | { kind: "user"; key: string; text: string; image?: { mime: string; data: string } }
   | { kind: "assistant"; key: string; text: string; seq: number; actions: boolean }
   | ToolRow
   | { kind: "steps"; key: string; tools: ToolRow[] }
@@ -153,7 +155,20 @@ export function buildRows(events: readonly ChainEvent[], local: string): Row[] {
     switch (event.type) {
       case "message": {
         flush();
-        rows.push({ kind: event.node === local ? "user" : "user", key: event.id, text: textOf(data) });
+        const image =
+          typeof (data as { image?: unknown } | null)?.image === "object" && data !== null
+            ? ((data as { image?: { mime?: unknown; data?: unknown } }).image ?? undefined)
+            : undefined;
+        rows.push({
+          kind: event.node === local ? "user" : "user",
+          key: event.id,
+          text: textOf(data),
+          ...(image !== undefined &&
+          typeof image.mime === "string" &&
+          typeof image.data === "string"
+            ? { image: { mime: image.mime, data: image.data } }
+            : {}),
+        });
         break;
       }
       case "assistant": {
@@ -228,7 +243,7 @@ export function buildRows(events: readonly ChainEvent[], local: string): Row[] {
   return markLastAnswer(groupSteps(rows));
 }
 
-export function Transcript({ events, pending, node, onRegenerate }: TranscriptProps): ReactElement {
+export function Transcript({ events, pending, node, onRegenerate, onCheckpoint }: TranscriptProps): ReactElement {
   const rows = useMemo(() => buildRows(events, node), [events, node]);
   const turn = useMemo(() => openTurn(events), [events]);
   const scroller = useRef<HTMLDivElement>(null);
@@ -264,7 +279,7 @@ export function Transcript({ events, pending, node, onRegenerate }: TranscriptPr
         ) : null}
 
         {rows.map((row) => (
-          <RowView key={row.key} row={row} turn={turn} onRegenerate={onRegenerate} />
+          <RowView key={row.key} row={row} turn={turn} onRegenerate={onRegenerate} onCheckpoint={onCheckpoint} />
         ))}
 
         {pending.map((item) => (
@@ -281,14 +296,23 @@ function RowView({
   row,
   turn,
   onRegenerate,
+  onCheckpoint,
 }: {
   row: Row;
   turn: ReturnType<typeof openTurn>;
   onRegenerate?: (seq: number) => void;
+  onCheckpoint?: () => void;
 }): ReactElement {
   switch (row.kind) {
     case "user":
-      return <div className="bubble bubble--out">{row.text}</div>;
+      return (
+        <div className="bubble bubble--out">
+          {row.image !== undefined ? (
+            <img className="bubble__photo" src={`data:${row.image.mime};base64,${row.image.data}`} alt="" />
+          ) : null}
+          {row.text}
+        </div>
+      );
     case "assistant":
       return (
         <div className="answer">
@@ -307,6 +331,15 @@ function RowView({
                   onClick={() => onRegenerate(row.seq)}
                 >
                   Regenerate
+                </button>
+              ) : null}
+              {row.actions && turn === null && onCheckpoint !== undefined ? (
+                <button
+                  type="button"
+                  className="answer__action"
+                  onClick={() => onCheckpoint()}
+                >
+                  📌 Checkpoint
                 </button>
               ) : null}
             </div>

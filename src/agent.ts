@@ -33,8 +33,19 @@ export class Agent {
     return this.messages;
   }
 
-  async send(userText: string): Promise<string> {
-    this.messages.push({ role: "user", content: userText });
+  async send(userText: string, image?: { mime: string; data: string }): Promise<string> {
+    // An image rides along on the live message only: the history stays text,
+    // so an old photo never taxes a new turn.
+    this.messages.push({
+      role: "user",
+      content:
+        image !== undefined
+          ? [
+              { type: "text", text: userText },
+              { type: "image_url", image_url: { url: `data:${image.mime};base64,${image.data}` } },
+            ]
+          : userText,
+    });
     const emit = this.opts.onEvent ?? (() => {});
     const specs = toToolSpecs(this.opts.tools);
     let stappen = 0;
@@ -56,7 +67,9 @@ export class Agent {
       }
 
       this.messages.push(antwoord);
-      if (antwoord.content) laatsteTekst = antwoord.content;
+      if (typeof antwoord.content === "string" && antwoord.content.length > 0) {
+        laatsteTekst = antwoord.content;
+      }
 
       const calls = antwoord.tool_calls ?? [];
       if (calls.length === 0) break;

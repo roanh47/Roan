@@ -9,7 +9,12 @@ export interface ControlServerOptions {
   /** null until a chain exists on this machine. */
   readonly store: () => EventStore | null;
   readonly state: () => DaemonState;
-  onMessage: (text: string, session?: string, echoId?: string) => void;
+  onMessage: (
+    text: string,
+    session?: string,
+    echoId?: string,
+    image?: { mime: string; data: string },
+  ) => void;
   /** Starts a new conversation without touching the old one. */
   readonly onNewSession?: (title?: string) => void;
   /** Names a conversation differently; appended, never rewriting history. */
@@ -118,7 +123,7 @@ export function startControlServer(options: ControlServerOptions): Promise<Contr
       }
       if (type === "append") {
         const event = frame["event"] as { id?: unknown; data?: unknown } | undefined;
-        const data = event?.data as { text?: unknown; session?: unknown } | null | undefined;
+        const data = event?.data as { text?: unknown; session?: unknown; image?: unknown } | null | undefined;
         const text = data && typeof data.text === "string" ? data.text : "";
         if (!text.trim()) return;
         // The daemon writes the message, because only it can decide which
@@ -127,11 +132,24 @@ export function startControlServer(options: ControlServerOptions): Promise<Contr
         // when the echo with the same id arrives, so the sent message never
         // shows up twice.
         const session = data && typeof data.session === "string" ? data.session : undefined;
+        const rawImage = data?.image;
+        const image =
+          typeof rawImage === "object" &&
+          rawImage !== null &&
+          typeof (rawImage as { mime?: unknown }).mime === "string" &&
+          typeof (rawImage as { data?: unknown }).data === "string" &&
+          ((rawImage as { data?: unknown }).data as string).length > 0 &&
+          ((rawImage as { data?: unknown }).data as string).length < 1_600_000
+            ? {
+                mime: (rawImage as { mime: string }).mime,
+                data: (rawImage as { data: string }).data,
+              }
+            : undefined;
         const echoId =
           event !== undefined && typeof event.id === "string" && event.id.length > 0
             ? event.id
             : undefined;
-        options.onMessage(text, session, echoId);
+        options.onMessage(text, session, echoId, image);
       }
       if (type === "checkpoint") {
         options.onCheckpoint?.(typeof frame["label"] === "string" ? frame["label"] : undefined);

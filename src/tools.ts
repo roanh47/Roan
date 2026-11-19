@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { Tool } from "./types.js";
+import { webFetch, webSearch } from "./tools/web.js";
 
 const execAsync = promisify(exec);
 
@@ -107,7 +108,7 @@ export const runShell: Tool = {
   },
 };
 
-export const builtinTools: Tool[] = [readFile, writeFile, listDir, runShell];
+export const builtinTools: Tool[] = [readFile, writeFile, listDir, runShell, webSearch, webFetch];
 
 export function toToolSpecs(tools: Tool[]) {
   return tools.map((t) => ({

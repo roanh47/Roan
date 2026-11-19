@@ -964,6 +964,42 @@ pre {
   color: #1d0f0f;
 }
 
+.composer__photo {
+  position: relative;
+  flex: none;
+  margin-right: 6px;
+}
+
+.composer__photo img {
+  display: block;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.composer__photo button {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--fg);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.bubble__photo {
+  display: block;
+  max-width: 240px;
+  max-height: 240px;
+  border-radius: 12px;
+  margin-bottom: 6px;
+}
+
 .rail__exportnote {
   margin: 4px 4px 8px;
   padding: 8px 10px;

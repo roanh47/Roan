@@ -656,7 +656,7 @@ export class ChainClient {
     this.update({ activeSession: id });
   }
 
-  sendMessage(text: string, session?: string | null): PendingMessage {
+  sendMessage(text: string, session?: string | null, image?: { mime: string; data: string }): PendingMessage {
     const body = text.trim();
     if (body.length === 0) throw new Error("cannot send an empty message");
     if (this.snapshot.status !== "open") {
@@ -675,7 +675,11 @@ export class ChainClient {
       node: this.node,
       ts,
       type: "message",
-      data: { text: body, ...(session !== undefined && session !== null ? { session } : {}) },
+      data: {
+        text: body,
+        ...(session !== undefined && session !== null ? { session } : {}),
+        ...(image !== undefined ? { image } : {}),
+      },
     };
     if (!this.send({ t: "append", event })) {
       throw new Error("socket is not open");

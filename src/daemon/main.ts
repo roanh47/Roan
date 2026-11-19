@@ -34,7 +34,7 @@ import { diffWorkspace, hashContent, scanWorkspace, type FileEntry } from "../wo
 import { applyWorkspaceEvent } from "../workspace/sync.js";
 import { randomUUID as uuid } from "node:crypto";
 import { existsSync } from "node:fs";
-import { copyFile, mkdir, readFile as readFileAsync, writeFile as writeFileAsync } from "node:fs/promises";
+import { copyFile, mkdir, readFile as readFileAsync, rm, writeFile as writeFileAsync } from "node:fs/promises";
 import { runHooks, type HookConfig } from "../hooks/run.js";
 import { dueJobs, loadCron } from "../cron/jobs.js";
 import { engineAvailable, runHermesTurn } from "../engine/hermes.js";
@@ -582,7 +582,12 @@ async function main(): Promise<void> {
     return id;
   };
 
-  const runMessage = async (text: string, wanted?: string, echoId?: string): Promise<void> => {
+  const runMessage = async (
+    text: string,
+    wanted?: string,
+    echoId?: string,
+    image?: { mime: string; data: string },
+  ): Promise<void> => {
     if (!session) return;
     const current = session;
     const sessionId = resolveSession(wanted) ?? startSession(text.slice(0, 60));
@@ -593,7 +598,7 @@ async function main(): Promise<void> {
       id: echoId !== undefined && echoId.length > 0 ? echoId : uuid(),
       node: current.identity.nodeId,
       type: "message",
-      data: { text, session: sessionId },
+      data: { text, session: sessionId, ...(image !== undefined ? { image } : {}) },
     });
     control?.broadcast({ t: "append", event: stored });
     const systemPrompt = await agentContext.prompt();
@@ -609,6 +614,7 @@ async function main(): Promise<void> {
     activeTurn = controller;
     await runTurn(
       {
+        ...(image !== undefined ? { image } : {}),
         signal: controller.signal,
         store: current.store,
         chain: current.identity.chainId,
@@ -950,6 +956,19 @@ async function main(): Promise<void> {
           await saveProviders(paths, upsertAccount(file, account));
           control?.sendState();
           reply({ ok: true, id, keySet: account.apiKey.length > 0 });
+          return;
+        }
+        if (kind === "take_shared") {
+          // The Android share sheet parks its text in a one-slot inbox next
+          // to the home; one read clears it, so the same text never lands twice.
+          const inbox = join(dirname(paths.home), "shared-inbox.txt");
+          try {
+            const shared = await readFileAsync(inbox, "utf8");
+            await rm(inbox, { force: true });
+            reply({ ok: true, text: shared.slice(0, 20_000) });
+          } catch {
+            reply({ ok: true, text: "" });
+          }
           return;
         }
         if (kind === "export") {

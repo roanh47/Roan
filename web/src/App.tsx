@@ -121,7 +121,29 @@ export default function App(): ReactElement {
   const [renaming, setRenaming] = useState<{ id: string; draft: string } | null>(null);
   /** Where the last export landed, shown until the next thing happens. */
   const [exportNote, setExportNote] = useState<string | null>(null);
+  /** Text the Android share sheet parked for us, with a fresh stamp per share. */
+  const [shared, setShared] = useState<{ text: string; at: number } | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // The share inbox is one slot: ask whenever the app becomes visible, and
+  // the daemon hands the text over exactly once.
+  useEffect(() => {
+    const pull = (): void => {
+      void client
+        .request<{ ok?: boolean; text?: string }>("take_shared", {})
+        .then((answer) => {
+          if (typeof answer.text === "string" && answer.text.trim().length > 0) {
+            setShared({ text: answer.text, at: Date.now() });
+          }
+        })
+        .catch(() => {
+          /* not shared from, or the daemon is not up yet */
+        });
+    };
+    pull();
+    document.addEventListener("visibilitychange", pull);
+    return () => document.removeEventListener("visibilitychange", pull);
+  }, [client]);
 
   // Ctrl-K opens the drawer on the search field, like every reference app.
   useEffect(() => {
@@ -191,9 +213,9 @@ export default function App(): ReactElement {
       ? "Waiting for the daemon…"
       : "Message Roan";
 
-  function send(text: string): void {
+  function send(text: string, image?: { mime: string; data: string }): void {
     try {
-      client.sendMessage(text, activeSession);
+      client.sendMessage(text, activeSession, image);
       setNotice(null);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "The message could not be sent.");
@@ -374,6 +396,10 @@ export default function App(): ReactElement {
             pending={snapshot.pending}
             node={snapshot.node}
             onRegenerate={regenerate}
+            onCheckpoint={() => {
+              const title = snapshot.sessions.find((entry) => entry.id === activeSession)?.title ?? "chat";
+              client.checkpoint(title);
+            }}
           />
         ) : settingsPage === "menu" ? (
           <section className="panel settings">
@@ -569,6 +595,7 @@ export default function App(): ReactElement {
           disabled={disabled}
           placeholder={placeholder}
           onSend={send}
+          prefill={shared}
           onPickFile={() => setView("chat")}
           client={client}
         />

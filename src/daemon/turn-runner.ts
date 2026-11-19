@@ -15,6 +15,8 @@ export interface TurnRunnerOptions {
   readonly store: EventStore;
   readonly chain: string;
   readonly node: string;
+  /** An image attached to this turn, base64; rides on the live message only. */
+  readonly image?: { readonly mime: string; readonly data: string };
   readonly provider: { baseUrl: string; apiKey: string; model: string };
   readonly cwd: string;
   readonly systemPrompt: string;
@@ -165,7 +167,7 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
       },
     });
 
-    await agent.send(userText);
+    await agent.send(userText, options.image);
     if (answer.trim()) append({ type: "assistant", data: { text: answer } });
     else if (!failed) append({ type: "error", data: { message: "the turn ended without an answer" } });
   } catch (err) {

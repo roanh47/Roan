@@ -103,7 +103,12 @@ function mapMessages(messages: ChatMessage[]): {
   const out: OutgoingMessage[] = [];
 
   for (const msg of messages) {
-    const text = msg.content ?? "";
+    // Images ride the OpenAI-compatible path; here a picture becomes its
+    // text and a placeholder, so the conversation stays coherent.
+    const text =
+      typeof msg.content === "string"
+        ? msg.content
+        : (msg.content ?? []).map((part) => (part.type === "text" ? part.text : "[afbeelding]")).join("\n");
 
     if (msg.role === "system") {
       if (text !== "") systemParts.push(text);

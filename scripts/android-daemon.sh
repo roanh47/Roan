@@ -247,6 +247,22 @@ if "RoanService" not in text:
     )
 manifest.write_text(text)
 
+# --- manifest: the Android share sheet can point at Roan ---
+# ACTION_SEND for plain text; the activity parks the text in a one-slot
+# inbox that the daemon hands over to the app on the next breath.
+text = manifest.read_text()
+if "android.intent.action.SEND" not in text:
+    text = text.replace(
+        "</activity>",
+        "            <intent-filter>\n"
+        "                <action android:name=\"android.intent.action.SEND\" />\n"
+        "                <category android:name=\"android.intent.category.DEFAULT\" />\n"
+        "                <data android:mimeType=\"text/plain\" />\n"
+        "            </intent-filter>\n"
+        "        </activity>",
+    )
+    manifest.write_text(text)
+
 # --- theme: dark system bars with light icons ---
 # The app is dark everywhere; Android's default day theme paints dark status
 # bar icons that vanish on the near-black header. Tauri regenerates these

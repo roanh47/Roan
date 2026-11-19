@@ -17,7 +17,7 @@ import type {
   Usage,
 } from "./adapter.js";
 import { ProviderError } from "./adapter.js";
-import type { ChatMessage, ToolCall } from "../types.js";
+import type { ChatMessage, ContentPart, ToolCall } from "../types.js";
 
 /* ------------------------------------------------------------------ */
 /* Wire shapes: only the fields this adapter reads or writes.          */
@@ -111,6 +111,12 @@ interface MappedHistory {
   systemInstruction?: { parts: { text: string }[] };
 }
 
+/** Parts become their text; a picture is its placeholder, keeping the story readable. */
+function flattenContent(content: string | ContentPart[] | null): string {
+  if (typeof content === "string" || content === null) return content ?? "";
+  return content.map((part) => (part.type === "text" ? part.text : "[afbeelding]")).join("\n");
+}
+
 function toContents(messages: ChatMessage[]): MappedHistory {
   const systemTexts: string[] = [];
   const contents: GeminiContent[] = [];
@@ -120,7 +126,8 @@ function toContents(messages: ChatMessage[]): MappedHistory {
 
   for (const msg of messages) {
     if (msg.role === "system") {
-      if (msg.content !== null && msg.content !== "") systemTexts.push(msg.content);
+      const flat = flattenContent(msg.content);
+      if (flat !== "") systemTexts.push(flat);
       lastWasToolResult = false;
       continue;
     }
@@ -145,13 +152,14 @@ function toContents(messages: ChatMessage[]): MappedHistory {
     lastWasToolResult = false;
 
     if (msg.role === "user") {
-      contents.push({ role: "user", parts: [{ text: msg.content ?? "" }] });
+      contents.push({ role: "user", parts: [{ text: flattenContent(msg.content) }] });
       continue;
     }
 
     // assistant
     const parts: GeminiPart[] = [];
-    if (msg.content !== null && msg.content !== "") parts.push({ text: msg.content });
+    const assistantText = flattenContent(msg.content);
+    if (assistantText !== "") parts.push({ text: assistantText });
     for (const call of msg.tool_calls ?? []) {
       parts.push({
         functionCall: {
