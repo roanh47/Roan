@@ -60,6 +60,10 @@ const EVENT_TYPES = {
   workspace: true,
   node: true,
   env: true,
+  mcp_server: true,
+  tool_rule: true,
+  tool_approval: true,
+  approval_request: true,
 } as const satisfies { readonly [K in EventType]: true };
 
 const FRAME_TYPES = {

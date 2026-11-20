@@ -13,6 +13,10 @@ interface TranscriptProps {
   onRegenerate?: (seq: number) => void;
   /** Mark this answer as a point to come back to. */
   onCheckpoint?: () => void;
+  /** Answer a tool asking for permission; an allow is learned in the chain. */
+  onApprove?: (req: string, allow: boolean) => void;
+  /** Tap your own words to send them again, changed. */
+  onEditMessage?: (text: string) => void;
 }
 
 /**
@@ -39,6 +43,7 @@ type Row =
   | ToolRow
   | { kind: "steps"; key: string; tools: ToolRow[] }
   | { kind: "notice"; key: string; text: string }
+  | { kind: "approval"; key: string; req: string; tool: string; resolved: "allow" | "deny" | null }
   | { kind: "meta"; key: string; text: string };
 
 interface OpenTool {
@@ -220,6 +225,26 @@ export function buildRows(events: readonly ChainEvent[], local: string): Row[] {
         rows.push({ kind: "meta", key: event.id, text: "new chat" });
         break;
       }
+      case "approval_request": {
+        const data = event.data as { req?: unknown; tool?: unknown } | null | undefined;
+        const req = typeof data?.req === "string" ? data.req : event.id;
+        const tool = typeof data?.tool === "string" ? data.tool : "een tool";
+        rows.push({ kind: "approval", key: event.id, req, tool, resolved: null });
+        break;
+      }
+      case "tool_approval": {
+        // The answer to a request: allow learns, deny answers this call,
+        // reset only touches the fold — none of them needs a row.
+        const data = event.data as { tool?: unknown; decision?: unknown } | null | undefined;
+        const tool = typeof data?.tool === "string" ? data.tool : null;
+        const decision = data?.decision === "allow" ? "allow" : data?.decision === "deny" ? "deny" : null;
+        if (tool !== null && decision !== null) {
+          for (const row of rows) {
+            if (row.kind === "approval" && row.tool === tool && row.resolved === null) row.resolved = decision;
+          }
+        }
+        break;
+      }
       case "checkpoint": {
         flush();
         const label = isRecord(data) && typeof data["label"] === "string" ? data["label"] : "";
@@ -243,7 +268,15 @@ export function buildRows(events: readonly ChainEvent[], local: string): Row[] {
   return markLastAnswer(groupSteps(rows));
 }
 
-export function Transcript({ events, pending, node, onRegenerate, onCheckpoint }: TranscriptProps): ReactElement {
+export function Transcript({
+  events,
+  pending,
+  node,
+  onRegenerate,
+  onCheckpoint,
+  onApprove,
+  onEditMessage,
+}: TranscriptProps): ReactElement {
   const rows = useMemo(() => buildRows(events, node), [events, node]);
   const turn = useMemo(() => openTurn(events), [events]);
   const scroller = useRef<HTMLDivElement>(null);
@@ -279,7 +312,15 @@ export function Transcript({ events, pending, node, onRegenerate, onCheckpoint }
         ) : null}
 
         {rows.map((row) => (
-          <RowView key={row.key} row={row} turn={turn} onRegenerate={onRegenerate} onCheckpoint={onCheckpoint} />
+          <RowView
+            key={row.key}
+            row={row}
+            turn={turn}
+            onRegenerate={onRegenerate}
+            onCheckpoint={onCheckpoint}
+            onApprove={onApprove}
+            onEditMessage={onEditMessage}
+          />
         ))}
 
         {pending.map((item) => (
@@ -297,20 +338,51 @@ function RowView({
   turn,
   onRegenerate,
   onCheckpoint,
+  onApprove,
+  onEditMessage,
 }: {
   row: Row;
   turn: ReturnType<typeof openTurn>;
   onRegenerate?: (seq: number) => void;
   onCheckpoint?: () => void;
+  onApprove?: (req: string, allow: boolean) => void;
+  onEditMessage?: (text: string) => void;
 }): ReactElement {
   switch (row.kind) {
     case "user":
       return (
-        <div className="bubble bubble--out">
+        <div
+          className="bubble bubble--out"
+          role={onEditMessage !== undefined ? "button" : undefined}
+          title={onEditMessage !== undefined ? "Tap to send this again, changed" : undefined}
+          onClick={onEditMessage !== undefined ? () => onEditMessage(row.text) : undefined}
+        >
           {row.image !== undefined ? (
             <img className="bubble__photo" src={`data:${row.image.mime};base64,${row.image.data}`} alt="" />
           ) : null}
           {row.text}
+        </div>
+      );
+    case "approval":
+      return (
+        <div className="approval" data-resolved={row.resolved ?? "open"}>
+          <span className="approval__text">
+            {row.resolved === null
+              ? `Roan asks to use ${row.tool}`
+              : row.resolved === "allow"
+                ? `${row.tool} — approved`
+                : `${row.tool} — denied`}
+          </span>
+          {row.resolved === null && onApprove !== undefined ? (
+            <span className="approval__buttons">
+              <button type="button" onClick={() => onApprove(row.req, true)}>
+                Approve
+              </button>
+              <button type="button" className="approval__deny" onClick={() => onApprove(row.req, false)}>
+                Deny
+              </button>
+            </span>
+          ) : null}
         </div>
       );
     case "assistant":

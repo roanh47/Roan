@@ -29,15 +29,18 @@ import { dirname, join, resolve } from "node:path";
 import { createRunOnNodeTool, serveDelegation, type RelayOptions } from "./relay.js";
 import { readSessions } from "../chain/sessions.js";
 import { exportChain } from "../chain/export.js";
-import { sessionMarkdown } from "../chain/export-markdown.js";
+import { sessionAttachments, sessionMarkdown } from "../chain/export-markdown.js";
 import { diffWorkspace, hashContent, scanWorkspace, type FileEntry } from "../workspace/scan.js";
 import { applyWorkspaceEvent } from "../workspace/sync.js";
 import { randomUUID as uuid } from "node:crypto";
 import { existsSync } from "node:fs";
-import { copyFile, mkdir, readFile as readFileAsync, rm, writeFile as writeFileAsync } from "node:fs/promises";
+import { copyFile, cp, mkdir, readFile as readFileAsync, rm, writeFile as writeFileAsync } from "node:fs/promises";
 import { runHooks, type HookConfig } from "../hooks/run.js";
 import { dueJobs, loadCron } from "../cron/jobs.js";
 import { engineAvailable, runHermesTurn } from "../engine/hermes.js";
+import { McpRuntime } from "./mcp-runtime.js";
+import { approvedToolsFromEvents, mcpServersFromEvents, toolRulesFromEvents } from "../chain/gates.js";
+import type { Tool } from "../types.js";
 import { catalogSource, loadCatalog } from "../providers/live.js";
 import { presetsFromCatalog, fetchModels, loadProviders, saveProviders, upsertAccount, type ProviderAccount } from "./providers.js";
 import { saveSettings } from "./settings-write.js";
@@ -129,6 +132,9 @@ async function main(): Promise<void> {
   const memory = new MemoryStore(paths.home);
   const skills = new SkillLibrary(join(paths.home, "skills"));
   const tools = [...builtinTools, ...contextTools(memory, skills)];
+  // MCP servers are chain config: this node dials them, every instance folds
+  // the same list. Unreachable servers are skipped, never fatal.
+  const mcp = new McpRuntime((line) => log(line));
   const agentContext: AgentContext = {
     memory,
     skills,
@@ -510,14 +516,78 @@ async function main(): Promise<void> {
   };
 
   /**
-   * The tools for one turn. `run_on_node` is bound to the live session, so it
-   * is added per turn instead of once at boot.
+   * Permission a tool asks for before it runs. The request becomes a chain
+   * event — the app shows it with Approve/Deny — and the answer arrives as a
+   * `tool_approve` frame. An allow is learned (the next call does not ask), a
+   * deny answers this call only, a timeout refuses honestly.
    */
-  const toolsForTurn = (): readonly import("../types.js").Tool[] => {
+  const APPROVAL_TIMEOUT_MS = 180_000;
+  const pendingApprovals = new Map<
+    string,
+    { tool: string; resolve: (decision: "allow" | "deny" | "timeout") => void }
+  >();
+  const askPermission = (tool: string, args: Record<string, unknown>): Promise<"allow" | "deny" | "timeout"> => {
+    if (session === null) return Promise.resolve("deny");
+    const current = session;
+    const req = uuid();
+    const request = current.store.append(current.identity.chainId, {
+      id: uuid(),
+      node: current.identity.nodeId,
+      type: "approval_request",
+      data: { req, tool, args },
+    });
+    control?.broadcast({ t: "append", event: request });
+    return new Promise((resolve) => {
+      pendingApprovals.set(req, { tool, resolve });
+      setTimeout(() => {
+        if (pendingApprovals.delete(req)) resolve("timeout");
+      }, APPROVAL_TIMEOUT_MS);
+    });
+  };
+  const withApproval = (tool: Tool): Tool => ({
+    ...tool,
+    async run(args, ctx) {
+      const decision = await askPermission(tool.name, args);
+      if (decision === "allow") return await tool.run(args, ctx);
+      if (decision === "timeout") throw new Error("geen goedkeuring gekomen binnen de tijd");
+      throw new Error("de gebruiker weigerde deze tool-aanroep");
+    },
+  });
+  const answerApproval = (req: string, allow: boolean): string | null => {
+    const pending = pendingApprovals.get(req);
+    if (pending === undefined) return null;
+    pendingApprovals.delete(req);
+    pending.resolve(allow ? "allow" : "deny");
+    return pending.tool;
+  };
+
+  /**
+   * The tools for one turn. The chain decides what exists: rules turn tools
+   * off, ask-flags gate them behind an approval, MCP servers add theirs. A
+   * config that arrived from a peer dials here, at the next look.
+   */
+  const toolsForTurn = (): readonly Tool[] => {
+    let rules = new Map<string, { enabled: boolean; ask: boolean }>();
+    let approved = new Set<string>();
+    let fleet: readonly Tool[] = [];
+    if (session !== null) {
+      const current = session;
+      const events = current.store.read(current.identity.chainId, 1, 100_000);
+      const servers = mcpServersFromEvents(events);
+      if (!mcp.matches(servers)) void mcp.sync(servers);
+      rules = toolRulesFromEvents(events);
+      approved = approvedToolsFromEvents(events);
+      fleet = mcp.tools();
+    }
+    const visible = [...tools, ...fleet].filter((tool) => rules.get(tool.name)?.enabled !== false);
+    const gated = visible.map((tool) => {
+      const rule = rules.get(tool.name);
+      return rule !== undefined && rule.ask && !approved.has(tool.name) ? withApproval(tool) : tool;
+    });
     const relayNow = relayOptions();
-    if (relayNow === null) return tools;
+    if (relayNow === null) return gated;
     return [
-      ...tools,
+      ...gated,
       createRunOnNodeTool(relayNow, () => {
         if (session === null) return [];
         const current = session;
@@ -927,6 +997,171 @@ async function main(): Promise<void> {
           });
           return;
         }
+        if (kind === "tools_state") {
+          // The per-tool screen: everything the model could reach, what the
+          // chain says about it, and which MCP servers are live right now.
+          const current = session;
+          const events = current === null ? [] : current.store.read(current.identity.chainId, 1, 100_000);
+          const rules = toolRulesFromEvents(events);
+          const approvedList = [...approvedToolsFromEvents(events)];
+          const names = [...tools.map((tool) => tool.name), ...mcp.tools().map((tool) => tool.name)];
+          const configured = mcpServersFromEvents(events);
+          const live = new Set(mcp.serverLabels().map((entry) => entry.id));
+          const liveTools = new Map(mcp.serverLabels().flatMap((entry) => entry.tools.map((name) => [name, entry.label] as const)));
+          reply({
+            ok: true,
+            tools: [...new Set(names)].map((name) => {
+              const rule = rules.get(name) ?? { enabled: true, ask: false };
+              return {
+                name,
+                source: liveTools.get(name) !== undefined ? `mcp: ${String(liveTools.get(name))}` : "built-in",
+                enabled: rule.enabled,
+                ask: rule.ask,
+                approved: approvedList.includes(name),
+              };
+            }),
+            servers: configured.map((server) => ({
+              id: server.id,
+              label: server.label,
+              transport: server.transport,
+              ...(server.url !== undefined ? { url: server.url } : {}),
+              ...(server.command !== undefined ? { command: server.command } : {}),
+              enabled: server.enabled,
+              live: live.has(server.id) && server.enabled,
+            })),
+          });
+          return;
+        }
+        if (kind === "mcp_save") {
+          // An MCP server is chain config: the event travels, every instance
+          // folds the same fleet. The id is the app's address for it.
+          const current = session;
+          if (current === null) {
+            reply({ ok: false, error: "no chain to configure MCP servers on yet" });
+            return;
+          }
+          const id = typeof data["id"] === "string" && data["id"].trim().length > 0 ? data["id"].trim() : null;
+          const label = typeof data["label"] === "string" && data["label"].trim().length > 0 ? data["label"].trim() : id;
+          const transport = data["transport"] === "stdio" ? "stdio" : "http";
+          const url = typeof data["url"] === "string" && data["url"].length > 0 ? data["url"] : undefined;
+          const command = typeof data["command"] === "string" && data["command"].length > 0 ? data["command"] : undefined;
+          if (id === null || (transport === "http" && url === undefined) || (transport === "stdio" && command === undefined)) {
+            reply({ ok: false, error: "an id and an url or command are required" });
+            return;
+          }
+          const event = current.store.append(current.identity.chainId, {
+            id: uuid(),
+            node: current.identity.nodeId,
+            type: "mcp_server",
+            data: {
+              id,
+              label,
+              transport,
+              ...(url !== undefined ? { url } : {}),
+              ...(command !== undefined ? { command } : {}),
+              enabled: data["enabled"] !== false,
+            },
+          });
+          control?.broadcast({ t: "append", event });
+          void mcp.sync(mcpServersFromEvents(current.store.read(current.identity.chainId, 1, 100_000)));
+          reply({ ok: true, id });
+          return;
+        }
+        if (kind === "mcp_delete") {
+          const current = session;
+          if (current === null) {
+            reply({ ok: false, error: "no chain to configure MCP servers on yet" });
+            return;
+          }
+          const id = typeof data["id"] === "string" && data["id"].trim().length > 0 ? data["id"].trim() : null;
+          if (id === null) {
+            reply({ ok: false, error: "an id is required" });
+            return;
+          }
+          const event = current.store.append(current.identity.chainId, {
+            id: uuid(),
+            node: current.identity.nodeId,
+            type: "mcp_server",
+            data: { id, removed: true },
+          });
+          control?.broadcast({ t: "append", event });
+          void mcp.sync(mcpServersFromEvents(current.store.read(current.identity.chainId, 1, 100_000)));
+          reply({ ok: true, id });
+          return;
+        }
+        if (kind === "tool_rule") {
+          const current = session;
+          if (current === null) {
+            reply({ ok: false, error: "no chain for tool rules yet" });
+            return;
+          }
+          const tool = typeof data["tool"] === "string" && data["tool"].trim().length > 0 ? data["tool"].trim() : null;
+          if (tool === null) {
+            reply({ ok: false, error: "a tool name is required" });
+            return;
+          }
+          const event = current.store.append(current.identity.chainId, {
+            id: uuid(),
+            node: current.identity.nodeId,
+            type: "tool_rule",
+            data: {
+              tool,
+              ...(typeof data["enabled"] === "boolean" ? { enabled: data["enabled"] } : {}),
+              ...(typeof data["ask"] === "boolean" ? { ask: data["ask"] } : {}),
+            },
+          });
+          control?.broadcast({ t: "append", event });
+          reply({ ok: true, tool });
+          return;
+        }
+        if (kind === "tool_approve") {
+          // The answer to an approval_request: allow learns for next time,
+          // deny answers this call only.
+          const req = typeof data["req"] === "string" && data["req"].length > 0 ? data["req"] : null;
+          if (req === null) {
+            reply({ ok: false, error: "a req is required" });
+            return;
+          }
+          const allow = data["allow"] !== false;
+          const tool = answerApproval(req, allow);
+          if (tool === null) {
+            reply({ ok: false, error: "no pending approval for that req" });
+            return;
+          }
+          if (allow && session !== null) {
+            const current = session;
+            const event = current.store.append(current.identity.chainId, {
+              id: uuid(),
+              node: current.identity.nodeId,
+              type: "tool_approval",
+              data: { tool, decision: "allow" },
+            });
+            control?.broadcast({ t: "append", event });
+          }
+          reply({ ok: true, tool, learned: allow });
+          return;
+        }
+        if (kind === "tool_approval_reset") {
+          const current = session;
+          if (current === null) {
+            reply({ ok: false, error: "no chain for approvals yet" });
+            return;
+          }
+          const tool = typeof data["tool"] === "string" && data["tool"].trim().length > 0 ? data["tool"].trim() : null;
+          if (tool === null) {
+            reply({ ok: false, error: "a tool name is required" });
+            return;
+          }
+          const event = current.store.append(current.identity.chainId, {
+            id: uuid(),
+            node: current.identity.nodeId,
+            type: "tool_approval",
+            data: { tool, decision: "reset" },
+          });
+          control?.broadcast({ t: "append", event });
+          reply({ ok: true, tool });
+          return;
+        }
         if (kind === "provider_save") {
           // A preset, or anything with a URL. Several customs can exist at once;
           // the id is what the rest of the app addresses.
@@ -1006,10 +1241,32 @@ async function main(): Promise<void> {
             return;
           }
           const markdown = sessionMarkdown(allEvents, what);
-          const path = join(exports, `conversation-${stamp}.md`);
-          await writeFileAsync(path, markdown, "utf8");
+          const attachments = sessionAttachments(allEvents, what);
           const window = join(dirname(paths.home), "downloads");
           let shared: string | null = null;
+          if (attachments.length > 0) {
+            // A conversation with photos becomes a folder: the story in
+            // conversation.md, the photos beside it in attachments/.
+            const folder = join(exports, `conversation-${stamp}`);
+            await mkdir(join(folder, "attachments"), { recursive: true });
+            const path = join(folder, "conversation.md");
+            await writeFileAsync(path, markdown, "utf8");
+            for (const file of attachments) {
+              await writeFileAsync(join(folder, "attachments", file.file), Buffer.from(file.data, "base64"));
+            }
+            if (existsSync(window)) {
+              try {
+                shared = join(window, `roan-conversation-${stamp}`);
+                await cp(folder, shared, { recursive: true });
+              } catch {
+                shared = null;
+              }
+            }
+            reply({ ok: true, path, shared, count: attachments.length });
+            return;
+          }
+          const path = join(exports, `conversation-${stamp}.md`);
+          await writeFileAsync(path, markdown, "utf8");
           if (existsSync(window)) {
             try {
               shared = join(window, `roan-conversation-${stamp}.md`);

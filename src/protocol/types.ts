@@ -33,7 +33,15 @@ export type EventType =
   /** One file in the shared workspace, as content rather than as a reference. */
   | "workspace"
   /** A machine in this chain: its id, its name and the address peers dial. */
-  | "node";
+  | "node"
+  /** An MCP server this chain knows: its shape and whether it is on. */
+  | "mcp_server"
+  /** Per-tool policy: whether a tool exists and whether it must ask first. */
+  | "tool_rule"
+  /** A permission decision: allow (learned), deny, or reset (forget). */
+  | "tool_approval"
+  /** The agent asking the owner to let one tool call through. */
+  | "approval_request";
 
 /**
  * One entry in the append-only chain.

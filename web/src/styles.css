@@ -1000,6 +1000,119 @@ pre {
   margin-bottom: 6px;
 }
 
+.approval {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 6px 0;
+  background: color-mix(in oklab, var(--surface-2) 70%, transparent);
+}
+
+.approval__buttons {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.approval__buttons button,
+.toolrow__approved button,
+.toolrow__remove {
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--fg);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 13px;
+}
+
+.approval__deny {
+  border-color: #b35c5c !important;
+  color: #e08e8e !important;
+}
+
+.approval[data-resolved="allow"] .approval__text::after {
+  content: " ✓";
+  color: #7cc48a;
+}
+
+.approval[data-resolved="deny"] .approval__text::after {
+  content: " ✗";
+  color: #e08e8e;
+}
+
+.bubble--out[role="button"] {
+  cursor: pointer;
+}
+
+.toolrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px 12px;
+  margin: 4px 0;
+}
+
+.toolrow__name {
+  font-weight: 600;
+}
+
+.toolrow__source {
+  color: var(--fg-dim);
+  font-size: 12px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.toolrow__toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--fg-dim);
+}
+
+.toolrow__approved {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #7cc48a;
+  font-size: 13px;
+}
+
+.panel__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.panel__form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--fg-dim);
+  flex: 1 1 180px;
+}
+
+.panel__form input {
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--fg);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
 .rail__exportnote {
   margin: 4px 4px 8px;
   padding: 8px 10px;

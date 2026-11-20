@@ -8,6 +8,7 @@ import { WorkspacePanel } from "./panels/WorkspacePanel.js";
 import { SchedulesPanel } from "./panels/SchedulesPanel.js";
 import { ProvidersPanel } from "./panels/ProvidersPanel.js";
 import { CapabilitiesPanel } from "./panels/CapabilitiesPanel.js";
+import { ToolsPanel } from "./panels/ToolsPanel.js";
 import { CheckpointsPanel } from "./panels/CheckpointsPanel.js";
 import { Transcript } from "./components/Transcript.js";
 import { ModelSheet } from "./components/ModelSheet.js";
@@ -72,6 +73,7 @@ type SettingsPage =
   | "workspace"
   | "schedules"
   | "checkpoints"
+  | "tools"
   | "devices"
   | "storage"
   | "about";
@@ -79,6 +81,7 @@ type SettingsPage =
 const SETTINGS_ROWS: readonly [SettingsPage, string, string][] = [
   ["providers", "Models & keys", "providers and API keys"],
   ["agent", "Agent", "tools, skills and MCP servers"],
+  ["tools", "Tools & rules", "on or off, ask first, MCP servers"],
   ["workspace", "Workspace", "files shared across devices"],
   ["schedules", "Schedules", "tasks that run later"],
   ["checkpoints", "Checkpoints", "named points to rewind to"],
@@ -400,6 +403,14 @@ export default function App(): ReactElement {
               const title = snapshot.sessions.find((entry) => entry.id === activeSession)?.title ?? "chat";
               client.checkpoint(title);
             }}
+            onApprove={(req, allow) => {
+              void client
+                .request("tool_approve", { req, allow })
+                .catch(() => {
+                  /* the banner keeps its buttons; the next refresh tells the truth */
+                });
+            }}
+            onEditMessage={(text) => setShared({ text, at: Date.now() })}
           />
         ) : settingsPage === "menu" ? (
           <section className="panel settings">
@@ -426,6 +437,8 @@ export default function App(): ReactElement {
           />
         ) : settingsPage === "agent" ? (
           <CapabilitiesPanel client={client} />
+        ) : settingsPage === "tools" ? (
+          <ToolsPanel client={client} />
         ) : settingsPage === "workspace" ? (
           <WorkspacePanel client={client} />
         ) : settingsPage === "schedules" ? (

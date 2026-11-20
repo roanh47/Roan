@@ -36,7 +36,11 @@ export type EventType =
   | "session_title"
   | "checkpoint"
   | "workspace"
-  | "node";
+  | "node"
+  | "mcp_server"
+  | "tool_rule"
+  | "tool_approval"
+  | "approval_request";
 
 export interface Event {
   v: 1;
@@ -89,6 +93,10 @@ const EVENT_TYPES: ReadonlySet<string> = new Set<EventType>([
   "checkpoint",
   "workspace",
   "node",
+  "mcp_server",
+  "tool_rule",
+  "tool_approval",
+  "approval_request",
 ]);
 
 const DEFAULT_LIMIT = 1000;
