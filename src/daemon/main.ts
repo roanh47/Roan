@@ -1032,7 +1032,7 @@ async function main(): Promise<void> {
           });
           return;
         }
-        if (kind === "mcp_save") {
+        if (kind === "mcp_server_save") {
           // An MCP server is chain config: the event travels, every instance
           // folds the same fleet. The id is the app's address for it.
           const current = session;
@@ -1067,7 +1067,7 @@ async function main(): Promise<void> {
           reply({ ok: true, id });
           return;
         }
-        if (kind === "mcp_delete") {
+        if (kind === "mcp_server_delete") {
           const current = session;
           if (current === null) {
             reply({ ok: false, error: "no chain to configure MCP servers on yet" });

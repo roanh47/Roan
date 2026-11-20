@@ -74,7 +74,7 @@ export function ToolsPanel({ client }: ToolsPanelProps): ReactElement {
       return;
     }
     void client
-      .request("mcp_save", { id, label: label.trim(), transport: "http", url: url.trim(), enabled: true })
+      .request("mcp_server_save", { id, label: label.trim(), transport: "http", url: url.trim(), enabled: true })
       .then(() => {
         setLabel("");
         setUrl("");
@@ -86,7 +86,7 @@ export function ToolsPanel({ client }: ToolsPanelProps): ReactElement {
 
   function toggleServer(server: ServerState): void {
     void client
-      .request("mcp_save", {
+      .request("mcp_server_save", {
         id: server.id,
         label: server.label,
         transport: server.transport,
@@ -100,7 +100,7 @@ export function ToolsPanel({ client }: ToolsPanelProps): ReactElement {
 
   function removeServer(server: ServerState): void {
     void client
-      .request("mcp_delete", { id: server.id })
+      .request("mcp_server_delete", { id: server.id })
       .then(refresh)
       .catch((error: unknown) => setNote(error instanceof Error ? error.message : "the removal did not stick"));
   }
