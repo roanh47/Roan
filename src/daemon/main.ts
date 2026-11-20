@@ -27,11 +27,12 @@ import { buildSystemPrompt } from "../context/prompt.js";
 import { adoptEnv, adoptEnvEvent, latestEnv, publishEnv } from "./env-sync.js";
 import { dirname, join, resolve } from "node:path";
 import { createRunOnNodeTool, serveDelegation, type RelayOptions } from "./relay.js";
-import { readSessions } from "../chain/sessions.js";
+import { autoTitleFor, readSessions } from "../chain/sessions.js";
 import { exportChain } from "../chain/export.js";
 import { sessionAttachments, sessionMarkdown } from "../chain/export-markdown.js";
 import { diffWorkspace, hashContent, scanWorkspace, type FileEntry } from "../workspace/scan.js";
 import { applyWorkspaceEvent } from "../workspace/sync.js";
+import { blobChunks, BlobSlate, hashBuffer, parseBlobEvent } from "../workspace/blob.js";
 import { randomUUID as uuid } from "node:crypto";
 import { existsSync } from "node:fs";
 import { copyFile, cp, mkdir, readFile as readFileAsync, rm, writeFile as writeFileAsync } from "node:fs/promises";
@@ -237,8 +238,12 @@ async function main(): Promise<void> {
       const chainEvent = event as unknown as import("../protocol/types.js").Event;
       control?.broadcast({ t: "append", event: chainEvent });
       if (chainEvent.type === "session" || chainEvent.type === "session_title") control?.sendState();
+      if (event.type === "blob") {
+        blobSlate.add(chainEvent);
+        return;
+      }
       if (event.type === "workspace") {
-        void applyWorkspaceEvent(paths.syncedWorkspace, event as never)
+        void applyWorkspaceEvent(paths.syncedWorkspace, event as never, blobSlate)
           .then((outcome) => {
             if (outcome.kind === "conflict") {
               log(`workspace: conflict on ${outcome.path}, both versions kept`);
@@ -360,6 +365,9 @@ async function main(): Promise<void> {
    */
   let workspaceKnown: Map<string, FileEntry> | null = null;
   let workspaceTimer: NodeJS.Timeout | null = null;
+  /** Chunks that arrived, waiting for the put that points at them. */
+  const blobSlate = new BlobSlate();
+  let blobKnown: Map<string, FileEntry> = new Map();
 
   const publishWorkspace = async (): Promise<void> => {
     if (session === null) return;
@@ -367,11 +375,12 @@ async function main(): Promise<void> {
     const root = paths.syncedWorkspace;
     const scanned = await scanWorkspace(root);
     if (workspaceKnown === null) {
-      workspaceKnown = scanned;
+      workspaceKnown = scanned.files;
+      blobKnown = new Map(scanned.blobs);
       return;
     }
     const before = workspaceKnown;
-    const { puts, deletes } = diffWorkspace(before, scanned);
+    const { puts, deletes } = diffWorkspace(before, scanned.files);
     for (const entry of puts) {
       const content = await readFileAsync(join(root, entry.path), "utf8");
       const base = before.get(entry.path)?.hash;
@@ -391,29 +400,73 @@ async function main(): Promise<void> {
         data: { op: "delete", path, ...(gone !== undefined ? { base: gone } : {}) },
       });
     }
-    workspaceKnown = scanned;
+    // The blob channel: big or binary files travel as hashed chunks with the
+    // put pointing at them, so sharing does not stop at the text cap.
+    const { puts: blobPuts } = diffWorkspace(blobKnown, scanned.blobs);
+    for (const entry of blobPuts) {
+      const buffer = await readFileAsync(join(root, entry.path));
+      const hash = hashBuffer(buffer);
+      for (const part of blobChunks(buffer)) {
+        const chunkEvent = current.store.append(current.identity.chainId, {
+          id: uuid(),
+          node: current.identity.nodeId,
+          type: "blob",
+          data: { hash, path: entry.path, ...part },
+        });
+        control?.broadcast({ t: "append", event: chunkEvent });
+      }
+      const putEvent = current.store.append(current.identity.chainId, {
+        id: uuid(),
+        node: current.identity.nodeId,
+        type: "workspace",
+        data: { op: "put", path: entry.path, blobHash: hash, bytes: buffer.length },
+      });
+      control?.broadcast({ t: "append", event: putEvent });
+    }
+    blobKnown = new Map(scanned.blobs);
+    workspaceKnown = scanned.files;
   };
 
   /** Replays every file event in the chain onto this disk, oldest first. */
   const applyChainWorkspace = async (root: string): Promise<void> => {
     if (session === null) return;
     const events = session.store.read(session.identity.chainId, 1, 100_000);
+    const slate = new BlobSlate();
+    for (const event of events) {
+      if (event.type === "blob") slate.add(event);
+    }
     for (const event of events) {
       if (event.type !== "workspace") continue;
-      await applyWorkspaceEvent(root, event as never);
+      await applyWorkspaceEvent(root, event as never, slate);
     }
   };
 
   /** What the chain already says each file is, so a first scan does not repeat it. */
   const chainWorkspaceIndex = (): Map<string, FileEntry> => {
     const index = new Map<string, FileEntry>();
+    for (const [path, entry] of chainBlobIndex()) index.set(path, entry);
     if (session === null) return index;
     for (const event of session.store.read(session.identity.chainId, 1, 100_000)) {
       if (event.type !== "workspace") continue;
-      const data = event.data as { op?: unknown; path?: unknown; hash?: unknown };
+      const data = event.data as { op?: unknown; path?: unknown; hash?: unknown; blobHash?: unknown };
       if (typeof data.path !== "string") continue;
       if (data.op === "delete") index.delete(data.path);
       else if (typeof data.hash === "string") index.set(data.path, { path: data.path, hash: data.hash, bytes: 0 });
+      else if (typeof data.blobHash === "string") index.set(data.path, { path: data.path, hash: data.blobHash, bytes: 0 });
+    }
+    return index;
+  };
+
+  /** What the chain already says each blob file is, keyed the same way. */
+  const chainBlobIndex = (): Map<string, FileEntry> => {
+    const index = new Map<string, FileEntry>();
+    if (session === null) return index;
+    for (const event of session.store.read(session.identity.chainId, 1, 100_000)) {
+      if (event.type !== "workspace") continue;
+      const data = event.data as { op?: unknown; path?: unknown; blobHash?: unknown };
+      if (typeof data.path !== "string") continue;
+      if (data.op === "delete") index.delete(data.path);
+      else if (typeof data.blobHash === "string") index.set(data.path, { path: data.path, hash: data.blobHash, bytes: 0 });
     }
     return index;
   };
@@ -421,6 +474,7 @@ async function main(): Promise<void> {
   const startWorkspaceLoop = async (): Promise<void> => {
     if (session === null) return;
     if (workspaceKnown === null) workspaceKnown = chainWorkspaceIndex();
+    if (blobKnown.size === 0) blobKnown = chainBlobIndex();
     await publishWorkspace().catch((error: unknown) => log("workspace: " + String(error)));
     if (workspaceTimer !== null) return;
     workspaceTimer = setInterval(() => {
@@ -671,6 +725,23 @@ async function main(): Promise<void> {
       data: { text, session: sessionId, ...(image !== undefined ? { image } : {}) },
     });
     control?.broadcast({ t: "append", event: stored });
+    // The first turn names the conversation after what was asked: a default
+    // title is a placeholder, and the rename rides the chain like any other.
+    const indexAfter = readSessions(current.store.read(current.identity.chainId, 1, 100_000));
+    const infoAfter = indexAfter.sessions.find((entry) => entry.id === sessionId);
+    if (infoAfter !== undefined && infoAfter.messages <= 1) {
+      const autoTitle = autoTitleFor(infoAfter.title, text);
+      if (autoTitle !== null) {
+        const named = current.store.append(current.identity.chainId, {
+          id: uuid(),
+          node: current.identity.nodeId,
+          type: "session_title",
+          data: { session: sessionId, title: autoTitle },
+        });
+        control?.broadcast({ t: "append", event: named });
+        control?.sendState();
+      }
+    }
     const systemPrompt = await agentContext.prompt();
     const hooks = await loadHooks();
     const started = await runHooks(hooks, "turn_start", {
@@ -809,7 +880,7 @@ async function main(): Promise<void> {
         if (kind === "workspace_list") {
           const scanned = await scanWorkspace(paths.syncedWorkspace);
           reply({
-            files: [...scanned.values()]
+            files: [...scanned.files.values(), ...scanned.blobs.values()]
               .map((entry) => ({ path: entry.path, bytes: entry.bytes, hash: entry.hash }))
               .sort((a, b) => a.path.localeCompare(b.path)),
           });

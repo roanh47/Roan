@@ -33,6 +33,19 @@ function str(value: unknown): string | null {
 }
 
 /** Every session in the chain, oldest first, with a count of what is in it. */
+/**
+ * The name a conversation should carry after its first message: the question
+ * itself, unless the owner already named it something real. A default title
+ * ("New chat", "Conversation N") is a placeholder, not a name — the first
+ * turn fixes it, and the rename travels as an event like any other.
+ */
+export function autoTitleFor(title: string, firstText: string): string | null {
+  const trimmed = firstText.trim().slice(0, 60);
+  if (trimmed.length === 0) return null;
+  if (title === "New chat" || /^Conversation \d+$/.test(title)) return trimmed;
+  return null;
+}
+
 export function readSessions(events: readonly Event[]): SessionIndex {
   const order: string[] = [];
   const byId = new Map<string, { info: SessionInfo; messages: number; lastSeq: number }>();

@@ -165,7 +165,7 @@ describe("replicatie", () => {
     session.close();
   });
 
-  it("gelijke seq maar andere id is een hard conflict, geen keuze", () => {
+  it("gelijke seq maar andere id wordt een tak: beide events blijven", () => {
     const local = createMemoryStore({ chain: "gesprek", nodeId: "a" });
     seed(local, 3, "a");
     const transport = new FakeTransport("peer");
@@ -178,12 +178,12 @@ describe("replicatie", () => {
     });
     session.start();
 
-    const voor = local.all().map((e) => e.id);
     transport.deliver({ t: "hello", v: 1, chain: "gesprek", node: "b", haveSeq: 3 });
     // Peer stuurt zijn eigen seq 3 met een andere id.
     transport.deliver({ t: "append", event: event(3, "b", "b-3-ander") });
 
-    assert.equal(session.status, "conflicted");
+    // De link blijft leven en de rapportering blijft zichtbaar.
+    assert.equal(session.status, "live");
     assert.equal(reports.length, 1);
     assert.deepEqual(reports[0], {
       kind: "seq-id-mismatch",
@@ -194,18 +194,16 @@ describe("replicatie", () => {
       localId: "a-3",
       remoteId: "b-3-ander",
     });
-    // Niets overschreven en niets bijgekomen.
-    assert.deepEqual(
-      local.all().map((e) => e.id),
-      voor,
-    );
+    // Onze tak staat nog steeds op zijn plek; de hunne rebaset erachter.
     assert.equal(local.idAt(3), "a-3");
-    assert.equal(transport.closedWith, "conflict");
+    assert.equal(local.head(), 4);
+    assert.equal(local.idAt(4), "b-3-ander");
+    assert.notEqual(transport.closedWith, "conflict");
 
     session.close();
   });
 
-  it("conflict in een events-batch stopt de batch meteen", () => {
+  it("een tak in een events-batch loopt door: de rest rebaset erachteraan", () => {
     const local = createMemoryStore({ chain: "gesprek", nodeId: "a" });
     seed(local, 2, "a");
     const transport = new FakeTransport("peer");
@@ -217,9 +215,61 @@ describe("replicatie", () => {
       events: [event(2, "b", "b-2-ander"), event(3, "b")],
     });
 
-    assert.equal(session.status, "conflicted");
-    assert.equal(local.head(), 2);
+    assert.equal(session.status, "live");
+    assert.equal(local.head(), 4);
+    assert.equal(local.idAt(3), "b-2-ander");
+    assert.equal(local.idAt(4), "b-3");
     session.close();
+  });
+
+  it("twee schrijvers op dezelfde seq: beide kanten houden beide takken", () => {
+    // Het spiegelcontract: elke kant houdt z'n eigen tak op z'n plek en
+    // rebaset de andere erachter. Beide events bestaan daarna overal.
+    const left = createMemoryStore({ chain: "gesprek", nodeId: "a" });
+    const right = createMemoryStore({ chain: "gesprek", nodeId: "b" });
+    seed(left, 3, "a");
+    right.append(event(1, "a", "a-1"));
+    right.append(event(2, "a", "a-2"));
+    right.append(event(3, "a", "a-3"));
+    // Beide schrijven seq 4 tegelijk, met een eigen id.
+    left.append(event(4, "a", "links-4"));
+    right.append(event(4, "b", "rechts-4"));
+
+    const leftTransport = new FakeTransport("rechts");
+    const rightTransport = new FakeTransport("links");
+    const leftSession = new ReplicationSession({
+      store: left,
+      transport: leftTransport,
+      logger: quietLogger,
+    });
+    const rightSession = new ReplicationSession({
+      store: right,
+      transport: rightTransport,
+      logger: quietLogger,
+    });
+    leftSession.start();
+    rightSession.start();
+
+    // Verbind ze: elkaars hello en dan de eigen divergentie.
+    rightTransport.deliver({ t: "hello", v: 1, chain: "gesprek", node: "a", haveSeq: 4 });
+    leftTransport.deliver({ t: "hello", v: 1, chain: "gesprek", node: "b", haveSeq: 4 });
+    leftTransport.deliver({ t: "append", event: event(4, "b", "rechts-4") });
+    rightTransport.deliver({ t: "append", event: event(4, "a", "links-4") });
+
+    assert.equal(leftSession.status, "live");
+    assert.equal(rightSession.status, "live");
+    // Links: eigen tak eerst, dan de hunne.
+    assert.equal(left.idAt(4), "links-4");
+    assert.equal(left.idAt(5), "rechts-4");
+    // Rechts: gespiegeld.
+    assert.equal(right.idAt(4), "rechts-4");
+    assert.equal(right.idAt(5), "links-4");
+    // En geen van beide is iets kwijt.
+    assert.equal(left.head(), 5);
+    assert.equal(right.head(), 5);
+
+    leftSession.close();
+    rightSession.close();
   });
 
   it("dubbele ids worden genegeerd", () => {

@@ -64,6 +64,7 @@ const EVENT_TYPES = {
   tool_rule: true,
   tool_approval: true,
   approval_request: true,
+  blob: true,
 } as const satisfies { readonly [K in EventType]: true };
 
 const FRAME_TYPES = {

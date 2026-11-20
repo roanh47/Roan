@@ -138,6 +138,14 @@ export class ReplicationSession {
   private readonly remoteIds = new Set<string>();
   private readonly requested = new Set<string>();
   private readonly conflictList: ConflictReport[] = [];
+  /**
+   * True once this peer's seq space diverged from ours: two writers picked
+   * the same seq. From then on this peer's seq numbers are ordering hints
+   * inside its own stream, not positions in our chain — every unknown
+   * incoming event is rebased onto our head. Both sides do the same, so
+   * both branches survive everywhere instead of the link freezing.
+   */
+  private mergeMode = false;
   private readonly unsubscribe: () => void;
   private closed = false;
 
@@ -283,6 +291,10 @@ export class ReplicationSession {
       return true;
     }
 
+    // Merge mode: the peer's stream rebase onto our head, in arrival order.
+    // Their ids keep them deduped; their events become our tail.
+    if (this.mergeMode) return this.rebaseRemote(event);
+
     const head = this.opts.store.head();
     if (event.seq > head + 1) {
       if (event.seq > head + MAX_PENDING) {
@@ -312,10 +324,30 @@ export class ReplicationSession {
       return false;
     }
     if (existingId !== event.id) {
-      this.reportConflict(event.seq, existingId, event.id, event.node);
-      return false;
+      // Two writers picked the same seq. Nobody's history gets deleted:
+      // we keep ours where it is and rebase this peer's branch after it.
+      this.reportDivergence(event.seq, existingId, event.id, event.node);
+      return this.rebaseRemote(event);
     }
     this.opts.logger.debug("event was al aanwezig", { id: event.id, seq: event.seq });
+    return true;
+  }
+
+  /** One incoming event onto the local tail, whatever seq it arrived with. */
+  private rebaseRemote(event: Event): boolean {
+    if (this.opts.store.has(event.id)) {
+      this.opts.logger.debug("gerebased event al aanwezig", { id: event.id });
+      return true;
+    }
+    const rebased: Event = { ...event, seq: this.opts.store.head() + 1 };
+    const outcome: AppendOutcome = this.opts.store.append(rebased);
+    if (outcome.status === "appended") {
+      this.rememberRemoteId(event.id);
+      this.opts.logger.debug("tak gerebased", { id: event.id, seq: rebased.seq, vanSeq: event.seq });
+      return true;
+    }
+    if (outcome.status === "duplicate") return true;
+    this.reportDivergence(event.seq, outcome.existingId, event.id, event.node);
     return true;
   }
 
@@ -323,8 +355,11 @@ export class ReplicationSession {
     const queued = this.pending.get(event.seq);
     if (queued !== undefined) {
       if (queued.id !== event.id) {
-        // Twee verschillende events voor dezelfde seq, nog voor we konden appenden.
-        this.reportConflict(event.seq, queued.id, event.id, event.node);
+        // Twee verschillende events voor dezelfde seq, nog voor we konden
+        // appenden: ook hier overleeft de tak, in plaats van te blijven staan.
+        this.reportDivergence(event.seq, queued.id, event.id, event.node);
+        this.pending.delete(event.seq);
+        this.rebaseRemote(event);
       }
       return;
     }
@@ -348,8 +383,8 @@ export class ReplicationSession {
       this.opts.logger.debug("store noemde event dubbel", { id: event.id });
       return true;
     }
-    this.reportConflict(event.seq, outcome.existingId, event.id, event.node);
-    return false;
+    this.reportDivergence(event.seq, outcome.existingId, event.id, event.node);
+    return true;
   }
 
   private flushPending(): void {
@@ -404,6 +439,12 @@ export class ReplicationSession {
       return;
     }
 
+    if (this.mergeMode) {
+      // The peer's seq space is its own; it rebases whatever we send.
+      this.opts.transport.send({ t: "append", event });
+      return;
+    }
+
     if (event.seq !== this.lastSentSeq + 1) {
       // De peer mist geschiedenis (of we weten niet beter): stuur de reeks opnieuw
       // in plaats van een los event dat hij toch niet kan plaatsen.
@@ -422,8 +463,15 @@ export class ReplicationSession {
 
   // --- afsluiten --------------------------------------------------------
 
-  private reportConflict(seq: number, localId: string, remoteId: string, remoteNode: string): void {
-    if (this.statusValue === "conflicted") return;
+  /**
+   * A divergence, reported but never fatal: the report stays visible for
+   * whoever listens, the link stays open, and this peer's branch merges
+   * after ours. Both sides do the same, so every event survives on every
+   * node — in the other's order on the other node, which is the honest
+   * price of two writers on one append-only line.
+   */
+  private reportDivergence(seq: number, localId: string, remoteId: string, remoteNode: string): void {
+    if (!this.mergeMode) this.mergeMode = true;
     const report: ConflictReport = {
       kind: "seq-id-mismatch",
       chain: this.opts.store.chain,
@@ -433,17 +481,13 @@ export class ReplicationSession {
       localId,
       remoteId,
     };
-    this.statusValue = "conflicted";
+    if (this.conflictList.some((entry) => entry.remoteId === remoteId && entry.localId === localId)) return;
     this.conflictList.push(report);
-    this.pending.clear();
-    this.opts.logger.error(
-      `hard conflict op seq ${seq}: lokale id ${localId}, remote id ${remoteId}; geen kant gekozen`,
+    this.opts.logger.warn(
+      `tak op seq ${seq}: lokale id ${localId}, remote id ${remoteId}; de remote tak rebase achter de onze`,
       { ...report },
     );
     this.opts.onConflict?.(report);
-    this.closed = true;
-    this.unsubscribe();
-    this.opts.transport.close("conflict");
   }
 
   private fail(error: SyncError): void {

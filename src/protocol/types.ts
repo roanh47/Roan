@@ -41,7 +41,9 @@ export type EventType =
   /** A permission decision: allow (learned), deny, or reset (forget). */
   | "tool_approval"
   /** The agent asking the owner to let one tool call through. */
-  | "approval_request";
+  | "approval_request"
+  /** One base64 chunk of a file too big for a single event, under its hash. */
+  | "blob";
 
 /**
  * One entry in the append-only chain.

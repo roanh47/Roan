@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs";
 import { dirname, join } from "node:path";
 import type { Event } from "../protocol/types.js";
+import { hashBuffer, type BlobSlate } from "./blob.js";
 import { hashContent, MAX_FILE_BYTES } from "./scan.js";
 
 /**
@@ -25,6 +26,9 @@ export interface WorkspaceEventData {
   readonly hash?: string;
   /** Hash the sender believed was on disk when it edited; absent for new files. */
   readonly base?: string;
+  /** A blob channel file: the hash its chunks arrived under, no inline content. */
+  readonly blobHash?: string;
+  readonly bytes?: number;
 }
 
 export function parseWorkspaceEvent(event: Event): WorkspaceEventData | null {
@@ -39,8 +43,18 @@ export function parseWorkspaceEvent(event: Event): WorkspaceEventData | null {
   const content = typeof data["content"] === "string" ? data["content"] : undefined;
   const hash = typeof data["hash"] === "string" ? data["hash"] : undefined;
   const base = typeof data["base"] === "string" ? data["base"] : undefined;
-  if (op === "put" && (content === undefined || hash === undefined)) return null;
-  return { op, path, ...(content !== undefined ? { content } : {}), ...(hash !== undefined ? { hash } : {}), ...(base !== undefined ? { base } : {}) };
+  if (op === "put" && (content === undefined || hash === undefined) && typeof data["blobHash"] !== "string") return null;
+  const blobHash = typeof data["blobHash"] === "string" ? data["blobHash"] : undefined;
+  const bytes = typeof data["bytes"] === "number" ? data["bytes"] : undefined;
+  return {
+    op,
+    path,
+    ...(content !== undefined ? { content } : {}),
+    ...(hash !== undefined ? { hash } : {}),
+    ...(base !== undefined ? { base } : {}),
+    ...(blobHash !== undefined ? { blobHash } : {}),
+    ...(bytes !== undefined ? { bytes } : {}),
+  };
 }
 
 async function readIfThere(path: string): Promise<string | null> {
@@ -51,7 +65,20 @@ async function readIfThere(path: string): Promise<string | null> {
   }
 }
 
-export async function applyWorkspaceEvent(root: string, event: Event): Promise<ApplyOutcome> {
+/** Binary stays bytes: reading a blob target as text would silently cook it. */
+async function readBytesIfThere(path: string): Promise<Buffer | null> {
+  try {
+    return await fs.readFile(path);
+  } catch {
+    return null;
+  }
+}
+
+export async function applyWorkspaceEvent(
+  root: string,
+  event: Event,
+  blobs?: BlobSlate,
+): Promise<ApplyOutcome> {
   const data = parseWorkspaceEvent(event);
   if (data === null) return { kind: "refused", path: "", reason: "not a workspace event" };
   const target = join(root, data.path);
@@ -65,6 +92,29 @@ export async function applyWorkspaceEvent(root: string, event: Event): Promise<A
     }
     await fs.rm(target, { force: true });
     return { kind: "deleted", path: data.path };
+  }
+
+  // The blob channel: chunks arrived under a hash, the put points at them.
+  if (data.blobHash !== undefined && data.content === undefined) {
+    const whole = blobs?.get(data.blobHash) ?? null;
+    if (whole === null) {
+      return { kind: "refused", path: data.path, reason: "chunks missing" };
+    }
+    const existing = await readBytesIfThere(target);
+    if (existing !== null && hashBuffer(existing) === data.blobHash) {
+      return { kind: "same", path: data.path };
+    }
+    if (existing !== null) {
+      // Same honesty as text: nothing is overwritten away; both stay.
+      const suffix = `.conflict-${event.node}-${String(event.seq)}`;
+      const keptAs = `${data.path}${suffix}`;
+      await fs.mkdir(dirname(target), { recursive: true });
+      await fs.writeFile(join(root, keptAs), whole);
+      return { kind: "conflict", path: data.path, keptAs };
+    }
+    await fs.mkdir(dirname(target), { recursive: true });
+    await fs.writeFile(target, whole);
+    return { kind: "written", path: data.path };
   }
 
   const content = data.content ?? "";

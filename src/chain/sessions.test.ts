@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Event } from "../protocol/types.js";
+import { autoTitleFor } from "./sessions.js";
 import { readSessions, sessionMessages } from "./sessions.js";
 
 function event(seq: number, type: Event["type"], data: unknown): Event {
@@ -69,4 +70,14 @@ test("a rename for an unknown session is ignored, not fatal", () => {
   const index = readSessions(events);
   assert.equal(index.sessions.length, 2);
   assert.equal(index.sessions[0]?.title, "Eerste");
+});
+
+test("the first message names a default-titled conversation after itself", () => {
+  assert.equal(autoTitleFor("New chat", "wat doet poort 7412 eigenlijk?"), "wat doet poort 7412 eigenlijk?");
+  assert.equal(autoTitleFor("Conversation 3", "hoeveel kost een tarief van 8 uur"), "hoeveel kost een tarief van 8 uur");
+  // A real name stays: the owner named it, the first turn does not overrule.
+  assert.equal(autoTitleFor("Poortvraag", "wat doet poort 7412?"), null);
+  assert.equal(autoTitleFor("Rewind to #4", "nog een vraag"), null);
+  // No text, no rename.
+  assert.equal(autoTitleFor("New chat", "   "), null);
 });

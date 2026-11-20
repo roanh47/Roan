@@ -91,7 +91,7 @@ test("the scan skips heavy directories and hashes what is left", async () => {
     await writeFile(join(root, "node_modules", "x", "big.js"), "ignore me");
     await writeFile(join(root, "main.ts"), "console.log(1)\n");
     const files = await scanWorkspace(root);
-    assert.deepEqual([...files.keys()], ["main.ts"]);
+    assert.deepEqual([...files.files.keys()], ["main.ts"]);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

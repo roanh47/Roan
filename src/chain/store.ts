@@ -40,7 +40,8 @@ export type EventType =
   | "mcp_server"
   | "tool_rule"
   | "tool_approval"
-  | "approval_request";
+  | "approval_request"
+  | "blob";
 
 export interface Event {
   v: 1;
@@ -97,6 +98,7 @@ const EVENT_TYPES: ReadonlySet<string> = new Set<EventType>([
   "tool_rule",
   "tool_approval",
   "approval_request",
+  "blob",
 ]);
 
 const DEFAULT_LIMIT = 1000;
