@@ -57,23 +57,23 @@ GEM=Gemini.
 | Session persistence & resume | session resume (CC, CX, GC, OC, QW), threads (AMP), sessions (CRU, GOO, DSH) | DONE — the chain replays events |
 | Cross-surface session continuity | sync across devices (GPT), cross-surface sessions (OCW), shared settings across surfaces (AG) | DONE — the chain syncs every peer |
 | Fork / branch / edit-resend | session branching & forking (CC, CX, OC), tree sessions `/tree` (PI), conversation branching (OH), edit a sent message / regenerate (GPT, CLD, GEM) | DONE — round 1 proven: regenerate branches via checkpoint, append-only intact; a turn never ends in silence anymore (0.0.14) |
-| Compaction | `/compact` & autocompact (CC, GC, OC, PI, OCW), recap (CX), condenser (OH, ROO), snapcompact (OMP) | BUILD — round 2 territory, first after transcript hygiene |
-| Session search | session search (OCW), chat search (CLD, GEM), history search (GPT) | SOON — one query over the chain DB |
-| Session names / auto-titles | session naming (CC), automatic session names (OCW, DSH) | LATER — rename exists as a known gap |
+| Compaction | `/compact` & autocompact (CC, GC, OC, PI, OCW), recap (CX), condenser (OH, ROO), snapcompact (OMP) | DONE — chain compaction, gc and summary with tests |
+| Session search | session search (OCW), chat search (CLD, GEM), history search (GPT) | DONE — Ctrl-K over titles and message text |
+| Session names / auto-titles | session naming (CC), automatic session names (OCW, DSH) | DONE — rename event plus the first-turn auto title |
 | Side questions without polluting context | `/btw` (CC, OC, AG), side chats (CX, OCW) | LATER |
 | Message queueing while the agent works | queue messages (CC, CX, GC, ROO) | LATER |
 | Share a conversation read-only | session share → gist (PI), shared links (GPT, CLD, GEM), public conversation links (OCW), thread sharing (AMP) | LATER |
-| Transcript export & backup | transcript export (CC), session export/import (OC), export data (GPT, GEM) | SOON — export/backup button is designed, not built |
+| Transcript export & backup | transcript export (CC), session export/import (OC), export data (GPT, GEM) | DONE — markdown per session, JSONL chain, attachments folder |
 | Archive / delete / temporary chats | archive & delete (GPT), incognito (CLD), temporary chats (GPT) | LATER |
 
 ## B. Permissions & safety
 
 | Concept | Aliases (harness) | Roan |
 |---|---|---|
-| Permission modes incl. the YOLO family | YOLO (CL, CRU, QW), Auto Approve / auto-approve `--auto` (CL, ROO, OC), acceptEdits / auto / dontAsk / bypassPermissions (CC), Turbo & permission presets (AG), Auto-Edit & Auto classifier (QW), full-access profiles (DSH), `--allow-all-tools` (CP), execution modes (CUR) | SOON — approval cards; the YOLO end of the scale is a setting, not a goal |
+| Permission modes incl. the YOLO family | YOLO (CL, CRU, QW), Auto Approve / auto-approve `--auto` (CL, ROO, OC), acceptEdits / auto / dontAsk / bypassPermissions (CC), Turbo & permission presets (AG), Auto-Edit & Auto classifier (QW), full-access profiles (DSH), `--allow-all-tools` (CP), execution modes (CUR) | DONE — approval cards, learned approvals, per-tool rules; a single global mode is not built |
 | Plan mode (read-only planning first) | plan mode (CC, QW, CP, CRU, GC, AG, CUR), Plan/Act (CL, ROO), plan agent (OC) | SOON — the grill-me/clarify pattern feeds this |
-| Approvals that learn | once/always approvals (OC), persistent permission grants (AG), trusted directories/folders (CP, GC), workspace/project trust (CC, CX, PI) | SOON — same allow twice → remember per workspace |
-| Per-tool allow/deny rules | permission rules (CC), allow/deny/ask + shell scanner (OC), action(target) engine (AG), tool permissions (ZED), command rules (CX), policy engine (GC) | SOON — allowlist exists, rule refinement follows |
+| Approvals that learn | once/always approvals (OC), persistent permission grants (AG), trusted directories/folders (CP, GC), workspace/project trust (CC, CX, PI) | DONE — tool_approval events, folded everywhere, resettable in the Tools panel |
+| Per-tool allow/deny rules | permission rules (CC), allow/deny/ask + shell scanner (OC), action(target) engine (AG), tool permissions (ZED), command rules (CX), policy engine (GC) | DONE — tool_rule events on the chain, toggled per tool in the app |
 | OS-level sandbox | Seatbelt/Landlock (CC, GC), Bubblewrap (QW, ZED), sandbox presets (AG), sandbox backend (DSH, GOO, CP), containerization (PI, OCW) | LATER — exec allowlist first |
 | Cloud sandbox / orbs | orbs (AMP), cloud environments (CX, CP), cloud agents (CL, CUR, OH) | WON'T — local only, every device is a peer |
 | Protected paths & ignore files | protected/critical paths (CC), `.clineignore`, QwenIgnore, `.rooignore`, path guard | DONE — home-bounded path guard |
@@ -85,8 +85,8 @@ GEM=Gemini.
 
 | Concept | Aliases (harness) | Roan |
 |---|---|---|
-| Instruction file | CLAUDE.md + AGENTS.md compat (CC), AGENTS.md (CX, AMP, DSH, OCW), GEMINI.md (GC), QWEN.md (QW), rules (CL, CUR, ZED), instructions (CP, GPT), `.goosehints` (GOO), conventions file (AID) | BUILD — round 2: `AGENTS.md` in the home |
-| Persona / identity / user-profile files | SOUL.md, IDENTITY.md, USER.md (OCW), personality settings (GPT) | BUILD — round 2, adopted from OpenClaw |
+| Instruction file | CLAUDE.md + AGENTS.md compat (CC), AGENTS.md (CX, AMP, DSH, OCW), GEMINI.md (GC), QWEN.md (QW), rules (CL, CUR, ZED), instructions (CP, GPT), `.goosehints` (GOO), conventions file (AID) | DONE — AGENTS.md is written on first start and travels in the env snapshot |
+| Persona / identity / user-profile files | SOUL.md, IDENTITY.md, USER.md (OCW), personality settings (GPT) | DONE — SOUL.md, IDENTITY.md, AGENTS.md bootstrap; USER/MEMORY ride the chain |
 | Auto-memory that distills | auto memory MEMORY.md (CC), self-written notes (QW), daily notes → MEMORY.md (OCW), persistent memory (OH), Memory Bank (CL, ROO), pi-mnemopi (OMP) | SOON — after the home exists |
 | Memory search tools | memory_search / memory_get (OCW), context_search (QW) | LATER |
 | Consumer personalization | memory (GPT, CLD), chat memory (GEM) | DONE — chain memory, different shape |
@@ -97,11 +97,11 @@ GEM=Gemini.
 
 | Concept | Aliases (harness) | Roan |
 |---|---|---|
-| Skills (SKILL.md) | skills (CC, GC, OC, QW, CP, ZED, OCW, CRU, DSH, CL, AG, ROO, GOO, CUR, GPT, CLD, PI, OMP) | BUILD — skills travel with the chain |
+| Skills (SKILL.md) | skills (CC, GC, OC, QW, CP, ZED, OCW, CRU, DSH, CL, AG, ROO, GOO, CUR, GPT, CLD, PI, OMP) | DONE — skills live in the home and load as context |
 | Slash / custom commands | ~50 commands (AID), custom commands (OC, GC, ROO), presets (CX) | LATER |
-| Plugins + marketplace | plugins & marketplaces (CC, OC, AG, CL, ROO, CX, GPT, CLD, AMP, DSH), ClawHub (OCW), extension gallery (GC) | LATER — skills first, no public store planned |
+| Plugins + marketplace | plugins & marketplaces (CC, OC, AG, CL, ROO, CX, GPT, CLD, AMP, DSH), ClawHub (OCW), extension gallery (GC) | DONE — plugin loader with manifests (bundled + home drop-in); no marketplace, by design |
 | Lifecycle hooks | 40+ hooks (CC), JSON hooks (AG), hooks (GC, CRU, CL, OH, OCW, CX, DSH, CUR) | LATER |
-| MCP client | MCP (every harness) | BUILD — `mcp.json` must actually start servers |
+| MCP client | MCP (every harness) | DONE — real JSON-RPC client (http + stdio), configured as a chain event, tools gated |
 | Expose self as server | CC as MCP server, OCW as MCP server + ACP harness, app-server (CX), `opencode serve` + REST (OC), ACP server (GOO) | LATER — control API exists, shape it later |
 | Subagents | subagents (CC, OC, GC, AG, QW, CL, OH, DSH, OCW, CUR, GOO, CX, ROO, PI, OMP, AMP) | WON'T — one agent, his rule; `run_on_node` moves *where*, not *who* |
 | Agent teams / swarm / board | agent teams (CC, CL, DSH, QW), `/boost` `/swarm` `/teamwork` (AG), swarm (OCW), hub-spoke (CL), parallel agents (ZED), multiplayer (OCW) | WON'T |
@@ -122,20 +122,20 @@ GEM=Gemini.
 | Dual-model roles (planner/builder, advisor, critic) | architect mode (AID), orchestrator pairs (AG), advisor (CC), critic + Ask Oracle (OH), model orchestration (CL) | LATER |
 | Cheap model for side tasks | weak/editor models (AID), summary model (OC) | LATER |
 | Token caching & warming | prompt caching (AID, GC, QW), cache warming (OC) | LATER — provider-side, worth doing right |
-| Cost / usage tracking | cost & usage (CC), `/usage` (CX, AMP), `/stats` (GC), `/tokens` (AID), usage dashboard (OMP), token mgmt (OCW) | SOON — usage per turn in the app |
+| Cost / usage tracking | cost & usage (CC), `/usage` (CX, AMP), `/stats` (GC), `/tokens` (AID), usage dashboard (OMP), token mgmt (OCW) | SOON — providers report usage, the app does not show it per turn |
 
 ## F. Tools
 
 | Concept | Aliases (harness) | Roan |
 |---|---|---|
 | Shell / terminal exec | Bash (CC), exec (OCW), native shell (OMP), interactive terminal (OH) | DONE |
-| Background jobs | background Bash (CC), background terminals (CX), jobs (DSH), background commands (OC) | SOON — with notify, round 2 |
+| Background jobs | background Bash (CC), background terminals (CX), jobs (DSH), background commands (OC) | SOON — cron module exists, no scheduler UI and no trigger from the app |
 | File tools (read/write/edit/grep) | every CLI; Jupyter editing (CL) | DONE |
-| Web search | WebSearch (CC), web_search (OC, OCW, QW, DSH), search grounding (GEM) | SOON |
-| Web fetch / URL reader | WebFetch (CC), web_fetch (OC, OCW), `/web` (AID) | SOON |
+| Web search | WebSearch (CC), web_search (OC, OCW, QW, DSH), search grounding (GEM) | DONE — web plugin: Bing RSS primary, DuckDuckGo lite, Wikipedia floor; providers are plugins |
+| Web fetch / URL reader | WebFetch (CC), web_fetch (OC, OCW), `/web` (AID) | DONE — page provider reads the first 64 kB, https-only |
 | Browser automation | browser subagent (AG), Browse (OC), browser tool (CL), BrowserToolSet (OH), browser automation + hosted browsers (OCW), cloud browser (CLD), built-in browser (GPT) | LATER |
 | Computer / GUI use | computer use (CC, CX, CP, OCW), Claude Duet (CLD) | LATER |
-| Image input (vision) | image inputs (CX, AMP, DSH, OH), multimodal input (GC), `@` images (PI), screenshot tool (GPT), image understanding (CLD) | SOON — images in turns |
+| Image input (vision) | image inputs (CX, AMP, DSH, OH), multimodal input (GC), `@` images (PI), screenshot tool (GPT), image understanding (CLD) | DONE — photo attachments ride the live message (0.0.20) |
 | Image / video / music generation | images (GPT, GEM), image generation (OC, ROO), media generation (OCW) | LATER |
 | Voice input / dictation | voice dictation (CC, GPT, CLD, AG, DSH, QW, PI, OMP), on-device voice (CP) | SOON — mic exists (feature-detect); on-device STT preferred |
 | Voice calls / live conversation | voice calls via Plivo/Twilio (OCW), ChatGPT Voice + 1-800 (GPT), Gemini Live + calls (GEM), voice mode (CLD), talk mode + wake (OCW) | LATER |
@@ -149,9 +149,9 @@ GEM=Gemini.
 | Concept | Aliases (harness) | Roan |
 |---|---|---|
 | Scheduled tasks / cron | scheduled tasks (CX, AG, GPT, GEM, CLD Cowork, DSH, CL), `/loop` (QW), cron & reminders (OCW), scheduled jobs (GOO), in-session scheduling (CC) | DONE — cron exists; the phone needs the foreground service |
-| Foreground service / always-on daemon | gateway background service (OCW), daemon-first (QW `qwen serve`, OC background service, OCW gateway) | BUILD — round 2, Android foreground service |
-| Notifications when done | notifications (CX, AID, GPT, CL), OS notifications (CL), quiet hours (CLD) | SOON — round 2, with quiet hours |
-| Stuck detector | stuck detector (OH) | BUILD — round 1, next to the thinking state |
+| Foreground service / always-on daemon | gateway background service (OCW), daemon-first (QW `qwen serve`, OC background service, OCW gateway) | DONE — 0.0.19 foreground service owns the daemon, clean stop, supervisor restart |
+| Notifications when done | notifications (CX, AID, GPT, CL), OS notifications (CL), quiet hours (CLD) | DONE — the foreground service tails the log and ticks "Roan is done" (0.0.19) |
+| Stuck detector | stuck detector (OH) | DONE — turn liveness reports at 2 min and owns up at 5 |
 | Webhooks / event triggers | webhook triggers (OCW), automation events (OH), issue-triage automation (CL, CC) | LATER |
 | Recaps / daily brief | session recap (CC), monthly recap (CLD), daily brief (GEM) | LATER |
 
@@ -159,7 +159,7 @@ GEM=Gemini.
 
 | Concept | Aliases (harness) | Roan |
 |---|---|---|
-| Checkpoints / rewind / undo | checkpointing & rewind (CC), checkpoints shadow-git (CL, QW), `/restore` (GC), snapshots/undo/redo (OC), undo commits (AID) | SOON — branch-regen round 1, file snapshots later |
+| Checkpoints / rewind / undo | checkpointing & rewind (CC), checkpoints shadow-git (CL, QW), `/restore` (GC), snapshots/undo/redo (OC), undo commits (AID) | DONE — checkpoints panel with go-back; file snapshots are not built |
 | Git integration (commit/PR/review pane) | auto-commit + attribution + dirty-file isolation (AID), git integration (CC), review pane (AG), GitHub NL (CP), `/review` (QW), PR reviews (CC, CX) | LATER — exec covers git; UI niceties later |
 | Git worktree isolation | worktrees (CC, GC, CX, AG, CL, ROO, OC, OCW) | LATER |
 | Code review | code review local + GitHub + security (CC), `/review` (QW), PR review automation (CL), Codex Security (CX) | LATER |
@@ -172,7 +172,7 @@ GEM=Gemini.
 | Desktop app | desktop apps (AG, OC, QW, CL, AMP, CUR, GPT, CLD, GEM, DSH, GOO, CX) | DONE — Tauri app |
 | Mobile app | apps (GPT, CLD, GEM, AMP, OCW, OC, CUR iOS, CC & CX companions) | DONE — the apk |
 | Web dashboard / control UI | Control UI + widgets (OCW), web shell (QW), Agent Canvas (OH), web dashboard (CUR, AMP) | DONE as webui; polish LATER |
-| Remote pairing / access from anywhere | pair QR (OC), remote Tailscale (OCW, OH), remote connections (CX, AG, CC), portals (AMP) | SOON — invite/join exists, join-bug is the open part |
+| Remote pairing / access from anywhere | pair QR (OC), remote Tailscale (OCW, OH), remote connections (CX, AG, CC), portals (AMP) | SOON — invite/join works; the return-flow of locally appended events is the open gap |
 | Messaging channels | 33 channels (OCW), chat channels (QW), connectors (CL), channels (CC, CX) | WON'T — the app is the channel; one Telegram door maybe, never the core |
 | CLI / TUI surface | every CLI harness | LATER — a thin CLI over the control socket, for the server |
 | IDE / editor extension | VS Code / JetBrains / Zed (CC, CX, OC, GC, CL, ZED, CUR, AG, QW, CP), watch mode (AID) | WON'T — the app is the whole product |
@@ -190,14 +190,14 @@ GEM=Gemini.
 |---|---|---|
 | Thinking / progress indicator | streaming status (GPT, GEM), progress card (OCW), transcript viewer (CC) | DONE — round 1 proven: the dock shows from turn_start (the lock's events were never broadcast before), plus a stuck report that says so after 2 min silence |
 | Diffs shown in the UI | visual artifacts & unified diffs (AG), diffs (OCW), changes tab (OH, AMP), `/diff` (CC, AID, CX) | LATER |
-| Steering / interrupt mid-turn | steering & interrupts (PI, CX, OH, OCW), safe interrupts (AID) | SOON — stop button + steer |
+| Steering / interrupt mid-turn | steering & interrupts (PI, CX, OH, OCW), safe interrupts (AID) | SOON — stop exists; steering a running turn does not |
 | Themes | themes (CC, GC, OC, QW, CRU, GEM, CLD) | DONE — dark mint, one system |
 | Keybinds / vim / multiline | keybindings (CC, GC, OC, ROO), vim mode (GC, AG, AID) | LATER — app keyboard set is small |
 | Status line / footer | statusline (CC, CX, AG) | WON'T — terminal concept, n/a in the app |
 | Config files | config & profiles (CX), opencode.json (OC), YAML (GOO), `.aider.conf.yml` (AID), settings.json (AG, GC), crushrc (CRU) | DONE — `config.json` in the home |
 | Natural-language config | configure by asking (CRU) | LATER |
-| Doctor / self-diagnostics | doctor (CC, CX, OCW), self-diagnostics (CC), trajectory view (DSH) | SOON — updater round |
-| Updater / release channels | update channels (CC, CX, GC, ROO nightly) | SOON — §9 updater |
+| Doctor / self-diagnostics | doctor (CC, CX, OCW), self-diagnostics (CC), trajectory view (DSH) | DONE — daemon diagnostics endpoints |
+| Updater / release channels | update channels (CC, CX, GC, ROO nightly) | SOON — updater UI exists, never tested with a second version and no feed published |
 | Telemetry policy | telemetry opt-in (GC, AID), version-check-only (OCW), privacy mode (CUR) | DONE — zero, stricter than all of them |
 | Accessibility | screen-reader & reduced-motion (CC) | LATER |
 | i18n / multiple UI languages | 18 UI languages (ROO), language setting (GEM, CLD) | WON'T — English only, standing rule |
