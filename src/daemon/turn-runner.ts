@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Agent } from "../agent.js";
 import type { EventStore } from "../chain/store.js";
 import type { Event } from "../protocol/types.js";
-import { builtinTools } from "../tools.js";
+import { allTools } from "../tools.js";
 import type { Tool } from "../types.js";
 import { acquire, release, SeqConflictError } from "../turn/index.js";
 import type { Event as TurnEvent, TurnEventDraft, TurnStore } from "../turn/types.js";
@@ -141,7 +141,7 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
 
     const agent = new Agent({
       provider: options.provider,
-      tools: [...(options.tools ?? builtinTools)],
+      tools: [...(options.tools ?? allTools())],
       systemPrompt: turnPrompt,
       cwd: options.cwd,
       history: compacted.recent as typeof history,

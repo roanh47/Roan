@@ -1,0 +1,7 @@
+{
+  "id": "web",
+  "kind": "web",
+  "entry": "index.js",
+  "providesTools": ["web_search", "web_fetch"],
+  "providesWebProviders": ["bing-rss", "ddg-lite", "wikipedia", "searxng", "page"]
+}

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { parseBingRss, parseDuckDuckGoLite, parseWikiOpenSearch } from "./web.js";
+import { parseBingRss, parseDuckDuckGoLite, parseSearxng, parseWikiOpenSearch } from "../web/parse.js";
 
 const FIXTURE = `<html><body><table>
 <tr><td><a class="result-link" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fvoorbeeld.nl%2Fpoorten&amp;rut=abc">Poorten en <b>adres</b>sen</a></td></tr>

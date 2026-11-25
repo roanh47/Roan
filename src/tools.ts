@@ -3,7 +3,8 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { Tool } from "./types.js";
-import { webFetch, webSearch } from "./tools/web.js";
+import { ensureBundledPlugins } from "./plugins/index.js";
+import { toolSurface } from "./tools/surface.js";
 
 const execAsync = promisify(exec);
 
@@ -108,7 +109,15 @@ export const runShell: Tool = {
   },
 };
 
-export const builtinTools: Tool[] = [readFile, writeFile, listDir, runShell, webSearch, webFetch];
+export const builtinTools: Tool[] = [readFile, writeFile, listDir, runShell];
+
+for (const tool of builtinTools) toolSurface.register(tool, { set: "core", source: "core" });
+
+/** Everything the model may call: core tools plus whatever plugins brought. */
+export function allTools(): Tool[] {
+  ensureBundledPlugins();
+  return toolSurface.all();
+}
 
 export function toToolSpecs(tools: Tool[]) {
   return tools.map((t) => ({

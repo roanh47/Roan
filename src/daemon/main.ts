@@ -19,7 +19,9 @@ import os from "node:os";
 import { createHash } from "node:crypto";
 import type { Logger } from "../sync/types.js";
 import { runTurn } from "./turn-runner.js";
-import { builtinTools } from "../tools.js";
+import { allTools } from "../tools.js";
+import { loadWebConfig, setWebConfigSource } from "../web/config.js";
+import { loadPlugins } from "../plugins/index.js";
 import { contextTools } from "../tools/context-tools.js";
 import { MemoryStore } from "../context/memory.js";
 import { SkillLibrary } from "../context/skills.js";
@@ -109,6 +111,12 @@ async function main(): Promise<void> {
   const migration = await migrateLegacyHome(paths);
   // The chain database moves into `state/` once, before anything opens it:
   // `workspace/` becomes the agent's desk instead of a bookkeeping floor.
+  // The web section (<home>/web.json) is per machine and read at call time:
+  // the tools never cache it, so a provider change applies on the next call.
+  setWebConfigSource(() => loadWebConfig(paths.home));
+  // Bundled plugins now, home plugins (<home>/plugins/<id>/plugin.json) after.
+  // A broken plugin is reported and skipped; boot never depends on one.
+  await loadPlugins(paths.home);
   const stateSplit = await migrateStateSplit(paths);
   if (stateSplit === "moved") log("home: chain database moved to state/");
   const bootstrapped = await ensureBootstrapFiles(paths);
@@ -132,7 +140,7 @@ async function main(): Promise<void> {
   // and the skills on its own disk. Both are copies, never a fetch from a peer.
   const memory = new MemoryStore(paths.home);
   const skills = new SkillLibrary(join(paths.home, "skills"));
-  const tools = [...builtinTools, ...contextTools(memory, skills)];
+  const tools = [...allTools(), ...contextTools(memory, skills)];
   // MCP servers are chain config: this node dials them, every instance folds
   // the same list. Unreachable servers are skipped, never fatal.
   const mcp = new McpRuntime((line) => log(line));

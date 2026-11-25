@@ -47,6 +47,67 @@ function assertPolicyNamesKnown(policy: Policy, tools: readonly Tool[]): void {
   }
 }
 
+/**
+ * The live surface: tools register themselves (core at import, plugins when
+ * they load), the policy decides what the agent may use. Plugin tools default
+ * to "allow" when the policy does not name them — installing a plugin is a
+ * deliberate act; core tools stay deny-by-default, so the allowlist still
+ * guards the shell.
+ */
+export class MutableToolRegistry implements ToolRegistry {
+  private readonly tools = new Map<string, { tool: Tool; set: string; source: "core" | "plugin" }>();
+  private generation = 0;
+
+  constructor(private readonly policy: Policy) {}
+
+  /** Registers a tool; a same-name registration replaces the old one (later wins). */
+  register(tool: Tool, options: { set?: string; source?: "core" | "plugin" } = {}): void {
+    const name = tool.name?.trim() ?? "";
+    if (name.length === 0) throw new Error("a tool needs a name");
+    if (typeof tool.run !== "function") throw new Error(`tool "${name}" has no run()`);
+    this.tools.set(name, { tool, set: options.set ?? "core", source: options.source ?? "core" });
+    this.generation += 1;
+  }
+
+  all(): Tool[] {
+    return [...this.tools.values()].map((entry) => entry.tool);
+  }
+
+  allowed(): Tool[] {
+    return [...this.tools.values()]
+      .filter((entry) => this.decisionFor(entry.tool) !== "deny")
+      .map((entry) => entry.tool);
+  }
+
+  needsApproval(): Tool[] {
+    return [...this.tools.values()]
+      .filter((entry) => this.decisionFor(entry.tool) === "ask")
+      .map((entry) => entry.tool);
+  }
+
+  get(name: string): Tool | undefined {
+    const entry = this.tools.get(name);
+    if (entry === undefined) return undefined;
+    return this.decisionFor(entry.tool) === "deny" ? undefined : entry.tool;
+  }
+
+  has(name: string): boolean {
+    return this.get(name) !== undefined;
+  }
+
+  /** Bumps on every registration; consumers use it to invalidate caches. */
+  registryGeneration(): number {
+    return this.generation;
+  }
+
+  private decisionFor(tool: Tool): Decision {
+    const entry = this.policy.tools[tool.name];
+    // Only an explicit decision gates a tool here; the chain's tool_rule events
+    // are the real per-turn gate. A registry with no policy allows everything.
+    return entry === "allow" || entry === "ask" || entry === "deny" ? entry : "allow";
+  }
+}
+
 export function buildRegistry(tools: Tool[], policy: Policy): ToolRegistry {
   assertUniqueNames(tools);
   assertPolicyNamesKnown(policy, tools);
