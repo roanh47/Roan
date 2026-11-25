@@ -7,37 +7,37 @@ import { webFetch, webSearch } from "./tools/web.js";
 
 const execAsync = promisify(exec);
 
-/** Zet een pad om naar iets binnen de werkmap; weiger paden die erbuiten wijzen. */
+/** Turn a path into one inside the working directory; reject paths that point outside it. */
 function resolveInside(cwd: string, target: unknown): string {
   const raw = typeof target === "string" && target.length > 0 ? target : ".";
   const full = path.resolve(cwd, raw);
   const rel = path.relative(cwd, full);
   if (rel.startsWith("..") || path.isAbsolute(rel)) {
-    throw new Error(`pad valt buiten de werkmap: ${raw}`);
+    throw new Error(`path falls outside the working directory: ${raw}`);
   }
   return full;
 }
 
 export const readFile: Tool = {
   name: "read_file",
-  description: "Lees een tekstbestand en geef de inhoud terug.",
+  description: "Read a text file and return its contents.",
   parameters: {
     type: "object",
     properties: {
-      path: { type: "string", description: "Pad, relatief aan de werkmap" },
+      path: { type: "string", description: "Path, relative to the working directory" },
     },
     required: ["path"],
   },
   async run(args, ctx) {
     const target = resolveInside(ctx.cwd, args["path"]);
     const content = await fs.readFile(target, "utf8");
-    return content.length > 40_000 ? content.slice(0, 40_000) + "\n…(afgekapt)" : content;
+    return content.length > 40_000 ? content.slice(0, 40_000) + "\n…(truncated)" : content;
   },
 };
 
 export const writeFile: Tool = {
   name: "write_file",
-  description: "Schrijf een tekstbestand. Maakt mappen aan als ze nog niet bestaan.",
+  description: "Write a text file. Creates directories if they do not exist yet.",
   parameters: {
     type: "object",
     properties: {
@@ -51,23 +51,23 @@ export const writeFile: Tool = {
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.writeFile(target, String(args["content"] ?? ""), "utf8");
     const bytes = Buffer.byteLength(String(args["content"] ?? ""));
-    return `geschreven: ${path.relative(ctx.cwd, target)} (${bytes} bytes)`;
+    return `written: ${path.relative(ctx.cwd, target)} (${bytes} bytes)`;
   },
 };
 
 export const listDir: Tool = {
   name: "list_dir",
-  description: "Toon de bestanden en mappen in een map.",
+  description: "List the files and directories in a directory.",
   parameters: {
     type: "object",
     properties: {
-      path: { type: "string", description: "Standaard de werkmap" },
+      path: { type: "string", description: "Defaults to the working directory" },
     },
   },
   async run(args, ctx) {
     const target = resolveInside(ctx.cwd, args["path"] ?? ".");
     const entries = await fs.readdir(target, { withFileTypes: true });
-    if (entries.length === 0) return "(leeg)";
+    if (entries.length === 0) return "(empty)";
     return entries
       .sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name))
       .map((e) => (e.isDirectory() ? `${e.name}/` : e.name))
@@ -78,18 +78,18 @@ export const listDir: Tool = {
 export const runShell: Tool = {
   name: "run_shell",
   description:
-    "Voer een shell-commando uit in de werkmap. Gebruik dit voor git, tests, builds en het opvragen van bestanden.",
+    "Run a shell command in the working directory. Use this for git, tests, builds and inspecting files.",
   parameters: {
     type: "object",
     properties: {
       command: { type: "string" },
-      timeout_seconds: { type: "number", description: "Standaard 60" },
+      timeout_seconds: { type: "number", description: "Default 60" },
     },
     required: ["command"],
   },
   async run(args, ctx) {
     const command = String(args["command"] ?? "").trim();
-    if (!command) throw new Error("leeg commando");
+    if (!command) throw new Error("empty command");
     const timeout = Math.min(Math.max(Number(args["timeout_seconds"]) || 60, 1), 600) * 1000;
     try {
       const { stdout, stderr } = await execAsync(command, {
@@ -99,11 +99,11 @@ export const runShell: Tool = {
         shell: "/bin/bash",
       });
       const out = [stdout, stderr].filter(Boolean).join("\n").trim();
-      return out === "" ? "(geen uitvoer, exit 0)" : out;
+      return out === "" ? "(no output, exit 0)" : out;
     } catch (err) {
       const e = err as { stdout?: string; stderr?: string; message?: string; code?: number };
       const out = [e.stdout, e.stderr].filter(Boolean).join("\n").trim();
-      throw new Error(`exit ${e.code ?? "?"}\n${out || e.message || "onbekende fout"}`);
+      throw new Error(`exit ${e.code ?? "?"}\n${out || e.message || "unknown error"}`);
     }
   },
 };

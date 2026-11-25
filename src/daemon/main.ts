@@ -62,25 +62,25 @@ interface Session {
 }
 
 /**
- * Waar de peer-link luistert. Standaard alléén het tailscale-adres: de
- * handshake weigert nog steeds elke peer met een verkeerd token of een
- * andere keten, maar de deur hoeft niet op élk netwerk open te staan.
- * `ROAN_PEER_BIND=lan` of een adres zet dat bewust om.
+ * Where the peer-link listens. By default only the tailscale address: the
+ * handshake still refuses every peer with a wrong token or a different chain,
+ * but the door does not have to stand open on every network.
+ * `ROAN_PEER_BIND=lan` or an address flips that on purpose.
  */
 function peerBind(paths: RoanPaths): PeerBind {
   return resolvePeerBind(os.networkInterfaces());
 }
 
 /**
- * Elk adres waarop een ander toestel dit toestel kan bellen, best eerst —
- * en nooit meer dan de bind blootstelt. De joiner belt ze allemaal tot er
- * één opengaat: de manier boekt niet, ze moeten elkaar vinden.
+ * Every address on which another device can call this device, best first —
+ * and never more than the bind exposes. The joiner dials them all until one
+ * opens: the approach guarantees nothing, they have to find each other.
  */
 function dialHosts(paths: RoanPaths): string[] {
   return advertiseHosts(peerBind(paths), os.networkInterfaces());
 }
 
-/** Discovery hoort bij het proces, niet bij een sessie: bij afsluiten moet hij stoppen. */
+/** Discovery belongs to the process, not to a session: it has to stop on shutdown. */
 let stopDiscovery: (() => void) | null = null;
 
 const peerLogger: Logger = {
@@ -268,8 +268,8 @@ async function main(): Promise<void> {
     });
     replicating = true;
     log("peer: listening on " + bindListenHost(bind) + ":" + String(PEER_PORT) + " (" + bind.kind + ")");
-    // Elke machine zoekt de andere via Tailscale. Zo hoeft niemand een code te
-    // plakken en komt de kluwen ook na een herstart of een nieuw IP terug.
+    // Every machine finds the other via Tailscale. That way nobody has to paste
+    // a code and the cluster comes back after a restart or a new IP too.
     if (process.env["ROAN_DISCOVERY"] !== "off" && stopDiscovery === null) {
       stopDiscovery = startDiscovery({
         port: PEER_PORT,
@@ -278,7 +278,7 @@ async function main(): Promise<void> {
           try {
             addPeer(`${host}:${String(PEER_PORT)}`);
           } catch (error: unknown) {
-            log("discovery: kon peer niet toevoegen: " + String(error));
+            log("discovery: could not add peer: " + String(error));
           }
         },
       });
@@ -603,8 +603,8 @@ async function main(): Promise<void> {
     async run(args, ctx) {
       const decision = await askPermission(tool.name, args);
       if (decision === "allow") return await tool.run(args, ctx);
-      if (decision === "timeout") throw new Error("geen goedkeuring gekomen binnen de tijd");
-      throw new Error("de gebruiker weigerde deze tool-aanroep");
+      if (decision === "timeout") throw new Error("no approval arrived in time");
+      throw new Error("the user refused this tool call");
     },
   });
   const answerApproval = (req: string, allow: boolean): string | null => {
@@ -868,9 +868,9 @@ async function main(): Promise<void> {
 
   control = await startControlServer({
     port: CONTROL_PORT,
-    // Standaard alleen loopback: de app op dit toestel is de enige die er iets
-    // te zoeken heeft. Zet ROAN_CONTROL_HOST alleen op een adres als de app er
-    // bewust van een andere machine bij moet kunnen.
+    // Loopback by default: the app on this device is the only one with any
+    // business here. Set ROAN_CONTROL_HOST to an address only when the app has
+    // to be able to reach it from another machine on purpose.
     host: process.env["ROAN_CONTROL_HOST"] ?? "127.0.0.1",
     store: () => session?.store ?? null,
     state,
@@ -890,7 +890,7 @@ async function main(): Promise<void> {
           const path = typeof data["path"] === "string" ? data["path"] : "";
           const full = resolve(paths.syncedWorkspace, path);
           if (!full.startsWith(paths.syncedWorkspace)) {
-            reply({ error: "buiten de werkmap" });
+            reply({ error: "outside the workspace" });
             return;
           }
           reply({ path, content: await readFileAsync(full, "utf8") });
@@ -900,12 +900,12 @@ async function main(): Promise<void> {
           const path = typeof data["path"] === "string" ? data["path"] : "";
           const content = typeof data["content"] === "string" ? data["content"] : null;
           if (content === null || session === null) {
-            reply({ error: "geen inhoud" });
+            reply({ error: "no content" });
             return;
           }
           const full = resolve(paths.syncedWorkspace, path);
           if (!full.startsWith(paths.syncedWorkspace)) {
-            reply({ error: "buiten de werkmap" });
+            reply({ error: "outside the workspace" });
             return;
           }
           await mkdir(dirname(full), { recursive: true });

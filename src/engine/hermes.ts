@@ -34,11 +34,11 @@ export function renderHistory(
 ): string {
   if (history.length === 0) return "";
   const lines = history.map((message) =>
-    `${message.role === "user" ? "Gebruiker" : "Jij"}: ${message.text.trim()}`,
+    `${message.role === "user" ? "User" : "You"}: ${message.text.trim()}`,
   );
   return [
-    "Dit is het gesprek tot nu toe, uit de keten. Gebruik het als context;",
-    "de laatste regel is het nieuwe bericht waar je op antwoordt.",
+    "This is the conversation so far, from the chain. Use it as context;",
+    "the last line is the new message you are answering.",
     "",
     ...lines,
     "",

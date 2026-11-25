@@ -1,42 +1,42 @@
 /**
- * Regelgebaseerde outline van een bronbestand.
+ * Rule-based outline of a source file.
  *
- * Bewust geen parser: de scanner kijkt per regel naar het begin van de regel en
- * herkent alleen top-level declaraties. Commentaar wordt eerst weggestript, dus
- * een `export class` binnen een blokcommentaar telt niet mee.
+ * Deliberately not a parser: the scanner looks at the start of each line and
+ * only recognises top-level declarations. Comments are stripped first, so
+ * an `export class` inside a block comment does not count.
  */
 
-/** Maximum aantal entries; daarna stopt de scanner met kijken. */
+/** Maximum number of entries; after that the scanner stops looking. */
 export const MAX_OUTLINE_ENTRIES = 200;
 
-/** Eén top-level declaratie. */
+/** One top-level declaration. */
 export interface OutlineEntry {
-  /** Gekende vorm: class, interface, type, function, const, let of default. */
+  /** Recognised form: class, interface, type, function, const, let or default. */
   kind: string;
-  /** Naam van de declaratie; "default" bij een anonieme default export. */
+  /** Name of the declaration; "default" for an anonymous default export. */
   name: string;
-  /** Regelnummer, 1-gebaseerd. */
+  /** Line number, 1-based. */
   line: number;
 }
 
-/** Declaratievormen in volgorde van herkenning. */
+/** Declaration forms in order of recognition. */
 const KINDS = ["class", "interface", "type", "function", "const", "let"] as const;
 
-/** Modifiers die vóór het keyword mogen staan. */
+/** Modifiers that may appear before the keyword. */
 const MODIFIERS = ["declare", "abstract", "async"] as const;
 
-/** Naam van een declaratie. */
+/** Name of a declaration. */
 const NAME_PATTERN = /^([A-Za-z_$][\w$]*)/;
 
-/** Commentaarstatus die over regels heen loopt. */
+/** Comment state that carries across lines. */
 interface ScanState {
   inBlock: boolean;
 }
 
 /**
- * Haalt commentaar uit één regel en werkt de blokstatus bij.
- * Een blokcommentaar wordt door een spatie vervangen zodat tokens niet aan
- * elkaar plakken.
+ * Strips comments from a single line and updates the block state.
+ * A block comment is replaced by a space so that tokens do not stick
+ * together.
  */
 function stripComments(line: string, state: ScanState): string {
   let result = "";
@@ -71,7 +71,7 @@ function stripComments(line: string, state: ScanState): string {
   return result;
 }
 
-/** Splitst `export`/`default` en modifiers van de regel af. */
+/** Splits `export`/`default` and modifiers off the line. */
 function splitPrefixes(text: string): { rest: string; isDefault: boolean } {
   let rest = text.trim();
   let isDefault = false;
@@ -92,7 +92,7 @@ function splitPrefixes(text: string): { rest: string; isDefault: boolean } {
   return { rest, isDefault };
 }
 
-/** Herkent één declaratie op een reeds commentaar-vrije regel. */
+/** Recognises one declaration on an already comment-free line. */
 function parseDeclaration(text: string): { kind: string; name: string } | undefined {
   if (text.trim() === "") {
     return undefined;
@@ -119,7 +119,7 @@ function parseDeclaration(text: string): { kind: string; name: string } | undefi
     if (name !== undefined) {
       return { kind, name };
     }
-    // Alleen bij een default export mag de naam ontbreken (bv. `export default class {}`).
+    // Only a default export may omit the name (e.g. `export default class {}`).
     return isDefault ? { kind, name: "default" } : undefined;
   }
 
@@ -127,10 +127,10 @@ function parseDeclaration(text: string): { kind: string; name: string } | undefi
 }
 
 /**
- * Geeft de top-level declaraties van `source` terug, met 1-gebaseerde
- * regelnummers en maximaal {@link MAX_OUTLINE_ENTRIES} entries.
+ * Returns the top-level declarations of `source`, with 1-based
+ * line numbers and at most {@link MAX_OUTLINE_ENTRIES} entries.
  *
- * `file` wordt alleen in foutmeldingen gebruikt.
+ * `file` is only used in error messages.
  */
 export function outline(source: string, file: string): OutlineEntry[] {
   if (typeof source !== "string") {
@@ -150,9 +150,9 @@ export function outline(source: string, file: string): OutlineEntry[] {
     if (raw === undefined) {
       continue;
     }
-    // Commentaar altijd strippen: ook op overgeslagen regels moet de blokstatus kloppen.
+    // Always strip comments: the block state must be correct on skipped lines too.
     const stripped = stripComments(raw, state);
-    // Alleen top-level: een ingesprongen regel hoort bij een class, functie of blok.
+    // Top-level only: an indented line belongs to a class, function or block.
     if (/^\s/.test(raw)) {
       continue;
     }

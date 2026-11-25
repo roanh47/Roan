@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { MAX_OUTLINE_ENTRIES, outline } from "./outline.js";
 
 describe("outline", () => {
-  it("herkent de declaratievormen met 1-gebaseerde regelnummers", () => {
+  it("recognises the declaration forms with 1-based line numbers", () => {
     const source = [
       "/**",
       " * Module-doc.",
@@ -36,7 +36,7 @@ describe("outline", () => {
     ]);
   });
 
-  it("geeft een anonieme default export de naam default", () => {
+  it("gives an anonymous default export the name default", () => {
     const source = ["export default class {}", "export default function () {}", "export default {}"].join(
       "\n",
     );
@@ -47,7 +47,7 @@ describe("outline", () => {
     ]);
   });
 
-  it("slaat treffers binnen commentaar over", () => {
+  it("skips hits inside comments", () => {
     const source = [
       "/* export class Hidden {}",
       "   interface AlsoHidden {}",
@@ -64,7 +64,7 @@ describe("outline", () => {
     ]);
   });
 
-  it("stopt bij het maximum van 200 entries", () => {
+  it("stops at the maximum of 200 entries", () => {
     const lines: string[] = [];
     for (let index = 0; index < 250; index += 1) {
       lines.push(`export const c${index} = ${index};`);
@@ -78,14 +78,14 @@ describe("outline", () => {
     assert.deepEqual(entries[entries.length - 1], { kind: "const", name: "c199", line: 200 });
   });
 
-  it("negeert ingesprongen declaraties en teruggegeven wordt niets gemuteerd", () => {
+  it("ignores indented declarations and nothing in the result is mutated", () => {
     const source = ["class Buiten {", "  const binnen = 1;", "}", ""].join("\n");
 
     assert.deepEqual(outline(source, "nested.ts"), [{ kind: "class", name: "Buiten", line: 1 }]);
     assert.deepEqual(outline("", "leeg.ts"), []);
   });
 
-  it("gooit op een niet-string source en noemt bestand en type", () => {
+  it("throws on a non-string source and names the file and type", () => {
     assert.throws(
       () => outline(42 as unknown as string, "kapot.ts"),
       (error: unknown) => {

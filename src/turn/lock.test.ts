@@ -11,15 +11,15 @@ import {
 } from "./lock.js";
 
 /**
- * Regel onder test: één schrijver per beurt ("one writer per turn").
+ * Rule under test: one writer per turn.
  *
- * De lock is in-process testbaar: alles hangt aan een `TurnStore`, dus een
- * eigen in-memory store volstaat en er is geen temp-pad of tweede proces
- * nodig. Elke test maakt een verse store, zodat ketens niet lekken.
+ * The lock is testable in-process: everything hangs off a `TurnStore`, so a
+ * local in-memory store suffices and no temp path or second process is
+ * needed. Every test builds a fresh store so chains do not leak.
  *
- * Let op: een tweede `acquire` gooit niets. `acquire` levert een resultaat
- * (`state: "busy"`), pas `release` door een niet-eigenaar gooit `TurnLockError`.
- * De tests hieronder volgen dat gedrag, niet een aangenomen throw.
+ * Note: a second `acquire` throws nothing. `acquire` returns a result
+ * (`state: "busy"`); only a `release` by a non-owner throws `TurnLockError`.
+ * The tests below follow that behaviour, not an assumed throw.
  */
 
 const CHAIN = "chain-1";
@@ -27,12 +27,12 @@ const HOLDER = "node-a";
 const OTHER = "node-b";
 const T0 = 1_700_000_000_000;
 
-/** In-memory `TurnStore` met atomische compare-and-append per keten. */
+/** In-memory `TurnStore` with atomic compare-and-append per chain. */
 class MemoryStore implements TurnStore {
   readonly #chains = new Map<string, Event[]>();
   #appends = 0;
 
-  /** Aantal geaccepteerde appends; handig om "geen schrijfactie" te bewijzen. */
+  /** Number of accepted appends; useful to prove "no write happened". */
   get appendCount(): number {
     return this.#appends;
   }
@@ -54,8 +54,8 @@ class MemoryStore implements TurnStore {
     const list = this.#chains.get(chain) ?? [];
     const head = list.at(-1)?.seq ?? 0;
     if (expectedSeq !== head + 1) {
-      // Zelfde contract als de echte store: de lock herkent dit via
-      // `instanceof SeqConflictError`, dus het moet de echte klasse zijn.
+      // Same contract as the real store: the lock recognises this via
+      // `instanceof SeqConflictError`, so it must be the real class.
       throw new SeqConflictError(expectedSeq, head + 1);
     }
 
@@ -105,11 +105,11 @@ async function rejectionOf(promise: Promise<unknown>): Promise<unknown> {
   } catch (error) {
     return error;
   }
-  assert.fail("verwachtte een rejection, maar de promise resolvde");
+  assert.fail("expected a rejection, but the promise resolved");
 }
 
 describe("turn lock: one writer per turn", () => {
-  it("geeft de eerste acquire en meldt de houder die hij kreeg", async () => {
+  it("grants the first acquire and reports the holder it got", async () => {
     const store = new MemoryStore();
 
     const result = await acquire(store, CHAIN, HOLDER, { now: T0 });
@@ -123,7 +123,7 @@ describe("turn lock: one writer per turn", () => {
     assert.equal(store.appendCount, 1);
   });
 
-  it("weigert een tweede acquire zolang de beurt gehouden wordt", async () => {
+  it("refuses a second acquire while the turn is held", async () => {
     const store = new MemoryStore();
     const logs: CapturedLog[] = [];
 
@@ -135,7 +135,7 @@ describe("turn lock: one writer per turn", () => {
       logger: capturingLogger(logs),
     });
 
-    // De module gooit hier niet: hij rapporteert `busy` met de bestaande houder.
+    // The module does not throw here: it reports `busy` with the existing holder.
     assert.equal(second.state, "busy");
     if (second.state !== "busy") assert.fail("unreachable");
     assert.equal(second.owner, HOLDER);
@@ -143,17 +143,17 @@ describe("turn lock: one writer per turn", () => {
     assert.equal(typeof second.lastActivityAt, "number");
     assert.ok(second.expiresAt > second.lastActivityAt);
 
-    // Geen tweede `turn_start`: de verliezer heeft niets geschreven.
+    // No second `turn_start`: the loser wrote nothing.
     assert.equal(store.appendCount, 1);
     assert.equal(store.events(CHAIN).length, 1);
 
     const busyLog = logs.find((entry) => entry.message === "turn busy");
-    assert.ok(busyLog, `verwachtte een "turn busy"-log, kreeg ${JSON.stringify(logs)}`);
+    assert.ok(busyLog, `expected a "turn busy" log, got ${JSON.stringify(logs)}`);
     assert.equal(busyLog.level, "warn");
     assert.equal(busyLog.fields?.["owner"], HOLDER);
   });
 
-  it("laat opnieuw acquiren toe nadat de beurt is vrijgegeven", async () => {
+  it("allows acquiring again after the turn is released", async () => {
     const store = new MemoryStore();
 
     await acquire(store, CHAIN, HOLDER, { now: T0 });
@@ -171,25 +171,25 @@ describe("turn lock: one writer per turn", () => {
     assert.equal(again.event.seq, 3);
   });
 
-  it("gooit bij een tweede release met code no-open-turn (geen stille tweede turn_end)", async () => {
+  it("throws on a second release with code no-open-turn (no silent second turn_end)", async () => {
     const store = new MemoryStore();
 
     await acquire(store, CHAIN, HOLDER, { now: T0 });
     await release(store, CHAIN, HOLDER, { now: T0 + 5 });
 
-    // Vastgelegd gedrag: de module gooit hier wél, met code "no-open-turn".
+    // Pinned behaviour: the module does throw here, with code "no-open-turn".
     const error = await rejectionOf(release(store, CHAIN, HOLDER, { now: T0 + 6 }));
 
     assert.ok(
       isTurnLockError(error, "no-open-turn"),
-      `verwachtte TurnLockError/ no-open-turn, kreeg ${String(error)}`,
+      `expected TurnLockError/ no-open-turn, got ${String(error)}`,
     );
     assert.match(error.message, /no turn is open/);
     assert.equal(store.appendCount, 2);
     assert.equal(store.events(CHAIN).length, 2);
   });
 
-  it("weigert een release door een andere node dan de houder", async () => {
+  it("refuses a release by a node other than the holder", async () => {
     const store = new MemoryStore();
 
     await acquire(store, CHAIN, HOLDER, { now: T0 });
@@ -198,12 +198,12 @@ describe("turn lock: one writer per turn", () => {
 
     assert.ok(
       isTurnLockError(error, "not-turn-owner"),
-      `verwachtte TurnLockError/ not-turn-owner, kreeg ${String(error)}`,
+      `expected TurnLockError/ not-turn-owner, got ${String(error)}`,
     );
-    // De melding noemt de echte eigenaar, niet de indringer.
+    // The message names the real owner, not the intruder.
     assert.match(error.message, new RegExp(`"${HOLDER}"`));
 
-    // De lock bleef staan: geen `turn_end`, de houder kan nog vrijgeven.
+    // The lock stayed: no `turn_end`, the holder can still release.
     assert.equal(store.events(CHAIN).length, 1);
 
     const stillBusy = await acquire(store, CHAIN, OTHER, { now: T0 + 6 });

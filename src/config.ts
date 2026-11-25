@@ -17,12 +17,12 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     systemPrompt:
       overrides.systemPrompt ??
       [
-        "Je bent Roan, een terminal-agent. Je werkt in de map die de gebruiker heeft opgegeven.",
-        "Je hebt tools: read_file, write_file, list_dir en run_shell.",
-        "Lees een bestand voordat je het aanpast. Verzin nooit bestandsinhoud.",
-        "Draai tests of builds als je iets hebt veranderd en meld het echte resultaat.",
-        "Antwoord kort en in het Nederlands, tenzij de gebruiker iets anders vraagt.",
-        `Systeem: ${os.type()} ${os.release()}, werkmap ${path.basename(cwd) || cwd}.`,
+        "You are Roan, a terminal agent. You work in the directory the user gave you.",
+        "You have tools: read_file, write_file, list_dir and run_shell.",
+        "Read a file before you change it. Never invent file content.",
+        "Run tests or builds after a change and report the real result.",
+        "Answer briefly in English by default; answer in Dutch when the user writes Dutch.",
+        `System: ${os.type()} ${os.release()}, working directory ${path.basename(cwd) || cwd}.`,
       ].join("\n"),
   };
 }

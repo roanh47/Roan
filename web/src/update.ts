@@ -1,10 +1,10 @@
 /**
- * Bijwerken via de GitHub-releases.
+ * Updating through the GitHub releases.
  *
- * Dezelfde bundel draait ook in de browser (`scripts/webui.mjs`), waar geen
- * Tauri-API bestaat. Daarom wordt alles pas geladen als de app echt in een
- * Tauri-venster draait, en zegt de knop in de browser eerlijk dat bijwerken
- * daar niet kan.
+ * The same bundle also runs in the browser (`scripts/webui.mjs`), where no
+ * Tauri API exists. So everything is loaded only once the app really runs in a
+ * Tauri window, and the button in the browser says honestly that updating is
+ * not possible there.
  */
 
 export interface UpdateInfo {
@@ -13,21 +13,21 @@ export interface UpdateInfo {
   readonly date?: string;
 }
 
-/** True als de UI in de desktop- of Android-app draait in plaats van de browser. */
+/** True when the UI runs in the desktop or Android app instead of the browser. */
 export function runsInApp(): boolean {
   if (typeof window === "undefined") return false;
   const scope = window as unknown as Record<string, unknown>;
   return "__TAURI_INTERNALS__" in scope || "__TAURI__" in scope;
 }
 
-/** Versie van de app die nu draait, of null in de browser. */
+/** Version of the app that is running now, or null in the browser. */
 export async function appVersion(): Promise<string | null> {
   if (!runsInApp()) return null;
   const { getVersion } = await import("@tauri-apps/api/app");
   return getVersion();
 }
 
-/** Kijkt of er een nieuwere versie in de release-feed staat. */
+/** Checks whether a newer version is up in the release feed. */
 export async function checkForUpdate(): Promise<UpdateInfo | null> {
   if (!runsInApp()) return null;
   const { check } = await import("@tauri-apps/plugin-updater");
@@ -41,14 +41,14 @@ export async function checkForUpdate(): Promise<UpdateInfo | null> {
 }
 
 /**
- * Haalt de update op, installeert hem en start de app opnieuw.
- * `onProgress` krijgt het aantal binnengehaalde en het totaal aantal bytes.
+ * Fetches the update, installs it and restarts the app.
+ * `onProgress` receives the number of bytes downloaded and the total.
  */
 export async function installUpdate(onProgress?: (done: number, total: number | null) => void): Promise<void> {
-  if (!runsInApp()) throw new Error("bijwerken kan alleen in de app, niet in de browser");
+  if (!runsInApp()) throw new Error("updating is only possible in the app, not in the browser");
   const { check } = await import("@tauri-apps/plugin-updater");
   const update = await check();
-  if (!update) throw new Error("er is geen update om te installeren");
+  if (!update) throw new Error("there is no update to install");
 
   let totaal: number | null = null;
   let gehaald = 0;

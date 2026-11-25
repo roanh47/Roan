@@ -228,7 +228,7 @@ export function buildRows(events: readonly ChainEvent[], local: string): Row[] {
       case "approval_request": {
         const data = event.data as { req?: unknown; tool?: unknown } | null | undefined;
         const req = typeof data?.req === "string" ? data.req : event.id;
-        const tool = typeof data?.tool === "string" ? data.tool : "een tool";
+        const tool = typeof data?.tool === "string" ? data.tool : "a tool";
         rows.push({ kind: "approval", key: event.id, req, tool, resolved: null });
         break;
       }

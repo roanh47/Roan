@@ -8,11 +8,11 @@ import type {
   PeerTransport,
 } from "./types.js";
 
-/** Aantal events per `events`-frame; houdt frames behapbaar op een langzame lijn. */
+/** Events per `events`-frame; keeps frames manageable on a slow line. */
 const SEND_BATCH = 200;
-/** Hoeveel van peers ontvangen id's we onthouden om echo's te dempen. */
+/** How many ids received from peers we remember to dampen echoes. */
 const ECHO_MEMORY = 2048;
-/** Bovengrens aan events die op een ontbrekende seq wachten. */
+/** Upper bound on events waiting for a missing seq. */
 const MAX_PENDING = 10_000;
 
 export type ReplicationStatus = "idle" | "live" | "conflicted" | "failed" | "closed";
@@ -38,9 +38,9 @@ export interface ReplicateOptions {
   store: NodeStore;
   transport: PeerTransport;
   logger: Logger;
-  /** Wordt één keer aangeroepen bij het eerste harde conflict. */
+  /** Called once on the first hard conflict. */
   onConflict?: (report: ConflictReport) => void;
-  /** Protocolfouten die niet over inhoud gaan (verkeerde keten, kapot frame). */
+  /** Protocol errors that are not about content (wrong chain, broken frame). */
   onError?: (error: SyncError) => void;
 }
 
@@ -75,32 +75,32 @@ function parseFrame(raw: string): Parsed {
   try {
     value = JSON.parse(raw);
   } catch {
-    return { kind: "bad", reason: "geen geldige JSON" };
+    return { kind: "bad", reason: "not valid JSON" };
   }
-  if (!isRecord(value)) return { kind: "bad", reason: "frame is geen object" };
+  if (!isRecord(value)) return { kind: "bad", reason: "frame is not an object" };
 
   const t = value["t"];
   if (t === "hello") {
     const chain = value["chain"];
     const node = value["node"];
     const haveSeq = value["haveSeq"];
-    if (value["v"] !== 1) return { kind: "bad", reason: "hello met onbekende versie" };
+    if (value["v"] !== 1) return { kind: "bad", reason: "hello with unknown version" };
     if (typeof chain !== "string" || typeof node !== "string") {
-      return { kind: "bad", reason: "hello zonder chain of node" };
+      return { kind: "bad", reason: "hello without chain or node" };
     }
     if (typeof haveSeq !== "number" || !Number.isInteger(haveSeq) || haveSeq < 0) {
-      return { kind: "bad", reason: "hello met ongeldige haveSeq" };
+      return { kind: "bad", reason: "hello with invalid haveSeq" };
     }
     return { kind: "frame", frame: { t: "hello", v: 1, chain, node, haveSeq } };
   }
 
   if (t === "events") {
     const events = value["events"];
-    if (!Array.isArray(events)) return { kind: "bad", reason: "events zonder lijst" };
+    if (!Array.isArray(events)) return { kind: "bad", reason: "events without a list" };
     const parsed: Event[] = [];
     for (const rawEvent of events) {
       const item: unknown = rawEvent;
-      if (!isEvent(item)) return { kind: "bad", reason: "events bevat een ongeldig event" };
+      if (!isEvent(item)) return { kind: "bad", reason: "events contains an invalid event" };
       parsed.push(item);
     }
     return { kind: "frame", frame: { t: "events", events: parsed } };
@@ -108,33 +108,33 @@ function parseFrame(raw: string): Parsed {
 
   if (t === "append") {
     const event = value["event"];
-    if (!isEvent(event)) return { kind: "bad", reason: "append zonder geldig event" };
+    if (!isEvent(event)) return { kind: "bad", reason: "append without a valid event" };
     return { kind: "frame", frame: { t: "append", event } };
   }
 
   if (typeof t === "string") return { kind: "foreign", t };
-  return { kind: "bad", reason: "frame zonder type" };
+  return { kind: "bad", reason: "frame without a type" };
 }
 
 /**
- * Replicatie van één keten naar één peer.
+ * Replication of one chain to one peer.
  *
- * Werking:
- * 1. Beide kanten sturen bij het starten een `hello` met hun hoogste seq.
- * 2. Wie achterloopt laat dat weten door (opnieuw) een `hello` te sturen; wie
- *    voorloopt antwoordt daarop met de events die de ander mist. Een expliciet
- *    request-frame is dus niet nodig: de hello is het verzoek.
- * 3. Bij gelijke seq stuurt de voorlopende kant één overlap-event (de anchor).
- *    Heeft de ander daar een andere id, dan is dat een hard conflict.
- * 4. Losse `append`-frames houden daarna de live gang erin.
+ * How it works:
+ * 1. On start both sides send a `hello` with their highest seq.
+ * 2. Whoever is behind says so by sending a `hello` (again); whoever is ahead
+ *    answers with the events the other is missing. An explicit request frame
+ *    is therefore unnecessary: the hello is the request.
+ * 3. At equal seq the leading side sends one overlap event (the anchor). If
+ *    the other has a different id there, that is a hard conflict.
+ * 4. Loose `append` frames keep the live flow going after that.
  */
 export class ReplicationSession {
   private statusValue: ReplicationStatus = "idle";
   private peerNode: string | undefined;
-  /** Hoogste seq waarvan we weten dat de peer hem heeft. */
+  /** Highest seq we know the peer has. */
   private lastSentSeq = 0;
   private readonly pending = new Map<number, Event>();
-  /** Ids die we van deze peer kregen; voorkomt dat we ze terugsturen. */
+  /** Ids we received from this peer; prevents sending them back. */
   private readonly remoteIds = new Set<string>();
   private readonly requested = new Set<string>();
   private readonly conflictList: ConflictReport[] = [];
@@ -163,12 +163,12 @@ export class ReplicationSession {
     return this.conflictList;
   }
 
-  /** Aantal events dat op een ontbrekende seq wacht. */
+  /** Number of events waiting for a missing seq. */
   get buffered(): number {
     return this.pending.size;
   }
 
-  /** Stuurt de eerste hello. Idempotent; nog een keer aanroepen is een nieuw verzoek. */
+  /** Sends the first hello. Idempotent; calling it again is a new request. */
   start(): this {
     this.sendHello("start");
     return this;
@@ -183,19 +183,19 @@ export class ReplicationSession {
     this.opts.transport.close(reason);
   }
 
-  // --- inkomend ---------------------------------------------------------
+  // --- incoming ---------------------------------------------------------
 
   private handleRaw(raw: string): void {
     if (this.statusValue === "conflicted" || this.statusValue === "failed" || this.closed) return;
 
     const parsed = parseFrame(raw);
     if (parsed.kind === "bad") {
-      this.fail(new SyncError("bad-frame", `ongeldig frame van ${this.opts.transport.label}: ${parsed.reason}`));
+      this.fail(new SyncError("bad-frame", `invalid frame from ${this.opts.transport.label}: ${parsed.reason}`));
       return;
     }
     if (parsed.kind === "foreign") {
-      // tool_req/tool_res en alles wat niet van replicatie is, laten we met rust.
-      this.opts.logger.debug("vreemd frame genegeerd", { t: parsed.t, peer: this.opts.transport.label });
+      // tool_req/tool_res and anything that is not replication we leave alone.
+      this.opts.logger.debug("ignored foreign frame", { t: parsed.t, peer: this.opts.transport.label });
       return;
     }
 
@@ -216,31 +216,31 @@ export class ReplicationSession {
   }
 
   /**
-   * Een peer die later aansluit krijgt geen hello terug maar direct events;
-   * ook dan is de handshake klaar en loopt de sessie.
+   * A peer that connects later gets no hello back but events directly; even
+   * then the handshake is done and the session is running.
    */
   private markLive(): void {
     if (this.statusValue !== "idle") return;
     this.statusValue = "live";
-    this.opts.logger.debug("sessie live", { peer: this.opts.transport.label });
+    this.opts.logger.debug("session live", { peer: this.opts.transport.label });
   }
 
   private onHello(frame: Extract<Frame, { t: "hello" }>): void {
     if (frame.v !== 1) {
-      this.fail(new SyncError("version-mismatch", `peer ${frame.node} spreekt protocol ${frame.v}`));
+      this.fail(new SyncError("version-mismatch", `peer ${frame.node} speaks protocol ${frame.v}`));
       return;
     }
     if (frame.chain !== this.opts.store.chain) {
       this.fail(
         new SyncError(
           "chain-mismatch",
-          `peer ${frame.node} stuurt keten "${frame.chain}", wij hebben "${this.opts.store.chain}"`,
+          `peer ${frame.node} sends chain "${frame.chain}", we have "${this.opts.store.chain}"`,
         ),
       );
       return;
     }
     if (frame.node === this.opts.store.nodeId) {
-      this.opts.logger.warn("hello van onszelf genegeerd", { peer: this.opts.transport.label });
+      this.opts.logger.warn("ignored hello from ourselves", { peer: this.opts.transport.label });
       return;
     }
 
@@ -249,10 +249,10 @@ export class ReplicationSession {
     const local = this.opts.store.head();
 
     if (frame.haveSeq > local) {
-      // Peer loopt voor: vraag de ontbrekende events op met een nieuwe hello.
-      // De sleutel voorkomt dat we bij elke herhaalde hello opnieuw gaan vragen.
+      // Peer is ahead: request the missing events with a new hello.
+      // The key prevents us from asking again on every repeated hello.
       const key = `${frame.node}:${frame.haveSeq}:${local}`;
-      this.opts.logger.info("peer loopt voor; ontbrekende events opgevraagd", {
+      this.opts.logger.info("peer is ahead; requested missing events", {
         peer: frame.node,
         peerSeq: frame.haveSeq,
         localSeq: local,
@@ -265,29 +265,29 @@ export class ReplicationSession {
       return;
     }
 
-    // Peer loopt achter of gelijk: wij sturen wat hij mist. Bij gelijke seq is dat
-    // precies één anchor-event, zodat hij een afwijkende id op die seq kan zien.
+    // Peer is behind or level: we send what it is missing. At equal seq that is
+    // exactly one anchor event, so it can spot a deviating id on that seq.
     this.lastSentSeq = Math.max(this.lastSentSeq, frame.haveSeq);
     this.sendSince(frame.haveSeq);
     this.lastSentSeq = Math.max(this.lastSentSeq, this.opts.store.head());
   }
 
-  /** Returns false als de sessie moet stoppen (conflict of fout). */
+  /** Returns false if the session must stop (conflict or error). */
   private applyRemote(event: Event): boolean {
     if (this.statusValue === "conflicted" || this.statusValue === "failed" || this.closed) return false;
 
     if (event.v !== 1) {
-      this.fail(new SyncError("invalid-event", `event ${event.id} heeft protocolversie ${event.v}`));
+      this.fail(new SyncError("invalid-event", `event ${event.id} has protocol version ${event.v}`));
       return false;
     }
     if (event.chain !== this.opts.store.chain) {
       this.fail(
-        new SyncError("invalid-event", `event ${event.id} hoort bij keten "${event.chain}"`),
+        new SyncError("invalid-event", `event ${event.id} belongs to chain "${event.chain}"`),
       );
       return false;
     }
     if (this.opts.store.has(event.id)) {
-      this.opts.logger.debug("dubbel event genegeerd", { id: event.id, seq: event.seq });
+      this.opts.logger.debug("ignored duplicate event", { id: event.id, seq: event.seq });
       return true;
     }
 
@@ -301,7 +301,7 @@ export class ReplicationSession {
         this.fail(
           new SyncError(
             "invalid-event",
-            `event ${event.id} ligt ${event.seq - head} voor op seq ${head}; dat is geen normale vertraging`,
+            `event ${event.id} is ${event.seq - head} ahead of seq ${head}; that is not normal lag`,
           ),
         );
         return false;
@@ -315,11 +315,11 @@ export class ReplicationSession {
       return ok;
     }
 
-    // seq <= head: bestaat er al iets op die plek?
+    // seq <= head: does something already exist at that spot?
     const existingId = this.opts.store.idAt(event.seq);
     if (existingId === undefined) {
       this.fail(
-        new SyncError("store-hole", `store heeft geen event op seq ${event.seq}, maar head is ${head}`),
+        new SyncError("store-hole", `store has no event at seq ${event.seq}, but head is ${head}`),
       );
       return false;
     }
@@ -329,21 +329,21 @@ export class ReplicationSession {
       this.reportDivergence(event.seq, existingId, event.id, event.node);
       return this.rebaseRemote(event);
     }
-    this.opts.logger.debug("event was al aanwezig", { id: event.id, seq: event.seq });
+    this.opts.logger.debug("event was already present", { id: event.id, seq: event.seq });
     return true;
   }
 
   /** One incoming event onto the local tail, whatever seq it arrived with. */
   private rebaseRemote(event: Event): boolean {
     if (this.opts.store.has(event.id)) {
-      this.opts.logger.debug("gerebased event al aanwezig", { id: event.id });
+      this.opts.logger.debug("rebased event already present", { id: event.id });
       return true;
     }
     const rebased: Event = { ...event, seq: this.opts.store.head() + 1 };
     const outcome: AppendOutcome = this.opts.store.append(rebased);
     if (outcome.status === "appended") {
       this.rememberRemoteId(event.id);
-      this.opts.logger.debug("tak gerebased", { id: event.id, seq: rebased.seq, vanSeq: event.seq });
+      this.opts.logger.debug("branch rebased", { id: event.id, seq: rebased.seq, vanSeq: event.seq });
       return true;
     }
     if (outcome.status === "duplicate") return true;
@@ -355,8 +355,8 @@ export class ReplicationSession {
     const queued = this.pending.get(event.seq);
     if (queued !== undefined) {
       if (queued.id !== event.id) {
-        // Twee verschillende events voor dezelfde seq, nog voor we konden
-        // appenden: ook hier overleeft de tak, in plaats van te blijven staan.
+        // Two different events for the same seq, before we could even
+        // append: here too the branch survives instead of getting stuck.
         this.reportDivergence(event.seq, queued.id, event.id, event.node);
         this.pending.delete(event.seq);
         this.rebaseRemote(event);
@@ -364,23 +364,23 @@ export class ReplicationSession {
       return;
     }
     this.pending.set(event.seq, event);
-    this.opts.logger.debug("event gebufferd tot het gat dicht is", {
+    this.opts.logger.debug("event buffered until the gap closes", {
       seq: event.seq,
       head: this.opts.store.head(),
     });
   }
 
   private appendRemote(event: Event): boolean {
-    // Voor de append registreren, zodat de subscribe-callback hem als echo herkent.
+    // Register before the append so the subscribe callback recognises it as an echo.
     this.rememberRemoteId(event.id);
     const outcome: AppendOutcome = this.opts.store.append(event);
     if (outcome.status === "appended") {
       this.lastSentSeq = Math.max(this.lastSentSeq, event.seq);
-      this.opts.logger.debug("event toegepast", { id: event.id, seq: event.seq, node: event.node });
+      this.opts.logger.debug("event applied", { id: event.id, seq: event.seq, node: event.node });
       return true;
     }
     if (outcome.status === "duplicate") {
-      this.opts.logger.debug("store noemde event dubbel", { id: event.id });
+      this.opts.logger.debug("store called event a duplicate", { id: event.id });
       return true;
     }
     this.reportDivergence(event.seq, outcome.existingId, event.id, event.node);
@@ -398,7 +398,7 @@ export class ReplicationSession {
     }
   }
 
-  // --- uitgaand ---------------------------------------------------------
+  // --- outgoing ---------------------------------------------------------
 
   private sendHello(reason: string): void {
     const frame: Frame = {
@@ -409,14 +409,14 @@ export class ReplicationSession {
       haveSeq: this.opts.store.head(),
     };
     this.opts.transport.send(frame);
-    this.opts.logger.debug("hello verstuurd", {
+    this.opts.logger.debug("hello sent", {
       reason,
       haveSeq: frame.haveSeq,
       peer: this.opts.transport.label,
     });
   }
 
-  /** Stuurt alles vanaf `from` (inclusief), in batches. */
+  /** Sends everything from `from` (inclusive), in batches. */
   private sendSince(from: number): void {
     const events = this.opts.store.since(Math.max(0, from));
     if (events.length === 0) return;
@@ -424,7 +424,7 @@ export class ReplicationSession {
       const batch: Frame = { t: "events", events: events.slice(i, i + SEND_BATCH) };
       this.opts.transport.send(batch);
     }
-    this.opts.logger.debug("events verstuurd", {
+    this.opts.logger.debug("events sent", {
       from,
       count: events.length,
       peer: this.opts.transport.label,
@@ -446,9 +446,9 @@ export class ReplicationSession {
     }
 
     if (event.seq !== this.lastSentSeq + 1) {
-      // De peer mist geschiedenis (of we weten niet beter): stuur de reeks opnieuw
-      // in plaats van een los event dat hij toch niet kan plaatsen.
-      this.opts.logger.debug("gat in wat de peer heeft; catch-up verstuurd", {
+      // The peer is missing history (or we know no better): send the sequence again
+      // instead of a loose event it cannot place anyway.
+      this.opts.logger.debug("gap in what the peer has; catch-up sent", {
         seq: event.seq,
         peerHas: this.lastSentSeq,
       });
@@ -461,7 +461,7 @@ export class ReplicationSession {
     this.opts.transport.send({ t: "append", event });
   }
 
-  // --- afsluiten --------------------------------------------------------
+  // --- shutting down ----------------------------------------------------
 
   /**
    * A divergence, reported but never fatal: the report stays visible for
@@ -484,7 +484,7 @@ export class ReplicationSession {
     if (this.conflictList.some((entry) => entry.remoteId === remoteId && entry.localId === localId)) return;
     this.conflictList.push(report);
     this.opts.logger.warn(
-      `tak op seq ${seq}: lokale id ${localId}, remote id ${remoteId}; de remote tak rebase achter de onze`,
+      `branch at seq ${seq}: local id ${localId}, remote id ${remoteId}; the remote branch rebases behind ours`,
       { ...report },
     );
     this.opts.onConflict?.(report);
@@ -507,8 +507,8 @@ export class ReplicationSession {
     this.unsubscribe();
     this.pending.clear();
     this.statusValue = "closed";
-    this.opts.logger.info("verbinding met peer gesloten", {
-      reason: reason ?? "onbekend",
+    this.opts.logger.info("connection with peer closed", {
+      reason: reason ?? "unknown",
       peer: this.opts.transport.label,
     });
   }
@@ -521,7 +521,7 @@ export class ReplicationSession {
   }
 }
 
-/** Maakt en start een replicatiesessie voor één keten en één peer. */
+/** Creates and starts a replication session for one chain and one peer. */
 export function replicate(options: ReplicateOptions): ReplicationSession {
   return new ReplicationSession(options).start();
 }

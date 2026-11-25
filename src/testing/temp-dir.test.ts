@@ -16,7 +16,7 @@ async function exists(target: string): Promise<boolean> {
 }
 
 describe("makeTempDir", () => {
-  it("maakt een bestaande map onder de tmpdir met het gevraagde voorvoegsel", async () => {
+  it("creates an existing directory under the tmpdir with the requested prefix", async () => {
     const dir = await makeTempDir("roan-temp-test-");
     try {
       assert.ok(path.isAbsolute(dir), dir);
@@ -28,7 +28,7 @@ describe("makeTempDir", () => {
     }
   });
 
-  it("geeft per aanroep een eigen map, ook bij hetzelfde voorvoegsel", async () => {
+  it("gives each call its own directory, even with the same prefix", async () => {
     const first = await makeTempDir("roan-temp-uniek-");
     const second = await makeTempDir("roan-temp-uniek-");
     try {
@@ -41,7 +41,7 @@ describe("makeTempDir", () => {
     }
   });
 
-  it("weigert een leeg voorvoegsel en noemt de invoer", async () => {
+  it("rejects an empty prefix and names the input", async () => {
     await assert.rejects(makeTempDir(""), (cause: unknown) => {
       assert.ok(cause instanceof Error);
       assert.match(cause.message, /prefix must not be empty/u);
@@ -49,14 +49,14 @@ describe("makeTempDir", () => {
     });
   });
 
-  it("weigert een voorvoegsel met een padscheidingsteken en noemt de invoer", async () => {
+  it("rejects a prefix with a path separator and names the input", async () => {
     for (const prefix of ["roan/sub", "roan\\sub"]) {
       await assert.rejects(makeTempDir(prefix), (cause: unknown) => {
         assert.ok(cause instanceof Error);
         assert.match(cause.message, /path separator/u);
         assert.ok(
           cause.message.includes(JSON.stringify(prefix)),
-          `verwachtte ${JSON.stringify(prefix)} in "${cause.message}"`,
+          `expected ${JSON.stringify(prefix)} in "${cause.message}"`,
         );
         return true;
       });
@@ -65,7 +65,7 @@ describe("makeTempDir", () => {
 });
 
 describe("removeTempDir", () => {
-  it("verwijdert een map met inhoud, inclusief submappen", async () => {
+  it("removes a directory with contents, including subdirectories", async () => {
     const dir = await makeTempDir("roan-temp-rm-");
     const nested = path.join(dir, "sub");
     await fs.mkdir(nested);
@@ -77,7 +77,7 @@ describe("removeTempDir", () => {
     assert.equal(await exists(dir), false);
   });
 
-  it("tolereert een pad dat al weg is", async () => {
+  it("tolerates a path that is already gone", async () => {
     const dir = await makeTempDir("roan-temp-weg-");
     await removeTempDir(dir);
     assert.equal(await exists(dir), false);
@@ -88,7 +88,7 @@ describe("removeTempDir", () => {
 });
 
 describe("withTempDir", () => {
-  it("geeft een werkende map aan de callback en ruimt die daarna op", async () => {
+  it("gives the callback a working directory and cleans it up afterwards", async () => {
     let seen = "";
     const result = await withTempDir(async (dir) => {
       seen = dir;
@@ -102,7 +102,7 @@ describe("withTempDir", () => {
     assert.equal(await exists(seen), false);
   });
 
-  it("geeft de waarde van de callback terug, ook als die geen string is", async () => {
+  it("returns the callback value, even when it is not a string", async () => {
     const value = await withTempDir(async (dir) => ({
       dir,
       answer: 42,
@@ -113,7 +113,7 @@ describe("withTempDir", () => {
     assert.equal(await exists(value.dir), false);
   });
 
-  it("ruimt de map op en gooit de fout opnieuw als de callback gooit", async () => {
+  it("cleans up the directory and rethrows the error when the callback throws", async () => {
     let seen = "";
     const boom = new Error("opzettelijke fout");
 
@@ -130,7 +130,7 @@ describe("withTempDir", () => {
     assert.equal(await exists(seen), false);
   });
 
-  it("ruimt ook op als de callback synchroon gooit", async () => {
+  it("also cleans up when the callback throws synchronously", async () => {
     let seen = "";
     const boom = new Error("synchroon");
 
@@ -146,7 +146,7 @@ describe("withTempDir", () => {
     assert.equal(await exists(seen), false);
   });
 
-  it("gebruikt het opgegeven voorvoegsel voor de mapnaam", async () => {
+  it("uses the given prefix for the directory name", async () => {
     let seen = "";
     await withTempDir(async (dir) => {
       seen = dir;

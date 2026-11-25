@@ -6,17 +6,17 @@ export interface GlobOptions {
   limit?: number;
 }
 
-/** Harde bovengrens, ongeacht wat de aanroeper vraagt. */
+/** Hard upper bound, regardless of what the caller asks for. */
 const MAX_RESULTS = 500;
 
-/** Mappen die we nooit inlopen: te groot en nooit interessant voor de agent. */
+/** Directories we never enter: too large and never interesting to the agent. */
 const IGNORED_DIRS = new Set(["node_modules", ".git"]);
 
 const segmentCache = new Map<string, RegExp>();
 
 /**
- * Eén glob-segment (`*` en `?`, geen `/`) naar een regex.
- * Het resultaat wordt gecachet: patronen herhalen zich vaak per map.
+ * One glob segment (`*` and `?`, no `/`) to a regex.
+ * The result is cached: patterns often repeat per directory.
  */
 function segmentToRegExp(segment: string): RegExp {
   const cached = segmentCache.get(segment);
@@ -33,16 +33,16 @@ function segmentToRegExp(segment: string): RegExp {
 }
 
 /**
- * `*` matcht binnen één segment, `?` één teken. Een naam die met een punt
- * begint matcht alleen als het patroon zelf met een punt begint; zo blijven
- * verborgen mappen buiten beeld tenzij ze expliciet genoemd worden.
+ * `*` matches within one segment, `?` one character. A name that starts with
+ * a dot only matches if the pattern itself starts with a dot; that way
+ * hidden directories stay out of sight unless they are named explicitly.
  */
 function matchesSegment(segment: string, name: string): boolean {
   if (name.startsWith(".") && !segment.startsWith(".")) return false;
   return segmentToRegExp(segment).test(name);
 }
 
-/** Maak van een pad-patroon een lijst segmenten, zonder lege stukken. */
+/** Turns a path pattern into a list of segments, without empty pieces. */
 function normalizePattern(pattern: string): string[] {
   let value = pattern.trim().replace(/\\/g, "/");
   while (value.startsWith("./")) value = value.slice(2);
@@ -61,12 +61,12 @@ async function readEntries(dir: string): Promise<Dirent[] | null> {
   try {
     return await fs.readdir(dir, { withFileTypes: true });
   } catch {
-    // Onleesbare of verdwenen map: overslaan, nooit laten klappen.
+    // Unreadable or vanished directory: skip it, never let it crash.
     return null;
   }
 }
 
-/** Bewaar een treffer als pad relatief aan cwd, met forward slashes. */
+/** Stores a hit as a path relative to cwd, with forward slashes. */
 function addMatch(absolute: string, state: WalkState): void {
   const relative = path.relative(state.cwd, absolute).split(path.sep).join("/");
   if (relative === "" || relative.startsWith("..") || path.isAbsolute(relative)) return;
@@ -76,8 +76,8 @@ function addMatch(absolute: string, state: WalkState): void {
 }
 
 /**
- * Loop een map in en probeer `state.segments[index]` en verder te matchen.
- * `base` is het relatieve pad van `dir` ten opzichte van cwd.
+ * Walks into a directory and tries to match `state.segments[index]` and beyond.
+ * `base` is the relative path of `dir` with respect to cwd.
  */
 async function walk(dir: string, base: string, index: number, state: WalkState): Promise<void> {
   const segments = state.segments;
@@ -88,7 +88,7 @@ async function walk(dir: string, base: string, index: number, state: WalkState):
   if (!entries) return;
 
   if (segment === "**") {
-    // `**` matcht nul segmenten: probeer meteen het volgende patroondeel.
+    // `**` matches zero segments: try the next pattern part right away.
     if (index + 1 < segments.length) await walk(dir, base, index + 1, state);
     for (const entry of entries) {
       if (entry.isDirectory()) {
@@ -96,7 +96,7 @@ async function walk(dir: string, base: string, index: number, state: WalkState):
         const childBase = base === "" ? entry.name : `${base}/${entry.name}`;
         await walk(path.join(dir, entry.name), childBase, index, state);
       } else if (index + 1 === segments.length && !entry.name.startsWith(".")) {
-        // `**` slokt dit bestand op als laatste segment.
+        // `**` swallows this file as the last segment.
         addMatch(path.join(dir, entry.name), state);
       }
     }
@@ -117,9 +117,9 @@ async function walk(dir: string, base: string, index: number, state: WalkState):
 }
 
 /**
- * Zoek bestanden onder `cwd` die aan `pattern` voldoen en geef ze gesorteerd
- * terug als relatieve paden met forward slashes. Ontbrekende of onleesbare
- * mappen leveren een lege lijst op in plaats van een fout.
+ * Finds files under `cwd` that match `pattern` and returns them sorted as
+ * relative paths with forward slashes. Missing or unreadable directories
+ * yield an empty list instead of an error.
  */
 export async function glob(pattern: string, cwd: string, options: GlobOptions = {}): Promise<string[]> {
   const requested = options.limit ?? MAX_RESULTS;
@@ -143,7 +143,7 @@ export async function glob(pattern: string, cwd: string, options: GlobOptions = 
   try {
     await walk(root, "", 0, state);
   } catch {
-    // Geen harde fout: geef terug wat we tot nu toe hebben.
+    // Not a hard error: return what we have so far.
   }
   state.matches.sort();
   return state.matches.slice(0, limit);

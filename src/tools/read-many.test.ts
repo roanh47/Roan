@@ -6,9 +6,9 @@ import path from "node:path";
 import { readMany } from "./read-many.js";
 
 /**
- * Tests staan naast de code (src/tools/) omdat `npm test` node --test over de
- * gecompileerde dist/**\/*.test.js laat lopen; een top-level tests/ map zou
- * buiten rootDir van tsconfig vallen.
+ * Tests live next to the code (src/tools/) because `npm test` runs node --test
+ * over the compiled dist/**\/*.test.js; a top-level tests/ directory would fall
+ * outside the rootDir of tsconfig.
  */
 
 async function withTempDir(fn: (dir: string) => Promise<void>): Promise<void> {
@@ -21,7 +21,7 @@ async function withTempDir(fn: (dir: string) => Promise<void>): Promise<void> {
 }
 
 describe("readMany", () => {
-  it("leest drie kleine bestanden en sorteert op pad", async () => {
+  it("reads three small files and sorts by path", async () => {
     await withTempDir(async (dir) => {
       const c = path.join(dir, "c.txt");
       const a = path.join(dir, "a.txt");
@@ -46,7 +46,7 @@ describe("readMany", () => {
     });
   });
 
-  it("meldt een ontbrekend bestand als fout zonder te gooien", async () => {
+  it("reports a missing file as an error without throwing", async () => {
     await withTempDir(async (dir) => {
       const ok = path.join(dir, "ok.txt");
       const missing = path.join(dir, "ontbreekt.txt");
@@ -59,7 +59,7 @@ describe("readMany", () => {
       assert.ok(failed !== undefined);
       assert.equal(failed.ok, false);
       assert.equal(failed.path, missing);
-      if (failed.ok) throw new Error("verwachtte een fout");
+      if (failed.ok) throw new Error("expected an error");
       assert.ok(failed.error.length > 0);
       assert.ok(failed.error.includes("ontbreekt.txt"), failed.error);
       assert.equal(result.truncated, false);
@@ -67,7 +67,7 @@ describe("readMany", () => {
     });
   });
 
-  it("rapporteert een binair bestand als fout in plaats van het te decoderen", async () => {
+  it("reports a binary file as an error instead of decoding it", async () => {
     await withTempDir(async (dir) => {
       const text = path.join(dir, "tekst.txt");
       const binary = path.join(dir, "beeld.bin");
@@ -83,7 +83,7 @@ describe("readMany", () => {
     });
   });
 
-  it("kapt af op het tekenbudget en markeert de rest", async () => {
+  it("cuts off at the character budget and marks the rest", async () => {
     await withTempDir(async (dir) => {
       const first = path.join(dir, "a.txt");
       const second = path.join(dir, "b.txt");
@@ -97,7 +97,7 @@ describe("readMany", () => {
       assert.ok(head !== undefined && tail !== undefined);
       assert.equal(head.path, first);
       assert.equal(head.ok, true);
-      if (!head.ok) throw new Error("verwachtte tekst");
+      if (!head.ok) throw new Error("expected text");
       assert.ok(head.text.startsWith("012345"));
       assert.ok(head.text.endsWith("[truncated]"), head.text);
       assert.deepEqual(tail, { path: second, ok: false, error: "not read: character budget exhausted" });
@@ -106,7 +106,7 @@ describe("readMany", () => {
     });
   });
 
-  it("leest niets zodra het budget nul is", async () => {
+  it("reads nothing once the budget is zero", async () => {
     await withTempDir(async (dir) => {
       const file = path.join(dir, "leeg-budget.txt");
       await fs.writeFile(file, "x", "utf8");

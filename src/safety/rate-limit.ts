@@ -42,7 +42,7 @@ export interface Limiter {
   readonly burst: number;
   /** Takes one token for `tool` at `nowMs`, or reports how long to wait. */
   take(tool: string, nowMs: number): TakeResult;
-  /** Dutch policy lines for this limiter; same output as `describeLimiter`. */
+  /** Policy lines for this limiter; same output as `describeLimiter`. */
   describeLimiter(): string[];
 }
 
@@ -126,13 +126,13 @@ function formatMs(value: number): string {
   return String(Math.round(value * 1_000) / 1_000);
 }
 
-/** Short Dutch policy lines for a limiter. */
+/** Short policy lines for a limiter. */
 export function describeLimiter(limiter: Limiter): string[] {
   return [
-    `Limiet: ${String(limiter.perMinute)} tokens per minuut, burst van ${String(limiter.burst)}.`,
-    `Herstel: één token per ${formatMs(UNITS_PER_TOKEN / limiter.perMinute)} ms.`,
-    "Buckets: één per tool, lui aangemaakt en direct vol.",
-    "Klok: de tijd wordt altijd meegegeven; deze limiter zet zelf geen timers.",
+    `Limit: ${String(limiter.perMinute)} tokens per minute, burst of ${String(limiter.burst)}.`,
+    `Recovery: one token per ${formatMs(UNITS_PER_TOKEN / limiter.perMinute)} ms.`,
+    "Buckets: one per tool, created lazily and full right away.",
+    "Clock: the time is always passed in; this limiter sets no timers itself.",
   ];
 }
 

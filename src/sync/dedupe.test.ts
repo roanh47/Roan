@@ -12,14 +12,14 @@ function ids(events: readonly Event[]): string[] {
 }
 
 describe("dedupeEvents", () => {
-  it("lege invoer levert niets op", () => {
+  it("empty input yields nothing", () => {
     const result = dedupeEvents([]);
     assert.deepEqual(result.kept, []);
     assert.deepEqual(result.dropped, []);
     assert.deepEqual(result.duplicateIds, []);
   });
 
-  it("unieke events blijven allemaal staan", () => {
+  it("unique events all stay in", () => {
     const events = [event(1), event(2), event(3)];
     const result = dedupeEvents(events);
     assert.deepEqual(ids(result.kept), ["a-1", "a-2", "a-3"]);
@@ -27,7 +27,7 @@ describe("dedupeEvents", () => {
     assert.deepEqual(result.duplicateIds, []);
   });
 
-  it("dubbel id: de eerste blijft, de rest gaat naar dropped", () => {
+  it("duplicate id: the first stays, the rest goes to dropped", () => {
     const events = [event(1, "x"), event(1, "x"), event(2, "y")];
     const result = dedupeEvents(events);
     assert.deepEqual(ids(result.kept), ["x", "y"]);
@@ -36,7 +36,7 @@ describe("dedupeEvents", () => {
     assert.equal(result.kept[0], events[0]);
   });
 
-  it("zelfde seq met andere id is een mismatch en wordt gedropt", () => {
+  it("same seq with another id is a mismatch and gets dropped", () => {
     const events = [event(1, "x"), event(1, "z"), event(2, "y")];
     const result = dedupeEvents(events);
     assert.deepEqual(ids(result.kept), ["x", "y"]);
@@ -44,7 +44,7 @@ describe("dedupeEvents", () => {
     assert.deepEqual(result.duplicateIds, ["z"]);
   });
 
-  it("mismatch en dubbel id samen: duplicateIds is gesorteerd en uniek", () => {
+  it("mismatch and duplicate id together: duplicateIds is sorted and unique", () => {
     const events = [
       event(1, "m"),
       event(1, "z"),
@@ -59,7 +59,7 @@ describe("dedupeEvents", () => {
     assert.deepEqual(result.duplicateIds, ["a", "b", "z"]);
   });
 
-  it("de volgorde van de invoer blijft behouden", () => {
+  it("the order of the input is preserved", () => {
     const events = [event(3, "c"), event(1, "a"), event(2, "b")];
     const result = dedupeEvents(events);
     assert.deepEqual(ids(result.kept), ["c", "a", "b"]);
@@ -69,7 +69,7 @@ describe("dedupeEvents", () => {
     );
   });
 
-  it("de invoer wordt niet aangepast", () => {
+  it("the input is not modified", () => {
     const events = [event(1, "x"), event(1, "x"), event(1, "z")];
     const before = events.slice();
     dedupeEvents(events);

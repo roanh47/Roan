@@ -1,22 +1,22 @@
 import type { Event } from "./types.js";
 
-/** Uitkomst van het opschonen van een reeks events. */
+/** Result of cleaning up a series of events. */
 export interface DedupeResult {
-  /** Eerste event per id, in de volgorde van de invoer. */
+  /** First event per id, in input order. */
   kept: Event[];
-  /** Events die zijn overgeslagen, in de volgorde van de invoer. */
+  /** Events that were skipped, in input order. */
   dropped: Event[];
-  /** Alle ids die minstens één keer zijn overgeslagen, alfabetisch gesorteerd. */
+  /** All ids skipped at least once, sorted alphabetically. */
   duplicateIds: string[];
 }
 
 /**
- * Houdt het eerste event per id en per seq.
+ * Keeps the first event per id and per seq.
  *
- * De keten kent twee vormen van dubbel: hetzelfde id nog een keer (exacte
- * herhaling) en dezelfde seq met een andere id (het event past niet op die
- * plek). Beide gaan naar `dropped`; de id van het overgeslagen event komt in
- * `duplicateIds`. De invoer wordt nooit aangepast.
+ * The chain knows two forms of duplicate: the same id again (exact
+ * repetition) and the same seq with a different id (the event does not fit at
+ * that spot). Both go to `dropped`; the id of the skipped event ends up in
+ * `duplicateIds`. The input is never modified.
  */
 export function dedupeEvents(events: readonly Event[]): DedupeResult {
   const kept: Event[] = [];

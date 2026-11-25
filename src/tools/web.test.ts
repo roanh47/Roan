@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { parseDuckDuckGoLite, parseWikiOpenSearch } from "./web.js";
+import { parseBingRss, parseDuckDuckGoLite, parseWikiOpenSearch } from "./web.js";
 
 const FIXTURE = `<html><body><table>
 <tr><td><a class="result-link" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fvoorbeeld.nl%2Fpoorten&amp;rut=abc">Poorten en <b>adres</b>sen</a></td></tr>
@@ -10,6 +10,27 @@ const FIXTURE = `<html><body><table>
 <tr><td class="result-snippet">Snippets volgen.</td></tr>
 <tr><td><a class="result-link" href="http://onveilig.example">Alleen http</a></td></tr>
 </table></body></html>`;
+
+test("the Bing RSS lane turns items into cited hits", () => {
+  const xml = `<?xml version="1.0"?><rss version="2.0"><channel><title>Bing: hanze</title>
+    <item><title>Hanze University</title><link>https://www.hanze.nl/en</link>
+    <description>Applied sciences in the north of the Netherlands &amp; beyond.</description></item>
+    <item><title>Hanzehogeschool &lt;wiki&gt;</title><link>https://nl.wikipedia.org/wiki/Hanzehogeschool</link>
+    <description><![CDATA[De <b>Hanzehogeschool</b> is een instelling.]]></description></item>
+    <item><title>Insecure</title><link>http://example.org/x</link><description>no</description></item>
+  </channel></rss>`;
+  const hits = parseBingRss(xml);
+  assert.equal(hits.length, 2);
+  assert.deepEqual(hits[0], {
+    title: "Hanze University",
+    url: "https://www.hanze.nl/en",
+    snippet: "Applied sciences in the north of the Netherlands & beyond.",
+  });
+  assert.equal(hits[1]?.title, "Hanzehogeschool <wiki>");
+  assert.equal(hits[1]?.snippet, "De Hanzehogeschool is een instelling.");
+  assert.equal(parseBingRss(xml, 1).length, 1);
+  assert.deepEqual(parseBingRss("<html>not a feed</html>"), []);
+});
 
 test("the parser turns a lite results page into cited hits", () => {
   const hits = parseDuckDuckGoLite(FIXTURE);

@@ -33,7 +33,7 @@ function assertFieldError(fn: () => unknown, field: string, value: string): void
 }
 
 describe("buildMsixManifest", () => {
-  it("bouwt een volledig manifest uit goede invoer", () => {
+  it("builds a complete manifest from good input", () => {
     const manifest = buildMsixManifest(GOOD_INFO);
 
     assert.deepEqual(manifest, {
@@ -47,13 +47,13 @@ describe("buildMsixManifest", () => {
     });
   });
 
-  it("accepteert een lege capability-lijst", () => {
+  it("accepts an empty capability list", () => {
     const manifest = buildMsixManifest({ ...GOOD_INFO, capabilities: [] });
 
     assert.deepEqual(manifest.capabilities, []);
   });
 
-  it("wijst een pakketnaam met een ongeldig teken af, met de veldnaam erbij", () => {
+  it("rejects a package name with an invalid character, naming the field", () => {
     assertFieldError(
       () => buildMsixManifest({ ...GOOD_INFO, identityName: "Roan.Heemstra App" }),
       "identityName",
@@ -66,7 +66,7 @@ describe("buildMsixManifest", () => {
     );
   });
 
-  it("wijst een pakketnaam af die niet alfanumeriek begint of eindigt", () => {
+  it("rejects a package name that does not start or end alphanumerically", () => {
     assertFieldError(
       () => buildMsixManifest({ ...GOOD_INFO, identityName: "-Roan.App" }),
       "identityName",
@@ -79,7 +79,7 @@ describe("buildMsixManifest", () => {
     );
   });
 
-  it("wijst een pakketnaam af die te kort of te lang is", () => {
+  it("rejects a package name that is too short or too long", () => {
     assertFieldError(
       () => buildMsixManifest({ ...GOOD_INFO, identityName: "Ro" }),
       "identityName",
@@ -90,7 +90,7 @@ describe("buildMsixManifest", () => {
       "identityName",
       "R".repeat(51),
     );
-    // 3 en 50 tekens zijn de randen en moeten wel mogen.
+    // 3 and 50 characters are the boundaries and must be allowed.
     assert.equal(buildMsixManifest({ ...GOOD_INFO, identityName: "R.R" }).identity.name, "R.R");
     assert.equal(
       buildMsixManifest({ ...GOOD_INFO, identityName: "R".repeat(50) }).identity.name,
@@ -98,7 +98,7 @@ describe("buildMsixManifest", () => {
     );
   });
 
-  it("wijst een versie met drie delen af", () => {
+  it("rejects a version with three parts", () => {
     assertFieldError(
       () => buildMsixManifest({ ...GOOD_INFO, version: "1.2.3" }),
       "version",
@@ -106,7 +106,7 @@ describe("buildMsixManifest", () => {
     );
   });
 
-  it("wijst een versie met een niet-numeriek deel of te grote delen af", () => {
+  it("rejects a version with a non-numeric part or parts that are too large", () => {
     assertFieldError(
       () => buildMsixManifest({ ...GOOD_INFO, version: "1.2.3.x" }),
       "version",
@@ -128,7 +128,7 @@ describe("buildMsixManifest", () => {
     );
   });
 
-  it("wijst een onbekende architectuur af", () => {
+  it("rejects an unknown architecture", () => {
     const bad = {
       ...GOOD_INFO,
       architecture: "arm",
@@ -138,7 +138,7 @@ describe("buildMsixManifest", () => {
     assert.throws(() => buildMsixManifest(bad), /x64, x86, arm64/);
   });
 
-  it("wijst een publisher af die geen distinguished name is", () => {
+  it("rejects a publisher that is not a distinguished name", () => {
     assertFieldError(
       () => buildMsixManifest({ ...GOOD_INFO, publisher: "Roan Heemstra" }),
       "publisher",
@@ -146,7 +146,7 @@ describe("buildMsixManifest", () => {
     );
   });
 
-  it("wijst een capability met spaties of vreemde tekens af", () => {
+  it("rejects a capability with spaces or strange characters", () => {
     assertFieldError(
       () => buildMsixManifest({ ...GOOD_INFO, capabilities: ["runFullTrust", "bad name"] }),
       "capability",
@@ -156,7 +156,7 @@ describe("buildMsixManifest", () => {
 });
 
 describe("renderMsixManifest", () => {
-  it("rendert de identity en de capabilities als XML-fragment", () => {
+  it("renders the identity and the capabilities as an XML fragment", () => {
     const xml = renderMsixManifest(buildMsixManifest(GOOD_INFO));
 
     assert.ok(xml.includes('<Identity\n    Name="Roan.Heemstra.App"'), xml);
@@ -172,14 +172,14 @@ describe("renderMsixManifest", () => {
     assert.ok(xml.endsWith("</Package>\n"), xml);
   });
 
-  it("rendert een leeg Capabilities-element zonder capabilities", () => {
+  it("renders an empty Capabilities element without capabilities", () => {
     const xml = renderMsixManifest(buildMsixManifest({ ...GOOD_INFO, capabilities: [] }));
 
     assert.ok(xml.includes("  <Capabilities />"), xml);
     assert.ok(!xml.includes("<Capability "), xml);
   });
 
-  it("escapet een quote en een ampersand in de publisher", () => {
+  it("escapes a quote and an ampersand in the publisher", () => {
     const xml = renderMsixManifest(
       buildMsixManifest({
         ...GOOD_INFO,
@@ -191,17 +191,17 @@ describe("renderMsixManifest", () => {
       xml.includes('Publisher="CN=Roan &amp; &quot;Zonen&quot;, O=Roan"'),
       xml,
     );
-    // De ruwe waarde mag nergens meer in de attribuutwaarde staan.
+    // The raw value must no longer appear anywhere in the attribute value.
     assert.ok(!xml.includes('"Zonen"'), xml);
     assert.ok(!xml.includes("Roan & "), xml);
   });
 
-  it("escapet alle vijf de XML-attribuuttekens in een losse waarde", () => {
+  it("escapes all five XML attribute characters in a loose value", () => {
     assert.equal(escapeXmlAttribute(`<a href="x">&'</a>`), "&lt;a href=&quot;x&quot;&gt;&amp;&apos;&lt;/a&gt;");
     assert.equal(escapeXmlAttribute("gewoon tekst"), "gewoon tekst");
   });
 
-  it("waarschuwt ook bij een handmatig gebouwd manifest met een slechte versie", () => {
+  it("also warns on a hand-built manifest with a bad version", () => {
     const handBuilt = {
       identity: {
         name: "Roan.Heemstra.App",

@@ -6,9 +6,9 @@ import path from "node:path";
 import { grep } from "./search.js";
 
 /**
- * Tests staan naast de code (src/tools/) omdat `npm test` node --test over de
- * gecompileerde dist/**\/*.test.js laat lopen; een top-level tests/ map zou
- * buiten rootDir van tsconfig vallen.
+ * Tests live next to the code (src/tools/) because `npm test` runs node --test
+ * over the compiled dist/**\/*.test.js; a top-level tests/ directory would fall
+ * outside the rootDir of tsconfig.
  */
 
 async function withTempDir(fn: (dir: string) => Promise<void>): Promise<void> {
@@ -27,7 +27,7 @@ async function write(dir: string, rel: string, content: string | Buffer): Promis
 }
 
 describe("grep", () => {
-  it("vindt treffers met 1-based regelnummers", async () => {
+  it("finds hits with 1-based line numbers", async () => {
     await withTempDir(async (dir) => {
       await write(dir, "a.ts", ["const alpha = 1;", "const beta = 2;", "const alpha = 3;", ""].join("\n"));
 
@@ -48,7 +48,7 @@ describe("grep", () => {
     });
   });
 
-  it("respecteert maxResults en zet truncated", async () => {
+  it("respects maxResults and sets truncated", async () => {
     await withTempDir(async (dir) => {
       await write(dir, "many.txt", Array.from({ length: 6 }, (_, i) => `hit ${i}`).join("\n") + "\n");
 
@@ -62,7 +62,7 @@ describe("grep", () => {
     });
   });
 
-  it("slaat binaire bestanden over", async () => {
+  it("skips binary files", async () => {
     await withTempDir(async (dir) => {
       await write(dir, "text.txt", "NEEDLE in tekst\n");
       await write(dir, "blob.bin", Buffer.from([0x4e, 0x45, 0x45, 0x44, 0x4c, 0x45, 0x00, 0xff, 0x10]));
@@ -76,7 +76,7 @@ describe("grep", () => {
     });
   });
 
-  it("geeft een error-string in plaats van te gooien bij een ongeldige regex", async () => {
+  it("returns an error string instead of throwing on an invalid regex", async () => {
     await withTempDir(async (dir) => {
       await write(dir, "a.ts", "const alpha = 1;\n");
 
@@ -88,7 +88,7 @@ describe("grep", () => {
     });
   });
 
-  it("meldt een ontbrekend pad zonder te gooien", async () => {
+  it("reports a missing path without throwing", async () => {
     await withTempDir(async (dir) => {
       const missing = path.join(dir, "bestaat-niet");
 
@@ -100,7 +100,7 @@ describe("grep", () => {
     });
   });
 
-  it("ondersteunt ignoreCase, literal en include", async () => {
+  it("supports ignoreCase, literal and include", async () => {
     await withTempDir(async (dir) => {
       await write(dir, "code.ts", "const HELLO = 'axb';\n");
       await write(dir, "notes.md", "hello en axb\n");
@@ -129,7 +129,7 @@ describe("grep", () => {
       const dotRegex = await grep("a.b", dir);
       assert.equal(dotRegex.matches.length, 2);
 
-      // `include` is een extensiefilter (".ts" of "ts"), geen glob.
+      // `include` is an extension filter (".ts" or "ts"), not a glob.
       const onlyTs = await grep("axb", dir, { include: ".ts" });
       assert.equal(onlyTs.matches.length, 1);
       const tsHit = onlyTs.matches[0];

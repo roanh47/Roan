@@ -1,9 +1,9 @@
 /**
- * Twee echte nodes, twee echte sockets: replicatie van begin tot eind.
+ * Two real nodes, two real sockets: replication from start to finish.
  *
- * De unit-tests dekken de losse onderdelen met nep-transports. Deze test doet
- * hetzelfde over een WebSocketServer, zodat de combinatie van store, transport
- * en replicatie zich gedraagt zoals in de daemon.
+ * The unit tests cover the individual parts with fake transports. This test
+ * does the same over a WebSocketServer, so the combination of store, transport
+ * and replication behaves the way it does in the daemon.
  */
 
 import assert from "node:assert/strict";
@@ -36,7 +36,7 @@ function event(seq: number, node: string, id = `${node}-${seq}`): Event {
 function seed(store: MemoryStore, count: number, node: string): void {
   for (let seq = store.head() + 1; seq <= count; seq++) {
     const outcome = store.append(event(seq, node));
-    assert.equal(outcome.status, "appended", `seed van seq ${seq} moet lukken`);
+    assert.equal(outcome.status, "appended", `seed of seq ${seq} should succeed`);
   }
 }
 
@@ -57,8 +57,8 @@ interface Pair {
 }
 
 /**
- * Start een server op poort 0 en verbindt precies één client. De serverkant
- * krijgt zijn eigen store en replicatiesessie, net als een tweede machine.
+ * Starts a server on port 0 and connects exactly one client. The server side
+ * gets its own store and replication session, just like a second machine.
  */
 async function connectPair(
   local: MemoryStore,
@@ -105,37 +105,37 @@ function headsAndIds(store: MemoryStore): { head: number; ids: string[] } {
   return { head: store.head(), ids: store.all().map((e) => e.id) };
 }
 
-it("twee nodes met gelijke heads blijven gelijk en dragen daarna live events", async () => {
+it("two nodes with equal heads stay equal and then carry live events", async () => {
   const local = createMemoryStore({ chain: CHAIN, nodeId: "a" });
   const remote = createMemoryStore({ chain: CHAIN, nodeId: "b" });
   seed(local, 2, "a");
   seed(remote, 2, "a");
 
-  // Uitgangspunt: gelijke heads, dezelfde keten.
+  // Starting point: equal heads, the same chain.
   assert.deepEqual(headsAndIds(local), headsAndIds(remote));
 
   const pair = await connectPair(local, remote);
   try {
-    await until(() => pair.sessions.every((s) => s.status === "live"), "beide sessies live");
+    await until(() => pair.sessions.every((s) => s.status === "live"), "both sessions live");
     await until(
       () =>
         pair.sessions.every((session) => session.status === "live") &&
         local.head() === remote.head(),
-      "heads blijven gelijk",
+      "heads stay equal",
     );
 
     assert.equal(local.head(), 2);
     assert.equal(remote.head(), 2);
     assert.deepEqual(headsAndIds(remote), headsAndIds(local));
 
-    // Live event van a naar b.
+    // Live event from a to b.
     local.append(event(3, "a"));
-    await until(() => remote.head() === 3, "live event van a komt aan bij b");
+    await until(() => remote.head() === 3, "live event from a reaches b");
     assert.equal(remote.all()[2]?.id, "a-3");
 
-    // En terug: b schrijft seq 4, a krijgt hem.
+    // And back: b writes seq 4, a receives it.
     remote.append(event(4, "b"));
-    await until(() => local.head() === 4, "live event van b komt aan bij a");
+    await until(() => local.head() === 4, "live event from b reaches a");
     assert.equal(local.all()[3]?.id, "b-4");
 
     assert.deepEqual(headsAndIds(remote), headsAndIds(local));
@@ -148,9 +148,9 @@ it("twee nodes met gelijke heads blijven gelijk en dragen daarna live events", a
   }
 });
 
-it("een botsende seq wordt als conflict gemeld en niet stil samengevoegd", async () => {
-  // Beide kanten hebben dezelfde geschiedenis tot en met seq 3 en schrijven
-  // daarna allebei hun eigen seq 4. Gelijke heads, verschillende id: hard conflict.
+it("a colliding seq is reported as a conflict and not merged silently", async () => {
+  // Both sides share the same history up to and including seq 3, then each
+  // writes its own seq 4. Equal heads, different id: hard conflict.
   const local = createMemoryStore({ chain: CHAIN, nodeId: "a" });
   const remote = createMemoryStore({ chain: CHAIN, nodeId: "b" });
   seed(local, 3, "a");
@@ -171,13 +171,13 @@ it("een botsende seq wordt als conflict gemeld en niet stil samengevoegd", async
   );
 
   try {
-    await until(() => localConflicts.length === 1 && remoteConflicts.length === 1, "beide kanten melden conflict");
+    await until(() => localConflicts.length === 1 && remoteConflicts.length === 1, "both sides report a conflict");
 
     const fromA = localConflicts[0];
     const fromB = remoteConflicts[0];
     assert.ok(fromA && fromB);
 
-    // De kant die het meldt is lokaal; de andere node is de peer.
+    // The side that reports it is local; the other node is the peer.
     assert.deepEqual(
       { ...fromA },
       {
@@ -203,7 +203,7 @@ it("een botsende seq wordt als conflict gemeld en niet stil samengevoegd", async
       },
     );
 
-    // Geen kant is gekozen: elk houdt zijn eigen event en er is niets bijgekomen.
+    // No side was chosen: each keeps its own event and nothing was added.
     assert.equal(local.head(), 4);
     assert.equal(remote.head(), 4);
     assert.equal(local.idAt(4), "a-4");
@@ -211,10 +211,10 @@ it("een botsende seq wordt als conflict gemeld en niet stil samengevoegd", async
     assert.deepEqual(local.all().map((e) => e.seq), [1, 2, 3, 4]);
     assert.deepEqual(remote.all().map((e) => e.seq), [1, 2, 3, 4]);
 
-    // De sessies stoppen; er wordt niet doorgewerkt op een gesplitste keten.
+    // The sessions stop; no work continues on a split chain.
     await until(
       () => pair.sessions.every((session) => session.status === "conflicted"),
-      "beide sessies staan op conflicted",
+      "both sessions sit at conflicted",
     );
   } finally {
     await pair.close();

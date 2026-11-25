@@ -5,7 +5,7 @@ import type { Tool } from "../types.js";
  * Two hands for the agent, both https-only: search the web and read a page.
  *
  * Both tools answer as *citations*: a list of sources with a one-line snippet
- * each, never a wall of text. The parsers are pure on injected HTML so the
+ * each, never a wall of text. The parsers are pure on injected markup so the
  * shape is pinned by tests without touching the network.
  */
 
@@ -19,6 +19,8 @@ const RESULT_LIMIT = 6;
 const FETCH_LIMIT_BYTES = 64_000;
 const TIMEOUT_MS = 10_000;
 
+/** Bing's RSS view: one <item> per result, no scripts, no cookies. */
+const BING_RSS = "https://www.bing.com/search?format=rss&q=";
 /** DuckDuckGo's lite endpoint: one result per anchor, no scripts, no cookies. */
 const DDG_LITE = "https://lite.duckduckgo.com/lite/?q=";
 
@@ -32,6 +34,34 @@ function stripTags(fragment: string): string {
     .replace(/&gt;/g, ">")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function xmlText(fragment: string): string {
+  return stripTags(
+    fragment
+      .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+      .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
+      .replace(/&#x([0-9a-fA-F]+);/g, (_, code: string) => String.fromCodePoint(parseInt(code, 16))),
+  );
+}
+
+/**
+ * Parses Bing's RSS result feed. Every <item> carries title, link and
+ * description; that is the whole contract, and it answers without cookies or
+ * scripts — which is why it is the primary lane.
+ */
+export function parseBingRss(xml: string, limit = RESULT_LIMIT): SearchHit[] {
+  const hits: SearchHit[] = [];
+  for (const match of xml.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
+    const item = match[1] ?? "";
+    const title = xmlText(/<title>([\s\S]*?)<\/title>/.exec(item)?.[1] ?? "");
+    const url = xmlText(/<link>([\s\S]*?)<\/link>/.exec(item)?.[1] ?? "");
+    const snippet = xmlText(/<description>([\s\S]*?)<\/description>/.exec(item)?.[1] ?? "");
+    if (!url.startsWith("https://") || title.length === 0) continue;
+    hits.push({ title, url, snippet });
+    if (hits.length >= limit) break;
+  }
+  return hits;
 }
 
 /**
@@ -63,7 +93,7 @@ export function parseDuckDuckGoLite(html: string, limit = RESULT_LIMIT): SearchH
 }
 
 function formatHits(hits: SearchHit[]): string {
-  if (hits.length === 0) return "geen resultaten gevonden";
+  if (hits.length === 0) return "no results found";
   return hits
     .map((hit, index) => `${String(index + 1)}. ${hit.title}\n   ${hit.url}\n   ${hit.snippet}`)
     .join("\n\n");
@@ -73,7 +103,10 @@ function fetchText(url: string, limitBytes = FETCH_LIMIT_BYTES): Promise<string>
   return new Promise((resolve, reject) => {
     const request = httpsGet(
       url,
-      { timeout: TIMEOUT_MS, headers: { "user-agent": "Mozilla/5.0 Roan-agent", accept: "text/html,text/plain,*/*" } },
+      {
+        timeout: TIMEOUT_MS,
+        headers: { "user-agent": "Mozilla/5.0 Roan-agent", accept: "text/html,text/plain,application/rss+xml,*/*" },
+      },
       (response) => {
         if (response.statusCode !== undefined && (response.statusCode < 200 || response.statusCode >= 300)) {
           response.resume();
@@ -82,30 +115,44 @@ function fetchText(url: string, limitBytes = FETCH_LIMIT_BYTES): Promise<string>
         }
         let seen = 0;
         let body = "";
+        let done = false;
+        const finish = (): void => {
+          if (done) return;
+          done = true;
+          response.destroy();
+          resolve(body);
+        };
         response.setEncoding("utf8");
         response.on("data", (chunk: string) => {
           seen += chunk.length;
+          // Enough is enough: the first `limit` bytes are the page for us.
+          // Destroying the request here used to surface as an "aborted" error,
+          // which is why every real (larger) page failed to load.
           if (seen <= limitBytes) body += chunk;
-          else request.destroy();
+          else finish();
         });
-        response.on("end", () => resolve(body));
-        response.on("error", reject);
+        response.on("end", finish);
+        response.on("error", (error) => {
+          if (!done) reject(error);
+        });
       },
     );
-    request.on("timeout", () => request.destroy());
+    request.on("timeout", () => {
+      request.destroy(new Error("request timed out"));
+    });
     request.on("error", reject);
   });
 }
 
 function assertSafeUrl(raw: unknown): string {
-  if (typeof raw !== "string" || raw.length === 0) throw new Error("geen url opgegeven");
+  if (typeof raw !== "string" || raw.length === 0) throw new Error("no url given");
   let parsed: URL;
   try {
     parsed = new URL(raw);
   } catch {
-    throw new Error(`geen geldige url: ${raw}`);
+    throw new Error(`not a valid url: ${raw}`);
   }
-  if (parsed.protocol !== "https:") throw new Error("alleen https wordt opgehaald");
+  if (parsed.protocol !== "https:") throw new Error("only https is fetched");
   const host = parsed.hostname.toLowerCase();
   const blocked =
     host === "localhost" ||
@@ -113,7 +160,7 @@ function assertSafeUrl(raw: unknown): string {
     host === "metadata.google.internal" ||
     /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host) ||
     host.endsWith(".local");
-  if (blocked) throw new Error("privé- en loopback-adressen worden niet opgehaald");
+  if (blocked) throw new Error("private and loopback addresses are not fetched");
   return parsed.toString();
 }
 
@@ -125,14 +172,11 @@ function assertSafeUrl(raw: unknown): string {
 const WIKI_API = "https://LANG.wikipedia.org/w/api.php?action=opensearch&limit=6&format=json&redirects=resolve&search=";
 
 export async function wikiSearch(query: string, lang: string): Promise<SearchHit[]> {
-  const raw = await fetchText(
-    `${WIKI_API.replace("LANG", lang)}${encodeURIComponent(query)}`,
-    20_000,
-  );
+  const raw = await fetchText(`${WIKI_API.replace("LANG", lang)}${encodeURIComponent(query)}`, 20_000);
   return parseWikiOpenSearch(raw);
 }
 
-/** Wikipedia's opensearch answer is [vraag, titels, beschrijvingen, urls]. */
+/** Wikipedia's opensearch answer is [question, titles, descriptions, urls]. */
 export function parseWikiOpenSearch(raw: string): SearchHit[] {
   let parsed: unknown;
   try {
@@ -159,52 +203,53 @@ export function parseWikiOpenSearch(raw: string): SearchHit[] {
 export const webSearch: Tool = {
   name: "web_search",
   description:
-    "Zoek live op het web. Gebruik dit voor actuele feiten, prijzen, versies of iets dat je " +
-    "niet zeker weet. Noem de bronnen uit het antwoord in je eigen antwoord.",
+    "Search the live web. Use this for current facts, prices, versions, or anything you are " +
+    "not sure about. Name the sources from the result in your own answer.",
   parameters: {
     type: "object",
     properties: {
-      query: { type: "string", description: "De zoekvraag, in de taal van het antwoord" },
+      query: { type: "string", description: "The search query, in the language of the answer" },
     },
     required: ["query"],
   },
   async run(args) {
     const query = typeof args["query"] === "string" ? args["query"].trim() : "";
-    if (query.length === 0) throw new Error("lege zoekvraag");
-    // Primary: the open web. Some networks (hosting IPs) get walled off; an
-    // empty answer then falls through to Wikipedia, which never walls.
-    let hits: SearchHit[] = [];
-    try {
-      hits = parseDuckDuckGoLite(await fetchText(`${DDG_LITE}${encodeURIComponent(query)}`));
-    } catch {
-      hits = [];
-    }
-    if (hits.length === 0) {
-      for (const lang of ["nl", "en"]) {
-        try {
-          hits = await wikiSearch(query, lang);
-        } catch {
-          hits = [];
-        }
-        if (hits.length > 0) {
-          return `${formatHits(hits)}\n\n(Wikipedia — de open-web-zoekopdracht gaf geen resultaten op dit netwerk.)`;
-        }
+    if (query.length === 0) throw new Error("empty search query");
+    // Primary: Bing's RSS view — plain items, no cookies, no scripts.
+    // DuckDuckGo lite is the second lane; Wikipedia the guaranteed floor.
+    const encoded = encodeURIComponent(query);
+    for (const lane of [BING_RSS, DDG_LITE]) {
+      try {
+        const body = await fetchText(`${lane}${encoded}`);
+        const hits = lane === BING_RSS ? parseBingRss(body) : parseDuckDuckGoLite(body);
+        if (hits.length > 0) return formatHits(hits);
+      } catch {
+        // A walled or broken lane falls through to the next one.
       }
-      return "geen resultaten gevonden";
     }
-    return formatHits(hits);
+    for (const lang of ["en", "nl"]) {
+      try {
+        const hits = await wikiSearch(query, lang);
+        if (hits.length > 0) {
+          return `${formatHits(hits)}\n\n(Wikipedia — the open-web lanes returned nothing from this network.)`;
+        }
+      } catch {
+        // Next language, then give up honestly.
+      }
+    }
+    return "no results found";
   },
 };
 
 export const webFetch: Tool = {
   name: "web_fetch",
   description:
-    "Lees één https-pagina en vat de inhoud samen. Gebruik dit na een zoekopdracht om de " +
-    "belangrijkste bron te lezen. Noem de url die je las.",
+    "Read one https page and summarize its content. Use this after a search to read the most " +
+    "important source. Name the url you read.",
   parameters: {
     type: "object",
     properties: {
-      url: { type: "string", description: "Volledige https-url" },
+      url: { type: "string", description: "Full https url" },
     },
     required: ["url"],
   },
@@ -223,6 +268,6 @@ export const webFetch: Tool = {
       .replace(/\n{3,}/g, "\n\n")
       .replace(/[ \t]{2,}/g, " ")
       .trim();
-    return text.length > 8_000 ? `${text.slice(0, 8_000)}\n…(afgekapt)` : text.length > 0 ? text : "lege pagina";
+    return text.length > 8_000 ? `${text.slice(0, 8_000)}\n…(cut)` : text.length > 0 ? text : "empty page";
   },
 };

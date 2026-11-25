@@ -1,19 +1,19 @@
 /**
- * Classificatie van een shell-regel vóór uitvoering.
+ * Classification of a shell line before execution.
  *
- * De regel wordt lexicaal in segmenten geknipt (op `&&`, `||`, `;`, nieuwe
- * regels en enkele `|`), elk segment wordt langs de regels gelegd en het
- * slechtste oordeel wint: `deny` > `ask` > `allow`. Er wordt niets uitgevoerd
- * en niets geëxpandeerd; dit is puur tekst.
+ * The line is cut lexically into segments (on `&&`, `||`, `;`, newlines
+ * and single `|`), each segment is checked against the rules and the
+ * worst verdict wins: `deny` > `ask` > `allow`. Nothing is executed and
+ * nothing is expanded; this is pure text.
  */
 
 export type ShellVerdict = "allow" | "ask" | "deny";
 
 export interface ShellDecision {
   verdict: ShellVerdict;
-  /** Waarom dit oordeel gegeven is. */
+  /** Why this verdict was given. */
   reason: string;
-  /** Het stuk tekst waarop het oordeel sloeg. */
+  /** The piece of text the verdict applied to. */
   matched?: string;
 }
 
@@ -23,24 +23,24 @@ export interface ShellRule {
   reason: string;
 }
 
-/** Hoger is strenger; bij een keten wint het hoogste cijfer. */
+/** Higher is stricter; for a chain the highest score wins. */
 const SEVERITY: Record<ShellVerdict, number> = { allow: 0, ask: 1, deny: 2 };
 
-/** Opdrachten die het echte commando pas na zichzelf starten. */
+/** Commands that only start the real command after themselves. */
 const DOWNLOADERS: ReadonlySet<string> = new Set(["curl", "wget", "fetch", "aria2c", "http", "https"]);
 
-/** Shells waarin een download uitgevoerd kan worden. */
+/** Shells in which a download can be executed. */
 const SHELLS: ReadonlySet<string> = new Set(["sh", "bash", "zsh", "dash", "ksh"]);
 
-/** Paden waarbuiten niets geschreven mag worden. */
+/** Paths outside of which nothing may be written. */
 const SYSTEM_ROOTS = "(?:etc|usr|boot|dev)";
 
-/** Voorvoegsels die het eigenlijke commando voorafgaan. */
+/** Prefixes that precede the actual command. */
 const PREFIX = /^(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+|(?:sudo|doas|env|nohup|time|command|exec)\s+)/;
 
 /**
- * Regels die pas op de hele regel kloppen, omdat hun gevaar in de combinatie
- * van segmenten zit (een fork bomb splitst zichzelf op `;` en `|`).
+ * Rules that only match the whole line, because their danger lies in the
+ * combination of segments (a fork bomb splits itself on `;` and `|`).
  */
 const WHOLE_LINE_RULES: readonly ShellRule[] = [
   {
@@ -51,8 +51,8 @@ const WHOLE_LINE_RULES: readonly ShellRule[] = [
 ];
 
 /**
- * Standaardregels, in volgorde: weigeren eerst, dan toestaan, dan navragen.
- * De eerste regel die past bepaalt het oordeel van dat segment.
+ * Default rules, in order: deny first, then allow, then ask.
+ * The first matching rule determines the verdict for that segment.
  */
 export const defaultRules: readonly ShellRule[] = [
   {
@@ -203,16 +203,16 @@ export const defaultRules: readonly ShellRule[] = [
 
 interface RawSegment {
   text: string;
-  /** Scheidingsteken vóór dit segment; leeg voor het eerste segment. */
+  /** Separator before this segment; empty for the first segment. */
   separator: string;
-  /** Waar als de quote in dit segment niet gesloten werd. */
+  /** True when the quote in this segment was not closed. */
   unterminated?: boolean;
 }
 
 /**
- * Lexicale splitsing die enkele en dubbele quotes respecteert. Geeft de
- * segmenten mét het scheidingsteken dat eraan voorafging, zodat een pijplijn
- * later herkend kan worden. Lege segmenten verdwijnen.
+ * Lexical split that respects single and double quotes. Returns the
+ * segments together with the separator that preceded them, so that a
+ * pipeline can be recognised later. Empty segments are dropped.
  */
 function splitRaw(command: string): RawSegment[] {
   const segments: RawSegment[] = [];
@@ -278,15 +278,15 @@ function splitRaw(command: string): RawSegment[] {
 }
 
 /**
- * Splits een shell-regel in segmenten op `&&`, `||`, `;`, nieuwe regels en
- * enkele `|`. Quotes (enkel en dubbel) beschermen hun inhoud, dus
- * `echo 'a && b'` blijft één segment. Er wordt niets uitgevoerd.
+ * Splits a shell line into segments on `&&`, `||`, `;`, newlines and
+ * a single `|`. Quotes (single and double) protect their content, so
+ * `echo 'a && b'` stays one segment. Nothing is executed.
  */
 export function splitSegments(command: string): string[] {
   return splitRaw(command).map((segment) => segment.text);
 }
 
-/** Laat voorvoegsels als `sudo` en `FOO=bar` weg. */
+/** Strips prefixes like `sudo` and `FOO=bar`. */
 function headWord(segment: string): string {
   let rest = segment.trim();
   for (;;) {
@@ -298,7 +298,7 @@ function headWord(segment: string): string {
   return word === null ? "" : word[0];
 }
 
-/** Commando-naam zonder pad en zonder quotes, in kleine letters. */
+/** Command name without path and without quotes, in lowercase. */
 function commandName(word: string): string {
   const cleaned = word.replace(/^["']/, "").replace(/["']$/, "");
   const parts = cleaned.split("/");
@@ -306,9 +306,9 @@ function commandName(word: string): string {
 }
 
 /**
- * Zoekt in een pijplijn naar een downloader die in een shell uitkomt, zoals
- * `curl … | sh`. De segmenten zijn al gesplitst, dus dit kijkt naar de
- * scheidingstekens tussen opeenvolgende segmenten.
+ * Looks in a pipeline for a downloader that ends up in a shell, such as
+ * `curl … | sh`. The segments are already split, so this looks at the
+ * separators between consecutive segments.
  */
 function findPipeToShell(segments: readonly RawSegment[]): { reason: string; matched: string } | null {
   let downloadInPipe = false;
@@ -336,7 +336,7 @@ function findPipeToShell(segments: readonly RawSegment[]): { reason: string; mat
   return null;
 }
 
-/** Beoordeelt één segment met de eerste regel die past. */
+/** Judges a single segment with the first rule that matches. */
 function classifySegment(segment: RawSegment, rules: readonly ShellRule[]): ShellDecision {
   const text = segment.text;
 
@@ -348,8 +348,8 @@ function classifySegment(segment: RawSegment, rules: readonly ShellRule[]): Shel
     };
   }
 
-  // Een segment met een omleiding of substitutie kan iets wegschrijven, ook
-  // als het met een onschuldig commando begint: `allow` vervalt dan.
+  // A segment with a redirect or substitution can write something, also
+  // when it starts with an innocent command: `allow` then no longer applies.
   const canWrite = /[<>`]|\$\(/.test(text);
 
   for (const rule of rules) {
@@ -366,9 +366,9 @@ function classifySegment(segment: RawSegment, rules: readonly ShellRule[]): Shel
 }
 
 /**
- * Bepaalt wat er met een volledige shell-regel gebeurt. Elk segment wordt
- * apart beoordeeld en het strengste oordeel wint. Gooit alleen bij een lege
- * of alleen-witruimte regel; vreemde quotes leveren `ask` op.
+ * Determines what happens with a complete shell line. Each segment is
+ * judged separately and the strictest verdict wins. Only throws on an empty
+ * or whitespace-only line; odd quotes result in `ask`.
  */
 export function classifyCommand(
   command: string,

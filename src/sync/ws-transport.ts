@@ -2,8 +2,8 @@ import { WebSocket } from "ws";
 import type { Frame, PeerTransport } from "./types.js";
 
 /**
- * PeerTransport bovenop een `ws`-socket. De socket hoeft nog niet open te zijn;
- * frames die vóór `open` worden verstuurd worden bewaard en daarna verzonden.
+ * PeerTransport on top of a `ws` socket. The socket need not be open yet;
+ * frames sent before `open` are buffered and transmitted afterwards.
  */
 export function webSocketTransport(socket: WebSocket, label?: string): PeerTransport {
   let messageHandler: ((raw: string) => void) | undefined;
@@ -28,7 +28,7 @@ export function webSocketTransport(socket: WebSocket, label?: string): PeerTrans
   socket.on("close", (code: number) => {
     closed = true;
     open = false;
-    closeHandler?.(`socket gesloten (${code})`);
+    closeHandler?.(`socket closed (${code})`);
   });
 
   socket.on("error", (error: Error) => {
@@ -49,8 +49,8 @@ export function webSocketTransport(socket: WebSocket, label?: string): PeerTrans
     close(reason?: string): void {
       if (closed) return;
       closed = true;
-      // 1000 = normale afsluiting, ook bij een conflict: de inhoud blijft staan.
-      socket.close(1000, reason ?? "klaar");
+      // 1000 = normal closure, also on a conflict: the content stays intact.
+      socket.close(1000, reason ?? "done");
     },
     onMessage(handler: (raw: string) => void): void {
       messageHandler = handler;

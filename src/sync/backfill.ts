@@ -7,33 +7,33 @@ import type {
   PeerTransport,
 } from "./types.js";
 
-/** Events per `events`-frame; klein genoeg voor een langzame lijn, groot genoeg om te werken. */
+/** Events per `events`-frame; small enough for a slow line, large enough to be useful. */
 const DEFAULT_PAGE_SIZE = 200;
-/** Harde bovengrens aan `pageSize`, ook als de caller iets groters meegeeft. */
+/** Hard upper bound on `pageSize`, even if the caller passes something bigger. */
 const MAX_PAGE_SIZE = 2_000;
-/** Aantal mislukte `send`-pogingen op een pagina voordat we opgeven. */
+/** Number of failed `send` attempts on a page before we give up. */
 const MAX_SEND_RETRIES = 2;
-/** Wachtijd voor die ene herkansing; er is nooit meer dan één timer. */
+/** Wait before that single retry; there is never more than one timer. */
 const RETRY_DELAY_MS = 1_000;
 
 export type BackfillStatus = "idle" | "sending" | "complete" | "failed" | "stopped";
 
-/** Momentopname van wat de backfill doet; veilig om te loggen of te tonen. */
+/** Snapshot of what the backfill is doing; safe to log or display. */
 export interface BackfillProgress {
   status: BackfillStatus;
-  /** Laatste `haveSeq` die de peer in een hello noemde. */
+  /** Last `haveSeq` the peer mentioned in a hello. */
   peerHaveSeq: number;
-  /** Eerste seq van het huidige plan; 0 als er niets te sturen is. */
+  /** First seq of the current plan; 0 when there is nothing to send. */
   from: number;
-  /** Laatste seq van het huidige plan (de lokale head op planmoment); 0 als er niets is. */
+  /** Last seq of the current plan (the local head when the plan was made); 0 when there is nothing. */
   to: number;
-  /** Volgende seq die nog de deur uit moet. */
+  /** Next seq that still has to go out. */
   nextSeq: number;
-  /** Hoogste seq die daadwerkelijk op de lijn is gezet. */
+  /** Highest seq that actually made it onto the wire. */
   lastSeqSent: number;
   eventsSent: number;
   pagesSent: number;
-  /** Telt alleen opeenvolgende mislukte send-pogingen; reset na een geslaagde pagina. */
+  /** Counts only consecutive failed send attempts; resets after a successful page. */
   retries: number;
   pendingRetry: boolean;
 }
@@ -41,7 +41,7 @@ export interface BackfillProgress {
 export interface BackfillDeps {
   store: NodeStore;
   transport: PeerTransport;
-  /** Aantal events per frame; standaard 200, begrensd op 2000. */
+  /** Events per frame; defaults to 200, capped at 2000. */
   pageSize?: number;
   logger?: Logger;
 }
@@ -54,16 +54,17 @@ const silentLogger: Logger = {
 };
 
 /**
- * Berekent het aaneengesloten seq-bereik dat de peer mist en wij kunnen leveren.
+ * Computes the contiguous seq range the peer is missing and we can deliver.
  *
- * `remoteHead` is wat de peer zegt te hebben (de `haveSeq` uit zijn hello),
- * `localHead` is wat wij hebben (standaard `store.head()`). Het resultaat loopt
- * van `remoteHead + 1` tot en met `localHead`. Loopt de peer gelijk of voor, of
- * is de invoer geen geldige seq, dan is er niets te sturen en volgt `null`.
+ * `remoteHead` is what the peer says it has (the `haveSeq` from its hello),
+ * `localHead` is what we have (defaults to `store.head()`). The result runs
+ * from `remoteHead + 1` up to and including `localHead`. If the peer is level
+ * or ahead, or the input is not a valid seq, there is nothing to send and the
+ * result is `null`.
  *
- * De functie raakt de store niet aan en Verzint niets: ze rekent alleen de
- * grenzen uit. Of er echt een event op elke seq staat, controleert de
- * `Backfiller` bij het inpakken van de pagina's.
+ * The function does not touch the store and invents nothing: it only works out
+ * the boundaries. Whether an event really sits on every seq is checked by the
+ * `Backfiller` when it packs the pages.
  */
 export function planBackfill(
   local: NodeStore,
@@ -79,20 +80,20 @@ export function planBackfill(
 }
 
 /**
- * Serveert één keten aan één peer die achterloopt.
+ * Serves one chain to one peer that is behind.
  *
- * De peer vraagt met een `hello` (haveSeq = wat hij heeft); wij antwoorden met
- * `events`-frames, één per pagina, tot onze head is bereikt. Een expliciet
- * request-frame bestaat niet in dit protocol, dus de hello is het verzoek.
+ * The peer asks with a `hello` (haveSeq = what it has); we answer with
+ * `events` frames, one per page, until our head is reached. An explicit
+ * request frame does not exist in this protocol, so the hello is the request.
  *
- * Regels die deze klasse bewaakt:
- * - alleen events uit `store.since()`, in seq-volgorde en zonder gaten;
- * - een frame gaat alleen de deur uit als elk event een geldige seq en id heeft;
- * - ids die al naar deze peer zijn gestuurd gaan niet nog een keer;
- * - een tweede `start()` of een herhaalde hello met hetzelfde bereik start geen
- *   tweede loper en stuurt geen dubbele pagina;
- * - bij een send die gooit is er precies één `setTimeout`-herkansing, en `stop()`
- *   ruimt die op.
+ * Rules this class guards:
+ * - only events from `store.since()`, in seq order and without holes;
+ * - a frame only goes out when every event has a valid seq and id;
+ * - ids already sent to this peer do not go out a second time;
+ * - a second `start()` or a repeated hello with the same range starts no
+ *   second runner and sends no duplicate page;
+ * - on a send that throws there is exactly one `setTimeout` retry, and `stop()`
+ *   cleans it up.
  */
 export class Backfiller {
   private readonly store: NodeStore;
@@ -113,7 +114,7 @@ export class Backfiller {
   private pagesSent = 0;
   private retries = 0;
 
-  /** id → seq van wat deze peer al van ons kreeg; dedupe over herhaalde hello's. */
+  /** id → seq of what this peer already got from us; dedupe across repeated hellos. */
   private readonly sentIds = new Map<string, number>();
 
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -132,13 +133,13 @@ export class Backfiller {
     return this.statusValue;
   }
 
-  /** Activeert het sturen. Idempotent: een tweede aanroep doet niets. */
+  /** Activates sending. Idempotent: a second call does nothing. */
   start(): this {
     if (this.closed || this.running) return this;
     this.running = true;
     if (this.plan !== null) {
       this.statusValue = "sending";
-      this.logger.debug("backfill gestart", {
+      this.logger.debug("backfill started", {
         peer: this.transport.label,
         from: this.plan.from,
         to: this.plan.to,
@@ -148,27 +149,27 @@ export class Backfiller {
     return this;
   }
 
-  /** Stopt met sturen en ruimt de ene eventuele retry-timer op. Sluit het transport niet. */
+  /** Stops sending and clears the single possible retry timer. Does not close the transport. */
   stop(): void {
     if (!this.running && this.retryTimer === null) return;
     this.running = false;
     this.clearRetry();
     if (this.statusValue !== "failed") this.statusValue = "stopped";
-    this.logger.debug("backfill gestopt", { peer: this.transport.label, lastSeqSent: this.lastSeqSent });
+    this.logger.debug("backfill stopped", { peer: this.transport.label, lastSeqSent: this.lastSeqSent });
   }
 
-  /** Verwerkt een hello van de peer; dit is het verzoek om bij te vullen. */
+  /** Handles a hello from the peer; this is the request to backfill. */
   onHello(hello: HelloFrame): void {
     if (this.closed) return;
     if (hello.v !== 1) {
-      this.logger.warn("backfill: hello met onbekende protocolversie", {
+      this.logger.warn("backfill: hello with unknown protocol version", {
         peer: this.transport.label,
         version: hello.v,
       });
       return;
     }
     if (hello.chain !== this.store.chain) {
-      this.logger.warn("backfill: hello voor een andere keten", {
+      this.logger.warn("backfill: hello for another chain", {
         peer: this.transport.label,
         chain: hello.chain,
         expected: this.store.chain,
@@ -176,11 +177,11 @@ export class Backfiller {
       return;
     }
     if (hello.node === this.store.nodeId) {
-      this.logger.debug("backfill: hello van onszelf genegeerd", { peer: this.transport.label });
+      this.logger.debug("backfill: ignoring hello from ourselves", { peer: this.transport.label });
       return;
     }
     if (!Number.isInteger(hello.haveSeq) || hello.haveSeq < 0) {
-      this.logger.warn("backfill: hello met ongeldige haveSeq", {
+      this.logger.warn("backfill: hello with invalid haveSeq", {
         peer: this.transport.label,
         haveSeq: hello.haveSeq,
       });
@@ -193,7 +194,7 @@ export class Backfiller {
       this.plan = null;
       this.cursor = 0;
       if (this.running) this.statusValue = "complete";
-      this.logger.debug("backfill: peer heeft alles al", {
+      this.logger.debug("backfill: peer already has everything", {
         peer: this.transport.label,
         haveSeq: hello.haveSeq,
         head: this.store.head(),
@@ -203,21 +204,21 @@ export class Backfiller {
 
     const same = this.plan !== null && this.plan.from === plan.from && this.plan.to === plan.to;
     if (same) {
-      // Herhaalde hello voor hetzelfde gat: geen nieuw plan, geen tweede loper.
+      // Repeated hello for the same gap: no new plan, no second runner.
       if (this.running) this.pump();
       return;
     }
 
     this.plan = plan;
-    // Ids die de peer volgens deze hello al heeft hoeven we niet meer te onthouden.
+    // Ids the peer already has according to this hello no longer need remembering.
     this.pruneSentIds(hello.haveSeq);
     if (this.pumping) {
-      // Een pagina is al onderweg; schuif alleen op als het nieuwe bereik later begint.
+      // A page is already in flight; only move up if the new range starts later.
       if (plan.from > this.cursor) this.cursor = plan.from;
     } else {
       this.cursor = plan.from;
     }
-    this.logger.info("backfill: bereik gepland", {
+    this.logger.info("backfill: range planned", {
       peer: this.transport.label,
       from: plan.from,
       to: plan.to,
@@ -244,7 +245,7 @@ export class Backfiller {
     };
   }
 
-  // --- inkomend ---------------------------------------------------------
+  // --- incoming ---------------------------------------------------------
 
   private handleRaw(raw: string): void {
     if (this.closed) return;
@@ -252,7 +253,7 @@ export class Backfiller {
     try {
       value = JSON.parse(raw);
     } catch {
-      this.logger.debug("backfill: ongeldig JSON-frame genegeerd", { peer: this.transport.label });
+      this.logger.debug("backfill: ignoring invalid JSON frame", { peer: this.transport.label });
       return;
     }
     if (typeof value !== "object" || value === null || Array.isArray(value)) return;
@@ -274,13 +275,13 @@ export class Backfiller {
     this.running = false;
     this.clearRetry();
     if (this.statusValue !== "failed") this.statusValue = "stopped";
-    this.logger.info("backfill: transport gesloten", {
+    this.logger.info("backfill: transport closed", {
       peer: this.transport.label,
-      reason: reason ?? "onbekend",
+      reason: reason ?? "unknown",
     });
   }
 
-  // --- uitgaand ---------------------------------------------------------
+  // --- outgoing ---------------------------------------------------------
 
   private pump(): void {
     if (!this.running || this.pumping || this.retryTimer !== null) return;
@@ -299,11 +300,11 @@ export class Backfiller {
         this.statusValue = "complete";
         return;
       }
-      // Nooit verder dan de head van dit moment; wat daarna komt is live-werk.
+      // Never past the head of this moment; what comes after is live work.
       const to = Math.min(plan.to, this.store.head());
       if (this.cursor > to) {
         this.statusValue = "complete";
-        this.logger.debug("backfill: klaar", {
+        this.logger.debug("backfill: done", {
           peer: this.transport.label,
           lastSeqSent: this.lastSeqSent,
           pages: this.pagesSent,
@@ -314,7 +315,7 @@ export class Backfiller {
       const page = this.collectPage(to);
       if (page === null) return;
       if (page.events.length === 0) {
-        // Alles in dit stuk was al verstuurd; schuif op zonder frame.
+        // Everything in this stretch was already sent; advance without a frame.
         this.cursor = page.next;
         continue;
       }
@@ -323,8 +324,8 @@ export class Backfiller {
   }
 
   /**
-   * Pakt de volgende pagina uit de store. Geeft `null` bij een fout die we niet
-   * mogen maskeren: een gat in de store of een event zonder bruikbare id/seq.
+   * Packs the next page from the store. Returns `null` on an error we must not
+   * mask: a hole in the store or an event without a usable id/seq.
    */
   private collectPage(to: number): { events: Event[]; next: number } | null {
     const from = this.cursor;
@@ -337,11 +338,11 @@ export class Backfiller {
       if (event.seq > to) break;
       if (event.seq !== expected) {
         return this.fail(
-          `store heeft geen aaneengesloten seq: verwacht ${expected}, kreeg ${event.seq}`,
+          `store has no contiguous seq: expected ${expected}, got ${event.seq}`,
         );
       }
       if (!this.isSendable(event)) {
-        return this.fail(`event op seq ${event.seq} heeft geen bruikbare id of keten`);
+        return this.fail(`event at seq ${event.seq} has no usable id or chain`);
       }
       expected = event.seq + 1;
       if (this.sentIds.has(event.id)) continue;
@@ -352,7 +353,7 @@ export class Backfiller {
     return { events, next: expected };
   }
 
-  /** Eén frame per pagina; bij een throw hooguit `MAX_SEND_RETRIES` herkansingen. */
+  /** One frame per page; on a throw at most `MAX_SEND_RETRIES` retries. */
   private sendPage(events: Event[], next: number): boolean {
     const frame: EventsFrame = { t: "events", events };
     try {
@@ -361,10 +362,10 @@ export class Backfiller {
       this.retries += 1;
       const reason = error instanceof Error ? error.message : String(error);
       if (this.retries > MAX_SEND_RETRIES) {
-        this.fail(`send naar ${this.transport.label} mislukte ${this.retries} keer: ${reason}`);
+        this.fail(`send to ${this.transport.label} failed ${this.retries} times: ${reason}`);
         return false;
       }
-      this.logger.warn("backfill: send mislukt; één herkansing ingepland", {
+      this.logger.warn("backfill: send failed; one retry scheduled", {
         peer: this.transport.label,
         attempt: this.retries,
         reason,
@@ -418,7 +419,7 @@ export class Backfiller {
     this.statusValue = "failed";
     this.running = false;
     this.clearRetry();
-    this.logger.error(`backfill gestopt: ${reason}`, {
+    this.logger.error(`backfill stopped: ${reason}`, {
       peer: this.transport.label,
       lastSeqSent: this.lastSeqSent,
     });

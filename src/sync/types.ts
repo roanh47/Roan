@@ -1,58 +1,58 @@
 /**
- * Draad-protocol en de minimale store-interface die replicatie nodig heeft.
+ * Wire protocol and the minimal store interface that replication needs.
  *
- * De store is de enige bron van waarheid voor de keten: hij kent de hoogste seq,
- * de id per seq en de events zelf. Replicatie schrijft nooit zelf in de keten en
- * verwacht dat `append` alleen toevoegt: nooit overschrijven, nooit gaten vullen
- * met iets anders dan het event dat op die seq hoort.
+ * The store is the single source of truth for the chain: it knows the highest
+ * seq, the id per seq and the events themselves. Replication never writes to
+ * the chain itself and expects `append` to only add: never overwrite, never
+ * fill holes with anything other than the event that belongs on that seq.
  */
 
-/** Eén onveranderlijk event in de keten. */
+/** One immutable event in the chain. */
 export interface Event {
-  /** Protocolversie van het event zelf. */
+  /** Protocol version of the event itself. */
   v: 1;
-  /** Naam van de keten; events van verschillende ketens worden nooit gemengd. */
+  /** Name of the chain; events from different chains are never mixed. */
   chain: string;
-  /** Positie in de keten, 1-gebaseerd en aaneengesloten. */
+  /** Position in the chain, 1-based and contiguous. */
   seq: number;
-  /** Wereldwijd unieke id van dit event. Twee events met dezelfde seq horen dezelfde id te hebben. */
+  /** Globally unique id of this event. Two events with the same seq should have the same id. */
   id: string;
-  /** Node die het event heeft gemaakt. */
+  /** Node that created the event. */
   node: string;
-  /** Unix-tijd in ms. */
+  /** Unix time in ms. */
   ts: number;
-  /** Soort event, vrij te kiezen door de laag erboven. */
+  /** Kind of event, freely chosen by the layer above. */
   type: string;
-  /** Payload; replicatie kijkt er niet in. */
+  /** Payload; replication does not look inside it. */
   data: unknown;
 }
 
-/** Handshake: "dit ben ik, zoveel heb ik al". */
+/** Handshake: "this is me, this is how much I have". */
 export interface HelloFrame {
   t: "hello";
   v: 1;
   chain: string;
   node: string;
-  /** Hoogste seq die de afzender heeft; 0 betekent een lege keten. */
+  /** Highest seq the sender has; 0 means an empty chain. */
   haveSeq: number;
 }
 
-/** Batch met events, oplopend op seq. */
+/** Batch of events, ascending by seq. */
 export interface EventsFrame {
   t: "events";
   events: Event[];
 }
 
-/** Eén live event. */
+/** One live event. */
 export interface AppendFrame {
   t: "append";
   event: Event;
 }
 
-/** Frames die replicatie zelf verstuurt of begrijpt. */
+/** Frames that replication itself sends or understands. */
 export type Frame = HelloFrame | EventsFrame | AppendFrame;
 
-/** Uitkomst van een append-poging; de store beslist, niet de replicatie. */
+/** Outcome of an append attempt; the store decides, not replication. */
 export type AppendOutcome =
   | { status: "appended" }
   | { status: "duplicate" }
@@ -61,29 +61,29 @@ export type AppendOutcome =
 export type Unsubscribe = () => void;
 
 /**
- * Wat replicatie van de opslag verwacht.
+ * What replication expects from storage.
  *
- * Invarianten die de implementatie moet bewaken:
- * - `append` schrijft alleen op `head() + 1` en weigert alles daarbuiten.
- * - `append` overschrijft nooit een bestaand event; zelfde seq + andere id is een conflict.
- * - `subscribe` meldt elke geslaagde append synchroon, in seq-volgorde.
+ * Invariants the implementation must guard:
+ * - `append` only writes at `head() + 1` and refuses anything outside that.
+ * - `append` never overwrites an existing event; same seq + different id is a conflict.
+ * - `subscribe` reports every successful append synchronously, in seq order.
  */
 export interface NodeStore {
-  /** Id van deze node, gebruikt in hello en in conflictrapporten. */
+  /** Id of this node, used in hello and in conflict reports. */
   readonly nodeId: string;
-  /** Naam van de keten die deze store bijhoudt. */
+  /** Name of the chain this store keeps. */
   readonly chain: string;
-  /** Hoogste seq in de keten, 0 als de keten leeg is. */
+  /** Highest seq in the chain, 0 if the chain is empty. */
   head(): number;
-  /** Id van het event op `seq`, of undefined als die seq niet bestaat. */
+  /** Id of the event at `seq`, or undefined if that seq does not exist. */
   idAt(seq: number): string | undefined;
-  /** Of dit event-id al in de keten staat (waar dan ook). */
+  /** Whether this event id is already in the chain (anywhere). */
   has(id: string): boolean;
-  /** Events met seq >= `from`, oplopend. `since(0)` geeft de hele keten. */
+  /** Events with seq >= `from`, ascending. `since(0)` returns the whole chain. */
   since(from: number): Event[];
-  /** Voegt toe; zie de invarianten hierboven. */
+  /** Appends; see the invariants above. */
   append(event: Event): AppendOutcome;
-  /** Luistert naar lokale appends; geeft een functie om te stoppen. */
+  /** Listens for local appends; returns a function to stop. */
   subscribe(listener: (event: Event) => void): Unsubscribe;
 }
 
@@ -95,8 +95,8 @@ export interface Logger {
 }
 
 /**
- * Hard conflict: dezelfde seq, een andere id. Beide kanten hebben hun eigen
- * event al in hun keten staan. Er wordt niet gekozen; de sessie stopt.
+ * Hard conflict: the same seq, a different id. Both sides already have their
+ * own event in their chain. Nothing is chosen; the session stops.
  */
 export interface ConflictReport {
   kind: "seq-id-mismatch";
@@ -109,11 +109,11 @@ export interface ConflictReport {
 }
 
 /**
- * Transport naar één peer. De implementatie serialiseert zelf (JSON) en levert
- * binnenkomende tekst aan `onMessage`. Replicatie kent geen sockets.
+ * Transport to one peer. The implementation serialises itself (JSON) and hands
+ * incoming text to `onMessage`. Replication knows no sockets.
  */
 export interface PeerTransport {
-  /** Leesbare naam voor logs, bijvoorbeeld "ws://host:1234". */
+  /** Readable name for logs, for example "ws://host:1234". */
   readonly label: string;
   send(frame: Frame): void;
   close(reason?: string): void;

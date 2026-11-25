@@ -21,7 +21,7 @@ async function until(check: () => boolean, label: string): Promise<void> {
   }
 }
 
-it("repliceert over een echte ws-socket, inclusief live appends", async () => {
+it("replicates over a real ws socket, including live appends", async () => {
   const server = new WebSocketServer({ port: 0, host: "127.0.0.1" });
   await new Promise<void>((resolve) => server.once("listening", () => resolve()));
   const address = server.address() as AddressInfo;
@@ -44,15 +44,15 @@ it("repliceert over een echte ws-socket, inclusief live appends", async () => {
   transports.push(clientTransport);
   sessions.push(replicate({ store: local, transport: clientTransport, logger: quietLogger }));
 
-  await until(() => remote.head() === 3, "server haalt in");
+  await until(() => remote.head() === 3, "server catches up");
   assert.deepEqual(remote.all().map((e) => e.id), ["a-1", "a-2", "a-3"]);
 
-  client.send(JSON.stringify({ t: "noop" })); // vreemd frame mag niets breken
+  client.send(JSON.stringify({ t: "noop" })); // a foreign frame must not break anything
   local.append(event(4, "a"));
-  await until(() => remote.head() === 4, "live append komt aan");
+  await until(() => remote.head() === 4, "live append arrives");
 
   remote.append(event(5, "b"));
-  await until(() => local.head() === 5, "terugweg komt aan");
+  await until(() => local.head() === 5, "the way back arrives");
   assert.equal(local.all().length, 5);
 
   for (const session of sessions) session.close();

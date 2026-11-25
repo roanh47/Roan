@@ -1,61 +1,61 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-/** Eén vermoedelijk geheim, met een geredigeerde preview in plaats van de waarde. */
+/** One suspected secret, with a redacted preview instead of the value. */
 export interface SecretFinding {
-  /** Pad relatief ten opzichte van `root`, met forward slashes. */
+  /** Path relative to `root`, with forward slashes. */
   file: string;
-  /** 1-based regelnummer. */
+  /** 1-based line number. */
   line: number;
-  /** 1-based kolom van het geheim binnen de regel. */
+  /** 1-based column of the secret within the line. */
   column: number;
-  /** Soort treffer, bijvoorbeeld `openai-key` of `assigned-credential`. */
+  /** Kind of hit, for example `openai-key` or `assigned-credential`. */
   kind: string;
-  /** Gematchte tekst met het midden weggelaten; nooit het volledige geheim. */
+  /** Matched text with the middle left out; never the complete secret. */
   preview: string;
 }
 
 export interface SecretsScanOptions {
-  /** Maximum aantal daadwerkelijk gelezen bestanden (standaard 2000). */
+  /** Maximum number of files actually read (default 2000). */
   maxFiles?: number;
-  /** Maximum aantal treffers (standaard 500). */
+  /** Maximum number of hits (default 500). */
   maxFindings?: number;
-  /** Stopt het scannen vroegtijdig; het resultaat is dan onvolledig. */
+  /** Aborts the scan early; the result is then incomplete. */
   signal?: AbortSignal;
 }
 
 export interface SecretsScanResult {
   findings: SecretFinding[];
-  /** Aantal bestanden dat als tekst is gelezen. */
+  /** Number of files read as text. */
   scanned: number;
-  /** Aantal bestanden dat is overgeslagen: binair, te groot of onleesbaar. */
+  /** Number of files skipped: binary, too large or unreadable. */
   skipped: number;
-  /** Waar als niet alles bekeken is: door een limiet of een abort. */
+  /** True when not everything was inspected: due to a limit or an abort. */
   truncated: boolean;
 }
 
-/** Mappen die we nooit inlopen: nooit van de gebruiker en te groot. */
+/** Directories we never enter: never the user's and too large. */
 const SKIP_DIRS: ReadonlySet<string> = new Set(["node_modules", ".git", "dist", "build"]);
 
-/** Hoeveel bytes we inlezen om te bepalen of een bestand binair is. */
+/** How many bytes we read to determine whether a file is binary. */
 const SNIFF_BYTES = 8192;
 
-/** Bestanden boven deze maat slaan we over: te duur en zelden interessant. */
+/** Files above this size are skipped: too expensive and rarely interesting. */
 const MAX_FILE_BYTES = 1024 * 1024;
 
 const DEFAULT_MAX_FILES = 2000;
 const DEFAULT_MAX_FINDINGS = 500;
 
-/** Bovengrens voor de preview; ruim boven wat `redact` ooit teruggeeft. */
+/** Upper bound for the preview; well above what `redact` ever returns. */
 const MAX_PREVIEW = 120;
 
 interface Rule {
   kind: string;
   source: string;
   flags?: string;
-  /** Capturegroep met de eigenlijke geheimtekst; 0 betekent de hele match. */
+  /** Capture group with the actual secret text; 0 means the whole match. */
   secretGroup?: number;
-  /** Extra filter: waarden die geen geheim zijn (plaatshouders) vallen af. */
+  /** Extra filter: values that are not a secret (placeholders) are dropped. */
   filter?: (value: string) => boolean;
 }
 
@@ -67,8 +67,8 @@ interface CompiledRule {
 }
 
 /**
- * Waarden die op een plaatshouder lijken en dus geen geheim zijn.
- * Bewust smal: liever een treffer te veel dan een echt geheim missen.
+ * Values that look like a placeholder and are therefore not a secret.
+ * Deliberately narrow: better one hit too many than missing a real secret.
  */
 const PLACEHOLDER: RegExp =
   /^(?:\$\{|<|%\{|\{\{|change(?:me|_me)?|placeholder|example|your(?:[_-].*)?|todo|none|null|true|false|x{3,}|\*+)$/i;
@@ -81,8 +81,8 @@ function isPlaceholder(value: string): boolean {
 }
 
 /**
- * Detectieregels, in deze volgorde geëvalueerd. `sk-ant-` staat vóór `sk-`
- * zodat een Anthropic-sleutel niet als OpenAI-sleutel gerapporteerd wordt.
+ * Detection rules, evaluated in this order. `sk-ant-` comes before `sk-`
+ * so that an Anthropic key is not reported as an OpenAI key.
  */
 const RULES: readonly Rule[] = [
   { kind: "anthropic-key", source: "\\bsk-ant-[A-Za-z0-9_-]{16,}" },
@@ -103,8 +103,8 @@ const RULES: readonly Rule[] = [
     flags: "i",
   },
   {
-    // .env-regels, YAML en TOML: sleutelnaam met een geheim-achtig woord erin,
-    // gevolgd door `=` of `:` en een waarde zonder witruimte of commentaar.
+    // .env lines, YAML and TOML: key name containing a secret-like word,
+    // followed by `=` or `:` and a value without whitespace or comment.
     kind: "assigned-credential",
     source:
       "^\\s*(?:export\\s+)?[\"']?[A-Za-z0-9_.-]*(?:api[_-]?key|secret|token|password|passwd|client[_-]?secret)[A-Za-z0-9_.-]*[\"']?\\s*[:=]\\s*[\"']?([^\"'\\s#]{4,})",
@@ -115,8 +115,8 @@ const RULES: readonly Rule[] = [
 ];
 
 /**
- * Compileer de regels eenmalig per scan. Een kapot patroon is een programmeer-
- * fout en moet luidruchtig falen met de bron van het patroon erbij.
+ * Compile the rules once per scan. A broken pattern is a programming
+ * error and must fail loudly, including the source of the pattern.
  */
 function compileRules(): CompiledRule[] {
   return RULES.map((rule) => {
@@ -130,15 +130,15 @@ function compileRules(): CompiledRule[] {
       return compiled;
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
-      throw new Error(`secrets-scan: ongeldig regex-patroon "${rule.source}": ${detail}`);
+      throw new Error(`secrets-scan: invalid regex pattern "${rule.source}": ${detail}`);
     }
   });
 }
 
 /**
- * Redigeer een gevonden waarde: eerste vier en laatste vier tekens blijven
- * staan, de rest wordt `…`. Korte waarden (<= 12 tekens) worden volledig
- * verborgen, want anders zou de preview het hele geheim alsnog bevatten.
+ * Redact a found value: the first four and last four characters stay,
+ * the rest becomes `…`. Short values (<= 12 characters) are hidden entirely,
+ * because otherwise the preview would still contain the whole secret.
  */
 function redact(value: string): string {
   const text = value.trim();
@@ -163,8 +163,8 @@ interface Counters {
 }
 
 /**
- * Verzamel alle gewone bestanden onder `dir`, deterministisch gesorteerd.
- * Onleesbare mappen tellen als overgeslagen en leveren geen fout op.
+ * Collect all regular files under `dir`, deterministically sorted.
+ * Unreadable directories count as skipped and do not raise an error.
  */
 async function collectFiles(dir: string, signal: AbortSignal | undefined, counters: Counters): Promise<string[]> {
   let entries;
@@ -184,15 +184,15 @@ async function collectFiles(dir: string, signal: AbortSignal | undefined, counte
       found.push(...(await collectFiles(path.join(dir, entry.name), signal, counters)));
       continue;
     }
-    // Symbolische koppelingen vallen af: die kunnen lussen veroorzaken.
+    // Symbolic links are dropped: they can cause loops.
     if (entry.isFile()) found.push(path.join(dir, entry.name));
   }
   return found;
 }
 
 /**
- * Lees een bestand als tekst. Geeft `null` terug voor binaire bestanden,
- * bestanden boven de maatlimiet en alles wat niet leesbaar is.
+ * Read a file as text. Returns `null` for binary files, files above the
+ * size limit and anything that is not readable.
  */
 async function readTextFile(absPath: string): Promise<string | null> {
   let handle: fs.FileHandle | undefined;
@@ -217,7 +217,7 @@ async function readTextFile(absPath: string): Promise<string | null> {
   }
 }
 
-/** Positie van de geheimtekst binnen de hele match, voor de kolom. */
+/** Position of the secret text within the whole match, for the column. */
 function groupOffset(match: RegExpExecArray, value: string): number {
   if (value === match[0]) return 0;
   const at = match[0].indexOf(value);
@@ -229,9 +229,9 @@ function toRelative(root: string, absPath: string): string {
 }
 
 /**
- * Scan een map op vermoedelijke geheimen. Onleesbare, binaire en te grote
- * bestanden worden geteld als `skipped` en laten de scan nooit klappen.
- * Alleen een onbruikbare `root` of een kapot regex-patroon gooit een `Error`.
+ * Scan a directory for suspected secrets. Unreadable, binary and oversized
+ * files are counted as `skipped` and never make the scan crash.
+ * Only an unusable `root` or a broken regex pattern throws an `Error`.
  */
 export async function scanForSecrets(
   root: string,
@@ -248,9 +248,9 @@ export async function scanForSecrets(
   const absoluteRoot = path.resolve(root);
   try {
     const info = await fs.stat(absoluteRoot);
-    if (!info.isDirectory()) throw new Error("geen map");
+    if (!info.isDirectory()) throw new Error("not a directory");
   } catch (err) {
-    throw new Error(`secrets-scan: kan map "${root}" niet scannen: ${toErrorMessage(err)}`);
+    throw new Error(`secrets-scan: cannot scan directory "${root}": ${toErrorMessage(err)}`);
   }
 
   const counters: Counters = { skipped: 0 };

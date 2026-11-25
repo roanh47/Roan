@@ -31,7 +31,7 @@ export function parseRpcBody(body: string): RpcAnswer {
   const trimmed = body.trim();
   if (trimmed.startsWith("{")) return asAnswer(JSON.parse(trimmed));
   // text/event-stream: the last data: line that parses wins.
-  let last: RpcAnswer = { ok: false, error: "leeg antwoord" };
+  let last: RpcAnswer = { ok: false, error: "empty answer" };
   for (const line of trimmed.split(/\r?\n/)) {
     if (!line.startsWith("data:")) continue;
     try {
@@ -44,13 +44,13 @@ export function parseRpcBody(body: string): RpcAnswer {
 }
 
 function asAnswer(value: unknown): RpcAnswer {
-  if (typeof value !== "object" || value === null) return { ok: false, error: "geen object" };
+  if (typeof value !== "object" || value === null) return { ok: false, error: "not an object" };
   const record = value as Record<string, unknown>;
   if (typeof record["error"] === "object" && record["error"] !== null) {
     const detail = record["error"] as Record<string, unknown>;
-    return { ok: false, error: stringOr(detail["message"], "serverfout") };
+    return { ok: false, error: stringOr(detail["message"], "server error") };
   }
-  if (record["result"] === undefined) return { ok: false, error: "geen result" };
+  if (record["result"] === undefined) return { ok: false, error: "no result" };
   return { ok: true, result: record["result"] };
 }
 
@@ -106,12 +106,12 @@ export async function connectMcpServer(server: McpServerConfig): Promise<McpConn
       : server.transport === "stdio" && server.command !== undefined
         ? await stdioSender(server.command)
         : null;
-  if (sender === null) throw new Error(`${server.label}: geen geldig adres of commando`);
+  if (sender === null) throw new Error(`${server.label}: no valid address or command`);
 
   const init = parseRpcBody(await sender(rpc(1, "initialize", { protocolVersion: PROTOCOL_VERSION, capabilities: {}, clientInfo: { name: "roan", version: "0.0.21" } })));
-  if (!init.ok) throw new Error(`${server.label}: handshake mislukt — ${init.error ?? "geen antwoord"}`);
+  if (!init.ok) throw new Error(`${server.label}: handshake failed — ${init.error ?? "no answer"}`);
   const list = parseRpcBody(await sender(rpc(2, "tools/list", {})));
-  if (!list.ok) throw new Error(`${server.label}: tools/list mislukt — ${list.error ?? "geen antwoord"}`);
+  if (!list.ok) throw new Error(`${server.label}: tools/list failed — ${list.error ?? "no answer"}`);
 
   const definitions = asToolDefs(list.result);
   const tools: Tool[] = definitions.map((definition) => ({
@@ -123,10 +123,10 @@ export async function connectMcpServer(server: McpServerConfig): Promise<McpConn
         : { type: "object", properties: {} },
     async run(args) {
       const answer = parseRpcBody(await sender(rpc(3, "tools/call", { name: definition.name, arguments: args })));
-      if (!answer.ok) throw new Error(answer.error ?? "tools/call mislukt");
+      if (!answer.ok) throw new Error(answer.error ?? "tools/call failed");
       const record = typeof answer.result === "object" && answer.result !== null ? (answer.result as Record<string, unknown>) : {};
       if (record["isError"] === true) throw new Error(flattenMcpContent(record["content"]));
-      return flattenMcpContent(record["content"]) || "(leeg resultaat)";
+      return flattenMcpContent(record["content"]) || "(empty result)";
     },
   }));
   return { server, tools };
@@ -174,7 +174,7 @@ async function stdioSender(command: string): Promise<(body: string) => Promise<s
     }
   });
   const exited = new Promise<never>((_, reject) => {
-    child.on("exit", (code) => reject(new Error(`stdio-server stopte (exit ${String(code)})`)));
+    child.on("exit", (code) => reject(new Error(`stdio server exited (exit ${String(code)})`)));
   });
   return async (body: string) => {
     child.stdin.write(`${body}\n`);
@@ -187,7 +187,7 @@ async function stdioSender(command: string): Promise<(body: string) => Promise<s
         }
       }, CALL_TIMEOUT_MS);
     });
-    if (line.length === 0) throw new Error("stdio-server antwoordde niet binnen de tijd");
+    if (line.length === 0) throw new Error("stdio server did not answer in time");
     return await Promise.race([Promise.resolve(line), exited]);
   };
 }

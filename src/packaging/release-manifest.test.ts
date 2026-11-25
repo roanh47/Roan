@@ -10,7 +10,7 @@ import type { ReleaseManifestEntry } from "./release-manifest.js";
 
 const GOOD_SHA256 = "9f2c4b1d8e7a6f5c4b3a2d1e0f9c8b7a6d5e4f3c2b1a0f9e8d7c6b5a4f3e2d10";
 
-/** Een geldige regel; tests overschrijven één veld om precies dat veld te testen. */
+/** A valid entry; tests override one field to test exactly that field. */
 function entry(overrides: Partial<ReleaseManifestEntry> = {}): ReleaseManifestEntry {
   return {
     version: "1.4.2",
@@ -24,24 +24,24 @@ function entry(overrides: Partial<ReleaseManifestEntry> = {}): ReleaseManifestEn
   };
 }
 
-/** Controleer dat de fout een Error is die de regel en het veld noemt. */
+/** Check that the error is an Error that names the entry and the field. */
 function assertEntryError(fn: () => unknown, entryLabel: string, field: string): void {
   assert.throws(fn, (error: unknown) => {
-    assert.ok(error instanceof Error, `verwachtte een Error, kreeg ${String(error)}`);
+    assert.ok(error instanceof Error, `expected an Error, got ${String(error)}`);
     assert.ok(
       error.message.includes(entryLabel),
-      `verwachtte dat de melding "${entryLabel}" noemt, kreeg: ${error.message}`,
+      `expected the message to name "${entryLabel}", got: ${error.message}`,
     );
     assert.ok(
       error.message.includes(field),
-      `verwachtte dat de melding het veld "${field}" noemt, kreeg: ${error.message}`,
+      `expected the message to name the field "${field}", got: ${error.message}`,
     );
     return true;
   });
 }
 
 describe("buildReleaseManifest", () => {
-  it("sorteert een geldige manifest op platform en dan arch", () => {
+  it("sorts a valid manifest by platform and then arch", () => {
     const manifest = buildReleaseManifest([
       entry({ platform: "win32", arch: "x64", file: "app-win32-x64.exe" }),
       entry({ platform: "linux", arch: "arm64", file: "app-linux-arm64.tar.gz" }),
@@ -57,7 +57,7 @@ describe("buildReleaseManifest", () => {
     assert.equal(manifest.length, 5);
   });
 
-  it("houdt alle velden intact en wijzigt de invoer niet", () => {
+  it("keeps all fields intact and does not modify the input", () => {
     const input = [
       entry({ platform: "win32", arch: "arm64", file: "app-arm64.exe" }),
       entry({ platform: "linux", arch: "x64" }),
@@ -70,16 +70,16 @@ describe("buildReleaseManifest", () => {
     assert.deepEqual(
       input.map((e) => e.file),
       before,
-      "de aangeroepen lijst mag niet opnieuw gesorteerd worden",
+      "the list passed in must not be sorted again",
     );
     assert.deepEqual(manifest[1], input[0]);
   });
 
-  it("accepteert een lege manifest", () => {
+  it("accepts an empty manifest", () => {
     assert.deepEqual(buildReleaseManifest([]), []);
   });
 
-  it("weigert een url die geen https is", () => {
+  it("rejects a url that is not https", () => {
     assertEntryError(
       () => buildReleaseManifest([entry({ url: "http://downloads.example.com/app.tar.gz" })]),
       "entry 1 (linux/x64)",
@@ -97,7 +97,7 @@ describe("buildReleaseManifest", () => {
     );
   });
 
-  it("weigert een sha256 met hoofdletters", () => {
+  it("rejects a sha256 with upper-case letters", () => {
     assertEntryError(
       () => buildReleaseManifest([entry({ sha256: GOOD_SHA256.toUpperCase() })]),
       "entry 1 (linux/x64)",
@@ -105,7 +105,7 @@ describe("buildReleaseManifest", () => {
     );
   });
 
-  it("weigert een sha256 die niet 64 tekens lang is", () => {
+  it("rejects a sha256 that is not 64 characters long", () => {
     assertEntryError(
       () => buildReleaseManifest([entry({ sha256: GOOD_SHA256.slice(1) })]),
       "entry 1 (linux/x64)",
@@ -113,7 +113,7 @@ describe("buildReleaseManifest", () => {
     );
   });
 
-  it("weigert nul bytes en negatieve of gebroken aantallen", () => {
+  it("rejects zero bytes and negative or fractional counts", () => {
     for (const bytes of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
       assertEntryError(
         () => buildReleaseManifest([entry({ bytes })]),
@@ -123,7 +123,7 @@ describe("buildReleaseManifest", () => {
     }
   });
 
-  it("weigert een dubbel platform+arch-paar en noemt beide regels", () => {
+  it("rejects a duplicate platform+arch pair and names both entries", () => {
     assert.throws(
       () =>
         buildReleaseManifest([
@@ -141,7 +141,7 @@ describe("buildReleaseManifest", () => {
     );
   });
 
-  it("weigert een versie die de strikte parser afkeurt", () => {
+  it("rejects a version the strict parser turns down", () => {
     for (const version of ["v1.4.2", "1.4", "1.4.2.1", "01.4.2", "", "1.4.2+build"]) {
       assertEntryError(
         () => buildReleaseManifest([entry({ version })]),
@@ -151,7 +151,7 @@ describe("buildReleaseManifest", () => {
     }
   });
 
-  it("weigert een bestandsnaam met een pad of stuurteken", () => {
+  it("rejects a file name with a path or control character", () => {
     for (const file of ["dist/app.tar.gz", "..\\app.exe", "app\n.tar.gz", ""]) {
       assertEntryError(
         () => buildReleaseManifest([entry({ file })]),
@@ -161,13 +161,13 @@ describe("buildReleaseManifest", () => {
     }
   });
 
-  it("weigert een onbekend veld in plaats van het te negeren", () => {
+  it("rejects an unknown field instead of ignoring it", () => {
     const withExtra = { ...entry(), channel: "beta" } as unknown as ReleaseManifestEntry;
 
     assertEntryError(() => buildReleaseManifest([withExtra]), "entry 1", "channel");
   });
 
-  it("weigert een invoer die geen lijst is", () => {
+  it("rejects an input that is not a list", () => {
     assert.throws(
       () => buildReleaseManifest({ entries: [] }),
       /release manifest must be an array of entries/,
@@ -177,7 +177,7 @@ describe("buildReleaseManifest", () => {
 });
 
 describe("toMarkdown", () => {
-  it("maakt een korte lijst in manifestvolgorde", () => {
+  it("makes a short list in manifest order", () => {
     const markdown = toMarkdown([
       entry({ platform: "win32", arch: "x64", file: "app-win32-x64.exe", bytes: 24_000_000 }),
       entry({ platform: "linux", arch: "x64", bytes: 900 }),
@@ -190,11 +190,11 @@ describe("toMarkdown", () => {
     );
   });
 
-  it("geeft een lege string voor een lege manifest", () => {
+  it("returns an empty string for an empty manifest", () => {
     assert.equal(toMarkdown([]), "");
   });
 
-  it("past dezelfde controles toe als de manifest", () => {
+  it("applies the same checks as the manifest", () => {
     assertEntryError(
       () => toMarkdown([entry({ sha256: "K".repeat(64) })]),
       "entry 1 (linux/x64)",

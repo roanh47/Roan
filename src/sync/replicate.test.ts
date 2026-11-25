@@ -56,7 +56,7 @@ class FakeTransport implements PeerTransport {
 
   close(reason?: string): void {
     if (this.closedWith !== undefined) return;
-    this.closedWith = reason ?? "dicht";
+    this.closedWith = reason ?? "closed";
   }
 
   onMessage(handler: (raw: string) => void): void {
@@ -67,14 +67,14 @@ class FakeTransport implements PeerTransport {
     this.closeHandler = handler;
   }
 
-  /** Testbesturing: doe alsof de peer dit frame stuurde. */
+  /** Test hook: pretend the peer sent this frame. */
   deliver(frame: Frame | string): void {
     const raw = typeof frame === "string" ? frame : JSON.stringify(frame);
     this.messageHandler?.(raw);
   }
 
-  /** Testbesturing: doe alsof de verbinding wegvalt. */
-  drop(reason = "peer weg"): void {
+  /** Test hook: pretend the connection drops. */
+  drop(reason = "peer gone"): void {
     this.closedWith = reason;
     this.closeHandler?.(reason);
   }
@@ -84,7 +84,7 @@ class FakeTransport implements PeerTransport {
   }
 }
 
-/** Twee transparanten die elkaar direct doorgeven, als twee uiteinden van een socket. */
+/** Two transports that pass frames straight to each other, like two ends of a socket. */
 function link(): [FakeTransport, FakeTransport] {
   const left = new FakeTransport("links");
   const right = new FakeTransport("rechts");
@@ -105,8 +105,8 @@ function setOf(store: MemoryStore): Set<string> {
   return new Set(store.all().map((e) => e.id));
 }
 
-describe("replicatie", () => {
-  it("peer loopt voor: lokale kant haalt in, in orde", () => {
+describe("replication", () => {
+  it("peer is ahead: the local side catches up, fine", () => {
     const local = createMemoryStore({ chain: "gesprek", nodeId: "a" });
     const remote = createMemoryStore({ chain: "gesprek", nodeId: "b" });
     seed(remote, 5);
@@ -127,7 +127,7 @@ describe("replicatie", () => {
     peer.close();
   });
 
-  it("peer loopt achter: wij sturen wat hij mist", () => {
+  it("peer is behind: we send what it is missing", () => {
     const local = createMemoryStore({ chain: "gesprek", nodeId: "a" });
     const remote = createMemoryStore({ chain: "gesprek", nodeId: "b" });
     seed(local, 4);
@@ -144,13 +144,13 @@ describe("replicatie", () => {
     peer.close();
   });
 
-  it("lege kant vraagt ontbrekende events op met een hello", () => {
+  it("empty side requests the missing events with a hello", () => {
     const local = createMemoryStore({ chain: "gesprek", nodeId: "a" });
     const transport = new FakeTransport("peer");
     const session = new ReplicationSession({ store: local, transport, logger: quietLogger });
     session.start();
 
-    // Peer zegt dat hij seq 7 heeft; wij hebben niets.
+    // Peer says it has seq 7; we have nothing.
     transport.deliver({ t: "hello", v: 1, chain: "gesprek", node: "b", haveSeq: 7 });
 
     const hellos = transport.sent.filter((f) => f.t === "hello");
@@ -158,14 +158,14 @@ describe("replicatie", () => {
     assert.equal(hellos[1]?.t === "hello" ? hellos[1].haveSeq : -1, 0);
     assert.equal(session.status, "live");
 
-    // Twee keer dezelfde hello mag geen tweede verzoek opleveren.
+    // The same hello twice must not produce a second request.
     transport.deliver({ t: "hello", v: 1, chain: "gesprek", node: "b", haveSeq: 7 });
     assert.equal(transport.sent.filter((f) => f.t === "hello").length, 2);
 
     session.close();
   });
 
-  it("gelijke seq maar andere id wordt een tak: beide events blijven", () => {
+  it("same seq but a different id becomes a branch: both events survive", () => {
     const local = createMemoryStore({ chain: "gesprek", nodeId: "a" });
     seed(local, 3, "a");
     const transport = new FakeTransport("peer");
@@ -179,10 +179,10 @@ describe("replicatie", () => {
     session.start();
 
     transport.deliver({ t: "hello", v: 1, chain: "gesprek", node: "b", haveSeq: 3 });
-    // Peer stuurt zijn eigen seq 3 met een andere id.
+    // Peer sends its own seq 3 with a different id.
     transport.deliver({ t: "append", event: event(3, "b", "b-3-ander") });
 
-    // De link blijft leven en de rapportering blijft zichtbaar.
+    // The link stays alive and the reporting stays visible.
     assert.equal(session.status, "live");
     assert.equal(reports.length, 1);
     assert.deepEqual(reports[0], {
@@ -194,7 +194,7 @@ describe("replicatie", () => {
       localId: "a-3",
       remoteId: "b-3-ander",
     });
-    // Onze tak staat nog steeds op zijn plek; de hunne rebaset erachter.
+    // Our branch still sits in its place; theirs rebases behind it.
     assert.equal(local.idAt(3), "a-3");
     assert.equal(local.head(), 4);
     assert.equal(local.idAt(4), "b-3-ander");
@@ -203,7 +203,7 @@ describe("replicatie", () => {
     session.close();
   });
 
-  it("een tak in een events-batch loopt door: de rest rebaset erachteraan", () => {
+  it("a branch inside an events batch keeps going: the rest rebases behind it", () => {
     const local = createMemoryStore({ chain: "gesprek", nodeId: "a" });
     seed(local, 2, "a");
     const transport = new FakeTransport("peer");
@@ -222,16 +222,16 @@ describe("replicatie", () => {
     session.close();
   });
 
-  it("twee schrijvers op dezelfde seq: beide kanten houden beide takken", () => {
-    // Het spiegelcontract: elke kant houdt z'n eigen tak op z'n plek en
-    // rebaset de andere erachter. Beide events bestaan daarna overal.
+  it("two writers on the same seq: both sides keep both branches", () => {
+    // The mirror contract: each side keeps its own branch in place and
+    // rebases the other behind it. Both events then exist everywhere.
     const left = createMemoryStore({ chain: "gesprek", nodeId: "a" });
     const right = createMemoryStore({ chain: "gesprek", nodeId: "b" });
     seed(left, 3, "a");
     right.append(event(1, "a", "a-1"));
     right.append(event(2, "a", "a-2"));
     right.append(event(3, "a", "a-3"));
-    // Beide schrijven seq 4 tegelijk, met een eigen id.
+    // Both write seq 4 at the same time, each with its own id.
     left.append(event(4, "a", "links-4"));
     right.append(event(4, "b", "rechts-4"));
 
@@ -250,7 +250,7 @@ describe("replicatie", () => {
     leftSession.start();
     rightSession.start();
 
-    // Verbind ze: elkaars hello en dan de eigen divergentie.
+    // Connect them: each other's hello and then their own divergence.
     rightTransport.deliver({ t: "hello", v: 1, chain: "gesprek", node: "a", haveSeq: 4 });
     leftTransport.deliver({ t: "hello", v: 1, chain: "gesprek", node: "b", haveSeq: 4 });
     leftTransport.deliver({ t: "append", event: event(4, "b", "rechts-4") });
@@ -258,13 +258,13 @@ describe("replicatie", () => {
 
     assert.equal(leftSession.status, "live");
     assert.equal(rightSession.status, "live");
-    // Links: eigen tak eerst, dan de hunne.
+    // Left: own branch first, then theirs.
     assert.equal(left.idAt(4), "links-4");
     assert.equal(left.idAt(5), "rechts-4");
-    // Rechts: gespiegeld.
+    // Right: mirrored.
     assert.equal(right.idAt(4), "rechts-4");
     assert.equal(right.idAt(5), "links-4");
-    // En geen van beide is iets kwijt.
+    // And neither of them has lost anything.
     assert.equal(left.head(), 5);
     assert.equal(right.head(), 5);
 
@@ -272,7 +272,7 @@ describe("replicatie", () => {
     rightSession.close();
   });
 
-  it("dubbele ids worden genegeerd", () => {
+  it("duplicate ids are ignored", () => {
     const local = createMemoryStore({ chain: "gesprek", nodeId: "a" });
     const transport = new FakeTransport("peer");
     const session = new ReplicationSession({ store: local, transport, logger: quietLogger });
@@ -288,7 +288,7 @@ describe("replicatie", () => {
     session.close();
   });
 
-  it("events die te vroeg binnenkomen worden gebufferd tot het gat dicht is", () => {
+  it("events that arrive too early are buffered until the gap closes", () => {
     const local = createMemoryStore({ chain: "gesprek", nodeId: "a" });
     const transport = new FakeTransport("peer");
     const session = new ReplicationSession({ store: local, transport, logger: quietLogger });
@@ -306,7 +306,7 @@ describe("replicatie", () => {
     session.close();
   });
 
-  it("live appends blijven lopen na de handshake", () => {
+  it("live appends keep flowing after the handshake", () => {
     const local = createMemoryStore({ chain: "gesprek", nodeId: "a" });
     const remote = createMemoryStore({ chain: "gesprek", nodeId: "b" });
     const [ta, tb] = link();
@@ -319,7 +319,7 @@ describe("replicatie", () => {
     remote.append(event(2, "b"));
     assert.deepEqual(seqs(local), [1, 2]);
 
-    // Heen en weer zonder echo-lus: elk event staat er precies één keer.
+    // Back and forth without an echo loop: every event appears exactly once.
     local.append(event(3, "a"));
     assert.deepEqual(seqs(remote), [1, 2, 3]);
     assert.equal(remote.all().length, 3);
@@ -329,7 +329,7 @@ describe("replicatie", () => {
     peer.close();
   });
 
-  it("een lokaal event na een gat stuurt een catch-up in plaats van een los event", () => {
+  it("a local event after a gap sends a catch-up instead of a loose event", () => {
     const local = createMemoryStore({ chain: "gesprek", nodeId: "a" });
     seed(local, 2);
     const transport = new FakeTransport("peer");
@@ -346,7 +346,7 @@ describe("replicatie", () => {
     session.close();
   });
 
-  it("vreemde frames (tool_req) worden genegeerd", () => {
+  it("foreign frames (tool_req) are ignored", () => {
     const local = createMemoryStore({ chain: "gesprek", nodeId: "a" });
     const transport = new FakeTransport("peer");
     const errors: string[] = [];
@@ -364,7 +364,7 @@ describe("replicatie", () => {
     session.close();
   });
 
-  it("kapotte json is een protocolfout", () => {
+  it("broken json is a protocol error", () => {
     const local = createMemoryStore({ chain: "gesprek", nodeId: "a" });
     const transport = new FakeTransport("peer");
     const errors: string[] = [];
@@ -382,7 +382,7 @@ describe("replicatie", () => {
     assert.equal(transport.closedWith, "bad-frame");
   });
 
-  it("een andere keten wordt geweigerd", () => {
+  it("another chain is refused", () => {
     const local = createMemoryStore({ chain: "gesprek", nodeId: "a" });
     const transport = new FakeTransport("peer");
     const errors: string[] = [];
@@ -400,7 +400,7 @@ describe("replicatie", () => {
     assert.equal(local.head(), 0);
   });
 
-  it("beide kanten gelijk: alleen een anchor, niets verandert", () => {
+  it("both sides equal: only an anchor, nothing changes", () => {
     const local = createMemoryStore({ chain: "gesprek", nodeId: "a" });
     const remote = createMemoryStore({ chain: "gesprek", nodeId: "b" });
     seed(local, 3, "a");

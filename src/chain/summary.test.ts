@@ -4,11 +4,11 @@ import type { Event } from "../sync/types.js";
 import { formatSummary, summarize } from "./summary.js";
 
 /**
- * Deze test staat naast de bron in src/chain/ omdat tsconfig alleen "src"
- * include't en `npm test` de gecompileerde dist/**\/*.test.js draait.
+ * This test sits next to the source in src/chain/ because tsconfig only
+ * includes "src" and `npm test` runs the compiled dist/**\/*.test.js.
  *
- * summarize() kijkt alleen naar seq, type en data, dus de events worden hier
- * met de hand gebouwd; er is geen store en geen tijd nodig.
+ * summarize() only looks at seq, type and data, so the events are built by
+ * hand here; no store and no clock are needed.
  */
 
 const CHAIN = "main";
@@ -28,7 +28,7 @@ function makeEvent(seq: number, type: string, data: unknown = { seq }): Event {
 }
 
 describe("summarize", () => {
-  it("geeft nullen en largest null voor een lege keten", () => {
+  it("returns zeroes and largest null for an empty chain", () => {
     const summary = summarize([]);
 
     assert.equal(summary.count, 0);
@@ -39,7 +39,7 @@ describe("summarize", () => {
     assert.equal(summary.contiguous, true);
   });
 
-  it("telt per type en levert de typesleutels gesorteerd", () => {
+  it("counts per type and returns the type keys sorted", () => {
     const summary = summarize([
       makeEvent(1, "message"),
       makeEvent(2, "tool_call"),
@@ -57,7 +57,7 @@ describe("summarize", () => {
     assert.equal(summary.contiguous, true);
   });
 
-  it("meldt een gat als niet-aaneengesloten", () => {
+  it("reports a gap as not contiguous", () => {
     const summary = summarize([makeEvent(1, "message"), makeEvent(3, "message")]);
 
     assert.equal(summary.count, 2);
@@ -66,7 +66,7 @@ describe("summarize", () => {
     assert.equal(summary.contiguous, false);
   });
 
-  it("meldt een dubbele seq als niet-aaneengesloten", () => {
+  it("reports a duplicate seq as not contiguous", () => {
     const summary = summarize([
       makeEvent(1, "message"),
       makeEvent(2, "message"),
@@ -80,14 +80,14 @@ describe("summarize", () => {
     assert.equal(summary.contiguous, false);
   });
 
-  it("kiest de grootste payload, ook als die niet het laatste event is", () => {
+  it("picks the largest payload, even when it is not the last event", () => {
     const summary = summarize([
       makeEvent(1, "message", { text: "kort" }),
       makeEvent(2, "tool_result", { text: "x".repeat(500), n: 42 }),
       makeEvent(3, "message", { text: "ook kort" }),
     ]);
 
-    assert.ok(summary.largest, "verwachtte een largest-payload");
+    assert.ok(summary.largest, "expected a largest payload");
     assert.equal(summary.largest.seq, 2);
     assert.equal(
       summary.largest.bytes,
@@ -95,7 +95,7 @@ describe("summarize", () => {
     );
   });
 
-  it("is ongevoelig voor de volgorde van de input", () => {
+  it("is insensitive to the order of the input", () => {
     const events = [makeEvent(3, "message"), makeEvent(1, "message"), makeEvent(2, "message")];
     const summary = summarize(events);
 
@@ -106,11 +106,11 @@ describe("summarize", () => {
 });
 
 describe("formatSummary", () => {
-  it("geeft één regel voor een lege keten", () => {
-    assert.deepEqual(formatSummary(summarize([])), ["Lege keten: geen events."]);
+  it("returns one line for an empty chain", () => {
+    assert.deepEqual(formatSummary(summarize([])), ["Empty chain: no events."]);
   });
 
-  it("noemt aantallen, types en de grootste payload", () => {
+  it("mentions counts, types and the largest payload", () => {
     const lines = formatSummary(
       summarize([
         makeEvent(1, "message", { text: "a" }),
@@ -121,7 +121,7 @@ describe("formatSummary", () => {
     assert.equal(lines.length, 4);
     assert.equal(lines[0], "Events: 2, seq 1..2");
     assert.equal(lines[1], "Per type: message 1, tool_call 1");
-    assert.ok(lines[2]?.startsWith("Grootste payload: seq 2, "), lines[2] ?? "");
-    assert.ok(lines[3]?.includes("aaneengesloten"), lines[3] ?? "");
+    assert.ok(lines[2]?.startsWith("Largest payload: seq 2, "), lines[2] ?? "");
+    assert.ok(lines[3]?.includes("contiguous"), lines[3] ?? "");
   });
 });

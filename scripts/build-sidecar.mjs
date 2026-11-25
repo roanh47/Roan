@@ -20,7 +20,7 @@ const outDir = join(root, "src-tauri", "binaries");
 const work = join(root, ".sidecar");
 const bundle = join(work, "daemon.cjs");
 const blob = join(work, "daemon.blob");
-// Tauri zoekt op Windows naar hetzelfde pad met .exe erachter.
+// Tauri looks for the same path with .exe appended on Windows.
 const suffix = process.platform === "win32" ? ".exe" : "";
 const target = join(outDir, `roan-daemon-${triple}${suffix}`);
 
@@ -28,9 +28,9 @@ mkdirSync(outDir, { recursive: true });
 mkdirSync(work, { recursive: true });
 
 /**
- * `npx` is een shell-script op Linux en macOS, maar `npx.cmd` op Windows; Node
- * kan dat pad niet raden. Daarom praten we esbuild via zijn API aan en starten
- * we postject als JS-bestand met node — op elk platform hetzelfde.
+ * `npx` is a shell script on Linux and macOS, but `npx.cmd` on Windows; Node
+ * cannot guess that path. So we drive esbuild through its API and start
+ * postject as a JS file with node — the same on every platform.
  */
 const cli = (name) => join(root, "node_modules", name);
 

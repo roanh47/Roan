@@ -3,15 +3,15 @@ import { describe, it } from "node:test";
 import { CancelToken, type CancelListener } from "./cancel.js";
 
 /**
- * Regel onder test: annuleren is definitief en reden-vast.
+ * Rule under test: cancelling is final and sticks to its reason.
  *
- * De eerste reden wint, een tweede `cancel` is een no-op en luisteraars horen
- * de reden precies één keer. Er zit geen timer of klok in de token, dus elke
- * test is deterministisch en heeft geen fake timers nodig.
+ * The first reason wins, a second `cancel` is a no-op, and listeners hear the
+ * reason exactly once. The token holds no timer or clock, so every test is
+ * deterministic and needs no fake timers.
  */
 
 describe("CancelToken", () => {
-  it("start levend: niet geannuleerd en zonder reden", () => {
+  it("starts alive: not cancelled and without a reason", () => {
     const token = new CancelToken();
 
     assert.equal(token.isCancelled, false);
@@ -19,7 +19,7 @@ describe("CancelToken", () => {
     assert.doesNotThrow(() => token.throwIfCancelled());
   });
 
-  it("onthoudt de reden en wordt geannuleerd", () => {
+  it("remembers the reason and becomes cancelled", () => {
     const token = new CancelToken();
     token.cancel("user pressed stop");
 
@@ -27,7 +27,7 @@ describe("CancelToken", () => {
     assert.equal(token.reason, "user pressed stop");
   });
 
-  it("laat de eerste reden winnen bij een tweede cancel", () => {
+  it("lets the first reason win on a second cancel", () => {
     const token = new CancelToken();
     token.cancel("first");
     token.cancel("second");
@@ -35,7 +35,7 @@ describe("CancelToken", () => {
     assert.equal(token.reason, "first");
   });
 
-  it("gooit niet bij een tweede cancel", () => {
+  it("does not throw on a second cancel", () => {
     const token = new CancelToken();
     token.cancel("first");
 
@@ -44,7 +44,7 @@ describe("CancelToken", () => {
     });
   });
 
-  it("roept luisteraars maar één keer, ook bij herhaald cancel", () => {
+  it("calls listeners only once, even on repeated cancel", () => {
     const token = new CancelToken();
     const seen: string[] = [];
     token.onCancel((reason) => {
@@ -57,7 +57,7 @@ describe("CancelToken", () => {
     assert.deepEqual(seen, ["first"]);
   });
 
-  it("throwIfCancelled gooit een Error met de reden in het bericht", () => {
+  it("throwIfCancelled throws an Error with the reason in the message", () => {
     const token = new CancelToken();
     token.cancel("shutdown requested");
 
@@ -73,7 +73,7 @@ describe("CancelToken", () => {
 });
 
 describe("CancelToken.onCancel", () => {
-  it("roept een geregistreerde luisteraar met de reden", () => {
+  it("calls a registered listener with the reason", () => {
     const token = new CancelToken();
     const seen: string[] = [];
     token.onCancel((reason) => {
@@ -85,7 +85,7 @@ describe("CancelToken.onCancel", () => {
     assert.deepEqual(seen, ["budget exhausted"]);
   });
 
-  it("roept meerdere luisteraars in registratievolgorde", () => {
+  it("calls multiple listeners in registration order", () => {
     const token = new CancelToken();
     const seen: string[] = [];
     token.onCancel(() => seen.push("a"));
@@ -96,7 +96,7 @@ describe("CancelToken.onCancel", () => {
     assert.deepEqual(seen, ["a", "b"]);
   });
 
-  it("belt de luisteraar niet meer na afmelden", () => {
+  it("no longer calls the listener after unsubscribing", () => {
     const token = new CancelToken();
     const seen: string[] = [];
     const unsubscribe = token.onCancel((reason) => {
@@ -109,7 +109,7 @@ describe("CancelToken.onCancel", () => {
     assert.deepEqual(seen, []);
   });
 
-  it("meldt alleen de eigen registratie af", () => {
+  it("only unsubscribes its own registration", () => {
     const token = new CancelToken();
     const seen: string[] = [];
     const listener: CancelListener = (reason) => {
@@ -121,11 +121,11 @@ describe("CancelToken.onCancel", () => {
     first();
     token.cancel("stop");
 
-    // Dezelfde functie twee keer registreren geeft twee losse afmeldingen.
+    // Registering the same function twice yields two separate unsubscribes.
     assert.deepEqual(seen, ["stop"]);
   });
 
-  it("tweede keer afmelden is een no-op", () => {
+  it("unsubscribing a second time is a no-op", () => {
     const token = new CancelToken();
     const unsubscribe = token.onCancel(() => undefined);
 
@@ -133,7 +133,7 @@ describe("CancelToken.onCancel", () => {
     assert.doesNotThrow(() => unsubscribe());
   });
 
-  it("roept een late registratie meteen aan met de reden", () => {
+  it("calls a late registration immediately with the reason", () => {
     const token = new CancelToken();
     token.cancel("too late");
 
@@ -145,7 +145,7 @@ describe("CancelToken.onCancel", () => {
     assert.deepEqual(seen, ["too late"]);
   });
 
-  it("geeft bij een late registratie een afmelding die niets doet", () => {
+  it("returns a do-nothing unsubscribe for a late registration", () => {
     const token = new CancelToken();
     token.cancel("too late");
 
@@ -159,7 +159,7 @@ describe("CancelToken.onCancel", () => {
     assert.equal(calls, 1);
   });
 
-  it("laat een luisteraar de token al geannuleerd zien", () => {
+  it("lets a listener see the token already cancelled", () => {
     const token = new CancelToken();
     let observed: boolean | undefined;
     let observedReason: string | undefined;
@@ -174,7 +174,7 @@ describe("CancelToken.onCancel", () => {
     assert.equal(observedReason, "stop");
   });
 
-  it("laat een gooiende luisteraar de andere luisteraars niet blokkeren", () => {
+  it("keeps a throwing listener from blocking the other listeners", () => {
     const token = new CancelToken();
     const seen: string[] = [];
     token.onCancel(() => {
@@ -190,8 +190,8 @@ describe("CancelToken.onCancel", () => {
   });
 });
 
-describe("CancelToken.cancel validatie", () => {
-  it("weigert een lege of blanco reden en annuleert dan niet", () => {
+describe("CancelToken.cancel validation", () => {
+  it("refuses an empty or blank reason and then does not cancel", () => {
     for (const reason of ["", "   ", "\t\n"]) {
       const token = new CancelToken();
       assert.throws(
@@ -205,7 +205,7 @@ describe("CancelToken.cancel validatie", () => {
     }
   });
 
-  it("noemt de foute invoer in het bericht", () => {
+  it("names the bad input in the message", () => {
     const token = new CancelToken();
     assert.throws(
       () => token.cancel("  "),
@@ -217,7 +217,7 @@ describe("CancelToken.cancel validatie", () => {
     );
   });
 
-  it("weigert een reden die geen string is", () => {
+  it("refuses a reason that is not a string", () => {
     const token = new CancelToken();
     assert.throws(
       () => {
@@ -227,7 +227,7 @@ describe("CancelToken.cancel validatie", () => {
     );
   });
 
-  it("weigert een luisteraar die geen functie is", () => {
+  it("refuses a listener that is not a function", () => {
     const token = new CancelToken();
     assert.throws(
       () => {

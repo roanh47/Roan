@@ -7,16 +7,15 @@ import {
 } from "./stub-provider.js";
 
 /**
- * Deze test staat in src/testing/ (en niet in tests/) omdat tsconfig alleen
- * "src" include't en `npm test` de gecompileerde dist/**\/*.test.js draait; een
- * test buiten rootDir zou dus niet typechecken en niet draaien.
+ * This test lives in src/testing/ (and not in tests/) because tsconfig only
+ * includes "src" and `npm test` runs the compiled dist/**\/*.test.js; a test
+ * outside rootDir would therefore neither typecheck nor run.
  *
- * De server luistert op 127.0.0.1:0 (een door de OS gekozen poort) en wordt in
- * elke test weer gesloten, dus er blijft niets hangen en er gaat geen verkeer
- * naar buiten.
+ * The server listens on 127.0.0.1:0 (a port picked by the OS) and is closed
+ * again in every test, so nothing is left hanging and no traffic goes out.
  */
 
-/** Sleutelvolgorde hier moet die van de server spiegelen; tekst wordt letterlijk vergeleken. */
+/** Key order here must mirror the server's; the text is compared literally. */
 function chunkFrame(id: string, delta: Record<string, unknown>, finish: string | null): string {
   const payload = {
     id,
@@ -28,7 +27,7 @@ function chunkFrame(id: string, delta: Record<string, unknown>, finish: string |
   return `data: ${JSON.stringify(payload)}\n\n`;
 }
 
-/** Framet een chunk die alleen `usage` draagt (geen choices). */
+/** Frames a chunk that carries only `usage` (no choices). */
 function usageFrame(id: string, usage: StubUsage): string {
   const payload = {
     id,
@@ -41,36 +40,36 @@ function usageFrame(id: string, usage: StubUsage): string {
   return `data: ${JSON.stringify(payload)}\n\n`;
 }
 
-/** `created` is een klokwaarde; nullen hem zodat de rest letterlijk te vergelijken is. */
+/** `created` is a clock value; zero it so the rest can be compared literally. */
 function normalizeCreated(body: string): string {
   return body.replace(/"created":\d+/g, '"created":0');
 }
 
-/** Splitst de SSE-body in zijn `data:`-payloads en controleert de framing. */
+/** Splits the SSE body into its `data:` payloads and checks the framing. */
 function ssePayloads(body: string): string[] {
   const blocks = body.split("\n\n");
-  assert.equal(blocks.at(-1), "", "SSE-body eindigt niet op een lege regel");
+  assert.equal(blocks.at(-1), "", "SSE body does not end on an empty line");
   return blocks.slice(0, -1).map((block) => {
-    assert.ok(block.startsWith("data: "), `SSE-blok zonder "data: "-prefix: ${block}`);
+    assert.ok(block.startsWith("data: "), `SSE block without a "data: " prefix: ${block}`);
     return block.slice("data: ".length);
   });
 }
 
-/** Parset alle frames behalve `[DONE]` en controleert dat `[DONE]` de laatste is. */
+/** Parses all frames except `[DONE]` and checks that `[DONE]` is the last one. */
 function parseEvents(body: string): Record<string, unknown>[] {
   const payloads = ssePayloads(body);
-  assert.equal(payloads.at(-1), "[DONE]", "stream eindigt niet op data: [DONE]");
+  assert.equal(payloads.at(-1), "[DONE]", "stream does not end on data: [DONE]");
   return payloads.slice(0, -1).map((payload) => {
     const parsed: unknown = JSON.parse(payload);
     assert.ok(
       typeof parsed === "object" && parsed !== null && !Array.isArray(parsed),
-      `frame is geen object: ${payload}`,
+      `frame is not an object: ${payload}`,
     );
     return parsed as Record<string, unknown>;
   });
 }
 
-/** Plakt alle `choices[0].delta.content`-stukken aan elkaar. */
+/** Glues all `choices[0].delta.content` pieces together. */
 function textOf(events: readonly Record<string, unknown>[]): string {
   let text = "";
   for (const event of events) {
@@ -86,7 +85,7 @@ function textOf(events: readonly Record<string, unknown>[]): string {
   return text;
 }
 
-/** Haalt de `usage` uit de frames, of `null` als geen frame die meedraagt. */
+/** Pulls the `usage` out of the frames, or `null` if no frame carries one. */
 function usageOf(events: readonly Record<string, unknown>[]): unknown {
   for (const event of events) {
     if (event.usage !== undefined && event.usage !== null) return event.usage;
@@ -103,7 +102,7 @@ const CHAT_BODY = {
 };
 
 describe("stub provider", () => {
-  it("streamt gescripte antwoorden, logt verzoeken en geeft 429 door", async () => {
+  it("streams scripted responses, logs requests and passes 429 through", async () => {
     const script: ScriptedResponse[] = [
       {
         chunks: [{ content: "Hello" }, { content: ", world" }, { usage: USAGE }],
@@ -121,7 +120,7 @@ describe("stub provider", () => {
 
     const stub = await createStubProvider(script);
     try {
-      // Eerste aanroep: tekst + usage.
+      // First call: text + usage.
       const first = await fetch(`${stub.baseUrl}/chat/completions`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -143,7 +142,7 @@ describe("stub provider", () => {
       assert.equal(textOf(firstEvents), "Hello, world");
       assert.deepEqual(usageOf(firstEvents), USAGE);
 
-      // Tweede aanroep: tool-call delta's worden aan elkaar geplakt.
+      // Second call: tool-call deltas are glued together.
       const toolBody = {
         model: "stub-model",
         messages: [{ role: "user", content: "weer?" }],
@@ -199,7 +198,7 @@ describe("stub provider", () => {
       assert.equal(assembledArgs, '{"city":"Ha"}');
       assert.equal(calls[0]?.id, "call_abc");
 
-      // Derde aanroep: de gescripte 429 moet zichtbaar zijn als status.
+      // Third call: the scripted 429 must show up as the status.
       const third = await fetch(`${stub.baseUrl}/chat/completions`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -208,7 +207,7 @@ describe("stub provider", () => {
       assert.equal(third.status, 429);
       assert.equal(await third.text(), '{"error":{"message":"rate limited"}}');
 
-      // Vierde aanroep: queue is leeg, dus een minimale tekstcompletion.
+      // Fourth call: the queue is empty, so a minimal text completion.
       const fourth = await fetch(`${stub.baseUrl}/chat/completions`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -216,10 +215,10 @@ describe("stub provider", () => {
       });
       assert.equal(fourth.status, 200);
       const fourthText = await fourth.text();
-      assert.ok(fourthText.endsWith("data: [DONE]\n\n"), "fallback sluit niet af met [DONE]");
+      assert.ok(fourthText.endsWith("data: [DONE]\n\n"), "fallback does not end with [DONE]");
       assert.match(textOf(parseEvents(fourthText)), /no scripted response left/);
 
-      // Verzoeken zijn in volgorde vastgelegd, met geparsed JSON-body.
+      // Requests were recorded in order, with a parsed JSON body.
       assert.equal(stub.requests.length, 4);
       const urls = stub.requests.map((request) => `${request.method} ${request.url}`);
       assert.deepEqual(urls, [
@@ -236,7 +235,7 @@ describe("stub provider", () => {
     }
   });
 
-  it("weigert onbekende routes en andere methodes, en sluit de poort", async () => {
+  it("rejects unknown routes and other methods, and closes the port", async () => {
     const stub = await createStubProvider([{ chunks: [{ content: "later" }] }]);
     const { baseUrl, port, requests } = stub;
 
@@ -249,7 +248,7 @@ describe("stub provider", () => {
       assert.equal(wrongMethod.status, 405);
       assert.equal(wrongMethod.headers.get("allow"), "POST");
 
-      // Alleen de geldige completions-POST mag in het logboek staan.
+      // Only the valid completions POST may end up in the log.
       assert.equal(requests.length, 0);
 
       stub.enqueue({ chunks: [{ content: "expliciet" }] });
@@ -259,7 +258,7 @@ describe("stub provider", () => {
         body: JSON.stringify(CHAT_BODY),
       });
       assert.equal(ok.status, 200);
-      // Eerste scripted respons ("later") gaat voor de later ge-enqueuede.
+      // The first scripted response ("later") wins over the later enqueued one.
       assert.equal(textOf(parseEvents(await ok.text())), "later");
     } finally {
       await stub.close();

@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { probe, startDiscovery, tailscaleHosts } from "./discovery.js";
 
-/** Een nep-`tailscale` die precies zegt wat de test wil horen. */
+/** A fake `tailscale` that says exactly what the test wants to hear. */
 function fakeTailscale(payload: unknown, exitCode = 0): string {
   const dir = mkdtempSync(join(tmpdir(), "roan-ts-"));
   const file = join(dir, "tailscale");
@@ -26,7 +26,7 @@ async function listening(port = 0): Promise<{ port: number; close: () => Promise
   };
 }
 
-test("leest de adressen uit tailscale status en slaat dit device over", async () => {
+test("reads the addresses from tailscale status and skips this device", async () => {
   process.env["ROAN_TAILSCALE_BIN"] = fakeTailscale({
     Self: { TailscaleIPs: ["100.64.0.1", "fd7a::1"] },
     Peer: {
@@ -41,7 +41,7 @@ test("leest de adressen uit tailscale status en slaat dit device over", async ()
   delete process.env["ROAN_TAILSCALE_BIN"];
 });
 
-test("zonder Tailscale is de lijst leeg in plaats van een fout", async () => {
+test("without Tailscale the list is empty instead of an error", async () => {
   process.env["ROAN_TAILSCALE_BIN"] = "/nonexistent/tailscale";
   const { self, hosts } = await tailscaleHosts();
   assert.equal(self, null);
@@ -49,14 +49,14 @@ test("zonder Tailscale is de lijst leeg in plaats van een fout", async () => {
   delete process.env["ROAN_TAILSCALE_BIN"];
 });
 
-test("probe ziet of er iets op de poort luistert", async () => {
+test("probe sees whether something is listening on the port", async () => {
   const server = await listening();
   assert.equal(await probe("127.0.0.1", server.port), true);
   await server.close();
   assert.equal(await probe("127.0.0.1", server.port), false);
 });
 
-test("discovery biedt elk gevonden adres één keer aan", async () => {
+test("discovery offers every found address once", async () => {
   const server = await listening();
   process.env["ROAN_TAILSCALE_BIN"] = fakeTailscale({
     Self: { TailscaleIPs: ["100.64.0.1"] },

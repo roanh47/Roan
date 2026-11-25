@@ -11,11 +11,11 @@ import {
   type Limiter,
 } from "./rate-limit.js";
 
-/** Een vaste tijd; de limiter leest zelf nooit de klok. */
+/** A fixed time; the limiter itself never reads the clock. */
 const T0 = 1_000_000;
 
 describe("createLimiter", () => {
-  it("geeft eerst een volle burst en weigert daarna", () => {
+  it("gives a full burst first and refuses afterwards", () => {
     const limiter = createLimiter({ perMinute: 60, burst: 3 });
 
     assert.deepEqual(limiter.take("search", T0), { ok: true, waitMs: 0, remaining: 2 });
@@ -24,43 +24,43 @@ describe("createLimiter", () => {
     assert.deepEqual(limiter.take("search", T0), { ok: false, waitMs: 1_000, remaining: 0 });
   });
 
-  it("zegt hoe lang wachten tot één token weer vrij is", () => {
+  it("says how long to wait until one token is free again", () => {
     const limiter = createLimiter({ perMinute: 60, burst: 1 });
     assert.equal(limiter.take("fetch", T0).ok, true);
-    // 60 per minuut is precies één token per 1000 ms.
+    // 60 per minute is exactly one token per 1000 ms.
     assert.deepEqual(limiter.take("fetch", T0 + 1), { ok: false, waitMs: 999, remaining: 0 });
     assert.deepEqual(limiter.take("fetch", T0 + 999), { ok: false, waitMs: 1, remaining: 0 });
     assert.deepEqual(limiter.take("fetch", T0 + 1_000), { ok: true, waitMs: 0, remaining: 0 });
   });
 
-  it("vult bij na verstreken tijd, niet eerder", () => {
+  it("refills after time has passed, not before", () => {
     const limiter = createLimiter({ perMinute: 120, burst: 2 });
     assert.equal(limiter.take("db", T0).ok, true);
     assert.equal(limiter.take("db", T0).ok, true);
-    // 120 per minuut = één token per 500 ms.
+    // 120 per minute = one token per 500 ms.
     assert.deepEqual(limiter.take("db", T0 + 499), { ok: false, waitMs: 1, remaining: 0 });
     assert.deepEqual(limiter.take("db", T0 + 500), { ok: true, waitMs: 0, remaining: 0 });
     assert.equal(limiter.take("db", T0 + 500).ok, false);
     assert.equal(limiter.take("db", T0 + 1_000).ok, true);
   });
 
-  it("houdt buckets per toolnaam gescheiden", () => {
+  it("keeps buckets separate per tool name", () => {
     const limiter = createLimiter({ perMinute: 60, burst: 2 });
     assert.equal(limiter.take("alpha", T0).ok, true);
     assert.equal(limiter.take("alpha", T0).ok, true);
     assert.equal(limiter.take("alpha", T0).ok, false);
-    // Een andere tool heeft zijn eigen, verse bucket.
+    // A different tool has its own fresh bucket.
     assert.deepEqual(limiter.take("beta", T0), { ok: true, waitMs: 0, remaining: 1 });
     assert.deepEqual(limiter.take("beta", T0), { ok: true, waitMs: 0, remaining: 0 });
     assert.equal(limiter.take("beta", T0).ok, false);
-    // En alpha blijft leeg.
+    // And alpha stays empty.
     assert.equal(limiter.take("alpha", T0).ok, false);
   });
 
-  it("maakt een bucket pas lui aan en start hem vol", () => {
+  it("creates a bucket lazily and starts it full", () => {
     const limiter = createLimiter({ perMinute: 60, burst: 2 });
-    // Ruim later eerste gebruik: de bucket heeft niet buiten gebruik opgespaard
-    // en ook niets verloren; hij begint gewoon vol.
+    // First use much later: the bucket has not saved up anything while idle
+    // and has lost nothing either; it simply starts full.
     assert.deepEqual(limiter.take("late", T0 + 86_400_000), {
       ok: true,
       waitMs: 0,
@@ -68,11 +68,11 @@ describe("createLimiter", () => {
     });
   });
 
-  it("spaart niet verder op dan een volle bucket", () => {
+  it("does not save up past a full bucket", () => {
     const limiter = createLimiter({ perMinute: 60, burst: 2 });
     assert.equal(limiter.take("cache", T0).ok, true);
     assert.equal(limiter.take("cache", T0).ok, true);
-    // Een uur later is de bucket vol (2), niet 62.
+    // An hour later the bucket is full (2), not 62.
     assert.deepEqual(limiter.take("cache", T0 + 3_600_000), {
       ok: true,
       waitMs: 0,
@@ -82,16 +82,16 @@ describe("createLimiter", () => {
     assert.equal(limiter.take("cache", T0 + 3_600_000).ok, false);
   });
 
-  it("geeft geen tokens bij een tijd die terugloopt", () => {
+  it("gives no tokens when the time runs backwards", () => {
     const limiter = createLimiter({ perMinute: 60, burst: 1 });
     assert.equal(limiter.take("skew", T0).ok, true);
-    // Klokschommeling: nu ligt vóór de vorige aanroep.
+    // Clock skew: now lies before the previous call.
     assert.equal(limiter.take("skew", T0 - 5_000).ok, false);
     assert.equal(limiter.take("skew", T0 + 999).ok, false);
     assert.equal(limiter.take("skew", T0 + 1_000).ok, true);
   });
 
-  it("weigert een lege of niet-tekstuele toolnaam, met veldnaam", () => {
+  it("rejects an empty or non-textual tool name, with the field name", () => {
     const limiter = createLimiter({ perMinute: 60, burst: 1 });
     assert.throws(() => limiter.take("", T0), /rate limit tool/);
     assert.throws(() => limiter.take(42 as unknown as string, T0), /rate limit tool: .*42/);
@@ -99,7 +99,7 @@ describe("createLimiter", () => {
     assert.throws(() => limiter.take("x", Number.POSITIVE_INFINITY), /rate limit nowMs/);
   });
 
-  it("werkt met een limiter die aan de bovengrens staat", () => {
+  it("works with a limiter at the upper bound", () => {
     const limiter = createLimiter({ perMinute: MAX_PER_MINUTE, burst: MAX_BURST });
     assert.equal(limiter.perMinute, MAX_PER_MINUTE);
     assert.equal(limiter.burst, MAX_BURST);
@@ -107,21 +107,21 @@ describe("createLimiter", () => {
       assert.equal(limiter.take("bulk", T0).ok, true);
     }
     assert.equal(limiter.take("bulk", T0).ok, false);
-    // 6000 per minuut = één token per 10 ms.
+    // 6000 per minute = one token per 10 ms.
     assert.equal(limiter.take("bulk", T0).waitMs, 10);
     assert.equal(limiter.take("bulk", T0 + 10).ok, true);
   });
 });
 
 describe("clampRateLimitConfig", () => {
-  it("laat een config binnen de grenzen ongemoeid", () => {
+  it("leaves a config within the limits untouched", () => {
     assert.deepEqual(clampRateLimitConfig({ perMinute: 60, burst: 10 }), {
       perMinute: 60,
       burst: 10,
     });
   });
 
-  it("klemt perMinute op 1..6000", () => {
+  it("clamps perMinute to 1..6000", () => {
     assert.equal(clampRateLimitConfig({ perMinute: 0, burst: 1 }).perMinute, MIN_PER_MINUTE);
     assert.equal(clampRateLimitConfig({ perMinute: 0.5, burst: 1 }).perMinute, MIN_PER_MINUTE);
     assert.equal(clampRateLimitConfig({ perMinute: 1, burst: 1 }).perMinute, MIN_PER_MINUTE);
@@ -130,7 +130,7 @@ describe("clampRateLimitConfig", () => {
     assert.equal(clampRateLimitConfig({ perMinute: 1e9, burst: 1 }).perMinute, MAX_PER_MINUTE);
   });
 
-  it("klemt burst op 1..1000", () => {
+  it("clamps burst to 1..1000", () => {
     assert.equal(clampRateLimitConfig({ perMinute: 60, burst: 0 }).burst, MIN_BURST);
     assert.equal(clampRateLimitConfig({ perMinute: 60, burst: 1 }).burst, MIN_BURST);
     assert.equal(clampRateLimitConfig({ perMinute: 60, burst: 1_000 }).burst, MAX_BURST);
@@ -138,27 +138,27 @@ describe("clampRateLimitConfig", () => {
     assert.equal(clampRateLimitConfig({ perMinute: 60, burst: 99_999 }).burst, MAX_BURST);
   });
 
-  it("laat de geklemde waarden in het gedrag terugzien", () => {
-    // perMinute 0 wordt 1: één token per 60_000 ms.
+  it("shows the clamped values in the behaviour", () => {
+    // perMinute 0 becomes 1: one token per 60_000 ms.
     const slow = createLimiter({ perMinute: 0, burst: 1 });
     assert.equal(slow.take("x", T0).ok, true);
     assert.equal(slow.take("x", T0).waitMs, 60_000);
 
-    // Een enorme perMinute wordt 6000: één token per 10 ms.
+    // A huge perMinute becomes 6000: one token per 10 ms.
     const fast = createLimiter({ perMinute: 100_000, burst: 2 });
     assert.equal(fast.perMinute, MAX_PER_MINUTE);
     assert.equal(fast.take("x", T0).ok, true);
     assert.equal(fast.take("x", T0).ok, true);
     assert.equal(fast.take("x", T0).waitMs, 10);
 
-    // burst 0 wordt 1: na één token is de bucket leeg.
+    // burst 0 becomes 1: after one token the bucket is empty.
     const single = createLimiter({ perMinute: 60, burst: 0 });
     assert.equal(single.burst, MIN_BURST);
     assert.equal(single.take("x", T0).ok, true);
     assert.equal(single.take("x", T0).ok, false);
   });
 
-  it("weigert een negatieve waarde met de veldnaam erbij", () => {
+  it("rejects a negative value and includes the field name", () => {
     assert.throws(
       () => clampRateLimitConfig({ perMinute: -1, burst: 1 }),
       /perMinute: must not be negative, got -1/,
@@ -169,7 +169,7 @@ describe("clampRateLimitConfig", () => {
     );
   });
 
-  it("weigert niet-eindige en niet-numerieke waarden, met veld en waarde", () => {
+  it("rejects non-finite and non-numeric values, with field and value", () => {
     assert.throws(
       () => clampRateLimitConfig({ perMinute: Number.NaN, burst: 1 }),
       /perMinute: .*NaN/,
@@ -189,7 +189,7 @@ describe("clampRateLimitConfig", () => {
     assert.throws(() => clampRateLimitConfig({ burst: 1 }), /perMinute: .*undefined/);
   });
 
-  it("weigert invoer die geen object is", () => {
+  it("rejects input that is not an object", () => {
     for (const bad of [null, undefined, 42, "config", true, [1, 2]] as unknown[]) {
       assert.throws(() => clampRateLimitConfig(bad), /rate limit config: expected an object/);
     }
@@ -198,7 +198,7 @@ describe("clampRateLimitConfig", () => {
 });
 
 describe("describeLimiter", () => {
-  it("geeft korte Nederlandse beleidsregels", () => {
+  it("gives short English policy lines", () => {
     const limiter: Limiter = createLimiter({ perMinute: 60, burst: 5 });
     const lines = describeLimiter(limiter);
 
@@ -210,16 +210,16 @@ describe("describeLimiter", () => {
     }
     const text = lines.join("\n");
     assert.match(text, /60/);
-    assert.match(text, /milliseconden|ms/);
-    assert.match(text, /per minuut/);
+    assert.match(text, /milliseconds|ms/);
+    assert.match(text, /per minute/);
   });
 
-  it("noemt het herstelinterval dat bij perMinute hoort", () => {
+  it("names the recovery interval that goes with perMinute", () => {
     assert.match(describeLimiter(createLimiter({ perMinute: 120, burst: 1 })).join("\n"), /500/);
     assert.match(describeLimiter(createLimiter({ perMinute: 1, burst: 1 })).join("\n"), /60000/);
   });
 
-  it("is ook als methode op de limiter beschikbaar", () => {
+  it("is also available as a method on the limiter", () => {
     const limiter = createLimiter({ perMinute: 30, burst: 2 });
     assert.deepEqual(limiter.describeLimiter(), describeLimiter(limiter));
   });

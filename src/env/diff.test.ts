@@ -7,35 +7,35 @@ function diff(local: EnvValues, chain: EnvValues) {
 }
 
 describe("diffEnv", () => {
-  it("adopteert wat de keten heeft en lokaal ontbreekt", () => {
+  it("adopts what the chain has and is missing locally", () => {
     const result = diff({}, { SOUL: "keten", MEMORY: "keten" });
     assert.deepEqual(result.adopted, ["MEMORY", "SOUL"]);
     assert.deepEqual(result.dropped, []);
     assert.deepEqual(result.unchanged, []);
   });
 
-  it("adopteert de ketenwaarde als de lokale waarde afwijkt", () => {
+  it("adopts the chain value when the local value differs", () => {
     const result = diff({ config: "lokaal" }, { config: "keten" });
     assert.deepEqual(result.adopted, ["config"]);
     assert.deepEqual(result.dropped, []);
     assert.deepEqual(result.unchanged, []);
   });
 
-  it("parkeert lokale sleutels die de keten niet kent", () => {
+  it("parks local keys the chain does not know", () => {
     const result = diff({ "skills/eigen": "lokaal", SOUL: "zelfde" }, { SOUL: "zelfde" });
     assert.deepEqual(result.adopted, []);
     assert.deepEqual(result.dropped, ["skills/eigen"]);
     assert.deepEqual(result.unchanged, ["SOUL"]);
   });
 
-  it("meldt gelijke waarden als unchanged", () => {
+  it("reports equal values as unchanged", () => {
     const result = diff({ a: "1", b: "2" }, { a: "1", b: "2" });
     assert.deepEqual(result.adopted, []);
     assert.deepEqual(result.dropped, []);
     assert.deepEqual(result.unchanged, ["a", "b"]);
   });
 
-  it("sorteert alle drie de lijsten, ongeacht invoervolgorde", () => {
+  it("sorts all three lists, regardless of input order", () => {
     const local = { zeta: "lokaal", mu: "zelfde", alfa: "lokaal" };
     const chain = { zeta: "keten", mu: "zelfde", alfa: "lokaal", beta: "keten" };
     const result = diff(local, chain);
@@ -44,12 +44,12 @@ describe("diffEnv", () => {
     assert.deepEqual(result.unchanged, ["alfa", "mu"]);
   });
 
-  it("sorteert gedropte sleutels ook", () => {
+  it("sorts dropped keys as well", () => {
     const result = diff({ omega: "x", alfa: "x", mu: "x" }, {});
     assert.deepEqual(result.dropped, ["alfa", "mu", "omega"]);
   });
 
-  it("werkt met een Map als invoer", () => {
+  it("works with a Map as input", () => {
     const local = new Map<string, string>([["a", "1"]]);
     const chain = new Map<string, string>([
       ["a", "2"],
@@ -61,7 +61,7 @@ describe("diffEnv", () => {
     assert.deepEqual(result.unchanged, []);
   });
 
-  it("laat de invoer ongemoeid", () => {
+  it("leaves the input untouched", () => {
     const local = { a: "1", b: "2" };
     const chain = { b: "3" };
     diff(local, chain);
@@ -69,19 +69,19 @@ describe("diffEnv", () => {
     assert.deepEqual(chain, { b: "3" });
   });
 
-  it("gooit bij een niet-object en noemt het argument", () => {
+  it("throws on a non-object and names the argument", () => {
     assert.throws(() => diff(null as unknown as EnvValues, {}), /local/);
     assert.throws(() => diff({}, "keten" as unknown as EnvValues), /chain/);
     assert.throws(() => diff({}, 42 as unknown as EnvValues), /chain/);
     assert.throws(() => diff(undefined as unknown as EnvValues, {}), /local/);
   });
 
-  it("weigert een array als invoer", () => {
+  it("rejects an array as input", () => {
     assert.throws(() => diff([] as unknown as EnvValues, {}), /local.*array/);
     assert.throws(() => diff({}, [1, 2] as unknown as EnvValues), /chain.*array/);
   });
 
-  it("noemt bij een foute waarde alleen de sleutel, nooit de waarde", () => {
+  it("names only the key on a bad value, never the value", () => {
     const local = { SOUL: "super-geheim" } as unknown as EnvValues;
     assert.throws(
       () => diff(local, { SOUL: 1 } as unknown as EnvValues),

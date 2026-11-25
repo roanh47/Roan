@@ -27,7 +27,7 @@ const DEFAULT_AGENTS = `# Rules — measure every answer against this file
 
 - Short and direct. The answer first, the explanation after, and only if it
   earns its place.
-- No management language. No filler openings ("Zeker, ik kan je helpen"),
+- No management language. No filler openings ("Sure, happy to help with that"),
   no padding, no restating the question.
 - Plain about failure. If something did not work, say what happened and what
   you did about it — never paper over it.

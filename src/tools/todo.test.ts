@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { TodoStore } from "./todo.js";
 
 describe("TodoStore", () => {
-  it("voegt taken toe en geeft ze terug in volgorde", () => {
+  it("adds tasks and returns them in order", () => {
     const store = new TodoStore();
 
     const first = store.add("  melk halen  ");
@@ -17,7 +17,7 @@ describe("TodoStore", () => {
     ]);
   });
 
-  it("hergebruikt ids niet na remove", () => {
+  it("does not reuse ids after remove", () => {
     const store = new TodoStore();
     store.add("een");
     store.add("twee");
@@ -39,7 +39,7 @@ describe("TodoStore", () => {
     );
   });
 
-  it("markeert een taak als done en blijft idempotent", () => {
+  it("marks a task as done and stays idempotent", () => {
     const store = new TodoStore();
     const item = store.add("afwassen");
 
@@ -51,7 +51,7 @@ describe("TodoStore", () => {
     assert.deepEqual(store.list(), [{ id: item.id, text: "afwassen", done: true }]);
   });
 
-  it("gooit op lege of alleen-spatie tekst en noemt de invoer", () => {
+  it("throws on empty or whitespace-only text and names the input", () => {
     const store = new TodoStore();
 
     for (const input of ["", "   ", "\t\n "]) {
@@ -69,7 +69,7 @@ describe("TodoStore", () => {
     assert.deepEqual(store.list(), []);
   });
 
-  it("gooit op een onbekende id bij complete en remove", () => {
+  it("throws on an unknown id at complete and remove", () => {
     const store = new TodoStore();
     const item = store.add("iets");
 
@@ -95,7 +95,7 @@ describe("TodoStore", () => {
     assert.deepEqual(store.list(), [{ id: item.id, text: "iets", done: false }]);
   });
 
-  it("geeft een bevroren kopie die de store niet kan aanpassen", () => {
+  it("returns a frozen copy that cannot modify the store", () => {
     const store = new TodoStore();
     store.add("een");
     const snapshot = store.list();
@@ -105,7 +105,7 @@ describe("TodoStore", () => {
     assert.ok(first !== undefined);
     assert.equal(Object.isFrozen(first), true);
 
-    // ESM is strict mode: muteren van de array of een item gooit een TypeError.
+    // ESM is strict mode: mutating the array or an item throws a TypeError.
     assert.throws(() => {
       (snapshot as TodoItemMutable[]).push({ id: 99, text: "stiekem", done: false });
     }, TypeError);
@@ -116,11 +116,11 @@ describe("TodoStore", () => {
       first.text = "aangepast";
     }, TypeError);
 
-    // En de store zelf is onveranderd.
+    // And the store itself is unchanged.
     assert.deepEqual(store.list(), [{ id: 1, text: "een", done: false }]);
   });
 
-  it("geeft elke keer een nieuwe array", () => {
+  it("returns a new array every time", () => {
     const store = new TodoStore();
     store.add("een");
 
@@ -132,7 +132,7 @@ describe("TodoStore", () => {
   });
 });
 
-/** Alleen voor de test: een niet-bevroren vorm om push op te mogen aanroepen. */
+/** For this test only: a non-frozen shape so that push may be called on it. */
 interface TodoItemMutable {
   id: number;
   text: string;

@@ -2,12 +2,12 @@ import type { Tool } from "../types.js";
 import type { Policy } from "./policy.js";
 
 /**
- * Een registry is de enige plek waar de agent zijn tools vandaan haalt.
+ * A registry is the only place where the agent gets its tools from.
  *
- * - `all()`         alle bekende tools, ook de geweigerde (voor UI/inspectie)
- * - `allowed()`     tools die de agent daadwerkelijk mag gebruiken
- * - `needsApproval()` tools waar de UI eerst toestemming voor vraagt
- * - `get()`/`has()` gecontroleerde lookup; een geweigerde tool bestaat niet
+ * - `all()`         all known tools, including the denied ones (for UI/inspection)
+ * - `allowed()`     tools the agent may actually use
+ * - `needsApproval()` tools for which the UI asks permission first
+ * - `get()`/`has()` guarded lookup; a denied tool does not exist
  */
 export interface ToolRegistry {
   all(): Tool[];
@@ -19,7 +19,7 @@ export interface ToolRegistry {
 
 type Decision = "allow" | "ask" | "deny";
 
-/** Lees de beslissing voor één tool; alles wat geen expliciete allow/ask is, is deny. */
+/** Reads the decision for one tool; anything that is not an explicit allow/ask is deny. */
 function decide(policy: Policy, name: string): Decision {
   const entry = policy.tools[name];
   if (entry === "ask") return "ask";
@@ -59,7 +59,7 @@ export function buildRegistry(tools: Tool[], policy: Policy): ToolRegistry {
     byName.set(tool.name, tool);
     const decision = decide(policy, tool.name);
     if (decision === "deny") continue;
-    // "ask" staat ook in allowed(): de agent mag het proberen, de UI poort het.
+    // "ask" is also in allowed(): the agent may try it, the UI gates it.
     allowedNames.add(tool.name);
     if (decision === "ask") approvalNames.add(tool.name);
   }

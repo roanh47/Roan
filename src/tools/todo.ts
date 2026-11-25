@@ -1,28 +1,28 @@
 /**
- * In-memory takenlijst voor de sessie.
+ * In-memory task list for the session.
  *
- * Bewust zonder bestandssysteem en zonder `console`: de store is pure staat die
- * de caller zelf mag tonen. Alle mutaties gaan via de methodes, zodat de
- * interne lijst nooit per ongeluk door een caller aangepast wordt.
+ * Deliberately without a filesystem and without `console`: the store is pure state
+ * that the caller may display itself. All mutations go through the methods, so the
+ * internal list is never accidentally changed by a caller.
  */
 
-/** Eén taak in de lijst. */
+/** One task in the list. */
 export interface TodoItem {
-  /** Sequentiële id, start bij 1 en wordt nooit hergebruikt. */
+  /** Sequential id, starts at 1 and is never reused. */
   id: number;
-  /** Getrimde tekst zoals meegegeven aan {@link TodoStore.add}. */
+  /** Trimmed text as passed to {@link TodoStore.add}. */
   text: string;
-  /** Waar zodra {@link TodoStore.complete} deze id gezien heeft. */
+  /** True as soon as {@link TodoStore.complete} has seen this id. */
   done: boolean;
 }
 
 export class TodoStore {
-  /** Interne staat; de volgorde van toevoegen blijft behouden. */
+  /** Internal state; the order of insertion is preserved. */
   private readonly items = new Map<number, TodoItem>();
-  /** Laatst uitgegeven id; 0 betekent nog niets uitgegeven. */
+  /** Last issued id; 0 means nothing has been issued yet. */
   private nextId = 0;
 
-  /** Voegt een taak toe en geeft deze terug. Lege of alleen-spatie tekst gooit. */
+  /** Adds a task and returns it. Empty or whitespace-only text throws. */
   add(text: string): TodoItem {
     const trimmed = text.trim();
     if (trimmed === "") {
@@ -36,8 +36,8 @@ export class TodoStore {
   }
 
   /**
-   * Markeert een taak als done. Idempotent: een al afgeronde taak blijft done
-   * en gooit niet. Een onbekende id gooit wel.
+   * Marks a task as done. Idempotent: an already completed task stays done
+   * and does not throw. An unknown id does throw.
    */
   complete(id: number): TodoItem {
     const item = this.require(id);
@@ -45,22 +45,22 @@ export class TodoStore {
     return { ...item };
   }
 
-  /** Verwijdert een taak; de id wordt daarna nooit meer uitgegeven. */
+  /** Removes a task; the id is never issued again afterwards. */
   remove(id: number): void {
     this.require(id);
     this.items.delete(id);
   }
 
   /**
-   * Geeft een bevroren kopie van de lijst. De array én de items zijn bevroren,
-   * en het zijn kopieën: een caller kan de store dus niet aanpassen.
+   * Returns a frozen copy of the list. Both the array and the items are frozen,
+   * and they are copies: a caller therefore cannot modify the store.
    */
   list(): readonly TodoItem[] {
     const copy = [...this.items.values()].map((item) => Object.freeze({ ...item }));
     return Object.freeze(copy);
   }
 
-  /** Zoekt een item op of gooit een fout die de gevraagde id noemt. */
+  /** Looks up an item or throws an error that names the requested id. */
   private require(id: number): TodoItem {
     const item = this.items.get(id);
     if (item === undefined) {

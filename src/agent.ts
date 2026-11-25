@@ -15,9 +15,9 @@ export interface AgentOptions {
 }
 
 /**
- * De agent-loop: model → tool → model, tot het model klaar is of het stappenbudget op is.
- * Weet niets van de UI; alles gaat via onEvent, zodat de app en de daemon
- * dezelfde core gebruiken.
+ * The agent loop: model → tool → model, until the model is done or the step budget runs out.
+ * Knows nothing about the UI; everything goes through onEvent, so the app and the daemon
+ * share the same core.
  */
 export class Agent {
   private messages: ChatMessage[] = [];
@@ -82,7 +82,7 @@ export class Agent {
         let ok = true;
         if (!tool) {
           ok = false;
-          output = `onbekende tool: ${call.function.name}`;
+          output = `unknown tool: ${call.function.name}`;
         } else {
           try {
             const args = call.function.arguments ? JSON.parse(call.function.arguments) : {};

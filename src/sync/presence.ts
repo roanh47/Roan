@@ -1,33 +1,33 @@
 import type { Event, HelloFrame } from "./types.js";
 
 /**
- * Lokale administratie van wie er leeft en hoe ver die staat.
+ * Local bookkeeping of who is alive and how far along they are.
  *
- * Presence doet zelf niets met het netwerk: geen sockets, geen timers. De
- * aanroeper meldt een hello of een event en levert de klok (`now`) aan; de
- * vervaltijd wordt bij het lezen toegepast. Zo is het gedrag deterministisch
- * te testen en kan niets in deze module uit zichzelf "verlopen".
+ * Presence does nothing with the network itself: no sockets, no timers. The
+ * caller reports a hello or an event and supplies the clock (`now`); expiry
+ * is applied at read time. That makes the behaviour deterministic to test and
+ * nothing in this module can "expire" on its own.
  *
- * Een node die na zijn TTL opnieuw iets laat horen, krijgt gewoon dezelfde
- * entry met een verse `lastSeen`; er komt geen tweede entry bij.
+ * A node that shows up again after its TTL simply gets the same entry with a
+ * fresh `lastSeen`; no second entry is added.
  */
 
 export interface PresenceOptions {
-  /** Hoe lang een node na zijn laatste teken van leven live blijft. */
+  /** How long a node stays live after its last sign of life. */
   ttlMs?: number;
-  /** Klok in ms; standaard `Date.now`. */
+  /** Clock in ms; defaults to `Date.now`. */
   now?: () => number;
 }
 
 export interface PresenceEntry {
   node: string;
   chain: string;
-  /** Hoogste seq die we van deze node kennen. */
+  /** Highest seq we know of for this node. */
   head: number;
   transportLabel?: string;
-  /** Klokwaarde (ms) van het laatste teken van leven. */
+  /** Clock value (ms) of the last sign of life. */
   lastSeen: number;
-  /** Of `lastSeen` op het moment van lezen binnen de TTL valt. */
+  /** Whether `lastSeen` falls within the TTL at read time. */
   live: boolean;
 }
 
@@ -37,7 +37,7 @@ export interface PresenceSnapshot {
   stale: PresenceEntry[];
 }
 
-/** Standaard TTL: een halve minuut zonder teken van leven is niet meer live. */
+/** Default TTL: half a minute without a sign of life is no longer live. */
 export const DEFAULT_PRESENCE_TTL_MS = 30_000;
 
 interface PresenceRecord {
@@ -52,27 +52,27 @@ export class Presence {
   private readonly ttlMs: number;
   private readonly clock: () => number;
   private readonly records = new Map<string, PresenceRecord>();
-  /** De keten waar deze presence bij hoort; `null` tot de eerste melding. */
+  /** The chain this presence belongs to; `null` until the first report. */
   private chainValue: string | null = null;
 
   constructor(options: PresenceOptions = {}) {
     const ttlMs = options.ttlMs ?? DEFAULT_PRESENCE_TTL_MS;
     if (!Number.isFinite(ttlMs) || ttlMs < 0) {
-      throw new RangeError(`ongeldige ttlMs: ${String(ttlMs)}`);
+      throw new RangeError(`invalid ttlMs: ${String(ttlMs)}`);
     }
     this.ttlMs = ttlMs;
     this.clock = options.now ?? Date.now;
   }
 
-  /** Ketennaam zoals die uit de eerste hello of het eerste event kwam. */
+  /** Chain name as it came from the first hello or the first event. */
   get chain(): string | null {
     return this.chainValue;
   }
 
   /**
-   * Verwerkt een hello van een peer. `haveSeq` is wat de peer zegt te hebben;
-   * een eerder waargenomen hogere head zakt nooit terug, want events die we al
-   * zagen zijn echt gebeurd.
+   * Handles a hello from a peer. `haveSeq` is what the peer says it has; a
+   * previously observed higher head never drops back, because events we
+   * already saw really happened.
    */
   seeHello(hello: HelloFrame, transportLabel?: string): void {
     const now = this.clock();
@@ -96,8 +96,8 @@ export class Presence {
   }
 
   /**
-   * Verwerkt een event: de afzender leeft en zit minstens op `event.seq`.
-   * Alleen een hogere seq dan we kennen verhoogt de head.
+   * Handles an event: the sender is alive and is at least at `event.seq`.
+   * Only a seq higher than the one we know raises the head.
    */
   seeEvent(event: Event, transportLabel?: string): void {
     const now = this.clock();
@@ -120,24 +120,24 @@ export class Presence {
     if (transportLabel !== undefined) existing.transportLabel = transportLabel;
   }
 
-  /** Een transport naar deze node is dicht; de node is niet langer aanwezig. */
+  /** A transport to this node is closed; the node is no longer present. */
   drop(node: string): void {
     this.records.delete(node);
   }
 
-  /** Nodes die op dit moment binnen de TTL vallen, op naam gesorteerd. */
+  /** Nodes currently within the TTL, sorted by name. */
   live(): PresenceEntry[] {
     return this.collect(this.clock(), true);
   }
 
-  /** Nodes waarvan `lastSeen` ouder is dan de TTL, op naam gesorteerd. */
+  /** Nodes whose `lastSeen` is older than the TTL, sorted by name. */
   stale(now?: number): PresenceEntry[] {
     return this.collect(now ?? this.clock(), false);
   }
 
   /**
-   * Hoogste seq van een node, of `undefined` als we hem niet kennen of als hij
-   * verlopen is: de head van een dode node is geen live stand.
+   * Highest seq of a node, or `undefined` if we do not know it or if it has
+   * expired: the head of a dead node is not a live state.
    */
   head(node: string): number | undefined {
     const record = this.records.get(node);
@@ -155,9 +155,9 @@ export class Presence {
     };
   }
 
-  // --- intern ------------------------------------------------------------
+  // --- internal ----------------------------------------------------------
 
-  /** De eerste melding zet de keten; elke andere keten is een fout, geen ruis. */
+  /** The first report sets the chain; any other chain is an error, not noise. */
   private adoptChain(chain: string, node: string): void {
     if (this.chainValue === null) {
       this.chainValue = chain;
@@ -165,12 +165,12 @@ export class Presence {
     }
     if (chain !== this.chainValue) {
       throw new Error(
-        `keten-mismatch: node "${node}" meldt keten "${chain}", maar presence volgt keten "${this.chainValue}"`,
+        `chain-mismatch: node "${node}" reports chain "${chain}", but presence follows chain "${this.chainValue}"`,
       );
     }
   }
 
-  /** Precies op de TTL-grens telt als live; pas daarna is een node oud. */
+  /** Exactly at the TTL boundary counts as live; only after that is a node old. */
   private isLive(record: PresenceRecord, now: number): boolean {
     return now - record.lastSeen <= this.ttlMs;
   }

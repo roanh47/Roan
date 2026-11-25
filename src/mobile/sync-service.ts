@@ -1,48 +1,48 @@
 /**
- * Pure-data beschrijving van de Android foreground service die de keten-sync
- * in leven houdt. Geen platformaanroepen: de Kotlin-kant leest dit plan en
- * vertaalt het naar een echte `Service.startForeground(...)`.
+ * Pure-data description of the Android foreground service that keeps the
+ * chain sync alive. No platform calls: the Kotlin side reads this plan and
+ * translates it into a real `Service.startForeground(...)`.
  */
 
-/** Kanaal waarop de sync-melding leeft; moet op `^[a-z0-9_]+$` passen. */
+/** Channel the sync notification lives on; must match `^[a-z0-9_]+$`. */
 export const SYNC_CHANNEL_ID = "roan_chain_sync";
 
-/** Vaste notification-id, zodat een nieuwe start de oude melding vervangt. */
+/** Fixed notification id, so a new start replaces the old notification. */
 export const SYNC_NOTIFICATION_ID = 1001;
 
-/** Jitter als fractie van de backoff, tegen een dansende reconnect-kudde. */
+/** Jitter as a fraction of the backoff, against a thundering reconnect herd. */
 const RECONNECT_JITTER_RATIO = 0.2;
 
-/** Manieren waarop de service gestart kan worden. */
+/** Ways the service can be started. */
 export type StartAction = "chain-changed" | "manual-refresh" | "boot" | "network-available";
 
-/** Herhaalbeleid voor de verbinding; waarden zijn milliseconden. */
+/** Retry policy for the connection; values are milliseconds. */
 export interface SyncRetryPolicy {
   baseMs: number;
   maxMs: number;
   jitterRatio: number;
 }
 
-/** Alles wat de native kant nodig heeft om de service op te zetten. */
+/** Everything the native side needs to set up the service. */
 export interface SyncServicePlan {
   serviceName: string;
   foregroundServiceType: "dataSync";
   channelId: string;
   notification: {
-    /** Titel met `{}`-placeholders, in volgorde gevuld door de native kant. */
+    /** Title with `{}` placeholders, filled in order by the native side. */
     titleTemplate: string;
-    /** Body met `{}`-placeholders, in volgorde gevuld door de native kant. */
+    /** Body with `{}` placeholders, filled in order by the native side. */
     bodyTemplate: string;
   };
-  /** Intent-actie per startroute, precies zoals op de draad. */
+  /** Intent action per start route, exactly as on the wire. */
   startActions: Record<StartAction, string>;
-  /** Intent-actie om de service weer te stoppen. */
+  /** Intent action to stop the service again. */
   stopAction: string;
   wakeLockTag: string;
   retry: SyncRetryPolicy;
 }
 
-/** Invoer voor {@link buildSyncServicePlan}. */
+/** Input for {@link buildSyncServicePlan}. */
 export interface SyncServicePlanInput {
   serviceName: string;
   channelId: string;
@@ -50,9 +50,9 @@ export interface SyncServicePlanInput {
   reconnectMaxMs: number;
 }
 
-/** Eén punt-segment van een Java-package/klassenaam: begint met letter of `_`. */
+/** One dot segment of a Java package/class name: starts with a letter or `_`. */
 const SEGMENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
-/** Android-kanaal-id's zijn bewust saai: kleine letters, cijfers, underscore. */
+/** Android channel ids are deliberately dull: lower-case, digits, underscore. */
 const CHANNEL_ID = /^[a-z0-9_]+$/;
 
 function assertServiceName(serviceName: string): void {
@@ -91,8 +91,8 @@ function assertRetry(reconnectBaseMs: number, reconnectMaxMs: number): void {
 }
 
 /**
- * Bouwt het serviceplan. Gooit een `Error` die het gewraakte veld bij naam
- * noemt zodra een waarde niet klopt.
+ * Builds the service plan. Throws an `Error` that names the offending field
+ * as soon as a value is wrong.
  */
 export function buildSyncServicePlan(input: SyncServicePlanInput): SyncServicePlan {
   const { serviceName, channelId, reconnectBaseMs, reconnectMaxMs } = input;

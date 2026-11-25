@@ -3,7 +3,7 @@ import type { AppendOutcome, Event, NodeStore, Unsubscribe } from "./types.js";
 export interface MemoryStoreOptions {
   chain: string;
   nodeId: string;
-  /** Begininhoud; moet aaneengesloten zijn vanaf seq 1. */
+  /** Initial content; must be contiguous from seq 1. */
   events?: Event[];
 }
 
@@ -12,9 +12,9 @@ export interface MemoryStore extends NodeStore {
 }
 
 /**
- * In-memory store met dezelfde invarianten als de echte opslag: alleen appenden,
- * alleen op head + 1, nooit overschrijven. Bedoeld voor tests en als voorbeeld
- * van hoe `NodeStore` hoort te gedragen.
+ * In-memory store with the same invariants as the real storage: append only,
+ * only at head + 1, never overwrite. Meant for tests and as an example
+ * of how `NodeStore` should behave.
  */
 export function createMemoryStore(options: MemoryStoreOptions): MemoryStore {
   const events: Event[] = [];
@@ -31,7 +31,7 @@ export function createMemoryStore(options: MemoryStoreOptions): MemoryStore {
       return { status: "conflict", existingId: existing?.id ?? "" };
     }
     if (event.seq !== events.length + 1) {
-      throw new Error(`store gap: kan seq ${event.seq} niet toevoegen na ${events.length}`);
+      throw new Error(`store gap: cannot append seq ${event.seq} after ${events.length}`);
     }
     events.push(event);
     ids.add(event.id);
@@ -60,7 +60,7 @@ export function createMemoryStore(options: MemoryStoreOptions): MemoryStore {
   for (const event of options.events ?? []) {
     const outcome = append(event);
     if (outcome.status !== "appended") {
-      throw new Error(`ongeldige begininhoud op seq ${event.seq}: ${outcome.status}`);
+      throw new Error(`invalid initial content at seq ${event.seq}: ${outcome.status}`);
     }
   }
 

@@ -6,7 +6,7 @@
 
 export type Locale = "en" | "nl";
 
-export const defaultLocale: Locale = "nl";
+export const defaultLocale: Locale = "en";
 
 export const locales: readonly Locale[] = ["en", "nl"];
 

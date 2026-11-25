@@ -4,12 +4,12 @@ import { type Event, EventStore } from "./store.js";
 import { verifyChain, verifyStore } from "./verify.js";
 
 /**
- * Deze test staat in src/chain/ (en niet in tests/) omdat tsconfig alleen
- * "src" include't en `npm test` de gecompileerde dist/**\/*.test.js draait. Een
- * test buiten rootDir zou dus niet typechecken en niet draaien.
+ * This test sits in src/chain/ (and not in tests/) because tsconfig only
+ * includes "src" and `npm test` runs the compiled dist/**\/*.test.js. A test
+ * outside rootDir would neither typecheck nor run.
  *
- * De events worden hier met de hand gebouwd: verifyChain kijkt alleen naar
- * chain, seq en id, dus de payload doet er niet toe.
+ * The events are built by hand here: verifyChain only looks at chain, seq and
+ * id, so the payload does not matter.
  */
 
 const CHAIN = "main";
@@ -29,7 +29,7 @@ function makeEvent(seq: number, id: string, chain: string = CHAIN): Event {
   };
 }
 
-/** Een aaneengesloten, unieke keten van `count` events vanaf seq 1. */
+/** A contiguous, unique chain of `count` events starting at seq 1. */
 function healthyChain(count: number): Event[] {
   const events: Event[] = [];
   for (let seq = 1; seq <= count; seq += 1) {
@@ -38,83 +38,83 @@ function healthyChain(count: number): Event[] {
   return events;
 }
 
-/** De codes van alle problemen, in de volgorde die verifyChain ze meldt. */
+/** The codes of all problems, in the order verifyChain reports them. */
 function codes(events: readonly Event[]): string[] {
   return verifyChain(events).problems.map((problem) => problem.code);
 }
 
-/** Het eerste probleem met `code`, of undefined als het er niet is. */
+/** The first problem with `code`, or undefined when there is none. */
 function problemWith(events: readonly Event[], code: string): { code: string; seq: number } | undefined {
   return verifyChain(events).problems.find((problem) => problem.code === code);
 }
 
 describe("verifyChain", () => {
-  it("keurt een gezonde keten van drie events goed", () => {
+  it("accepts a healthy chain of three events", () => {
     const report = verifyChain(healthyChain(3));
 
     assert.equal(report.ok, true);
     assert.deepEqual(report.problems, []);
   });
 
-  it("keurt een lege keten goed", () => {
+  it("accepts an empty chain", () => {
     const report = verifyChain([]);
 
     assert.equal(report.ok, true);
     assert.deepEqual(report.problems, []);
   });
 
-  it("meldt een gat als seq 2 ontbreekt", () => {
+  it("reports a gap when seq 2 is missing", () => {
     const events = [makeEvent(1, "id-1"), makeEvent(3, "id-3")];
 
     const report = verifyChain(events);
     assert.equal(report.ok, false);
-    assert.ok(codes(events).includes("gap"), `verwachtte een gap, kreeg ${JSON.stringify(codes(events))}`);
+    assert.ok(codes(events).includes("gap"), `expected a gap, got ${JSON.stringify(codes(events))}`);
 
     const gap = problemWith(events, "gap");
-    assert.ok(gap, "verwachtte een gap-probleem");
+    assert.ok(gap, "expected a gap problem");
     assert.equal(gap.seq, 2);
   });
 
-  it("meldt een gat op seq 1 als de keten bij 2 begint", () => {
+  it("reports a gap at seq 1 when the chain starts at 2", () => {
     const events = [makeEvent(2, "id-2"), makeEvent(3, "id-3")];
 
     const gap = problemWith(events, "gap");
-    assert.ok(gap, "verwachtte een gap-probleem");
+    assert.ok(gap, "expected a gap problem");
     assert.equal(gap.seq, 1);
     assert.equal(verifyChain(events).ok, false);
   });
 
-  it("meldt duplicate-id als hetzelfde id op twee seqs staat", () => {
+  it("reports duplicate-id when the same id sits on two seqs", () => {
     const events = [makeEvent(1, "same-id"), makeEvent(2, "same-id"), makeEvent(3, "id-3")];
 
     const report = verifyChain(events);
     assert.equal(report.ok, false);
     assert.ok(
       codes(events).includes("duplicate-id"),
-      `verwachtte duplicate-id, kreeg ${JSON.stringify(codes(events))}`,
+      `expected duplicate-id, got ${JSON.stringify(codes(events))}`,
     );
 
     const duplicate = problemWith(events, "duplicate-id");
-    assert.ok(duplicate, "verwachtte een duplicate-id-probleem");
+    assert.ok(duplicate, "expected a duplicate-id problem");
     assert.equal(duplicate.seq, 2);
   });
 
-  it("meldt bad-order als events niet op seq gesorteerd zijn", () => {
+  it("reports bad-order when events are not sorted by seq", () => {
     const events = [makeEvent(1, "id-1"), makeEvent(3, "id-3"), makeEvent(2, "id-2")];
 
     const report = verifyChain(events);
     assert.equal(report.ok, false);
     assert.ok(
       codes(events).includes("bad-order"),
-      `verwachtte bad-order, kreeg ${JSON.stringify(codes(events))}`,
+      `expected bad-order, got ${JSON.stringify(codes(events))}`,
     );
 
     const badOrder = problemWith(events, "bad-order");
-    assert.ok(badOrder, "verwachtte een bad-order-probleem");
+    assert.ok(badOrder, "expected a bad-order problem");
     assert.equal(badOrder.seq, 2);
   });
 
-  it("meldt geen problemen voor een lange gezonde keten", () => {
+  it("reports no problems for a long healthy chain", () => {
     const events = healthyChain(50);
 
     const report = verifyChain(events);
@@ -124,7 +124,7 @@ describe("verifyChain", () => {
 });
 
 describe("verifyStore", () => {
-  it("keurt een echte store met toegevoegde events goed", () => {
+  it("accepts a real store with appended events", () => {
     const store = EventStore.open(":memory:");
     try {
       for (let seq = 1; seq <= 3; seq += 1) {
@@ -139,7 +139,7 @@ describe("verifyStore", () => {
     }
   });
 
-  it("keurt een lege store goed", () => {
+  it("accepts an empty store", () => {
     const store = EventStore.open(":memory:");
     try {
       const report = verifyStore(store, "leeg");

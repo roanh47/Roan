@@ -1,20 +1,20 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-/** Een aanroep van een tool die de werkmap kan veranderen. */
+/** A tool call that can change the working directory. */
 export type MutatingCall =
   | { tool: "write_file"; path: string; content: string }
   | { tool: "apply_patch"; path: string; oldText: string; newText: string }
   | { tool: "run_shell"; command: string; cwd?: string };
 
-/** Wat een bevestigingskaart nodig heeft: één samenvatting, details, en of er iets verloren kan gaan. */
+/** What a confirmation card needs: one summary, details, and whether something can be lost. */
 export interface DryRunResult {
   summary: string;
   details: string[];
   destructive: boolean;
 }
 
-/** Commando's die onherstelbaar kunnen zijn; we matchen op hele woorden zodat "format" niet telt. */
+/** Commands that can be irreversible; we match whole words so that "format" does not count. */
 const SHELL_PATTERNS: ReadonlyArray<{ label: string; re: RegExp }> = [
   { label: "rm", re: /\brm\b/ },
   { label: "mv", re: /\bmv\b/ },
@@ -23,7 +23,7 @@ const SHELL_PATTERNS: ReadonlyArray<{ label: string; re: RegExp }> = [
   { label: "truncate", re: /\btruncate\b/ },
 ];
 
-/** `>` of `>>` gevolgd door een absoluut pad; de lookbehind voorkomt dat `>>` dubbel telt. */
+/** `>` or `>>` followed by an absolute path; the lookbehind prevents `>>` from counting twice. */
 const ABSOLUTE_REDIRECT = /(?<!>)>>?\s*(\/[^\s;|&<>]*)/g;
 
 const MAX_SUMMARY_COMMAND = 160;
@@ -33,14 +33,14 @@ function describeError(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-/** Leest de foutcode (`ENOENT`, `EACCES`, …) zonder naar `any` te grijpen. */
+/** Reads the error code (`ENOENT`, `EACCES`, …) without reaching for `any`. */
 function errorCode(err: unknown): string | undefined {
   if (typeof err !== "object" || err === null || !("code" in err)) return undefined;
   const code = (err as { code?: unknown }).code;
   return typeof code === "string" ? code : undefined;
 }
 
-/** Splits in regels; een afsluitende nieuwe regel telt niet als extra lege regel. */
+/** Splits into lines; a trailing newline does not count as an extra empty line. */
 function toLines(text: string): string[] {
   if (text === "") return [];
   const body = text.replace(/\r\n/g, "\n");
@@ -48,7 +48,7 @@ function toLines(text: string): string[] {
   return trimmed === "" ? [] : trimmed.split("\n");
 }
 
-/** Tel exacte, niet-overlappende voorkomens van een stuk tekst. */
+/** Counts exact, non-overlapping occurrences of a piece of text. */
 function countOccurrences(haystack: string, needle: string): number {
   let count = 0;
   let index = haystack.indexOf(needle);
@@ -59,7 +59,7 @@ function countOccurrences(haystack: string, needle: string): number {
   return count;
 }
 
-/** Regelnummer (1-based) van een tekenpositie. */
+/** Line number (1-based) of a character position. */
 function lineNumberAt(text: string, index: number): number {
   let line = 1;
   for (let i = 0; i < index; i += 1) {
@@ -68,7 +68,7 @@ function lineNumberAt(text: string, index: number): number {
   return line;
 }
 
-/** Beginregels van de eerste `limit` voorkomens, voor de detailregels. */
+/** Start lines of the first `limit` occurrences, for the detail lines. */
 function occurrenceLines(text: string, needle: string, limit: number): number[] {
   const lines: number[] = [];
   let index = text.indexOf(needle);
@@ -83,12 +83,12 @@ function signed(value: number): string {
   return value > 0 ? `+${value}` : `${value}`;
 }
 
-/** "1 line" / "2 lines", zodat een kaart niet "1 lines" toont. */
+/** "1 line" / "2 lines", so that a card does not show "1 lines". */
 function plural(count: number, singular: string): string {
   return `${count} ${count === 1 ? singular : `${singular}s`}`;
 }
 
-/** Relatief pad binnen de werkmap, anders het absolute pad. */
+/** Relative path within the working directory, otherwise the absolute path. */
 function displayPath(resolved: string): string {
   const relative = path.relative(process.cwd(), resolved);
   if (relative === "") return ".";
@@ -96,7 +96,7 @@ function displayPath(resolved: string): string {
   return relative.split(path.sep).join("/");
 }
 
-/** Relatieve paden worden tegen process.cwd() afgezet; een leeg pad is een programmeerfout. */
+/** Relative paths are checked against process.cwd(); an empty path is a programming error. */
 function resolveTarget(tool: string, raw: string): string {
   if (raw.trim() === "") throw new Error(`${tool}: path is empty`);
   return path.isAbsolute(raw) ? path.resolve(raw) : path.resolve(process.cwd(), raw);
@@ -108,7 +108,7 @@ function isOutsideCwd(resolved: string): boolean {
   return relative.startsWith("..") || path.isAbsolute(relative);
 }
 
-/** Alles wat we lezen over het doelpad; nooit een schrijfactie. */
+/** Everything we read about the target path; never a write. */
 interface Inspection {
   resolved: string;
   shown: string;
@@ -370,8 +370,8 @@ function describeRunShell(call: { command: string; cwd?: string }): DryRunResult
 }
 
 /**
- * Beschrijft wat een aanroep zou doen zonder iets uit te voeren: alleen stat en
- * readFile op het doelpad, nooit een schrijfactie, proces of verwijdering.
+ * Describes what a call would do without executing anything: only stat and
+ * readFile on the target path, never a write, process or deletion.
  */
 export async function describeCall(call: MutatingCall): Promise<DryRunResult> {
   switch (call.tool) {

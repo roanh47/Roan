@@ -6,9 +6,9 @@ import path from "node:path";
 import { glob } from "./glob.js";
 
 /**
- * Tests staan naast de code (src/tools/) omdat `npm test` node --test over de
- * gecompileerde dist/**\/*.test.js laat lopen; een top-level tests/ map zou
- * buiten rootDir van tsconfig vallen.
+ * Tests live next to the code (src/tools/) because `npm test` runs node --test
+ * over the compiled dist/**\/*.test.js; a top-level tests/ directory would fall
+ * outside the rootDir of tsconfig.
  */
 
 async function withTempDir(fn: (dir: string) => Promise<void>): Promise<void> {
@@ -38,7 +38,7 @@ async function seed(dir: string): Promise<void> {
 }
 
 describe("glob", () => {
-  it("geeft gesorteerde resultaten voor **/*.ts", async () => {
+  it("returns sorted results for **/*.ts", async () => {
     await withTempDir(async (dir) => {
       await seed(dir);
 
@@ -49,7 +49,7 @@ describe("glob", () => {
     });
   });
 
-  it("honoreert een genest patroon", async () => {
+  it("honours a nested pattern", async () => {
     await withTempDir(async (dir) => {
       await seed(dir);
 
@@ -61,7 +61,7 @@ describe("glob", () => {
     });
   });
 
-  it("slaat node_modules en .git over", async () => {
+  it("skips node_modules and .git", async () => {
     await withTempDir(async (dir) => {
       await seed(dir);
 
@@ -80,7 +80,7 @@ describe("glob", () => {
     });
   });
 
-  it("respecteert een kleine limit", async () => {
+  it("respects a small limit", async () => {
     await withTempDir(async (dir) => {
       await seed(dir);
 
@@ -92,7 +92,7 @@ describe("glob", () => {
     });
   });
 
-  it("geeft een lege lijst voor een onbekende map zonder te gooien", async () => {
+  it("returns an empty list for an unknown directory without throwing", async () => {
     await withTempDir(async (dir) => {
       const results = await glob("**/*.ts", path.join(dir, "bestaat-niet"));
       assert.deepEqual(results, []);

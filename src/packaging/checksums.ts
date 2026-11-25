@@ -38,18 +38,18 @@ function describeReadFailure(err: unknown): string {
   const e = (typeof err === "object" && err !== null ? err : {}) as ReadFailure;
   switch (e.code) {
     case "ENOENT":
-      return "bestand bestaat niet";
+      return "file does not exist";
     case "EACCES":
     case "EPERM":
-      return "geen leesrechten";
+      return "no read permission";
     case "EISDIR":
-      return "pad is een map, geen bestand";
+      return "path is a directory, not a file";
     case "ELOOP":
-      return "te veel symbolische koppelingen";
+      return "too many symbolic links";
     case "ENAMETOOLONG":
-      return "padnaam is te lang";
+      return "path name is too long";
     case "ENOTDIR":
-      return "een deel van het pad is geen map";
+      return "part of the path is not a directory";
     default:
       return e.message ?? String(err);
   }
@@ -60,7 +60,7 @@ async function checksumOne(
   path: string,
 ): Promise<{ ok: Checksum } | { failed: MissingFile }> {
   if (typeof path !== "string" || path.length === 0) {
-    return { failed: { path: String(path), reason: "leeg of ongeldig pad" } };
+    return { failed: { path: String(path), reason: "empty or invalid path" } };
   }
 
   let data: Buffer;

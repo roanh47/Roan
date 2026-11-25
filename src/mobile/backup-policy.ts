@@ -1,22 +1,22 @@
 /**
- * Back-upregels van de Roan mobile shell, als platte data.
+ * Backup rules of the Roan mobile shell, as plain data.
  *
- * De shell toont deze lijsten in het instellingenscherm en geeft ze door aan de
- * native kant. Geen bestandssysteem, geen klok, geen platformaanroepen: alleen
- * data en twee pure functies, zodat alles zonder emulator te testen is.
+ * The shell shows these lists in the settings screen and passes them on to the
+ * native side. No filesystem, no clock, no platform calls: just data and two
+ * pure functions, so everything can be tested without an emulator.
  */
 
-/** Eén regel uit de back-uplijst. */
+/** One entry from the backup list. */
 export interface BackupEntry {
-  /** Pad of patroon binnen de app-data, eindigt op `/` bij een map. */
+  /** Path or pattern inside the app data, ends on `/` for a directory. */
   readonly path: string;
-  /** Korte naam voor de UI. */
+  /** Short name for the UI. */
   readonly label: string;
-  /** Waarom dit wel of niet meegaat; één zin. */
+  /** Why this is or is not included; one sentence. */
   readonly reason: string;
 }
 
-/** Wat er wél in een back-up zit. */
+/** What does go into a backup. */
 export const included: readonly BackupEntry[] = Object.freeze([
   {
     path: "env/snapshot.json",
@@ -40,7 +40,7 @@ export const included: readonly BackupEntry[] = Object.freeze([
   },
 ]);
 
-/** Wat er nooit in een back-up zit, ook niet als de lijst hierboven groeit. */
+/** What never goes into a backup, even if the list above grows. */
 export const neverIncluded: readonly BackupEntry[] = Object.freeze([
   {
     path: "secrets/",
@@ -64,21 +64,21 @@ export const neverIncluded: readonly BackupEntry[] = Object.freeze([
   },
 ]);
 
-/** Hoe vaak en hoe lang er bewaard wordt. */
+/** How often and how long things are kept. */
 export interface BackupSchedule {
-  /** Uren tussen twee back-ups, 1..168. */
+  /** Hours between two backups, 1..168. */
   everyHours: number;
-  /** Aantal bewaarde back-ups, 1..30. */
+  /** Number of backups kept, 1..30. */
   keep: number;
 }
 
-/** Invoer van buiten (JSON, remote config): nog niet vertrouwd, dus `unknown`. */
+/** Input from outside (JSON, remote config): not trusted yet, so `unknown`. */
 export interface BackupScheduleInput {
   readonly everyHours?: unknown;
   readonly keep?: unknown;
 }
 
-/** Grenzen van {@link parseSchedule}. */
+/** Limits of {@link parseSchedule}. */
 export const SCHEDULE_LIMITS = Object.freeze({
   everyHours: Object.freeze({ min: 1, max: 168 }),
   keep: Object.freeze({ min: 1, max: 30 }),
@@ -107,10 +107,10 @@ function readField(
 }
 
 /**
- * Leest een schema uit onbetrouwbare invoer. Ontbrekende velden komen uit
- * `defaults`; waarden buiten bereik worden geklemd in plaats van geweigerd.
- * Gooit een `Error` die het veld bij naam noemt als een waarde geen eindig
- * getal is.
+ * Reads a schedule from untrusted input. Missing fields come from
+ * `defaults`; out-of-range values are clamped instead of rejected.
+ * Throws an `Error` that names the field when a value is not a finite
+ * number.
  */
 export function parseSchedule(
   input: BackupScheduleInput | null | undefined,
@@ -135,8 +135,8 @@ export function parseSchedule(
 }
 
 /**
- * Korte regels voor het instellingenscherm. De waarden van het schema en alle
- * nooit-mee-regels staan er letterlijk in, zodat de UI niets hoeft te verzinnen.
+ * Short lines for the settings screen. The schedule values and every
+ * never-included rule appear literally, so the UI does not have to invent anything.
  */
 export function describeBackupPolicy(schedule: BackupSchedule): string[] {
   const paths = (entries: readonly BackupEntry[]): string =>

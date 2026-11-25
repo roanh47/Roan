@@ -1,40 +1,40 @@
 /**
- * Uitgaande wachtrij van de telefoon.
+ * The phone's outbound queue.
  *
- * De telefoon is vaak offline. Wat de gebruiker doet gaat eerst in deze
- * wachtrij en pas bij een flush over de lijn. De wachtrij bewaart events in
- * invoegvolgorde, kent geen tijd, start geen timers en doet geen I/O: de klok
- * komt van buiten (`planFlush`) en het versturen zelf gebeurt elders.
+ * The phone is often offline. Whatever the user does goes into this queue
+ * first and only crosses the wire on a flush. The queue keeps events in
+ * insertion order, knows no time, starts no timers and does no I/O: the clock
+ * comes from outside (`planFlush`) and sending itself happens elsewhere.
  */
 
 import type { Event } from "../sync/types.js";
 
-/** Uitkomst van {@link OutboundQueue.planFlush}. */
+/** Result of {@link OutboundQueue.planFlush}. */
 export interface FlushPlan {
-  /** Events die nu verstuurd mogen worden, in invoegvolgorde, hooguit `max`. */
+  /** Events that may go out now, in insertion order, at most `max`. */
   send: Event[];
-  /** Aantal events dat in de wachtrij blijft staan. */
+  /** Number of events that stay in the queue. */
   hold: number;
-  /** Korte Nederlandse regel die uitlegt waarom dit de flush is. */
+  /** Short line explaining why this is the flush. */
   reason: string;
 }
 
-/** Wat de rest van de app van de wachtrij mag gebruiken. */
+/** What the rest of the app may use from the queue. */
 export interface OutboundQueue {
   /**
-   * Zet een event achteraan in de wachtrij. Een event waarvan het id al in de
-   * wachtrij staat wordt genegeerd; geeft `true` als het is toegevoegd.
+   * Appends an event to the queue. An event whose id is already in the
+   * queue is ignored; returns `true` if it was added.
    */
   enqueue(event: Event): boolean;
-  /** De eerstvolgende `n` events in invoegvolgorde; `n <= 0` geeft een lege lijst. */
+  /** The next `n` events in insertion order; `n <= 0` gives an empty list. */
   head(n: number): Event[];
-  /** Haalt het event met dit id uit de wachtrij; onbekend id is een fout. */
+  /** Removes the event with this id from the queue; an unknown id is an error. */
   ack(id: string): void;
-  /** Aantal events in de wachtrij. */
+  /** Number of events in the queue. */
   size(): number;
   /**
-   * Berekent wat een flush op `nowIso` zou versturen, zonder iets te wijzigen.
-   * Hooguit `max` events gaan mee, in invoegvolgorde; de rest blijft staan.
+   * Computes what a flush at `nowIso` would send, without changing anything.
+   * At most `max` events go along, in insertion order; the rest stays put.
    */
   planFlush(nowIso: string, max: number): FlushPlan;
 }
@@ -47,11 +47,11 @@ function requireCount(value: number, field: string): number {
 }
 
 /**
- * Maakt een lege wachtrij.
+ * Creates an empty queue.
  *
- * De fabriek houdt de opslag in een closure, zodat twee wachtrijen elkaars
- * events nooit zien. De volgorde is die van `enqueue`; `ack` verwijdert en
- * latere events schuiven naar voren zonder hun onderlinge volgorde te verliezen.
+ * The factory keeps the storage in a closure, so two queues never see each
+ * other's events. The order is that of `enqueue`; `ack` removes and later
+ * events move up without losing their relative order.
  */
 export function createOutboundQueue(): OutboundQueue {
   const pending = new Map<string, Event>();
@@ -111,13 +111,13 @@ export function createOutboundQueue(): OutboundQueue {
 
       let reason: string;
       if (total === 0) {
-        reason = "wachtrij leeg: niets te versturen";
+        reason = "queue empty: nothing to send";
       } else if (max === 0) {
-        reason = "limiet 0: alles blijft in de wachtrij";
+        reason = "limit 0: everything stays in the queue";
       } else if (hold === 0) {
-        reason = `alles past: ${send.length} events versturen om ${nowIso}`;
+        reason = `everything fits: sending ${send.length} events at ${nowIso}`;
       } else {
-        reason = `limiet ${max}: ${hold} events wachten nog na ${nowIso}`;
+        reason = `limit ${max}: ${hold} events still waiting after ${nowIso}`;
       }
 
       return { send, hold, reason };

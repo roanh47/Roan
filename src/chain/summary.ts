@@ -119,14 +119,14 @@ export function summarize(events: readonly Event[]): ChainSummary {
 }
 
 /**
- * A few short Dutch lines for a status panel or a log line rendered by a human.
+ * A few short English lines for a status panel or a log line rendered by a human.
  *
  * Returned as separate lines rather than one string so the caller decides the
  * separator; nothing here is long enough to wrap.
  */
 export function formatSummary(summary: ChainSummary): string[] {
   if (summary.count === 0) {
-    return ["Lege keten: geen events."];
+    return ["Empty chain: no events."];
   }
 
   const types = Object.entries(summary.perType)
@@ -134,15 +134,15 @@ export function formatSummary(summary: ChainSummary): string[] {
     .join(", ");
   const largest =
     summary.largest === null
-      ? "Grootste payload: geen"
-      : `Grootste payload: seq ${summary.largest.seq}, ${summary.largest.bytes} bytes`;
+      ? "Largest payload: none"
+      : `Largest payload: seq ${summary.largest.seq}, ${summary.largest.bytes} bytes`;
 
   return [
     `Events: ${summary.count}, seq ${summary.firstSeq}..${summary.lastSeq}`,
     `Per type: ${types}`,
     largest,
     summary.contiguous
-      ? "Seq is aaneengesloten van 1 tot en met de laatste."
-      : "Seq is niet aaneengesloten: er is een gat of een dubbele seq.",
+      ? "Seq is contiguous from 1 through the last event."
+      : "Seq is not contiguous: there is a gap or a duplicate seq.",
   ];
 }

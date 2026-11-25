@@ -21,7 +21,7 @@ export interface GrepResult {
 }
 
 const DEFAULT_MAX_RESULTS = 200;
-/** Hoeveel bytes we inlezen om te bepalen of een bestand binair is. */
+/** How many bytes we read to determine whether a file is binary. */
 const SNIFF_BYTES = 8192;
 const SKIP_DIRS = new Set(["node_modules", ".git"]);
 
@@ -30,7 +30,7 @@ function toErrorMessage(err: unknown): string {
   return String(err);
 }
 
-/** Lees een bestand als tekst; geef null terug als het binair lijkt of onleesbaar is. */
+/** Reads a file as text; returns null if it looks binary or is unreadable. */
 async function readTextFile(absPath: string): Promise<string | null> {
   let handle: fs.FileHandle | undefined;
   try {
@@ -49,7 +49,7 @@ async function readTextFile(absPath: string): Promise<string | null> {
   }
 }
 
-/** Verzamel alle tekstkandidaat-bestanden onder een map, deterministisch gesorteerd. */
+/** Collects all candidate text files under a directory, deterministically sorted. */
 async function collectFiles(root: string): Promise<string[]> {
   const found: string[] = [];
 
@@ -67,7 +67,7 @@ async function collectFiles(root: string): Promise<string[]> {
         if (SKIP_DIRS.has(entry.name)) continue;
         await walk(abs);
       } else if (entry.isFile()) {
-        // Symbolische koppelingen slaan we over: die kunnen lussen veroorzaken.
+        // We skip symbolic links: they can cause loops.
         found.push(abs);
       }
     }
@@ -95,7 +95,7 @@ function normalizeMaxResults(value: number | undefined): number {
 }
 
 /**
- * Zoek naar een patroon in tekstbestanden. Gooit nooit: fouten komen terug in `error`.
+ * Searches for a pattern in text files. Never throws: errors come back in `error`.
  */
 export async function grep(
   pattern: string,
@@ -118,7 +118,7 @@ export async function grep(
     return {
       matches: [],
       truncated: false,
-      error: `pad bestaat niet of is niet leesbaar: ${targetPath}`,
+      error: `path does not exist or is not readable: ${targetPath}`,
     };
   }
 

@@ -11,15 +11,15 @@ import {
   type HeartbeatPolicy,
 } from "./heartbeat.js";
 
-/** Een policy die al binnen de grenzen valt. */
+/** A policy that already falls within the limits. */
 const VALID: HeartbeatPolicy = { intervalMs: 5_000, missThreshold: 3 };
 
 describe("clampPolicy", () => {
-  it("laat een policy binnen de grenzen ongemoeid", () => {
+  it("leaves a policy within the limits untouched", () => {
     assert.deepEqual(clampPolicy({ intervalMs: 5_000, missThreshold: 3 }), VALID);
   });
 
-  it("klemt intervalMs aan beide kanten", () => {
+  it("clamps intervalMs on both ends", () => {
     assert.equal(clampPolicy({ intervalMs: 0, missThreshold: 3 }).intervalMs, MIN_INTERVAL_MS);
     assert.equal(clampPolicy({ intervalMs: 999, missThreshold: 3 }).intervalMs, MIN_INTERVAL_MS);
     assert.equal(clampPolicy({ intervalMs: 1, missThreshold: 3 }).intervalMs, MIN_INTERVAL_MS);
@@ -28,12 +28,12 @@ describe("clampPolicy", () => {
       clampPolicy({ intervalMs: 10_000_000, missThreshold: 3 }).intervalMs,
       MAX_INTERVAL_MS,
     );
-    // Precies op de grenzen blijft staan.
+    // Exactly on the limits it stays put.
     assert.equal(clampPolicy({ intervalMs: 1_000, missThreshold: 3 }).intervalMs, 1_000);
     assert.equal(clampPolicy({ intervalMs: 60_000, missThreshold: 3 }).intervalMs, 60_000);
   });
 
-  it("klemt missThreshold aan beide kanten", () => {
+  it("clamps missThreshold on both ends", () => {
     assert.equal(clampPolicy({ intervalMs: 5_000, missThreshold: 1 }).missThreshold, MIN_MISS_THRESHOLD);
     assert.equal(clampPolicy({ intervalMs: 5_000, missThreshold: 0 }).missThreshold, MIN_MISS_THRESHOLD);
     assert.equal(clampPolicy({ intervalMs: 5_000, missThreshold: -3 }).missThreshold, MIN_MISS_THRESHOLD);
@@ -43,14 +43,14 @@ describe("clampPolicy", () => {
     assert.equal(clampPolicy({ intervalMs: 5_000, missThreshold: 10 }).missThreshold, 10);
   });
 
-  it("klemt beide velden onafhankelijk", () => {
+  it("clamps both fields independently", () => {
     assert.deepEqual(clampPolicy({ intervalMs: 10, missThreshold: 50 }), {
       intervalMs: MIN_INTERVAL_MS,
       missThreshold: MAX_MISS_THRESHOLD,
     });
   });
 
-  it("noemt het veld en de waarde in de foutmelding", () => {
+  it("names the field and the value in the error message", () => {
     assert.throws(() => clampPolicy({ intervalMs: "5000", missThreshold: 3 }), /intervalMs/);
     assert.throws(() => clampPolicy({ intervalMs: "5000", missThreshold: 3 }), /"5000"/);
     assert.throws(() => clampPolicy({ intervalMs: 5_000, missThreshold: "3" }), /missThreshold/);
@@ -60,7 +60,7 @@ describe("clampPolicy", () => {
     assert.throws(() => clampPolicy({ missThreshold: 3 }), /intervalMs: .*undefined/);
   });
 
-  it("weigert NaN en Infinity, met veldnaam", () => {
+  it("rejects NaN and Infinity, with the field name", () => {
     assert.throws(() => clampPolicy({ intervalMs: Number.NaN, missThreshold: 3 }), /intervalMs/);
     assert.throws(
       () => clampPolicy({ intervalMs: Number.POSITIVE_INFINITY, missThreshold: 3 }),
@@ -72,7 +72,7 @@ describe("clampPolicy", () => {
     );
   });
 
-  it("weigert invoer die geen object is", () => {
+  it("rejects input that is not an object", () => {
     for (const bad of [null, undefined, 42, "policy", true, [1, 2]] as unknown[]) {
       assert.throws(() => clampPolicy(bad), /heartbeat policy: expected an object/);
     }
@@ -80,29 +80,29 @@ describe("clampPolicy", () => {
 });
 
 describe("isPeerStale", () => {
-  // interval 5000 * 3 = 15000 ms is de grens.
+  // interval 5000 * 3 = 15000 ms is the boundary.
   const policy = VALID;
 
-  it("is niet stale vlak voor de grens en precies erop wel", () => {
+  it("is not stale just before the boundary and is exactly on it", () => {
     const last = 1_000_000;
     assert.equal(isPeerStale(last, last + 14_999, policy), false);
     assert.equal(isPeerStale(last, last + 15_000, policy), true);
     assert.equal(isPeerStale(last, last + 15_001, policy), true);
   });
 
-  it("is vers als er net een teken van leven was", () => {
+  it("is fresh when there was a sign of life just now", () => {
     const last = 1_000_000;
     assert.equal(isPeerStale(last, last, policy), false);
     assert.equal(isPeerStale(last, last + 1, policy), false);
   });
 
-  it("behandelt een lastSeenAt in de toekomst als niet-stale", () => {
+  it("treats a lastSeenAt in the future as not stale", () => {
     const last = 1_000_000;
     assert.equal(isPeerStale(last, last - 1, policy), false);
     assert.equal(isPeerStale(last, last - 1_000_000, policy), false);
   });
 
-  it("respecteert de missThreshold-grens per policy", () => {
+  it("respects the missThreshold boundary per policy", () => {
     const last = 0;
     const lenient: HeartbeatPolicy = { intervalMs: 1_000, missThreshold: 10 };
     const strict: HeartbeatPolicy = { intervalMs: 1_000, missThreshold: 2 };
@@ -112,20 +112,20 @@ describe("isPeerStale", () => {
     assert.equal(isPeerStale(last, 2_000, strict), true);
   });
 
-  it("is niet-stale bij een niet-eindige tijd", () => {
+  it("is not stale for a non-finite time", () => {
     assert.equal(isPeerStale(0, Number.NaN, policy), false);
   });
 });
 
 describe("nextBeatAt", () => {
-  it("telt precies één interval bij nu op", () => {
+  it("adds exactly one interval to now", () => {
     assert.equal(nextBeatAt(1_000_000, VALID), 1_005_000);
     assert.equal(nextBeatAt(0, VALID), 5_000);
     assert.equal(nextBeatAt(0, { intervalMs: 1_000, missThreshold: 2 }), 1_000);
     assert.equal(nextBeatAt(0, { intervalMs: 60_000, missThreshold: 10 }), 60_000);
   });
 
-  it("is onafhankelijk van missThreshold", () => {
+  it("is independent of missThreshold", () => {
     const now = 123_456;
     assert.equal(
       nextBeatAt(now, { intervalMs: 7_500, missThreshold: 2 }),

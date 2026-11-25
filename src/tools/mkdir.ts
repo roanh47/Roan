@@ -1,41 +1,41 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-/** Uitkomst van {@link mkdir}. */
+/** Outcome of {@link mkdir}. */
 export interface MkdirResult {
-  /** Absoluut pad van de map, met eventuele symbolische links opgelost. */
+  /** Absolute path of the directory, with any symbolic links resolved. */
   path: string;
-  /** Pad relatief ten opzichte van de root, met forward slashes. */
+  /** Path relative to the root, with forward slashes. */
   relative: string;
-  /** True als de map in deze aanroep is aangemaakt, false als hij al bestond. */
+  /** True if the directory was created in this call, false if it already existed. */
   created: boolean;
 }
 
-/** Opties voor {@link mkdir}; nu alleen een abort-signaal. */
+/** Options for {@link mkdir}; currently only an abort signal. */
 export interface MkdirOptions {
   signal?: AbortSignal;
 }
 
-/** Leest de foutcode (`ENOENT`, `EACCES`, …) zonder naar `any` te grijpen. */
+/** Reads the error code (`ENOENT`, `EACCES`, …) without reaching for `any`. */
 function errorCode(err: unknown): string | undefined {
   if (typeof err !== "object" || err === null || !("code" in err)) return undefined;
   const code = (err as { code?: unknown }).code;
   return typeof code === "string" ? code : undefined;
 }
 
-/** True als `child` gelijk is aan `root` of eronder ligt. */
+/** True if `child` equals `root` or lies below it. */
 function isWithin(root: string, child: string): boolean {
   if (child === root) return true;
   const prefix = root.endsWith(path.sep) ? root : root + path.sep;
-  // Vergelijk hoofdlettergevoelig zoals het besturingssysteem dat doet; op
-  // Windows is dit een benadering, op Linux exact.
+  // Compare case-sensitively the way the operating system does; on
+  // Windows this is an approximation, on Linux it is exact.
   return child.startsWith(prefix);
 }
 
 /**
- * Lost `absolute` op tot een echt pad en volgt daarbij symbolische links voor
- * het deel dat al bestaat. Segmenten die nog niet bestaan blijven staan zoals
- * ze zijn, zodat een aan te maken map hetzelfde pad houdt.
+ * Resolves `absolute` to a real path, following symbolic links for the part
+ * that already exists. Segments that do not exist yet are left as they are, so
+ * that a directory still to be created keeps the same path.
  */
 async function resolveReal(absolute: string): Promise<string> {
   const missing: string[] = [];
@@ -54,17 +54,17 @@ async function resolveReal(absolute: string): Promise<string> {
 }
 
 /**
- * Maakt `target` aan als map, inclusief alle tussenliggende mappen.
+ * Creates `target` as a directory, including all intermediate directories.
  *
- * - `root` is de werkmap en moet al bestaan; `target` wordt daartegen afgezet.
- * - Relatieve én absolute paden zijn toegestaan zolang ze binnen `root` vallen.
- *   Een pad dat via `..` of een symbolische link naar buiten wijst wordt geweigerd.
- * - Idempotent: een bestaande map levert `created: false` op zonder fout.
- * - Bestaat er al een bestand of een dangling symlink op het pad, dan volgt een
- *   fout; er wordt niets overschreven.
+ * - `root` is the working directory and must already exist; `target` is checked against it.
+ * - Relative and absolute paths are allowed as long as they stay within `root`.
+ *   A path that points outside via `..` or a symbolic link is rejected.
+ * - Idempotent: an existing directory yields `created: false` without an error.
+ * - If a file or a dangling symlink already exists at the path, an error follows;
+ *   nothing is overwritten.
  *
- * @throws Error als `root` geen bestaande map is, als `target` buiten de root
- *   valt, of als het doelpad door een niet-map wordt geblokkeerd.
+ * @throws Error if `root` is not an existing directory, if `target` falls outside
+ *   the root, or if the target path is blocked by a non-directory.
  */
 export async function mkdir(
   root: string,
@@ -74,36 +74,36 @@ export async function mkdir(
   options.signal?.throwIfAborted();
 
   if (typeof target !== "string" || target.includes("\0")) {
-    throw new Error(`ongeldig pad: ${JSON.stringify(target)}`);
+    throw new Error(`invalid path: ${JSON.stringify(target)}`);
   }
   if (typeof root !== "string" || root.trim() === "") {
-    throw new Error("werkmap ontbreekt");
+    throw new Error("working directory is missing");
   }
 
-  // De root moet bestaan: zonder bestaande root is er geen grens om tegen te
-  // controleren en zou een typefout stilzwijgend mappen buiten de werkmap maken.
+  // The root must exist: without an existing root there is no boundary to
+  // check against and a typo would silently create directories outside the working directory.
   let rootReal: string;
   try {
     rootReal = await fs.realpath(path.resolve(root));
   } catch {
-    throw new Error(`werkmap bestaat niet: ${path.resolve(root)}`);
+    throw new Error(`working directory does not exist: ${path.resolve(root)}`);
   }
   const rootInfo = await fs.stat(rootReal);
   if (!rootInfo.isDirectory()) {
-    throw new Error(`werkmap is geen map: ${rootReal}`);
+    throw new Error(`working directory is not a directory: ${rootReal}`);
   }
 
   const raw = target.trim() === "" ? "." : target;
   const lexical = path.resolve(rootReal, raw);
   if (!isWithin(rootReal, lexical)) {
-    throw new Error(`pad "${target}" valt buiten de werkmap ${rootReal}`);
+    throw new Error(`path "${target}" falls outside the working directory ${rootReal}`);
   }
 
-  // Het diepst bestaande deel kan een symbolische link naar buiten zijn; daarom
-  // controleren we het echte pad en niet alleen de lexicale vorm.
+  // The deepest existing part may be a symbolic link pointing outside; that is why
+  // we check the real path and not just the lexical form.
   const resolved = await resolveReal(lexical);
   if (!isWithin(rootReal, resolved)) {
-    throw new Error(`pad "${target}" wijst via een symbolische link buiten de werkmap ${rootReal}`);
+    throw new Error(`path "${target}" points outside the working directory ${rootReal} via a symbolic link`);
   }
 
   let exists = true;
@@ -116,15 +116,15 @@ export async function mkdir(
 
   let created = false;
   if (exists) {
-    // Een bestaand doel mag alleen een map zijn (of een link daarnaartoe).
+    // An existing target may only be a directory (or a link to one).
     let isDirectory = false;
     try {
       isDirectory = (await fs.stat(resolved)).isDirectory();
     } catch (err) {
       if (errorCode(err) !== "ENOENT") throw err;
-      throw new Error(`doel is een dangling symbolische link: ${resolved}`);
+      throw new Error(`target is a dangling symbolic link: ${resolved}`);
     }
-    if (!isDirectory) throw new Error(`doel bestaat al en is geen map: ${resolved}`);
+    if (!isDirectory) throw new Error(`target already exists and is not a directory: ${resolved}`);
   } else {
     options.signal?.throwIfAborted();
     await fs.mkdir(resolved, { recursive: true });

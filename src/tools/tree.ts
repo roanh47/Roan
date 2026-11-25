@@ -1,21 +1,21 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-/** Opties voor {@link listTree}; alles is optioneel. */
+/** Options for {@link listTree}; everything is optional. */
 export interface TreeOptions {
-  /** Aantal niveaus onder de root dat getoond wordt (standaard 3). */
+  /** Number of levels below the root that are shown (default 3). */
   depth?: number;
-  /** Harde bovengrens op het aantal getoonde regels (standaard 500). */
+  /** Hard upper bound on the number of lines shown (default 500). */
   maxEntries?: number;
 }
 
-/** Resultaat van {@link listTree}. */
+/** Result of {@link listTree}. */
 export interface TreeResult {
-  /** De boom als platte tekst, regels gescheiden door "\n". */
+  /** The tree as plain text, lines separated by "\n". */
   text: string;
-  /** Aantal getoonde items, exclusief de rootregel. */
+  /** Number of items shown, excluding the root line. */
   entries: number;
-  /** True zodra de wandeling door de limiet is gestopt. */
+  /** True as soon as the walk was stopped by the limit. */
   truncated: boolean;
 }
 
@@ -58,7 +58,7 @@ function toCount(value: number | undefined, fallback: number): number {
   return Math.max(0, Math.floor(value));
 }
 
-/** Leest een map en geeft alleen de zichtbare, niet-genegeerde items terug, gesorteerd. */
+/** Reads a directory and returns only the visible, non-ignored items, sorted. */
 async function readChildren(dir: string): Promise<Child[]> {
   let dirents;
   try {
@@ -101,16 +101,16 @@ async function walk(dir: string, level: number, prefix: string, state: WalkState
 }
 
 /**
- * Bouwt een compacte, ingesprongen boomweergave van `root`.
+ * Builds a compact, indented tree view of `root`.
  *
- * - node_modules, .git, dist en .cache worden altijd overgeslagen, net als dotfiles
- *   (behalve .env.example).
- * - Mappen krijgen een "/" en sorteren voor bestanden; beide met localeCompare.
- * - Bij het bereiken van `maxEntries` stopt de wandeling en is `truncated` true.
- * - Symbolische links worden niet gevolgd (en dus als bestand getoond), zodat
- *   kringverwijzingen onmogelijk zijn.
+ * - node_modules, .git, dist and .cache are always skipped, as are dotfiles
+ *   (except .env.example).
+ * - Directories get a "/" and sort before files; both with localeCompare.
+ * - On reaching `maxEntries` the walk stops and `truncated` is true.
+ * - Symbolic links are not followed (and are therefore shown as a file), so
+ *   circular references are impossible.
  *
- * @throws Error wanneer `root` geen bestaande map is; de melding bevat het pad.
+ * @throws Error when `root` is not an existing directory; the message contains the path.
  */
 export async function listTree(root: string, options: TreeOptions = {}): Promise<TreeResult> {
   const target = path.resolve(root);
@@ -120,7 +120,7 @@ export async function listTree(root: string, options: TreeOptions = {}): Promise
   } catch {
     isDirectory = false;
   }
-  if (!isDirectory) throw new Error(`geen map: ${target}`);
+  if (!isDirectory) throw new Error(`not a directory: ${target}`);
 
   const state: WalkState = {
     lines: [`${target}/`],

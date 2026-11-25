@@ -38,21 +38,21 @@ interface ExecFailure {
 
 function requireRepo(repo: string): string {
   if (typeof repo !== "string" || repo.trim().length === 0) {
-    throw new Error("repo moet een niet-lege padnaam zijn");
+    throw new Error("repo must be a non-empty path name");
   }
   return repo;
 }
 
 function describeFailure(repo: string, err: unknown): Error {
   const e = err as ExecFailure;
-  const detail = (e.stderr ?? "").trim() || (e.stdout ?? "").trim() || e.message || "onbekende fout";
+  const detail = (e.stderr ?? "").trim() || (e.stdout ?? "").trim() || e.message || "unknown error";
   if (e.code === "ENOENT") {
-    return new Error(`git niet gevonden voor ${repo}: ${detail}`);
+    return new Error(`git not found for ${repo}: ${detail}`);
   }
   if (e.code === "E2BIG" || e.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") {
-    return new Error(`git-uitvoer te groot voor ${repo}: ${detail}`);
+    return new Error(`git output too large for ${repo}: ${detail}`);
   }
-  return new Error(`git faalde voor ${repo}: ${detail}`);
+  return new Error(`git failed for ${repo}: ${detail}`);
 }
 
 /** Run git in `repo` and return stdout; any failure becomes an Error naming the repo. */
@@ -84,7 +84,7 @@ function positiveInt(value: number | undefined, fallback: number, field: string)
     return fallback;
   }
   if (!Number.isSafeInteger(value) || value < 1) {
-    throw new Error(`${field} moet een positief geheel getal zijn`);
+    throw new Error(`${field} must be a positive integer`);
   }
   return value;
 }
@@ -181,7 +181,7 @@ export async function gitDiff(
   }
   if (options?.path !== undefined) {
     if (typeof options.path !== "string" || options.path.length === 0) {
-      throw new Error("diff-pad moet een niet-lege string zijn");
+      throw new Error("diff path must be a non-empty string");
     }
     args.push("--", options.path);
   } else {
@@ -193,7 +193,7 @@ export async function gitDiff(
     return out;
   }
   const withheld = out.length - maxChars;
-  const marker = `…(diff afgekapt: ${maxChars} van ${out.length} tekens getoond, ${withheld} tekens weggelaten)`;
+  const marker = `…(diff truncated: ${maxChars} of ${out.length} characters shown, ${withheld} characters omitted)`;
   return `${out.slice(0, maxChars)}\n${marker}\n`;
 }
 

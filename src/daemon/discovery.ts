@@ -1,13 +1,13 @@
 /**
- * Peers vinden via Tailscale.
+ * Finding peers via Tailscale.
  *
- * Elke Roan luistert op de peer-poort. In plaats van een invite-code te plakken
- * vraagt de daemon aan Tailscale wie er in het netwerk zitten, probeert de
- * peer-poort op elk adres en koppelt wat antwoordt. Zo komen vier machines
- * vanzelf aan elkaar, ook na een herstart of een nieuw IP.
+ * Every Roan listens on the peer port. Instead of pasting an invite code the
+ * daemon asks Tailscale who is on the network, probes the peer port on every
+ * address and links whatever answers. That way four machines find each other
+ * by themselves, also after a restart or a new IP.
  *
- * Tailscale is de bron van adressen, niet de beveiliging: de handshake weigert
- * nog steeds elke peer met een verkeerd token of een andere keten.
+ * Tailscale is the source of addresses, not the security: the handshake still
+ * refuses every peer with a wrong token or a different chain.
  */
 
 import { execFile } from "node:child_process";
@@ -16,15 +16,15 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-/** Hoe vaak de lijst opnieuw wordt gelezen. */
+/** How often the list is read again. */
 const DEFAULT_INTERVAL_MS = 20_000;
-/** Een adres dat niet binnen deze tijd antwoordt, draait geen daemon. */
+/** An address that does not answer within this time runs no daemon. */
 const PROBE_TIMEOUT_MS = 700;
 
 export interface DiscoveryOptions {
-  /** Poort waarop elke peer luistert. */
+  /** Port every peer listens on. */
   readonly port: number;
-  /** Aangeroepen voor elk adres dat antwoordt en nog niet bekend is. */
+  /** Called for every address that answers and is not known yet. */
   readonly onCandidate: (host: string) => void;
   readonly intervalMs?: number;
   readonly logger?: { info: (message: string, meta?: Record<string, unknown>) => void };
@@ -43,11 +43,11 @@ interface TailscaleStatus {
 }
 
 /**
- * Waar de Tailscale-CLI staat.
+ * Where the Tailscale CLI lives.
  *
- * De server draait Tailscale in Docker (de host heeft alleen `tailscale0`), dus
- * naast een gewoon `tailscale`-commando proberen we de container. Wie het ergens
- * anders heeft staan zet `ROAN_TAILSCALE_BIN` of `ROAN_TAILSCALE_CONTAINER`.
+ * The server runs Tailscale in Docker (the host only has `tailscale0`), so
+ * besides a plain `tailscale` command we try the container. Anyone who has it
+ * somewhere else sets `ROAN_TAILSCALE_BIN` or `ROAN_TAILSCALE_CONTAINER`.
  */
 function tailscaleCommands(): Array<{ bin: string; args: string[] }> {
   const eigen = process.env["ROAN_TAILSCALE_BIN"];
@@ -62,16 +62,16 @@ function tailscaleCommands(): Array<{ bin: string; args: string[] }> {
 function firstV4(addresses: readonly string[] | undefined): string | null {
   if (!addresses) return null;
   for (const address of addresses) {
-    if (address.includes(".")) return address; // IPv4; IPv6 laten we aan Tailscale
+    if (address.includes(".")) return address; // IPv4; IPv6 we leave to Tailscale
   }
   return null;
 }
 
 /**
- * Alle IPv4-adressen in de tailnet behalve dit device.
+ * All IPv4 addresses in the tailnet except this device.
  *
- * `tailscale status --json` is de enige bron die "online" weet; apparaten die
- * uit staan slaan we over zodat we niet elke ronde in een timeout lopen.
+ * `tailscale status --json` is the only source that knows "online"; devices
+ * that are off we skip so we do not hit a timeout every round.
  */
 export async function tailscaleHosts(): Promise<{ self: string | null; hosts: string[] }> {
   let parsed: TailscaleStatus | null = null;
@@ -81,7 +81,7 @@ export async function tailscaleHosts(): Promise<{ self: string | null; hosts: st
       parsed = JSON.parse(stdout) as TailscaleStatus;
       break;
     } catch {
-      // Volgende kandidaat: geen CLI, of de daemon draait daar niet.
+      // Next candidate: no CLI, or no daemon running there.
     }
   }
   if (parsed === null) return { self: null, hosts: [] };
@@ -96,7 +96,7 @@ export async function tailscaleHosts(): Promise<{ self: string | null; hosts: st
   return { self, hosts: [...hosts].sort() };
 }
 
-/** Doet een korte TCP-poging: antwoordt er niets, dan draait daar geen daemon. */
+/** Does a short TCP attempt: if nothing answers, no daemon runs there. */
 export function probe(host: string, port: number): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = connect({ host, port });
@@ -112,8 +112,8 @@ export function probe(host: string, port: number): Promise<boolean> {
 }
 
 /**
- * Start de ronde. Elke bekende host wordt één keer aangeboden; daarna is het aan
- * de replicatie om de link levend te houden.
+ * Starts the round. Every known host is offered once; after that it is up to
+ * replication to keep the link alive.
  */
 export function startDiscovery(options: DiscoveryOptions): () => void {
   const interval = options.intervalMs ?? DEFAULT_INTERVAL_MS;
@@ -124,7 +124,7 @@ export function startDiscovery(options: DiscoveryOptions): () => void {
     if (stopped) return;
     const { self, hosts } = await tailscaleHosts();
     if (self === null && hosts.length === 0) {
-      options.logger?.info("discovery: Tailscale gaf geen adressen");
+      options.logger?.info("discovery: Tailscale returned no addresses");
       return;
     }
     for (const host of hosts) {
@@ -133,12 +133,12 @@ export function startDiscovery(options: DiscoveryOptions): () => void {
       if (await probe(host, options.port)) {
         offered.add(host);
         options.onCandidate(host);
-        options.logger?.info("discovery: peer gevonden", { host });
+        options.logger?.info("discovery: peer found", { host });
       }
     }
   };
 
-  // Eerste ronde met een korte vertraging: de peer-server moet eerst luisteren.
+  // First round after a short delay: the peer-server has to be listening first.
   const first = setTimeout(() => void round().catch(() => undefined), 3_000);
   first.unref();
   const timer = setInterval(() => void round().catch(() => undefined), interval);

@@ -103,7 +103,7 @@ test("a server that refuses the handshake fails honestly", async () => {
   try {
     await assert.rejects(
       connectMcpServer({ id: "x", label: "X", transport: "http", url: `http://127.0.0.1:${String(port)}/mcp`, enabled: true }),
-      /handshake mislukt.*binnen verboden/,
+      /handshake failed.*binnen verboden/,
     );
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));

@@ -1,9 +1,9 @@
 /**
- * Haalt een URL op en geeft de inhoud als platte tekst terug.
+ * Fetches a URL and returns the content as plain text.
  *
- * Bewust simpel: geen retries, geen cookies, geen authenticatie. Een niet-2xx
- * antwoord is geen fout — de status en de body komen gewoon terug, zodat de
- * aanroeper zelf kan beslissen wat hij ermee doet.
+ * Deliberately simple: no retries, no cookies, no authentication. A non-2xx
+ * response is not an error — the status and the body are returned as-is, so the
+ * caller can decide for itself what to do with them.
  */
 
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -22,24 +22,24 @@ export interface FetchOptions {
   maxChars?: number;
 }
 
-/** Alleen bruikbare positieve getallen; alles anders valt terug op de standaard. */
+/** Only usable positive numbers; anything else falls back to the default. */
 function positiveInt(value: number | undefined, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) && value > 0
     ? Math.floor(value)
     : fallback;
 }
 
-/** Media-type zonder parameters, kleine letters. */
+/** Media type without parameters, lowercase. */
 function mediaType(contentType: string): string {
   return (contentType.split(";")[0] ?? "").trim().toLowerCase();
 }
 
-/** text/* en JSON zijn leesbaar; afbeeldingen, PDF's en binaire troep niet. */
+/** text/* and JSON are readable; images, PDFs and binary junk are not. */
 function isTextual(media: string): boolean {
   return media.startsWith("text/") || media === "application/json" || media.endsWith("+json");
 }
 
-/** HTML moet eerst leesbaar worden gemaakt; de rest gaat ongewijzigd door. */
+/** HTML must first be made readable; everything else passes through unchanged. */
 function isHtml(media: string): boolean {
   return media === "text/html" || media === "application/xhtml+xml";
 }
@@ -74,8 +74,8 @@ function decodeEntities(input: string): string {
 }
 
 /**
- * Maakt van HTML platte tekst: scripts, styles, commentaar en tags weg,
- * blokgrenzen worden regeleindes, witruimte wordt genormaliseerd.
+ * Turns HTML into plain text: scripts, styles, comments and tags removed,
+ * block boundaries become line breaks, whitespace is normalised.
  */
 function htmlToText(html: string): string {
   return decodeEntities(
@@ -96,8 +96,8 @@ function htmlToText(html: string): string {
 }
 
 /**
- * Leest de body tot maximaal `maxChars` tekens. Stopt met lezen zodra het
- * maximum is overschreden, zodat een enorme pagina geen geheugen vreet.
+ * Reads the body up to at most `maxChars` characters. Stops reading as soon as
+ * the maximum is exceeded, so an enormous page does not eat memory.
  */
 async function readBody(
   res: Response,
@@ -138,7 +138,7 @@ async function readBody(
   return { text, truncated };
 }
 
-/** Maakt van de uiteenlopende fetch-fouten één duidelijke melding per faalwijze. */
+/** Turns the various fetch errors into one clear message per failure mode. */
 function fetchError(url: string, err: unknown, timeoutMs: number): Error {
   const e = (typeof err === "object" && err !== null ? err : {}) as {
     name?: string;
@@ -147,12 +147,12 @@ function fetchError(url: string, err: unknown, timeoutMs: number): Error {
   };
 
   if (e.name === "TimeoutError" || e.name === "AbortError") {
-    return new Error(`timeout na ${timeoutMs} ms: geen antwoord van ${url}`);
+    return new Error(`timeout after ${timeoutMs} ms: no response from ${url}`);
   }
 
   const code = e.cause?.code ?? "";
   if (code === "ENOTFOUND" || code === "EAI_AGAIN" || code === "EAI_FAIL" || code === "ENODATA") {
-    return new Error(`DNS-fout (${code}): host van ${url} niet gevonden`);
+    return new Error(`DNS error (${code}): host of ${url} not found`);
   }
   if (
     code === "ECONNREFUSED" ||
@@ -162,10 +162,10 @@ function fetchError(url: string, err: unknown, timeoutMs: number): Error {
     code === "ECONNABORTED" ||
     code === "EPIPE"
   ) {
-    return new Error(`verbindingsfout (${code}): kan geen verbinding maken met ${url}`);
+    return new Error(`connection error (${code}): cannot connect to ${url}`);
   }
   if (code === "ETIMEDOUT") {
-    return new Error(`verbindingsfout (ETIMEDOUT): verbinding met ${url} viel weg`);
+    return new Error(`connection error (ETIMEDOUT): connection to ${url} dropped`);
   }
   if (
     code.startsWith("ERR_TLS") ||
@@ -173,16 +173,16 @@ function fetchError(url: string, err: unknown, timeoutMs: number): Error {
     code === "UNABLE_TO_VERIFY_LEAF_SIGNATURE" ||
     code === "DEPTH_ZERO_SELF_SIGNED_CERT"
   ) {
-    return new Error(`TLS-fout (${code}): certificaat van ${url} is niet te vertrouwen`);
+    return new Error(`TLS error (${code}): certificate of ${url} is not trusted`);
   }
 
-  const detail = e.cause?.message ?? e.message ?? "onbekende oorzaak";
-  return new Error(`netwerkfout bij ${url}: ${detail}`);
+  const detail = e.cause?.message ?? e.message ?? "unknown cause";
+  return new Error(`network error at ${url}: ${detail}`);
 }
 
 /**
- * Haalt `url` op. Gooit alleen bij een onbruikbare URL of een netwerkfout;
- * een HTTP-foutstatus komt gewoon in het resultaat terecht.
+ * Fetches `url`. Only throws on an unusable URL or a network error;
+ * an HTTP error status simply ends up in the result.
  */
 export async function fetchUrl(url: string, options: FetchOptions = {}): Promise<FetchResult> {
   const timeoutMs = positiveInt(options.timeoutMs, DEFAULT_TIMEOUT_MS);
@@ -192,10 +192,10 @@ export async function fetchUrl(url: string, options: FetchOptions = {}): Promise
   try {
     target = new URL(url);
   } catch {
-    throw new Error(`ongeldige URL: "${url}"`);
+    throw new Error(`invalid URL: "${url}"`);
   }
   if (target.protocol !== "http:" && target.protocol !== "https:") {
-    throw new Error(`ongeldige URL: "${url}" (alleen http en https worden ondersteund)`);
+    throw new Error(`invalid URL: "${url}" (only http and https are supported)`);
   }
 
   let res: Response;
@@ -218,12 +218,12 @@ export async function fetchUrl(url: string, options: FetchOptions = {}): Promise
   const media = mediaType(contentType);
 
   if (!isTextual(media)) {
-    // Niets leesbaars: body niet binnenhalen, meteen opruimen.
+    // Nothing readable: do not pull in the body, clean up right away.
     await res.body?.cancel().catch(() => undefined);
     return { url: target.toString(), status: res.status, contentType, text: "", truncated: false };
   }
 
-  // HTML bevat veel markup per teken: meer ruwe tekens inlezen dan het eindbudget.
+  // HTML carries a lot of markup per character: read more raw characters than the final budget.
   const html = isHtml(media);
   const readLimit = html ? maxChars * 4 : maxChars;
 

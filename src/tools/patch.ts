@@ -8,18 +8,18 @@ export interface PatchResult {
 
 const CONTEXT = 3;
 
-/** Zet een pad om naar iets binnen de werkmap; weiger paden die erbuiten wijzen. */
+/** Turns a path into something inside the working directory; rejects paths pointing outside it. */
 function resolveInside(cwd: string, target: string): string {
   const raw = target.length > 0 ? target : ".";
   const full = nodePath.resolve(cwd, raw);
   const rel = nodePath.relative(cwd, full);
   if (rel.startsWith("..") || nodePath.isAbsolute(rel)) {
-    throw new Error(`pad valt buiten de werkmap: ${target}`);
+    throw new Error(`path falls outside the working directory: ${target}`);
   }
   return full;
 }
 
-/** Tel exacte, niet-overlappende voorkomens van een stuk tekst. */
+/** Counts exact, non-overlapping occurrences of a piece of text. */
 function countOccurrences(haystack: string, needle: string): number {
   let count = 0;
   let index = haystack.indexOf(needle);
@@ -30,13 +30,13 @@ function countOccurrences(haystack: string, needle: string): number {
   return count;
 }
 
-/** Splits in regels zonder de afsluitende nieuwe regel als extra lege regel te tellen. */
+/** Splits into lines without counting the trailing newline as an extra empty line. */
 function toLines(text: string): string[] {
   const body = text.endsWith("\n") ? text.slice(0, -1) : text;
   return body === "" ? [] : body.split("\n");
 }
 
-/** Bouw één unified hunk rond het eerste verschil, met context aan beide kanten. */
+/** Builds one unified hunk around the first difference, with context on both sides. */
 function buildDiff(file: string, oldText: string, newText: string): string {
   const oldLines = toLines(oldText);
   const newLines = toLines(newText);
@@ -88,8 +88,8 @@ function buildDiff(file: string, oldText: string, newText: string): string {
 }
 
 /**
- * Vervang één uniek stuk tekst in een bestaand bestand en geef een unified diff terug.
- * Weigert als de tekst ontbreekt of vaker dan één keer voorkomt; maakt geen nieuwe bestanden.
+ * Replaces one unique piece of text in an existing file and returns a unified diff.
+ * Refuses if the text is missing or occurs more than once; does not create new files.
  */
 export async function applyPatch(
   filePath: string,
@@ -101,24 +101,24 @@ export async function applyPatch(
   const shown = nodePath.relative(cwd, full).split(nodePath.sep).join("/") || full;
 
   if (oldText === "") {
-    throw new Error(`leeg zoekpatroon in ${shown}: geef de exacte tekst op die vervangen moet worden`);
+    throw new Error(`empty search pattern in ${shown}: provide the exact text that should be replaced`);
   }
 
   let content: string;
   try {
     const stat = await fs.stat(full);
-    if (!stat.isFile()) throw new Error("geen bestand");
+    if (!stat.isFile()) throw new Error("not a file");
     content = await fs.readFile(full, "utf8");
   } catch {
-    throw new Error(`bestand bestaat niet of is geen bestand: ${shown}`);
+    throw new Error(`file does not exist or is not a file: ${shown}`);
   }
 
   const count = countOccurrences(content, oldText);
   if (count === 0) {
-    throw new Error(`tekst niet gevonden in ${shown}`);
+    throw new Error(`text not found in ${shown}`);
   }
   if (count > 1) {
-    throw new Error(`tekst komt ${count} keer voor in ${shown}; maak de tekst unieker`);
+    throw new Error(`text occurs ${count} times in ${shown}; make the text unique`);
   }
 
   if (oldText === newText) {

@@ -5,12 +5,12 @@ import { createAdapter, isSupported, protocolFor, supportedProviders } from "./f
 import { CATALOG } from "./lookup.js";
 
 /**
- * Deze test staat in src/providers/ (en niet in tests/) omdat tsconfig alleen
- * "src" include't en `npm test` de gecompileerde dist/**\/*.test.js draait; een
- * test buiten rootDir zou dus niet typechecken en niet draaien.
+ * This test sits in src/providers/ (and not in tests/) because tsconfig only
+ * includes "src" and `npm test` runs the compiled dist/**\/*.test.js; a test
+ * outside rootDir would neither typecheck nor run.
  *
- * De config wijst naar een dichte poort en de adapters worden alleen
- * geconstrueerd, nooit verzonden: geen netwerk, geen echte keys.
+ * The config points at a closed port and the adapters are only constructed,
+ * never sent: no network, no real keys.
  */
 const CFG: AdapterConfig = {
   baseUrl: "http://127.0.0.1:9/v1",
@@ -26,10 +26,10 @@ function adapterFor(providerId: string): ChatAdapter {
   return createAdapter(providerId, CFG);
 }
 
-/** Controleert dat `fn` een ProviderError voor precies `providerId` gooit. */
+/** Asserts that `fn` throws a ProviderError for exactly `providerId`. */
 function assertProviderError(fn: () => unknown, providerId: string): void {
   assert.throws(fn, (error: unknown) => {
-    assert.ok(error instanceof ProviderError, `verwachtte ProviderError, kreeg ${String(error)}`);
+    assert.ok(error instanceof ProviderError, `expected a ProviderError, got ${String(error)}`);
     assert.equal(error.provider, providerId);
     assert.match(error.message, new RegExp(providerId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.equal(error.status, null);
@@ -38,75 +38,75 @@ function assertProviderError(fn: () => unknown, providerId: string): void {
 }
 
 describe("provider factory", () => {
-  it("heeft een niet-lege catalogus om over te testen", () => {
-    assert.ok(providerIds.length > 0, "catalogus bevat geen providers");
+  it("has a non-empty catalog to test against", () => {
+    assert.ok(providerIds.length > 0, "the catalog contains no providers");
   });
 
-  it("laat geen enkele catalogusprovider stil falen", () => {
+  it("lets no catalog provider fail silently", () => {
     for (const providerId of providerIds) {
       if (isSupported(providerId)) {
         const adapter = adapterFor(providerId);
         assert.ok(
           PROTOCOLS.includes(adapter.id),
-          `${providerId} resolvet naar onbekend protocol "${adapter.id}"`,
+          `${providerId} resolves to unknown protocol "${adapter.id}"`,
         );
-        assert.equal(typeof adapter.send, "function", `${providerId}: send is geen functie`);
+        assert.equal(typeof adapter.send, "function", `${providerId}: send is not a function`);
         assert.equal(
           protocolFor(providerId),
           adapter.id,
-          `${providerId}: protocolFor en adapter.id lopen uiteen`,
+          `${providerId}: protocolFor and adapter.id disagree`,
         );
         assert.ok(
           supportedProviders().includes(providerId),
-          `${providerId} is supported maar staat niet in supportedProviders()`,
+          `${providerId} is supported but is not in supportedProviders()`,
         );
       } else {
         assertProviderError(() => adapterFor(providerId), providerId);
         assert.ok(
           !supportedProviders().includes(providerId),
-          `${providerId} is unsupported maar staat wel in supportedProviders()`,
+          `${providerId} is unsupported but is in supportedProviders()`,
         );
       }
     }
   });
 
-  it("gooit voor een onbekende id in plaats van een stille default", () => {
+  it("throws for an unknown id instead of returning a silent default", () => {
     const unknown = "no-such-provider";
     assert.equal(isSupported(unknown), false);
     assert.equal(protocolFor(unknown), null);
     assertProviderError(() => adapterFor(unknown), unknown);
   });
 
-  it("pint de protocollen van anthropic en google", () => {
+  it("pins the protocols of anthropic and google", () => {
     assert.equal(protocolFor("anthropic"), "anthropic");
     assert.equal(protocolFor("google"), "google");
     assert.equal(adapterFor("anthropic").id, "anthropic");
     assert.equal(adapterFor("google").id, "google");
   });
 
-  it("geeft supportedProviders() gesorteerd en zonder duplicaten", () => {
+  it("returns supportedProviders() sorted and without duplicates", () => {
     const ids = supportedProviders();
     const sorted = [...ids].sort();
-    assert.deepEqual(ids, sorted, "supportedProviders() is niet gesorteerd");
-    assert.equal(new Set(ids).size, ids.length, "supportedProviders() bevat duplicaten");
+    assert.deepEqual(ids, sorted, "supportedProviders() is not sorted");
+    assert.equal(new Set(ids).size, ids.length, "supportedProviders() contains duplicates");
 
     for (const id of ids) {
       assert.ok(
         Object.prototype.hasOwnProperty.call(CATALOG.providers, id),
-        `supportedProviders() noemt onbekende provider ${id}`,
+        `supportedProviders() names unknown provider ${id}`,
       );
-      assert.equal(isSupported(id), true, `${id} staat in supportedProviders() maar is niet supported`);
+      assert.equal(isSupported(id), true, `${id} is in supportedProviders() but is not supported`);
     }
   });
 
-  it("resolvet elke provider naar precies één protocol", () => {
-    // protocolFor is enkelvoudig; een tweede constructie mag niet van protocol
-    // wisselen (geen stemming/ordening die per aanroep verandert).
+  it("resolves every provider to exactly one protocol", () => {
+    // protocolFor is single-valued; a second construction must not switch
+    // protocol (no mood/ordering that changes per call).
     for (const providerId of supportedProviders()) {
       const first = adapterFor(providerId).id;
       const second = adapterFor(providerId).id;
-      assert.equal(first, second, `${providerId} wisselt tussen ${first} en ${second}`);
-      assert.ok(PROTOCOLS.includes(first), `${providerId} heeft onbekend protocol ${first}`);
+      assert.equal(first, second, `${providerId} switches between ${first} and ${second}`);
+      assert.ok(PROTOCOLS.includes(first), `${providerId} has an unknown protocol ${first}`);
     }
   });
 });

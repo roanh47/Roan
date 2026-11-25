@@ -6,12 +6,12 @@ import path from "node:path";
 import { scanForSecrets } from "./secrets-scan.js";
 
 /**
- * Tests staan naast de code (src/tools/) omdat `npm test` node --test over de
- * gecompileerde dist/**\/*.test.js laat lopen; een top-level tests/ map zou
- * buiten rootDir van tsconfig vallen.
+ * Tests live next to the code (src/tools/) because `npm test` runs node --test
+ * over the compiled dist/**\/*.test.js; a top-level tests/ directory would fall
+ * outside the rootDir of tsconfig.
  */
 
-/** Tijdelijke mappen horen in de scratch-map van de runner, niet in /tmp. */
+/** Temporary directories belong in the runner's scratch directory, not in /tmp. */
 const TEMP_ROOT = process.env.TMPDIR ?? os.tmpdir();
 
 async function withTempDir(fn: (dir: string) => Promise<void>): Promise<void> {
@@ -30,7 +30,7 @@ async function write(dir: string, rel: string, content: string | Buffer): Promis
 }
 
 describe("scanForSecrets", () => {
-  it("vindt een provider-sleutel en redigeert de preview", async () => {
+  it("finds a provider key and redacts the preview", async () => {
     await withTempDir(async (dir) => {
       const secret = "sk-test0123456789abcdefghijklmnop";
       await write(dir, "src/config.ts", `const apiKey = "${secret}";\n`);
@@ -54,7 +54,7 @@ describe("scanForSecrets", () => {
     });
   });
 
-  it("geeft niets terug voor een schoon bestand", async () => {
+  it("returns nothing for a clean file", async () => {
     await withTempDir(async (dir) => {
       await write(dir, "notes.md", "# Notities\n\nGeen geheimen hier, alleen tekst.\n");
 
@@ -67,7 +67,7 @@ describe("scanForSecrets", () => {
     });
   });
 
-  it("slaat node_modules over", async () => {
+  it("skips node_modules", async () => {
     await withTempDir(async (dir) => {
       await write(
         dir,
@@ -82,7 +82,7 @@ describe("scanForSecrets", () => {
     });
   });
 
-  it("slaat binaire bestanden over en telt ze als skipped", async () => {
+  it("skips binary files and counts them as skipped", async () => {
     await withTempDir(async (dir) => {
       await write(dir, "clean.txt", "gewone tekst\n");
       await write(
@@ -99,7 +99,7 @@ describe("scanForSecrets", () => {
     });
   });
 
-  it("herkent toewijzingen in .env, YAML en TOML", async () => {
+  it("recognises assignments in .env, YAML and TOML", async () => {
     await withTempDir(async (dir) => {
       await write(
         dir,
@@ -146,7 +146,7 @@ describe("scanForSecrets", () => {
     });
   });
 
-  it("kapt af op maxFindings en zet truncated", async () => {
+  it("cuts off at maxFindings and sets truncated", async () => {
     await withTempDir(async (dir) => {
       await write(dir, "a.txt", 'key = "sk-aaaaaaaaaaaaaaaaaaaaaaaa"\n');
       await write(dir, "b.txt", 'key = "sk-bbbbbbbbbbbbbbbbbbbbbbbb"\n');
@@ -158,7 +158,7 @@ describe("scanForSecrets", () => {
     });
   });
 
-  it("kapt af op maxFiles en zet truncated", async () => {
+  it("cuts off at maxFiles and sets truncated", async () => {
     await withTempDir(async (dir) => {
       await write(dir, "a.txt", "gewoon tekst\n");
       await write(dir, "b.txt", "ook gewoon tekst\n");

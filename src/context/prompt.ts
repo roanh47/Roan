@@ -20,6 +20,15 @@ export interface PromptParts {
 export function buildSystemPrompt(parts: PromptParts): string {
   const blocks: string[] = [parts.base.trim()];
 
+  // The owner speaks Dutch; the product speaks English. Dutch is allowed as an
+  // answer, never as the default, and never in the code itself.
+  blocks.push(
+    `# Language\n\n` +
+      `Speak English by default, on every device. Dutch is welcome too: answer in ` +
+      `Dutch when the person writes Dutch, and follow them back when they switch. ` +
+      `Code, file names, comments, log lines and commit messages are always English.`,
+  );
+
   if (parts.soul !== undefined && parts.soul.trim().length > 0) {
     blocks.push(
       `# Who you are\n\n${parts.soul.trim()}\n\n` +

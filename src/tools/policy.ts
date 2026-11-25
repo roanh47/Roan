@@ -2,19 +2,19 @@ import { realpathSync } from "node:fs";
 import path from "node:path";
 
 /**
- * Beslissing die het beleid aan een tool-aanroep hangt.
- * - `allow`: de aanroep mag zonder tussenkomst door
- * - `ask`: de gebruiker moet eerst bevestigen
- * - `deny`: de aanroep wordt geweigerd
+ * Decision the policy attaches to a tool call.
+ * - `allow`: the call may proceed without intervention
+ * - `ask`: the user must confirm first
+ * - `deny`: the call is rejected
  */
 export type Decision = "allow" | "ask" | "deny";
 
 export interface Policy {
-  /** Beslissing per toolnaam. Een ontbrekende tool valt terug op de standaardregels. */
+  /** Decision per tool name. A missing tool falls back to the default rules. */
   tools: Record<string, Decision>;
-  /** De werkmap waar paden tegenaan worden afgezet. */
+  /** The working directory that paths are checked against. */
   workspace: string;
-  /** Extra mappen (naam of pad) die nooit beschreven of gelezen mogen worden. */
+  /** Extra directories (name or path) that may never be written or read. */
   extraDenyDirs?: string[];
 }
 
@@ -23,13 +23,13 @@ export interface PolicyVerdict {
   reason: string;
 }
 
-/** Tools die iets kunnen schrijven, verwijderen of uitvoeren: nooit stilzwijgend toegestaan. */
+/** Tools that can write, delete or execute something: never allowed silently. */
 const WRITE_TOOLS: readonly string[] = ["write_file", "apply_patch", "run_shell", "delete_file"];
 
-/** Mapnamen die altijd geweigerd worden, waar ze ook in de werkmap staan. */
+/** Directory names that are always denied, wherever they sit in the working directory. */
 const PROTECTED_DIRS: readonly string[] = ["secrets", ".ssh", ".gnupg"];
 
-/** Sleutels in de tool-argumenten die een pad bevatten. */
+/** Keys in the tool arguments that contain a path. */
 const PATH_KEYS: ReadonlySet<string> = new Set([
   "path",
   "paths",
@@ -62,9 +62,9 @@ function isNonEmptyString(value: unknown): value is string {
 }
 
 /**
- * Lost een pad op tot een absoluut pad en volgt symbolische links voor het deel
- * dat al bestaat. Bestaat het pad (nog) niet, dan blijven de ontbrekende
- * segmenten staan zoals ze zijn: lexicaal opgelost dus.
+ * Resolves a path to an absolute path and follows symbolic links for the part
+ * that already exists. If the path does not exist (yet), the missing
+ * segments stay as they are: so lexically resolved.
  */
 function resolvePath(input: string): string {
   const absolute = path.resolve(input);
@@ -90,8 +90,9 @@ function isWithin(root: string, resolved: string): boolean {
 }
 
 /**
- * Bepaalt of `target` binnen de werkmap valt. Relatieve paden worden tegen de
- * werkmap afgezet; paden die via `..` ontsnappen vallen er per definitie buiten.
+ * Determines whether `target` falls within the working directory. Relative paths
+ * are checked against the working directory; paths that escape via `..` fall
+ * outside it by definition.
  */
 export function isInsideWorkspace(workspace: string, target: string): boolean {
   if (!isNonEmptyString(target)) return false;
@@ -101,7 +102,7 @@ export function isInsideWorkspace(workspace: string, target: string): boolean {
   return isWithin(root, resolved);
 }
 
-/** Verzamelt alle pad-achtige argumenten, ook in geneste objecten. */
+/** Collects all path-like arguments, also in nested objects. */
 function collectPaths(args: unknown, depth = 0): string[] {
   const found: string[] = [];
   if (depth > MAX_ARG_DEPTH || !isRecord(args)) return found;
@@ -134,7 +135,7 @@ function collectPaths(args: unknown, depth = 0): string[] {
   return found;
 }
 
-/** Geeft de weigeringsreden voor een pad, of `null` als het pad mag. */
+/** Returns the denial reason for a path, or `null` if the path is allowed. */
 function pathViolation(policy: Policy, raw: string): string | null {
   const root = resolvePath(policy.workspace);
   const resolved = resolvePath(path.resolve(root, raw));
@@ -181,9 +182,9 @@ function isDeclaredDecision(value: Decision | undefined): value is Decision {
 }
 
 /**
- * Bepaalt wat er met een tool-aanroep gebeurt. Paden in de argumenten winnen
- * altijd: een pad buiten de werkmap of in een beschermde map geeft `deny`, ook
- * als het beleid de tool expliciet toestaat.
+ * Determines what happens with a tool call. Paths in the arguments always win:
+ * a path outside the working directory or in a protected directory yields `deny`,
+ * even if the policy explicitly allows the tool.
  */
 export function decide(
   policy: Policy,
@@ -226,7 +227,7 @@ export function decide(
   }
 }
 
-/** Standaardbeleid: lezen en zoeken mag, schrijven en uitvoeren vraagt bevestiging. */
+/** Default policy: reading and searching is allowed, writing and executing needs confirmation. */
 export function defaultPolicy(workspace: string): Policy {
   return {
     tools: {
