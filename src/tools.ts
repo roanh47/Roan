@@ -5,6 +5,7 @@ import { promisify } from "node:util";
 import type { Tool } from "./types.js";
 import { ensureBundledPlugins } from "./plugins/index.js";
 import { toolSurface } from "./tools/surface.js";
+import { defineBrowserTool } from "./browser/provider.js";
 
 const execAsync = promisify(exec);
 
@@ -112,6 +113,10 @@ export const runShell: Tool = {
 export const builtinTools: Tool[] = [readFile, writeFile, listDir, runShell];
 
 for (const tool of builtinTools) toolSurface.register(tool, { set: "core", source: "core" });
+
+// The browser is a core tool with an optional endpoint (BROWSER_CDP_URL):
+// without one it refuses honestly instead of pretending to browse.
+toolSurface.register(defineBrowserTool(), { set: "core", source: "core" });
 
 /** Everything the model may call: core tools plus whatever plugins brought. */
 export function allTools(): Tool[] {

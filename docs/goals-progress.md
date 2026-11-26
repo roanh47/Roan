@@ -30,14 +30,14 @@ Owner of this file: the orchestrator (not the children).
 | 21 | Commando's en hooks | done | command parse/fold/expand + isolated hooks + SlashMenu; `command` event type added; turn wiring open | 1 |
 | 22 | Server en SDK | done | docs/api.md from code, typed ws client (12 tests), deferred tools; sdk has its own tsconfig | 1 |
 | 23 | Leren en rollen | done | proposals inert until approval, env-carried; roleModel() planner/executor/side; 30 tests | 1 |
-| 24 | Browser | in-progress | — | 1 |
-| 25 | Computer use | in-progress | — | 1 |
-| 26 | Generatie | in-progress | — | 1 |
-| 27 | Spraakgesprek | in-progress | — | 1 |
-| 28 | Werkplek | pending | — | 0 |
-| 29 | Code en git | pending | — | 0 |
-| 30 | Surfaces | pending | — | 0 |
-| 31 | Koppelingen | pending | — | 0 |
+| 24 | Browser | done | CDP client + page actions + fake-CDP tests (39); registered as a core tool (needs BROWSER_CDP_URL) | 1 |
+| 25 | Computer use | done | grant store + gated actions + Linux driver plans, 67 tests; approval UI + daemon grant frames open | 1 |
+| 26 | Generatie | done | provider plugins (OpenAI images, ComfyUI) + registry/runtime, 27 tests; tool + config source wiring open | 1 |
+| 27 | Spraakgesprek | done | TTS provider + listen→think→speak loop, 36 tests; needs mic capture + speaker from the shell (open) | 1 |
+| 28 | Werkplek | in-progress | — | 1 |
+| 29 | Code en git | in-progress | — | 1 |
+| 30 | Surfaces | in-progress | — | 1 |
+| 31 | Koppelingen | in-progress | — | 1 |
 | 32 | Opruimen en docs | pending | — | 0 |
 | 33 | Bewijsronde | pending | — | 0 |
 | 34 | Eindrapport | pending | — | 0 |
