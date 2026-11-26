@@ -242,7 +242,7 @@ verify() {
   home="$(mktemp -d)"
   log_file="$(mktemp)"
   port=$(( 20000 + RANDOM % 20000 ))
-  ROAN_HOME="$home" ROAN_CONTROL_PORT="$port" ROAN_PEER_PORT="$((port + 1))" \
+  ROAN_HOME="$home" ROAN_PORT="$port" \
     "$OUT" >"$log_file" 2>&1 &
   local pid=$!
   local ok=1

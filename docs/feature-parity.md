@@ -131,7 +131,7 @@ These exist in mainstream agents and are **deliberately out**:
 |---|---|---|---|
 | Phone app with its own daemon | — (unique) | ✅ libnode in-apk | done |
 | Desktop app (Win/Mac/Linux) | GPT, CL, CC (desktop) | ✅ Tauri sidecar | done |
-| Web UI served by the daemon itself (gateway style) | HM (dashboard), OC (server) | ✅ `scripts/webui.mjs` port 6769 — **must be verified to serve the 0.0.12 UI** | **BUILD (verify + promote)** — one frontend, three shells, daemon-first |
+| Web UI served by the daemon itself (gateway style) | HM (dashboard), OC (server) | ✅ daemon serves `web/dist` on 6769, same port as `/ws` and `/peer` | done |
 | One scalable frontend on every surface | GPT, CL (one app per form factor) | ✅ one web frontend embedded by every shell | **BUILD (keep it honest)** — phone, tablet, desktop and the 6769 web UI render the *same* frontend, scaled by viewport; no per-platform fork of the UI |
 | Cross-device sync | GPT, CL (cloud) | ✅ chain (no cloud) | done |
 | Push notifications | GPT, CL | ❌ | **SOON** (after in-app notification) |
@@ -143,7 +143,7 @@ These exist in mainstream agents and are **deliberately out**:
 |---|---|---|---|
 | Runs headless / as a service | CC (headless), HM | ✅ daemon + systemd unit (`docs/webui.md`) | done |
 | Update check in-app | CC, HM | the update module is written and tested (`web/src/update.ts`); no mounted screen calls it | **BUILD** |
-| Crash/diag log reachable by the user | HM | ✅ log server :7413 + in-app | done |
+| Crash/diag log reachable by the user | HM | ✅ `GET /log` on the one port + in-app | done |
 | Telemetry | CC (opt-in), others | — | WON'T — no telemetry, ever |
 
 ## Priority order (next rounds)

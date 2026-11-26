@@ -1,9 +1,10 @@
 /**
  * A typed client for the daemon's control port.
  *
- * The daemon serves one WebSocket on loopback (`127.0.0.1:7411`, or whatever
- * `ROAN_CONTROL_PORT` says; `ROAN_CONTROL_HOST` can move it on purpose). Two
- * protocols share that socket and the server never inspects the path:
+ * The daemon serves one port on loopback (`127.0.0.1:6769`, or whatever
+ * `ROAN_PORT` says; `ROAN_HOST` can move it on purpose). The control socket is
+ * `/ws` on that port; `/peer` is peer sync. Two
+ * protocols share that socket, told apart by their frames:
  *
  *   control  client → daemon  `{ t: "state" }`, `{ t: "create_chain" }`,
  *                             `{ t: "join_chain", code }`, `{ t: "append", event }`,

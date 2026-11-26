@@ -4,7 +4,7 @@ import type { ChainResponse, DaemonState } from "./control-protocol.js";
 import { decodeJoinCode, encodeJoinCode } from "./control-protocol.js";
 import { createIdentity, loadIdentity, type Identity } from "./identity.js";
 import { ensurePaths, migrateLegacyHome, migrateStateSplit, resolvePaths, type RoanPaths } from "./paths.js";
-import { advertiseHost, advertiseHosts, bindListenHost, resolvePeerBind, type PeerBind } from "./advertise.js";
+import { advertiseHost, advertiseHosts, resolvePeerBind, type PeerBind } from "./advertise.js";
 import { leaveChain } from "./leave.js";
 import { ensureBootstrapFiles, readGuideFile } from "./bootstrap.js";
 import { ANDROID_STORAGE_TARGETS, openStorageWindow, sharedStorageProbe } from "./storage-window.js";
@@ -12,7 +12,7 @@ import { compactMessages } from "../chain/compaction.js";
 import { loadSettings } from "./settings.js";
 import { startControlServer } from "./control.js";
 import { ChainNodeStore } from "./peer-store.js";
-import { addPeer, peers as peerList, startPeers, stopPeers } from "./peers.js";
+import { addPeer, peers as peerList, PEER_PATH, startPeers, stopPeers } from "./peers.js";
 import { probe, startDiscovery, tailscaleHosts } from "./discovery.js";
 import { findNode, readNodes } from "../chain/nodes.js";
 import os from "node:os";
@@ -64,8 +64,17 @@ import { catalogSource, loadCatalog } from "../providers/live.js";
 import { presetsFromCatalog, fetchModels, loadProviders, saveProviders, upsertAccount, type ProviderAccount } from "./providers.js";
 import { saveSettings } from "./settings-write.js";
 
-const CONTROL_PORT = Number(process.env["ROAN_CONTROL_PORT"] ?? 7411);
-const PEER_PORT = Number(process.env["ROAN_PEER_PORT"] ?? 7412);
+/**
+ * One port for everything this machine serves: the built web UI over HTTP, the
+ * control socket on `/ws`, and peer sync on `/peer`. `ROAN_CONTROL_PORT` and
+ * `ROAN_CONTROL_HOST` are the old names for the same two settings and still
+ * work, so an existing unit file keeps starting.
+ */
+const PORT = Number(process.env["ROAN_PORT"] ?? process.env["ROAN_CONTROL_PORT"] ?? 6769);
+const HOST = process.env["ROAN_HOST"] ?? process.env["ROAN_CONTROL_HOST"] ?? "127.0.0.1";
+
+/** The last stretch of the daemon's own output, served at `/log` on the port. */
+const LOG_RING_CHARS = 64 * 1024;
 
 const SYSTEM_PROMPT = [
   "You are Roan, an agent running on one of the user's machines.",
@@ -80,22 +89,26 @@ interface Session {
 }
 
 /**
- * Where the peer-link listens. By default only the tailscale address: the
- * handshake still refuses every peer with a wrong token or a different chain,
- * but the door does not have to stand open on every network.
- * `ROAN_PEER_BIND=lan` or an address flips that on purpose.
+ * Where the one port listens, phrased the way the invite and the announcement
+ * understand it. The daemon binds exactly one address: `127.0.0.1` unless the
+ * operator set `ROAN_HOST` (an address, or `lan` / `tailscale` resolved here).
  */
-function peerBind(paths: RoanPaths): PeerBind {
-  return resolvePeerBind(os.networkInterfaces());
+function peerBind(): PeerBind {
+  const choice = HOST.trim();
+  if (choice === "lan" || choice === "tailscale") return resolvePeerBind(os.networkInterfaces(), { ROAN_PEER_BIND: choice });
+  if (choice === "0.0.0.0" || choice === "::") return { kind: "lan" };
+  if (choice === "127.0.0.1" || choice === "localhost" || choice === "::1") return { kind: "loopback" };
+  return { kind: "address", address: choice };
 }
 
 /**
- * Every address on which another device can call this device, best first —
- * and never more than the bind exposes. The joiner dials them all until one
- * opens: the approach guarantees nothing, they have to find each other.
+ * Every address on which another device can call this device, best first — and
+ * never more than the bind exposes. A loopback-only daemon advertises nothing,
+ * because a peer that dials it would hit its own machine: sync needs a wider
+ * bind, and the invite says so by being absent.
  */
-function dialHosts(paths: RoanPaths): string[] {
-  return advertiseHosts(peerBind(paths), os.networkInterfaces());
+function dialHosts(): string[] {
+  return advertiseHosts(peerBind(), os.networkInterfaces());
 }
 
 /** Discovery belongs to the process, not to a session: it has to stop on shutdown. */
@@ -108,8 +121,22 @@ const peerLogger: Logger = {
   error: (message, meta) => log("peer: " + message + (meta === undefined ? "" : " " + JSON.stringify(meta))),
 };
 
+/**
+ * The daemon's output goes to stderr (the Android service tails it) and to a
+ * bounded ring, which `/log` serves over the same port as everything else.
+ * There is no log server and no log port: one process, one listener.
+ */
+const logRing: string[] = [];
+let logRingChars = 0;
+
 function log(message: string): void {
   process.stderr.write(message + "\n");
+  logRing.push(message);
+  logRingChars += message.length + 1;
+  while (logRingChars > LOG_RING_CHARS && logRing.length > 1) {
+    const dropped = logRing.shift() ?? "";
+    logRingChars -= dropped.length + 1;
+  }
 }
 
 interface AgentContext {
@@ -236,18 +263,20 @@ async function main(): Promise<void> {
               // the local node depend on hearing from someone else.
               live: n.node === self || connected.includes(n.node) || (who?.isLive(n.node) ?? false),
             })),
-      invite:
-        session === null
-          ? null
-          : encodeJoinCode({
-              v: 2,
-              chain: session.identity.chainId,
-              token: session.identity.token,
-              hosts: dialHosts(paths),
-              port: PEER_PORT,
-            }),
+      invite: session === null ? null : joinCode(session.identity),
     };
   };
+
+  /**
+   * The code another device pastes in, or null when there is nothing to paste:
+   * a loopback-only daemon has no address another machine can dial, and a code
+   * without one is a lie that fails at the first handshake.
+   */
+  function joinCode(identity: Identity): string | null {
+    const hosts = dialHosts();
+    if (hosts.length === 0) return null;
+    return encodeJoinCode({ v: 2, chain: identity.chainId, token: identity.token, hosts, port: PORT });
+  }
 
   let control: Awaited<ReturnType<typeof startControlServer>> | null = null;
   /** The turn in flight, so "stop" has something to abort. */
@@ -313,26 +342,26 @@ async function main(): Promise<void> {
         log("relay: " + String(error)),
       );
     });
-    const bind = peerBind(paths);
     await startPeers({
       store: node,
       token: session.identity.token,
-      host: bindListenHost(bind),
-      port: PEER_PORT,
       logger: peerLogger,
       onError: (error) => log("peer error: " + error.message),
+      // Peers ride the same port as the app: `/peer` on the control server,
+      // no second listener.
+      mount: (handler) => control?.mountUpgrade(PEER_PATH, handler) ?? (() => undefined),
     });
     replicating = true;
-    log("peer: listening on " + bindListenHost(bind) + ":" + String(PEER_PORT) + " (" + bind.kind + ")");
+    log("peer: mounted on " + HOST + ":" + String(PORT) + PEER_PATH);
     // Every machine finds the other via Tailscale. That way nobody has to paste
     // a code and the cluster comes back after a restart or a new IP too.
     if (process.env["ROAN_DISCOVERY"] !== "off" && stopDiscovery === null) {
       stopDiscovery = startDiscovery({
-        port: PEER_PORT,
+        port: PORT,
         logger: peerLogger,
         onCandidate: (host) => {
           try {
-            addPeer(`${host}:${String(PEER_PORT)}`);
+            addPeer(`${host}:${String(PORT)}`);
           } catch (error: unknown) {
             log("discovery: could not add peer: " + String(error));
           }
@@ -341,7 +370,8 @@ async function main(): Promise<void> {
     }
   };
 
-  if (session !== null) await startReplication();
+  // Peer sync is mounted on the control server, so it starts once that server
+  // exists — at the end of main(), next to `startControlServer`.
 
   /**
    * Keeps this device's copy equal to the chain: adopt what is newer, publish
@@ -360,12 +390,15 @@ async function main(): Promise<void> {
     // One source of truth for "where can you call me": the same address the
     // invites carry. The tailscale scan stays for the discovery list; the
     // announcement uses the dialable host, tailnet first.
-    let host = advertiseHost(peerBind(paths), os.networkInterfaces());
-    if (host.length === 0) {
+    const bind = peerBind();
+    let host = advertiseHost(bind, os.networkInterfaces());
+    if (host.length === 0 && bind.kind !== "loopback") {
+      // A loopback-only daemon has no address a peer could dial, and naming the
+      // tailnet address anyway would be a route to a door that is not there.
       const found = await tailscaleHosts().catch(() => ({ self: null, hosts: [] as string[] }));
       host = found.self ?? "";
     }
-    const data = { node: current.identity.nodeId, name: os.hostname(), host, port: PEER_PORT };
+    const data = { node: current.identity.nodeId, name: os.hostname(), host, port: PORT };
     const id = `node-${createHash("sha256").update(JSON.stringify(data)).digest("hex")}`;
     if (current.store.read(chain, 1, 100_000).some((event) => event.id === id)) return;
     const event = current.store.append(chain, { id, node: current.identity.nodeId, type: "node", data });
@@ -908,28 +941,17 @@ async function main(): Promise<void> {
     // device with two identities and half its history in each.
     if (session !== null) {
       const existing = session.identity;
+      const code = joinCode(existing);
       return {
         t: "chain",
         chain: existing.chainId,
         node: existing.nodeId,
-        invite: encodeJoinCode({
-          v: 2,
-          chain: existing.chainId,
-          token: existing.token,
-          hosts: dialHosts(paths),
-          port: PEER_PORT,
-        }),
+        ...(code === null ? {} : { invite: code }),
       };
     }
     const created = await createIdentity(paths);
     session = { identity: created, store: EventStore.open(paths.database) };
-    const invite = encodeJoinCode({
-      v: 2,
-      chain: created.chainId,
-      token: created.token,
-      hosts: dialHosts(paths),
-      port: PEER_PORT,
-    });
+    const invite = joinCode(created);
     await startReplication();
     await startEnvLoop();
     await startWorkspaceLoop();
@@ -938,7 +960,7 @@ async function main(): Promise<void> {
     // the drawer reads as a bug, and every reference app opens a conversation
     // the moment you create an account/chain.
     startSession("New chat");
-    return { t: "chain", chain: created.chainId, node: created.nodeId, invite };
+    return { t: "chain", chain: created.chainId, node: created.nodeId, ...(invite === null ? {} : { invite }) };
   };
 
   const onJoin = async (code: string): Promise<ChainResponse> => {
@@ -977,11 +999,15 @@ async function main(): Promise<void> {
   };
 
   control = await startControlServer({
-    port: CONTROL_PORT,
-    // Loopback by default: the app on this device is the only one with any
-    // business here. Set ROAN_CONTROL_HOST to an address only when the app has
-    // to be able to reach it from another machine on purpose.
-    host: process.env["ROAN_CONTROL_HOST"] ?? "127.0.0.1",
+    port: PORT,
+    // One address, one port. Loopback by default: the app on this device is
+    // the only caller with business on the control socket. A wider bind makes
+    // the UI (and `/peer`) reachable; `/ws` still refuses everyone who is not
+    // local unless ROAN_ALLOW_REMOTE_CONTROL=1 says otherwise.
+    host: HOST,
+    logText: () => logRing.join("\n"),
+    isLocal:
+      process.env["ROAN_ALLOW_REMOTE_CONTROL"] === "1" ? () => true : undefined,
     store: () => session?.store ?? null,
     state,
     onMessage: runMessage,
@@ -1840,14 +1866,26 @@ async function main(): Promise<void> {
     },
     onCreate,
     onJoin,
-    log: (message) => process.stderr.write(message + "\n"),
+    log: (message) => log(message),
   });
 
+  // The port exists now, so peers can be mounted on it and the app's own
+  // windows have somewhere to connect.
+  if (session !== null) await startReplication();
+
   const st = state();
-  process.stderr.write(
+  log(
     st.onboarding
-      ? "roan daemon: waiting for a chain (control port " + control.port + ")\n"
-      : "roan daemon: chain " + String(st.chain) + ", node " + String(st.node) + ", control port " + control.port + "\n",
+      ? "roan daemon: waiting for a chain (port " + String(control.port) + ", " + control.url + ")"
+      : "roan daemon: chain " +
+          String(st.chain) +
+          ", node " +
+          String(st.node) +
+          ", port " +
+          String(control.port) +
+          " (" +
+          control.url +
+          ")",
   );
 }
 

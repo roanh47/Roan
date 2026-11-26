@@ -92,7 +92,7 @@ cat >"$HOME_DIR/config.json" <<JSON
 JSON
 
 echo "==> start daemon (control port $CONTROL_PORT)"
-ROAN_HOME="$HOME_DIR" ROAN_CONTROL_PORT="$CONTROL_PORT" \
+ROAN_HOME="$HOME_DIR" ROAN_PORT="$CONTROL_PORT" \
   node "$ROOT/dist/daemon/main.js" >"$TMP/daemon.log" 2>&1 &
 DAEMON_PID=$!
 wait_for_port "$CONTROL_PORT" || {

@@ -3,7 +3,8 @@
 Roan has one window. `web/src/main.tsx` mounts a single React tree at `#root`;
 there are no routes and no browser chrome. The same bundle is loaded by the
 Tauri desktop shell and by the Android WebView, and both talk only to the daemon
-on the same machine over `ws://127.0.0.1:7411/ws`.
+on the same machine over `ws://127.0.0.1:6769/ws`, which is also the port that
+serves the page.
 
 The desktop window is 1180 × 780, minimum 760 × 520, dark, with normal
 decorations (`src-tauri/tauri.conf.json`). The title bar carries

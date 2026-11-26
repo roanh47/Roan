@@ -47,23 +47,60 @@ control port, but nothing imports it: the sidecar and the systemd unit in
    broadcast of events a peer appends.
 10. `startEnvLoop()`, `startWorkspaceLoop()`, `startCron()` (only with a
     session) — the three timers that keep this copy equal to the chain.
-11. `startControlServer({ port, host, ... })` — `127.0.0.1` by default.
-12. One line to stderr: `roan daemon: waiting for a chain (control port N)` or
-    `roan daemon: chain …, node …, control port N`.
+11. `startControlServer({ port, host, ... })` — one HTTP server on one port
+    (`127.0.0.1` by default) that serves `web/dist`, upgrades `/ws` to the
+    control socket and carries `/peer` for sync.
+12. Peer sync is mounted on that same server (`/peer`), then one line to
+    stderr: `roan daemon: waiting for a chain (port N, http://host:N)` or
+    `roan daemon: chain …, node …, port N (http://host:N)`.
 
-Ports and switches come from the environment: `ROAN_CONTROL_PORT` (default
-`7411`), `ROAN_CONTROL_HOST` (default `127.0.0.1`; set it deliberately if the
-app has to reach the daemon from another machine), `ROAN_PEER_PORT` (default
-`7412`), `ROAN_PEER_BIND`: `tailscale` (default — the tailnet address, loopback
-without one), `lan` (every interface), `loopback`, or a specific address;
-`ROAN_PEER_HOST` still works as an address. `ROAN_DISCOVERY=off` disables the
-Tailscale scan. `ROAN_HOME` overrides the state root. `ROAN_SHELL=android`
-changes shutdown behaviour (section 4). Provider settings never come from the
-environment; they come from `config.json`.
+### The one port
 
-On the other side, `web/src/App.tsx` builds a `ChainClient` against
-`ws://127.0.0.1:7411/ws` unless `window.__ROAN__.socket` says otherwise. The
-`/ws` path is not inspected by the server; any path connects.
+There is one listener. `http://host:PORT/` is the built UI, `/ws` is the
+control socket, `/peer` is peer sync, `/log` is the daemon's own output and
+`/healthz` answers whether the UI was built. Nothing else opens a socket: no
+webui proxy process, no log server, no second peer port.
+
+| variable | default | meaning |
+| --- | --- | --- |
+| `ROAN_PORT` | `6769` | the one port (alias: `ROAN_CONTROL_PORT`) |
+| `ROAN_HOST` | `127.0.0.1` | bind address (alias: `ROAN_CONTROL_HOST`); `lan`/`tailscale` resolve to an interface |
+| `ROAN_WEB_DIST` | `web/dist` next to the package root | where the built UI lives |
+| `ROAN_ALLOW_REMOTE_CONTROL` | unset | `1` lets a non-loopback caller open `/ws` |
+| `ROAN_PEER_ADVERTISE` | unset | comma-separated hosts to put in the invite instead of the derived ones |
+| `ROAN_DISCOVERY` | on | `off` disables the Tailscale scan |
+| `ROAN_HOME` | `~/.Roan` | state root |
+| `ROAN_SHELL` | unset | `android` changes shutdown behaviour (section 4) |
+
+`ROAN_PEER_BIND` is gone as a listen switch: peering uses the one bind. A
+`lan`/`tailscale` value in `ROAN_HOST` is resolved through the same code, and
+`ROAN_PEER_ADVERTISE` still overrides what an invite carries.
+
+### What one port costs
+
+Loopback stays the default, so by default nothing off this machine can reach
+the daemon — including peers. Sync needs a wider bind
+(`ROAN_HOST=tailscale` or `lan`), and then:
+
+- `/peer` still requires the chain token in the upgrade (`Authorization: Bearer
+  …` or `?token=`) and the chain id in the hello, exactly as before;
+- `/ws` refuses every non-loopback caller with `403` unless
+  `ROAN_ALLOW_REMOTE_CONTROL=1`. The control socket has no token of its own —
+  that is the missing piece, and it is not pretended otherwise;
+- the static UI is public to whoever can reach the port. It is a bundle, not
+  data: the chain only moves over `/ws`, which is gated.
+
+When the bind is loopback the invite is `null`: there is no address another
+machine can dial, and a code without one fails at the first handshake.
+`ROAN_PEER_ADVERTISE` is the way to say "I am at this address anyway" (a proxy,
+a port forward, or two daemons on one machine).
+
+On the other side, `web/src/App.tsx` derives the socket from
+`window.location` when the page came over http(s), so the served UI dials
+`ws://<same host>/ws` by itself; `window.__ROAN__.socket` still wins. The native
+shells (Tauri desktop, Android) load the bundle from their own origin and fall
+back to a hardcoded loopback URL — that literal must be the new port, or the
+shell must inject `window.__ROAN__`.
 
 ## 2. The control protocol
 
@@ -234,7 +271,8 @@ node thread there aborts the whole app.
 store, watches applied events (presence, broadcast to the app windows, workspace
 and blob application, `serveDelegation` for `run_on_node`), then
 `startPeers({ store, token, host: bindListenHost(bind), port: PEER_PORT })` —
-`startPeerServer` on 7412, replication handshake included, plus an outbound
+`startPeerServer` mounted on `control.mountUpgrade("/peer", …)` — the same
+HTTP server, so there is no peer port — replication handshake included, plus an outbound
 `PeerClient` per joined peer with backoff.
 
 With `ROAN_DISCOVERY` not `off`, `startDiscovery` asks Tailscale for the
@@ -252,8 +290,10 @@ devices do not both fire).
 
 ## 6. Not built yet
 
-- The control socket has no authentication. `ROAN_CONTROL_HOST` can widen it,
-  but there is no token on the frame.
+- The control socket has no authentication of its own. It is refused for
+  non-loopback callers, but any local process can open it, and
+  `ROAN_ALLOW_REMOTE_CONTROL=1` opens it to the network with no token on the
+  frame.
 - There is no handler for the `peers` request type (`control-protocol.ts`
   declares it); the live list rides on `state` instead. A `{ t: "peers" }` frame
   is answered `unknown request: peers`.
@@ -262,11 +302,12 @@ devices do not both fire).
 - `health.ts` and `diagnostics.ts` exist and have no caller: there is no
   `health` or `diagnostics` request kind, and both modules are untested, so the
   daemon cannot report its own state beyond `state`.
-- `logging.ts` (scrubbed, rotated `roan.log`) and `log-rotate.ts` are not called
-  by the daemon; it writes stderr, and on Android the service tails it.
-- No HTTP server: `webhooks` (`dispatch.ts`, `sign.ts`) and `connectors`
-  (`github.ts`) are reachable only if something else routes to them, and nothing
-  does. Both start nothing.
+- `logging.ts` (scrubbed, rotated `roan.log`) and `log-rotate.ts` are still not
+  called by the daemon. `/log` serves the last 64 KB of what it wrote to stderr,
+  kept in memory; there is no file and no log port.
+- The HTTP server exists now, but `webhooks` (`dispatch.ts`, `sign.ts`) and
+  `connectors` (`github.ts`) are still only modules: no route reaches them, so
+  both start nothing.
 - `autostart.ts` (probe, spawn, stop, pid file) is not imported by the app.
 - `tool_req` / `tool_res` events exist and `serveDelegation` answers them for
   `run_on_node`, but there is no forwarding hop: a tool call the target node

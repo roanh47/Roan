@@ -20,11 +20,12 @@ Where the code has no answer, this document says so instead of inventing one.
 
 | Fact | Value | Source |
 | --- | --- | --- |
-| URL | `ws://127.0.0.1:7411` (any path; the server never reads it) | `control.ts`, `web/src/socket.ts` |
-| Port | `ROAN_CONTROL_PORT`, default `7411` | `main.ts`, `autostart.ts` |
-| Host | `ROAN_CONTROL_HOST`, default `127.0.0.1` | `main.ts` |
+| URL | `ws://127.0.0.1:6769/ws` (`/` still works; both speak the same frames) | `control.ts`, `web/src/socket.ts` |
+| Port | `ROAN_PORT`, default `6769` (alias `ROAN_CONTROL_PORT`) | `main.ts`, `autostart.ts` |
+| Host | `ROAN_HOST`, default `127.0.0.1` (alias `ROAN_CONTROL_HOST`) | `main.ts` |
+| Other paths | `/` static UI, `/peer` peer sync, `/log` daemon log, `/healthz` | `control-http.ts` |
 | Transport | plain WebSocket text frames, JSON only | `control.ts` |
-| Auth | none — any local process that can open the port can send `append` | `control.ts` |
+| Auth | none — any local process that can open the port can send `append`; non-loopback callers are refused unless `ROAN_ALLOW_REMOTE_CONTROL=1` | `control.ts` |
 | TLS | none | — |
 
 One socket carries two protocols, and the server does not distinguish them by
@@ -300,7 +301,7 @@ a fake server.
 ```ts
 import { connect, ControlClientError } from "./sdk/client.js";
 
-const client = connect("ws://127.0.0.1:7411/");
+const client = connect("ws://127.0.0.1:6769/ws");
 const state = await client.state();              // DaemonState
 await client.send("hello", state.activeSession ?? undefined);
 await client.append({ id: "mine", data: { text: "with image", image: { mime: "image/png", data } } });

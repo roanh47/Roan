@@ -22,7 +22,7 @@
  * token, and any local process that can open the port can speak this protocol.
  */
 
-export const DEFAULT_SOCKET_URL = "ws://127.0.0.1:7411/ws";
+export const DEFAULT_SOCKET_URL = "ws://127.0.0.1:6769/ws";
 
 /** Frames parked while the socket is down. Beyond this the oldest is dropped. */
 export const DEFAULT_QUEUE_LIMIT = 128;

@@ -35,8 +35,8 @@ const EXE_SHA = createHash("sha256").update(EXE_BODY).digest("hex");
 function releaseAssets(): unknown[] {
   return [
     {
-      name: "Roan-0.1.1-x64.exe",
-      browser_download_url: `${RELEASE_BASE}/Roan-0.1.1-x64.exe`,
+      name: "Roan-0.1.1-x64.msi",
+      browser_download_url: `${RELEASE_BASE}/Roan-0.1.1-x64.msi`,
       size: EXE_BODY.byteLength,
       digest: `sha256:${EXE_SHA}`,
     },
@@ -173,8 +173,8 @@ describe("checkGithubRelease", () => {
       releaseDocument({
         assets: [
           {
-            name: "Roan-0.1.1-x64.exe",
-            browser_download_url: `${RELEASE_BASE}/Roan-0.1.1-x64.exe`,
+            name: "Roan-0.1.1-x64.msi",
+            browser_download_url: `${RELEASE_BASE}/Roan-0.1.1-x64.msi`,
             size: 19,
             digest: `SHA256:${EXE_SHA.toUpperCase()}`,
           },
@@ -193,8 +193,8 @@ describe("checkGithubRelease", () => {
       releaseDocument({
         assets: [
           {
-            name: "Roan-0.1.1-x64.exe",
-            browser_download_url: `${RELEASE_BASE}/Roan-0.1.1-x64.exe`,
+            name: "Roan-0.1.1-x64.msi",
+            browser_download_url: `${RELEASE_BASE}/Roan-0.1.1-x64.msi`,
             size: 19,
             digest: "sha512:abcdef",
           },
@@ -338,7 +338,7 @@ const ASSET = (name: string): GithubReleaseAsset => ({
 describe("pickAsset", () => {
   it("picks the AppImage on linux/x64 and nothing else", () => {
     const assets = [
-      ASSET("Roan-0.1.1-x64.exe"),
+      ASSET("Roan-0.1.1-x64.msi"),
       ASSET("Roan-0.1.1-arm64.dmg"),
       ASSET("Roan-0.1.1-x86_64.AppImage"),
       ASSET("Roan-0.1.1.apk"),
@@ -358,9 +358,9 @@ describe("pickAsset", () => {
     assert.equal(pickAsset([ASSET("Roan-0.1.1-x86_64.AppImage")], "linux", "arm64"), null);
   });
 
-  it("picks the .exe on win32 and refuses an arm64 installer for x64", () => {
-    assert.equal(pickAsset([ASSET("Roan-0.1.1-x64.exe")], "win32", "x64")?.name, "Roan-0.1.1-x64.exe");
-    assert.equal(pickAsset([ASSET("Roan-0.1.1-arm64.exe")], "win32", "x64"), null);
+  it("picks the .msi on win32 and refuses an arm64 package for x64", () => {
+    assert.equal(pickAsset([ASSET("Roan-0.1.1-x64.msi")], "win32", "x64")?.name, "Roan-0.1.1-x64.msi");
+    assert.equal(pickAsset([ASSET("Roan-0.1.1-arm64.msi")], "win32", "x64"), null);
   });
 
   it("picks the matching .dmg per macOS architecture", () => {
@@ -486,17 +486,17 @@ describe("planGithubUpdate", () => {
     assert.doesNotMatch(notes, /replaces the installed version/);
   });
 
-  it("downloads the Windows installer and names the signing caveat", () => {
+  it("downloads the Windows MSI and names the signing caveat", () => {
     const exe = {
       ...UPDATE_RESULT,
-      asset: { name: "Roan-0.1.1-x64.exe", url: `${RELEASE_BASE}/Roan-0.1.1-x64.exe`, size: 19 },
+      asset: { name: "Roan-0.1.1-x64.msi", url: `${RELEASE_BASE}/Roan-0.1.1-x64.msi`, size: 19 },
     };
     const plan = planGithubUpdate(exe, { platform: "win32", arch: "x64" });
 
     assert.equal(plan.action, "download");
     const notes = plan.notes.join("\n");
-    assert.match(notes, /NSIS installer/);
-    assert.match(notes, /SmartScreen/);
+    assert.match(notes, /Windows Installer package/);
+    assert.match(notes, /msiexec/);
     assert.match(notes, /not Authenticode-signed/);
   });
 
@@ -527,10 +527,10 @@ function bodyFetch(body: Buffer, status = 200): typeof fetch {
 describe("downloadAndVerify", () => {
   it("writes the file at dest only after the sha256 matches", async () => {
     await withTempDir(async (dir) => {
-      const dest = join(dir, "Roan-0.1.1-x64.exe");
+      const dest = join(dir, "Roan-0.1.1-x64.msi");
       const outcome = await downloadAndVerify({
         fetch: bodyFetch(EXE_BODY),
-        url: `${RELEASE_BASE}/Roan-0.1.1-x64.exe`,
+        url: `${RELEASE_BASE}/Roan-0.1.1-x64.msi`,
         dest,
         sha256: EXE_SHA,
         maxBytes: 1_000,
@@ -538,16 +538,16 @@ describe("downloadAndVerify", () => {
 
       assert.deepEqual(outcome, { ok: true, path: dest, bytes: EXE_BODY.byteLength, sha256: EXE_SHA });
       assert.equal(await readFile(dest, "utf8"), EXE_BODY.toString("utf8"));
-      assert.deepEqual(await readdir(dir), ["Roan-0.1.1-x64.exe"]);
+      assert.deepEqual(await readdir(dir), ["Roan-0.1.1-x64.msi"]);
     });
   });
 
   it("keeps no file when the sha256 does not match", async () => {
     await withTempDir(async (dir) => {
-      const dest = join(dir, "Roan-0.1.1-x64.exe");
+      const dest = join(dir, "Roan-0.1.1-x64.msi");
       const outcome = await downloadAndVerify({
         fetch: bodyFetch(EXE_BODY),
-        url: `${RELEASE_BASE}/Roan-0.1.1-x64.exe`,
+        url: `${RELEASE_BASE}/Roan-0.1.1-x64.msi`,
         dest,
         sha256: "0".repeat(64),
       });
@@ -631,8 +631,8 @@ describe("downloadAndVerify", () => {
           called += 1;
           return new Response(EXE_BODY);
         },
-        url: `${RELEASE_BASE}/Roan-0.1.1-x64.exe`,
-        dest: join(dir, "Roan-0.1.1-x64.exe"),
+        url: `${RELEASE_BASE}/Roan-0.1.1-x64.msi`,
+        dest: join(dir, "Roan-0.1.1-x64.msi"),
         sha256: "not-a-digest",
       });
 

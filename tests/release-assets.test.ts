@@ -203,7 +203,7 @@ const VERSION_EXPR = "${{ env.APP_VERSION }}";
 
 /** The four release files, keyed by the job that builds each one. */
 const EXPECTED = {
-  windows: { artifact: "windows-x64", file: `Roan-${VERSION_EXPR}-x64.exe` },
+  windows: { artifact: "windows-x64", file: `Roan-${VERSION_EXPR}-x64.msi` },
   macos: { artifact: "macos-arm64", file: `Roan-${VERSION_EXPR}-arm64.dmg` },
   linux: { artifact: "linux-x86_64", file: `Roan-${VERSION_EXPR}-x86_64.AppImage` },
   android: { artifact: "android-apk", file: `Roan-${VERSION_EXPR}.apk` },

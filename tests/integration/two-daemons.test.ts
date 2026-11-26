@@ -1,5 +1,5 @@
 /**
- * Two real daemons, two temp homes, two ports.
+ * Two real daemons, two temp homes, one port each.
  *
  * Node A creates a chain and has one event in it. Node B is started empty and
  * joins A with the invite code from `create_chain`. The only thing asserted is
@@ -7,8 +7,8 @@
  * daemons report the same chain head, and that head is the event A seeded.
  *
  * This drives the shipped daemon entry point as a child process, not an
- * in-process harness: the peer server, the control server and the SQLite file
- * are all the real ones.
+ * in-process harness: the control server (with the peer protocol mounted on
+ * `/peer` of the same port) and the SQLite file are all the real ones.
  */
 
 import assert from "node:assert/strict";
@@ -67,7 +67,6 @@ interface Daemon {
   readonly child: ChildProcessByStdio<null, Readable, Readable>;
   readonly home: string;
   readonly controlPort: number;
-  readonly peerPort: number;
   /** Everything the daemon wrote to stderr, for failure messages. */
   stderr(): string;
   /** Resolves on a stderr line matching `pattern`; rejects on timeout or exit. */
@@ -75,15 +74,18 @@ interface Daemon {
   stop(): Promise<void>;
 }
 
-function startDaemon(home: string, controlPort: number, peerPort: number): Daemon {
+function startDaemon(home: string, controlPort: number): Daemon {
   const child = spawn(process.execPath, [TSX_CLI, "src/daemon/main.ts"], {
     cwd: REPO_ROOT,
     env: {
       ...process.env,
       ROAN_HOME: home,
-      ROAN_CONTROL_PORT: String(controlPort),
-      ROAN_PEER_PORT: String(peerPort),
-      ROAN_PEER_HOST: "127.0.0.1",
+      ROAN_PORT: String(controlPort),
+      // One port serves the UI, /ws and /peer. Two daemons on this machine are
+      // reachable only over loopback, which the daemon does not advertise by
+      // itself, so the test says where it is (the same variable an operator
+      // behind a proxy uses).
+      ROAN_PEER_ADVERTISE: "127.0.0.1",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -129,7 +131,6 @@ function startDaemon(home: string, controlPort: number, peerPort: number): Daemo
     child,
     home,
     controlPort,
-    peerPort,
     stderr: () => stderr,
     waitForStderr(pattern, timeoutMs) {
       return new Promise((resolve, reject) => {
@@ -333,13 +334,11 @@ test(
     });
 
     const controlA = await freePort();
-    const peerA = await freePort();
     const controlB = await freePort();
-    const peerB = await freePort();
 
-    const a = startDaemon(homeA, controlA, peerA);
+    const a = startDaemon(homeA, controlA);
     daemons.push(a);
-    await a.waitForStderr(/waiting for a chain \(control port \d+\)/, START_TIMEOUT_MS);
+    await a.waitForStderr(/waiting for a chain \(port \d+/, START_TIMEOUT_MS);
 
     const clientA = await ControlClient.connect(controlA);
     clients.push(clientA);
@@ -381,9 +380,9 @@ test(
       storeA.close();
     }
 
-    const b = startDaemon(homeB, controlB, peerB);
+    const b = startDaemon(homeB, controlB);
     daemons.push(b);
-    await b.waitForStderr(/waiting for a chain \(control port \d+\)/, START_TIMEOUT_MS);
+    await b.waitForStderr(/waiting for a chain \(port \d+/, START_TIMEOUT_MS);
 
     const clientB = await ControlClient.connect(controlB);
     clients.push(clientB);

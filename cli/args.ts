@@ -14,7 +14,11 @@
 
 /** Loopback, matching `src/daemon/main.ts`; a bare `roan` points here. */
 const DEFAULT_CONTROL_HOST = "127.0.0.1";
-const DEFAULT_CONTROL_PORT = 7411;
+/**
+ * The one port the daemon serves everything on (`ROAN_PORT`);
+ * `ROAN_CONTROL_PORT` is the old name and still read.
+ */
+const DEFAULT_CONTROL_PORT = 6769;
 
 /** Every option that takes a value. `--json` and `--help` are switches. */
 const VALUE_FLAGS = ["--url", "--session", "--out", "--title"] as const;
@@ -88,7 +92,7 @@ Commands
   help                         Show this text
 
 Options
-  --url <ws-url>   The control port. Default ws://127.0.0.1:7411/, or
+  --url <ws-url>   The daemon port. Default ws://127.0.0.1:6769/, or
                    ROAN_CONTROL_URL, or ROAN_CONTROL_HOST + ROAN_CONTROL_PORT.
   --json           Print the daemon's answer as JSON.
   -h, --help       Show this text.
@@ -118,7 +122,8 @@ function looksLikeFlag(value: string): boolean {
 
 /**
  * Resolves the control url: the flag wins over `ROAN_CONTROL_URL`, which wins
- * over `ROAN_CONTROL_HOST`/`ROAN_CONTROL_PORT`, which default to loopback 7411.
+ * over `ROAN_HOST`/`ROAN_PORT` (the old `ROAN_CONTROL_*` names still work),
+ * which default to loopback 6769.
  * Only `ws:` and `wss:` are accepted — an `http://` typo would otherwise hang
  * until the connect timeout instead of saying what is wrong.
  */
@@ -131,11 +136,12 @@ function resolveUrl(
   if (configured !== undefined && configured.trim().length > 0) {
     raw = configured.trim();
   } else {
-    const host = (env["ROAN_CONTROL_HOST"] ?? "").trim() || DEFAULT_CONTROL_HOST;
-    const port = (env["ROAN_CONTROL_PORT"] ?? "").trim() || String(DEFAULT_CONTROL_PORT);
+    const host = (env["ROAN_HOST"] ?? env["ROAN_CONTROL_HOST"] ?? "").trim() || DEFAULT_CONTROL_HOST;
+    const named = env["ROAN_PORT"] ?? env["ROAN_CONTROL_PORT"] ?? "";
+    const port = named.trim() || String(DEFAULT_CONTROL_PORT);
     const number = Number(port);
     if (!/^\d+$/.test(port) || !Number.isInteger(number) || number < 1 || number > 65_535) {
-      return { ok: false, error: `ROAN_CONTROL_PORT must be a port number, got ${JSON.stringify(port)}` };
+      return { ok: false, error: `ROAN_PORT must be a port number, got ${JSON.stringify(port)}` };
     }
     // A bare ipv6 literal needs brackets in a url; a bracketed one is left alone.
     const authority = host.includes(":") && !host.startsWith("[") ? `[${host}]` : host;

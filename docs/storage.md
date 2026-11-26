@@ -16,7 +16,8 @@ Nothing here points at a server, because there is no server.
 On Android that path is **app-private storage**, not `/storage/emulated/0/.Roan`.
 The app runs its own daemon inside its own sandbox, so the home is inside the
 sandbox too. Nothing else can read it without root, and that is why the app serves
-its own log on `127.0.0.1:7413` instead of asking you to fetch a file. `ROAN_HOME`
+the daemon's own log over the control port (`GET /log`) instead of asking you to
+fetch a file. `ROAN_HOME`
 overrides the path everywhere, which is how the tests and a second instance on one
 machine stay apart.
 
@@ -84,12 +85,10 @@ model cannot run a turn, and a node that cannot run a turn is a screen, not a pe
 
 | Port | Bound to | What |
 | --- | --- | --- |
-| `7411` | `127.0.0.1` | the control socket: the app talks to its own daemon |
-| `7412` | `0.0.0.0` | peers: token handshake, then events both ways |
-| `7413` | `127.0.0.1` | Android only: the app serving its own daemon log |
+| `6769` | `127.0.0.1` | the one port: UI on `/`, control on `/ws`, peers on `/peer`, log on `/log` |
 
 ## Keeping two instances apart on one machine
 
-`ROAN_HOME=/tmp/roan-b ROAN_CONTROL_PORT=7441 ROAN_PEER_PORT=7442 node dist/daemon/main.js`
+`ROAN_HOME=/tmp/roan-b ROAN_PORT=7441 node dist/daemon/main.js`
 gives a second, fully separate node with its own chain, its own identity and its
 own database. That is how two devices are simulated without a second device.

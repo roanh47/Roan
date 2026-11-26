@@ -70,9 +70,9 @@ class Daemon {
     const env = {
       ...process.env,
       ROAN_HOME: this.home,
-      ROAN_CONTROL_PORT: String(this.controlPort),
-      ROAN_PEER_PORT: String(this.peerPort),
-      ROAN_PEER_BIND: "lan",
+      ROAN_PORT: String(this.controlPort),
+      ROAN_HOST: "lan",
+      ROAN_PEER_ADVERTISE: String(this.host ?? "127.0.0.1"),
       ROAN_DISCOVERY: "off",
     };
     const child = spawn(process.execPath, [DAEMON], { env, stdio: ["ignore", "ignore", "pipe"] });

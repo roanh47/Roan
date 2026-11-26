@@ -17,8 +17,10 @@ A single opaque string: base64url of a small JSON object.
 `chain` is the chain's UUID. `token` is 32 random bytes; every peer must present
 it, the peer server compares it in constant time and refuses the connection
 otherwise. The code is a bearer credential: whoever has it can read the chain.
-`hosts` is what the peer bind exposes (see `daemon.md`: `ROAN_PEER_BIND`, default the tailscale address; `lan` for every interface); `port` is `ROAN_PEER_PORT`,
-default `7412`.
+`hosts` is what the bind exposes (see `daemon.md`: `ROAN_HOST`, default
+loopback, which advertises nothing; `tailscale` or `lan` for an interface, or
+`ROAN_PEER_ADVERTISE` to name an address); `port` is the daemon's one port,
+`ROAN_PORT`, default `6769`.
 
 It is produced only in the `create_chain` reply, as `invite` on the
 `ChainResponse`; a join reply carries no `invite`, so a joined node cannot pass
@@ -28,11 +30,12 @@ it is the chain token, so the code works as long as the chain does.
 
 ## 2. Who talks to whom
 
-Two sockets. The **control socket** is local only, bound to `127.0.0.1:7411`
-(`ROAN_CONTROL_PORT`), so the app on the same machine can ask for state and send
-`create_chain` / `join_chain`; peers never see these frames. The **peer socket**
-is the network path: `host:port` from the code, speaking `hello`, `events`,
-`append`, `tool_req` and `tool_res`.
+One port, two paths. The **control socket** is `/ws`, loopback only (any other
+caller gets `403` unless `ROAN_ALLOW_REMOTE_CONTROL=1`), so the app on the same
+machine can ask for state and send `create_chain` / `join_chain`; peers never
+see these frames. The **peer socket** is `/peer` on that same port — the network
+path, `ws://host:6769/peer` from the code, speaking `hello`, `events`,
+`append`, `tool_req` and `tool_res` after the chain token in the upgrade.
 
 The intended sequence, illustrative and not a screenshot:
 
@@ -160,8 +163,8 @@ parked. That is a gap, not a decision.
 - **Env is applied and parked on join.** Modules and tests exist; the call
   sequence does not.
 - **A peer listener runs in the daemon.** `src/transport/server.ts` accepts
-  peers with token auth; `src/daemon/main.ts` never starts it, so a running
-  daemon does not listen on 7412.
+  peers with token auth and `src/daemon/main.ts` mounts it on `/peer` of the one
+  port, so this one is built — the join is what is still partial.
 - **The peers list is filled.** The state frame always reports `peers: []`.
 - **A scanned code.** `PLAN.md` says typed or scanned; only a pasted or typed
   string reaches `join_chain`.

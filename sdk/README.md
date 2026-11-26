@@ -5,7 +5,7 @@ A typed, dependency-free client for the daemon's control port.
 ```ts
 import { connect } from "./client.js";
 
-const client = connect("ws://127.0.0.1:7411/");
+const client = connect("ws://127.0.0.1:6769/ws");
 console.log(await client.state());
 await client.send("hello");
 client.close();

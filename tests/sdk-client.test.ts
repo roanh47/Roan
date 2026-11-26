@@ -13,7 +13,7 @@ import { connect, ControlClientError } from "../sdk/client.js";
  * sdk is outside `tsconfig`'s rootDir: `npx tsx --test tests/*.test.ts` is the
  * gate that compiles and runs it with the repo's own tsx. The fake speaks the
  * real frame shapes from `src/daemon/control.ts` — no real daemon, no port
- * 7411, nothing chain-shaped is written.
+ * 6769, nothing chain-shaped is written.
  */
 
 interface FakeDaemon {

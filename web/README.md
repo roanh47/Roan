@@ -74,7 +74,7 @@ relative assets and `fetch` behave normally that way. Then:
 
 ```kotlin
 webView.evaluateJavascript(
-    """window.__ROAN__ = { socket: "ws://127.0.0.1:7411/ws", node: "pixel" };""",
+    """window.__ROAN__ = { socket: "ws://127.0.0.1:6769/ws", node: "pixel" };""",
     null
 )
 ```
@@ -87,12 +87,13 @@ Allow cleartext to loopback only (network security config with
 The shell passes a bridge object; nothing else is assumed:
 
 ```ts
-window.__ROAN__ = { socket: "ws://127.0.0.1:7411/ws", node: "roan-pc" };
+window.__ROAN__ = { socket: "ws://127.0.0.1:6769/ws", node: "roan-pc" };
 ```
 
-- `socket` — the local daemon's WebSocket. Default if absent:
-  `ws://127.0.0.1:7411/ws` (a placeholder port; change it here or in the shell's
-  injection, and keep it in step with the daemon).
+- `socket` — the local daemon's WebSocket. Served over http(s) the page derives
+  it from `window.location` (`ws://<page host>/ws`); in a native shell the
+  fallback is `ws://127.0.0.1:6769/ws`, the port the daemon serves everything
+  on. Keep it in step with `ROAN_PORT`.
 - `node` — this device's name, written into every event it appends. If absent,
   `device-xxxx` is generated once and kept in `localStorage` under `roan.node`.
 

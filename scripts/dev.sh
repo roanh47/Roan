@@ -11,8 +11,9 @@ npm run build
 ROAN_HOME="$(mktemp -d "${TMPDIR:-/tmp}/roan-dev.XXXXXX")"
 LOG="$ROAN_HOME/daemon.log"
 export ROAN_HOME
-# 0 asks the kernel for a free port, so a daemon already on 7411 is not in the way.
-export ROAN_CONTROL_PORT="${ROAN_CONTROL_PORT:-0}"
+# 0 asks the kernel for a free port, so a daemon already on 6769 is not in the way.
+# One port serves the web UI, the control socket (/ws) and peers (/peer).
+export ROAN_PORT="${ROAN_PORT:-0}"
 
 node dist/daemon/main.js >"$LOG" 2>&1 &
 PID=$!
@@ -33,7 +34,7 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-# The daemon prints "control port N" on stderr once it is listening.
+# The daemon prints "port N" on stderr once it is listening.
 port=""
 for _ in $(seq 1 100); do
   if ! kill -0 "$PID" 2>/dev/null; then
@@ -41,7 +42,7 @@ for _ in $(seq 1 100); do
     cat "$LOG" >&2
     exit 1
   fi
-  port="$(grep -oE 'control port [0-9]+' "$LOG" 2>/dev/null | head -n 1 | grep -oE '[0-9]+' || true)"
+  port="$(grep -oE 'port [0-9]+' "$LOG" 2>/dev/null | head -n 1 | grep -oE '[0-9]+' || true)"
   [ -n "$port" ] && break
   sleep 0.1
 done
@@ -52,7 +53,7 @@ if [ -z "$port" ]; then
 fi
 
 echo "roan dev: ROAN_HOME=$ROAN_HOME"
-echo "roan dev: control port $port  (ws://127.0.0.1:$port/ws)"
+echo "roan dev: one port $port  —  UI http://127.0.0.1:$port/  socket ws://127.0.0.1:$port/ws  peers /peer"
 echo "roan dev: following $LOG — ctrl-c stops the daemon"
 echo
 

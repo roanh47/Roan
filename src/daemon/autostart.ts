@@ -18,7 +18,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolvePaths } from "./paths.js";
 
-export const DEFAULT_CONTROL_PORT = 7411;
+/** The one port the daemon serves the UI, the control socket and peers on. */
+export const DEFAULT_CONTROL_PORT = 6769;
 export const DEFAULT_CONTROL_HOST = "127.0.0.1";
 
 const DEFAULT_WAIT_MS = 5_000;
@@ -29,13 +30,15 @@ const DEFAULT_KILL_GRACE_MS = 1_000;
 
 /** The control port, honouring the same variable the daemon itself reads. */
 export function controlPort(env: NodeJS.ProcessEnv = process.env): number {
-  const raw = env["ROAN_CONTROL_PORT"];
+  // `ROAN_PORT` is the name; `ROAN_CONTROL_PORT` is the alias an older unit
+  // file still sets.
+  const raw = env["ROAN_PORT"] ?? env["ROAN_CONTROL_PORT"];
   const parsed = raw === undefined ? Number.NaN : Number(raw);
   return Number.isInteger(parsed) && parsed > 0 && parsed < 65_536 ? parsed : DEFAULT_CONTROL_PORT;
 }
 
 export function controlHost(env: NodeJS.ProcessEnv = process.env): string {
-  return env["ROAN_CONTROL_HOST"] ?? DEFAULT_CONTROL_HOST;
+  return env["ROAN_HOST"] ?? env["ROAN_CONTROL_HOST"] ?? DEFAULT_CONTROL_HOST;
 }
 
 export function defaultPidFile(): string {
@@ -247,7 +250,7 @@ export async function ensureDaemon(options: EnsureDaemonOptions = {}): Promise<E
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     ...options.env,
-    ROAN_CONTROL_PORT: String(port),
+    ROAN_PORT: String(port),
   };
   const child = start(entry, env);
 

@@ -13,7 +13,7 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   NODE_VERSION: "22"
-  APP_VERSION: "0.0.24"
+  APP_VERSION: "0.0.25"
 
 concurrency:
   group: release-${{ github.ref }}
@@ -21,9 +21,9 @@ concurrency:
 
 jobs:
   # ---------------------------------------------------------------- Windows --
-  # NSIS gives a single self-contained .exe installer (MSI would give a .msi).
+  # Windows Installer: one .msi, and msiexec performs the in-place upgrade.
   windows:
-    name: Windows x64 (.exe)
+    name: Windows x64 (.msi)
     runs-on: windows-latest
     env:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -71,18 +71,18 @@ jobs:
           npm run build
           node scripts/build-sidecar.mjs x86_64-pc-windows-msvc
 
-      - name: Build Tauri app and NSIS installer
+      - name: Build Tauri app and MSI installer
         shell: bash
-        run: npx --yes @tauri-apps/cli@^2 build --config src-tauri/tauri.desktop.conf.json --bundles nsis --verbose
+        run: npx --yes @tauri-apps/cli@^2 build --config src-tauri/tauri.desktop.conf.json --bundles msi --verbose
 
       - name: Collect exactly one artifact
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p out
-          exe="$(find src-tauri/target/release/bundle/nsis -maxdepth 1 -name '*.exe' | head -n 1)"
-          test -n "$exe" || { echo "::error::NSIS produced no .exe"; exit 1; }
-          cp "$exe" "out/Roan-${APP_VERSION}-x64.exe"
+          msi="$(find src-tauri/target/release/bundle/msi -maxdepth 1 -name '*.msi' | head -n 1)"
+          test -n "$msi" || { echo "::error::WiX produced no .msi"; exit 1; }
+          cp "$msi" "out/Roan-${APP_VERSION}-x64.msi"
           # Drop every other bundler output so nothing else can reach the release.
           rm -rf src-tauri/target/release/bundle
           ls -l out
@@ -90,7 +90,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: windows-x64
-          path: out/Roan-${{ env.APP_VERSION }}-x64.exe
+          path: out/Roan-${{ env.APP_VERSION }}-x64.msi
           if-no-files-found: error
           retention-days: 7
 
@@ -391,7 +391,7 @@ jobs:
         run: |
           set -euo pipefail
           cd release
-          expected="Roan-${APP_VERSION}-x64.exe Roan-${APP_VERSION}-arm64.dmg Roan-${APP_VERSION}-x86_64.AppImage Roan-${APP_VERSION}.apk"
+          expected="Roan-${APP_VERSION}-x64.msi Roan-${APP_VERSION}-arm64.dmg Roan-${APP_VERSION}-x86_64.AppImage Roan-${APP_VERSION}.apk"
           for f in *; do
             case " $expected " in
               *" $f "*) ;;
@@ -423,7 +423,7 @@ jobs:
           prerelease: false
           fail_on_unmatched_files: true
           files: |
-            release/Roan-${{ env.APP_VERSION }}-x64.exe
+            release/Roan-${{ env.APP_VERSION }}-x64.msi
             release/Roan-${{ env.APP_VERSION }}-arm64.dmg
             release/Roan-${{ env.APP_VERSION }}-x86_64.AppImage
             release/Roan-${{ env.APP_VERSION }}.apk

@@ -259,7 +259,9 @@ function scoreFor(platform: string, arch: string, name: string): number | null {
       return null;
     }
     case "win32": {
-      if (!/\.exe$/i.test(name)) return null;
+      // Windows ships an MSI: Windows Installer performs the in-place upgrade,
+      // so the app can update itself without walking the user through a wizard.
+      if (!/\.msi$/i.test(name)) return null;
       if (arch === "arm64") {
         if (arm64) return 3;
         if (x64) return null;
@@ -588,9 +590,9 @@ export function planGithubUpdate(result: GithubCheckResult, target: LocalTarget)
       url: asset.url,
       notes: [
         `Roan ${latest} is available: ${asset.name}${size}.`,
-        "The .exe is an NSIS installer. Downloading it does not install anything: open it and confirm, and it replaces the installed version.",
+        "The .msi is a Windows Installer package: `msiexec /i <file> /qn` upgrades the installed version in place, no wizard.",
         verified,
-        "The installer is not Authenticode-signed, so SmartScreen will warn on first run (\"More info\" then \"Run anyway\").",
+        "The package is not Authenticode-signed, so Windows will warn on elevation (\"More info\" then \"Run anyway\").",
       ],
     };
   }

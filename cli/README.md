@@ -27,7 +27,8 @@ it.
 ## Options and exit codes
 
 - `--url <ws-url>` — the control port. Without it: `ROAN_CONTROL_URL`, then
-  `ROAN_CONTROL_HOST`/`ROAN_CONTROL_PORT`, then `ws://127.0.0.1:7411/`.
+  `ROAN_HOST`/`ROAN_PORT` (the old `ROAN_CONTROL_*` names still work), then
+  `ws://127.0.0.1:6769/`.
 - `--json` — the daemon's answer as JSON, for scripts.
 - `--` — everything after it is text, so a message may start with a dash.
 

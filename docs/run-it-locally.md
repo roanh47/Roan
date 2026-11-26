@@ -22,19 +22,20 @@ npm run dev                  # tsx src/daemon/main.ts, no build
 node dist/daemon/main.js     # after npm run build
 ```
 
-Both bind `127.0.0.1:7411` and print one stderr line:
+Both bind `127.0.0.1:6769` and print one stderr line:
 
 ```
-roan daemon: waiting for a chain (control port 7411)
+roan daemon: waiting for a chain (port 6769, http://127.0.0.1:6769)
 ```
 
 That means `~/.Roan/secrets/identity.json` does not exist; once a chain exists
 the line names the chain and node. It runs in the foreground; Ctrl-C stops it.
 
 No flag creates a chain. The app sends `{ t: "create_chain" }`, or
-`{ t: "join_chain", code }`, over `ws://127.0.0.1:7411/ws`; the daemon answers
+`{ t: "join_chain", code }`, over `ws://127.0.0.1:6769/ws`; the daemon answers
 `state`, then `chain` with an `invite` code, then `hello` and `state`. The socket
-is local and unauthenticated: any process that can open 7411 can run turns.
+is local and unauthenticated: any process that can open 6769 on this machine can
+run turns, and only this machine can open it.
 
 ## Where ~/.Roan lives
 
@@ -55,15 +56,21 @@ creates `config.json`. Throwaway instance:
 ROAN_HOME=/tmp/roan-scratch node dist/daemon/main.js
 ```
 
-## Ports 7411 and 7412
+## The one port, and its paths
 
-| port | env var | today |
-| --- | --- | --- |
-| 7411 | `ROAN_CONTROL_PORT` | the only listener: WebSocket on `127.0.0.1`. The path is not inspected, so `/ws` and `/` both connect. |
-| 7412 | `ROAN_PEER_PORT` | not bound. It only goes into an invite code as the port a peer should dial; `main.ts` never starts the peer server. |
+| path | what |
+| --- | --- |
+| `/` and `/assets/…` | `web/dist`; unknown non-asset paths get `index.html`, a missing asset gets `404` |
+| `/ws` (and legacy `/`) | the control WebSocket, loopback only |
+| `/peer` | peer sync; needs the chain token in the upgrade |
+| `/log` | the last 64 KB the daemon wrote |
+| `/healthz` | `{"ok":true,"ui":<bool>,"dist":"…"}` |
 
-`ROAN_PEER_BIND` (default the tailscale address; `lan` for every interface) fills the same invite. If 7411 is taken
-the daemon exits 1 with `listen EADDRINUSE ... 127.0.0.1:7411`.
+`ROAN_PORT` (default `6769`) and `ROAN_HOST` (default `127.0.0.1`) set it; the
+old `ROAN_CONTROL_PORT`/`ROAN_CONTROL_HOST` still work. If the port is taken the
+daemon exits 1 with `listen EADDRINUSE ... 127.0.0.1:6769`.
+
+Nothing else listens: no peer port, no log port, no proxy process.
 
 ## Tests
 

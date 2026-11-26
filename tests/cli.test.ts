@@ -14,7 +14,7 @@ import { EXIT_FAILED, EXIT_OK, EXIT_USAGE, main, type Io } from "../cli/roan.js"
 /**
  * The CLI, end to end. Arguments are parsed here directly; everything that
  * touches a socket talks to a fake daemon on 127.0.0.1 that speaks the frame
- * shapes from `src/daemon/control.ts`. No real daemon, no port 7411, no chain.
+ * shapes from `src/daemon/control.ts`. No real daemon, no port 6769, no chain.
  */
 
 /* -------------------------------------------------------------------------- */
@@ -169,11 +169,11 @@ async function waitForFrames(frames: Frame[], wanted: number): Promise<void> {
 /* -------------------------------------------------------------------------- */
 
 describe("parseArgv", () => {
-  it("defaults to the loopback control port", () => {
+  it("defaults to the loopback port the daemon serves everything on", () => {
     const parsed = parseArgv(["state"], {});
     assert.equal(parsed.ok, true);
     if (!parsed.ok) return;
-    assert.deepEqual(parsed.command, { kind: "state", url: "ws://127.0.0.1:7411/", json: false });
+    assert.deepEqual(parsed.command, { kind: "state", url: "ws://127.0.0.1:6769/", json: false });
   });
 
   it("prefers --url, then ROAN_CONTROL_URL, then host and port", () => {
@@ -189,18 +189,26 @@ describe("parseArgv", () => {
     assert.equal(fromParts.ok && fromParts.command.kind === "state" ? fromParts.command.url : "", "ws://100.64.0.5:7420/");
 
     const fromV6 = parseArgv(["state"], { ROAN_CONTROL_HOST: "::1" });
-    assert.equal(fromV6.ok && fromV6.command.kind === "state" ? fromV6.command.url : "", "ws://[::1]:7411/");
+    assert.equal(fromV6.ok && fromV6.command.kind === "state" ? fromV6.command.url : "", "ws://[::1]:6769/");
   });
 
-  it("refuses a port that is not a port", () => {
-    const parsed = parseArgv(["state"], { ROAN_CONTROL_PORT: "soon" });
+  it("refuses a port that is not a port, under the new name and the old one", () => {
+    const parsed = parseArgv(["state"], { ROAN_PORT: "soon" });
     assert.equal(parsed.ok, false);
     if (parsed.ok) return;
-    assert.match(parsed.error, /ROAN_CONTROL_PORT must be a port number, got "soon"/);
+    assert.match(parsed.error, /ROAN_PORT must be a port number, got "soon"/);
+
+    const legacy = parseArgv(["state"], { ROAN_CONTROL_PORT: "soon" });
+    assert.equal(legacy.ok, false);
+  });
+
+  it("reads ROAN_PORT before the deprecated ROAN_CONTROL_PORT", () => {
+    const parsed = parseArgv(["state"], { ROAN_PORT: "8000", ROAN_CONTROL_PORT: "9000" });
+    assert.equal(parsed.ok && parsed.command.kind === "state" ? parsed.command.url : "", "ws://127.0.0.1:8000/");
   });
 
   it("refuses a control url that is not a websocket", () => {
-    const parsed = parseArgv(["state", "--url", "http://127.0.0.1:7411/"], {});
+    const parsed = parseArgv(["state", "--url", "http://127.0.0.1:6769/"], {});
     assert.equal(parsed.ok, false);
     if (parsed.ok) return;
     assert.match(parsed.error, /must start with ws:\/\/ or wss:\/\//);

@@ -23,10 +23,11 @@ It runs inside the app instead.
   with `ws` inside it and `node:sqlite` built into the runtime.
 - **`RoanNode.ensureStarted()`** runs from `MainActivity.onCreate`, copies the
   bundle to `filesDir`, then sets `ROAN_HOME=filesDir/.Roan`,
-  `ROAN_ENGINE=builtin`, `ROAN_CONTROL_HOST=127.0.0.1`,
-  `ROAN_CONTROL_PORT=7411`, `ROAN_PEER_BIND=lan` (the old `0.0.0.0` listen-all; default is tailscale-only), `ROAN_PEER_PORT=7412` and
-  starts it.
-- **The WebView talks to loopback.** `ws://127.0.0.1:7411/ws`, the same socket
+  `ROAN_ENGINE=builtin`, `ROAN_HOST=127.0.0.1`, `ROAN_PORT=6769` and starts it.
+  That one port is the page, `/ws` and `/peer`; there is no separate peer port.
+  (The Android bridge still passes `ROAN_CONTROL_*`/`ROAN_PEER_*`; both are read
+  as aliases.)
+- **The WebView talks to loopback.** `ws://127.0.0.1:6769/ws`, the same socket
   the desktop app uses. Cleartext to loopback is allowed by
   `res/xml/network_security_config.xml` and nowhere else.
 - **The engine is the loop in this repo.** `ROAN_ENGINE=builtin` selects
@@ -43,13 +44,14 @@ shell is what made the 0.0.2 apk 623 MB.
 
 ## What the phone does now
 
-- Its own daemon on `127.0.0.1:7411`, from the moment the app opens.
+- Its own daemon on `127.0.0.1:6769`, from the moment the app opens.
 - Its own identity: the first launch shows **create a chain** or **join one**,
   and creating works on the device without another machine being up.
 - Every chain feature the daemon has: sessions, checkpoints, workspace sync,
   cron, env, remote `run_on_node`.
-- Peers over Tailscale: it listens on `0.0.0.0:7412`, and discovery finds the
-  other machines the same way they find it.
+- Peers over Tailscale: with `ROAN_HOST=lan` the one port is reachable from the
+  tailnet on `/peer`, and discovery finds the other machines the same way they
+  find it.
 - **Where is the daemon?** in the app is now only for looking at another
   machine's daemon; empty means the daemon on this device. The value is stored
   under `roan.daemon.remote`, so an address saved by an older build is ignored

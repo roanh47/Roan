@@ -1,11 +1,32 @@
+import { createServer, type IncomingMessage } from "node:http";
+import type { Duplex } from "node:stream";
 import { WebSocketServer, type WebSocket } from "ws";
 import type { EventStore } from "../chain/store.js";
 import { encodeFrame, PROTOCOL_VERSION, type TransportFrame } from "../protocol/index.js";
 import type { ChainResponse, ControlRequest, DaemonState } from "./control-protocol.js";
+import { createWebHandler, defaultWebDist, isLoopbackAddress } from "./control-http.js";
+
+/** One WebSocket protocol on the shared port. Same shape `ws` hands to `upgrade`. */
+export type UpgradeHandler = (req: IncomingMessage, socket: Duplex, head: Buffer) => void;
 
 export interface ControlServerOptions {
   readonly port: number;
   readonly host?: string;
+  /**
+   * Where the built UI lives. Defaults to `ROAN_WEB_DIST`, then `web/dist`
+   * next to the package root. A missing directory is not an error: the socket
+   * still works and the page says the UI was not built.
+   */
+  readonly webDist?: string;
+  /** The daemon's own output, served as text/plain at `/log` on this port. */
+  readonly logText?: () => string;
+  /**
+   * Whether this address may open the control socket. Loopback by default:
+   * the app runs on the same machine as the daemon it talks to. A wider bind
+   * (`ROAN_HOST`) makes the UI reachable; the socket stays closed unless the
+   * caller is local or the operator set `ROAN_ALLOW_REMOTE_CONTROL=1`.
+   */
+  readonly isLocal?: (address: string | undefined) => boolean;
   /** null until a chain exists on this machine. */
   readonly store: () => EventStore | null;
   readonly state: () => DaemonState;
@@ -48,6 +69,14 @@ export interface ControlServerOptions {
 
 export interface ControlServer {
   readonly port: number;
+  /** `http://host:port`, the address to open in a browser. */
+  readonly url: string;
+  /**
+   * Routes another WebSocket protocol on this same HTTP server — peer sync
+   * lives on `/peer` that way, so a machine exposes one port and not three.
+   * Returns the unmount, which removes the route if it is still the one there.
+   */
+  mountUpgrade(path: string, handler: UpgradeHandler): () => void;
   /** Push a chain event to every connected app window. */
   broadcast(frame: TransportFrame): void;
   /** Push a whole-state reply (used after create/join). */
@@ -55,13 +84,100 @@ export interface ControlServer {
   close(): Promise<void>;
 }
 
+/** A polite refusal on a socket that was about to become a WebSocket. */
+function refuseUpgrade(socket: Duplex, status: number, reason: string, body: string): void {
+  if (socket.destroyed) return;
+  socket.write(
+    "HTTP/1.1 " +
+      String(status) +
+      " " +
+      reason +
+      "\r\nconnection: close\r\ncontent-type: text/plain; charset=utf-8\r\ncontent-length: " +
+      String(Buffer.byteLength(body)) +
+      "\r\n\r\n" +
+      body,
+  );
+  socket.destroy();
+}
+
 /**
- * The socket the app talks to on the same machine. Chain frames for viewing and
- * sending; control requests for onboarding. It never replicates.
+ * A peer authenticates with the chain token, in the `Authorization` header or a
+ * `?token=` parameter. The control socket takes neither, so a request that
+ * carries one is a peer that dialed the wrong path.
+ */
+function presentsChainToken(req: IncomingMessage): boolean {
+  const header = req.headers["authorization"];
+  if (typeof header === "string" && /^bearer\s/i.test(header)) return true;
+  try {
+    return new URL(req.url ?? "/", "http://localhost").searchParams.has("token");
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The one port the app talks to: the built UI over HTTP, the chain frames on
+ * `/ws`, and whatever else a sibling mounts (`/peer` for sync). Chain frames
+ * for viewing and sending; control requests for onboarding. It never
+ * replicates.
  */
 export function startControlServer(options: ControlServerOptions): Promise<ControlServer> {
-  const server = new WebSocketServer({ host: options.host ?? "127.0.0.1", port: options.port });
+  const host = options.host ?? "127.0.0.1";
+  const isLocal = options.isLocal ?? isLoopbackAddress;
+  const mounts = new Map<string, UpgradeHandler>();
   const clients = new Set<WebSocket>();
+
+  const dist = options.webDist ?? process.env["ROAN_WEB_DIST"] ?? defaultWebDist();
+  const server = createServer(createWebHandler({ dist, ...(options.logText === undefined ? {} : { log: options.logText }) }));
+  const wss = new WebSocketServer({ noServer: true });
+
+  const log = (message: string): void => options.log?.(message);
+
+  server.on("upgrade", (req, socket, head) => {
+    let pathname: string;
+    try {
+      pathname = new URL(req.url ?? "/", "http://localhost").pathname;
+    } catch {
+      refuseUpgrade(socket, 400, "Bad Request", "bad request\n");
+      return;
+    }
+
+    const mounted = mounts.get(pathname);
+    if (mounted !== undefined) {
+      mounted(req, socket, head);
+      return;
+    }
+
+    // `/` is the legacy path the app connected to before `/ws` existed; both
+    // speak the same frames.
+    if (pathname !== "/ws" && pathname !== "/") {
+      refuseUpgrade(socket, 404, "Not Found", "no websocket on " + pathname + "\n");
+      return;
+    }
+    if (presentsChainToken(req)) {
+      log("control: refused a peer token on " + pathname + " (peers live on /peer)");
+      refuseUpgrade(socket, 403, "Forbidden", "the control socket takes no chain token; peers connect on /peer\n");
+      return;
+    }
+    if (!isLocal(req.socket.remoteAddress)) {
+      log(
+        "control: refused " +
+          (req.socket.remoteAddress ?? "unknown") +
+          " on " +
+          pathname +
+          " (loopback only; set ROAN_ALLOW_REMOTE_CONTROL=1 to allow it)",
+      );
+      refuseUpgrade(
+        socket,
+        403,
+        "Forbidden",
+        "the control socket is loopback only; set ROAN_ALLOW_REMOTE_CONTROL=1 on the daemon to allow remote control\n",
+      );
+      return;
+    }
+
+    wss.handleUpgrade(req, socket, head, (client) => wss.emit("connection", client, req));
+  });
 
   const send = (socket: WebSocket, payload: unknown): void => {
     if (socket.readyState === socket.OPEN) socket.send(typeof payload === "string" ? payload : JSON.stringify(payload));
@@ -90,7 +206,7 @@ export function startControlServer(options: ControlServerOptions): Promise<Contr
     for (const client of clients) send(client, payload);
   };
 
-  server.on("connection", (socket) => {
+  wss.on("connection", (socket) => {
     clients.add(socket);
     greet(socket);
 
@@ -103,6 +219,15 @@ export function startControlServer(options: ControlServerOptions): Promise<Contr
       }
 
       const type = frame["t"];
+      if (type === "hello") {
+        // A peer dialed `/ws`: it wants the replication handshake, which lives
+        // on `/peer` behind the chain token. Answering it here would let a
+        // peer read this machine's chain without proving anything.
+        log("control: refused a peer hello on /ws (peers connect on /peer)");
+        socket.close(1008, "peer protocol lives on /peer");
+        clients.delete(socket);
+        return;
+      }
       if (type === "state") {
         send(socket, { t: "state", data: options.state() });
         return;
@@ -214,18 +339,31 @@ export function startControlServer(options: ControlServerOptions): Promise<Contr
   });
 
   return new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.once("listening", () => {
+    const onError = (error: Error): void => reject(error);
+    server.once("error", onError);
+    server.listen(options.port, host, () => {
+      server.off("error", onError);
       const address = server.address();
-      const port = typeof address === "object" && address ? address.port : options.port;
+      const port = typeof address === "object" && address !== null ? address.port : options.port;
       resolve({
         port,
+        url: "http://" + host + ":" + String(port),
+        mountUpgrade(path: string, handler: UpgradeHandler): () => void {
+          mounts.set(path, handler);
+          return () => {
+            if (mounts.get(path) === handler) mounts.delete(path);
+          };
+        },
         broadcast,
         sendState,
         close: () =>
           new Promise<void>((done) => {
             for (const client of clients) client.close();
+            wss.close();
+            // Keep-alive HTTP sockets (the page and its assets) would otherwise
+            // hold the close open until they time out.
             server.close(() => done());
+            server.closeAllConnections();
           }),
       });
     });

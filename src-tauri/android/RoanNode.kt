@@ -80,16 +80,16 @@ object RoanNode {
     // phone and no way to spawn one.
     setEnvironment("ROAN_ENGINE", "builtin")
     // The app talks to the daemon over loopback; peers reach it on the tailnet.
+    // One port carries the UI, control and peers; the app dials it on loopback.
     setEnvironment("ROAN_CONTROL_HOST", "127.0.0.1")
-    setEnvironment("ROAN_CONTROL_PORT", "7411")
+    setEnvironment("ROAN_CONTROL_PORT", "6769")
     // The daemon must never call exit() here: a hard exit from the node
     // thread runs static destructors mid-flight and kills the app with a
     // SIGABRT. This flag makes it close its servers, drain the loop and
     // return — the supervisor below decides what happens next.
     setEnvironment("ROAN_SHELL", "android")
-    // The peer link defaults to the tailscale address (loopback without
-    // one); ROAN_PEER_BIND=lan in the shell turns the old listen-all on.
-    setEnvironment("ROAN_PEER_PORT", "7412")
+    // Peers are served on the same port, under /peer; there is no second port
+    // to configure here any more.
     // Node's interface list does not see Android's VPN tunnel, so the daemon
     // cannot find this phone's tailnet address on its own — its invite would
     // carry no route and it would listen on loopback only. Kotlin sees the
@@ -136,7 +136,7 @@ object RoanNode {
     // A phone cannot show its own logcat and a cable is not always at hand. The
     // app therefore serves its own log on loopback, so the screen can show what
     // the daemon said when it refused to come up.
-    startLogServer(log)
+    // The daemon serves /log on its one port; there is no second HTTP server here.
     // A phone has no terminal and `adb` is not always at hand, so the daemon's
     // own output is copied into Downloads a few seconds after start: that file
     // is the only way to see why it refused to come up.
@@ -144,44 +144,6 @@ object RoanNode {
       Thread.sleep(6_000)
       exportLog(context, log)
     }, "roan-log-export").start()
-  }
-
-  /** Plain HTTP on 127.0.0.1:7413, one route: GET /log. */
-  private fun startLogServer(log: File) {
-    Thread({
-      try {
-        val server = java.net.ServerSocket(7413, 4, java.net.InetAddress.getByName("127.0.0.1"))
-        while (true) {
-          val socket = server.accept()
-          try {
-            val reader = socket.getInputStream().bufferedReader()
-            val line = reader.readLine() ?: ""
-            val body = if (line.startsWith("GET /log")) {
-              if (log.exists()) log.readText().takeLast(80_000) else "no log file: the daemon never started\n"
-            } else {
-              ""
-            }
-            val bytes = body.toByteArray()
-            val status = if (line.startsWith("GET /log")) "200 OK" else "404 Not Found"
-            val head = "HTTP/1.1 $status\r\n" +
-              "Content-Type: text/plain; charset=utf-8\r\n" +
-              "Access-Control-Allow-Origin: *\r\n" +
-              "Cache-Control: no-store\r\n" +
-              "Content-Length: ${bytes.size}\r\n" +
-              "Connection: close\r\n\r\n"
-            socket.getOutputStream().apply {
-              write(head.toByteArray())
-              write(bytes)
-              flush()
-            }
-          } finally {
-            socket.close()
-          }
-        }
-      } catch (error: Throwable) {
-        Log.w(TAG, "log server stopped", error)
-      }
-    }, "roan-log-http").start()
   }
 
   /**

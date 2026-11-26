@@ -18,7 +18,7 @@ import { ModelSheet } from "./components/ModelSheet.js";
 
 /**
  * The shell (Tauri / Android) injects this before the bundle runs:
- *   window.__ROAN__ = { socket: "ws://127.0.0.1:7411/ws", node: "roan-pc" }
+ *   window.__ROAN__ = { socket: "ws://127.0.0.1:6769/ws", node: "roan-pc" }
  *
  * There is no public address and no token here: the daemon listens on loopback
  * on the same device, and the app is the only client. If the daemon moves to a
@@ -43,12 +43,12 @@ function resolveSocketUrl(fallback: string | undefined): string {
   // loopback, so any page that came out of the shell talks to 127.0.0.1 — never
   // to the shell's own origin.
   if (hostname === "tauri.localhost" || protocol === "tauri:" || protocol === "ipc:") {
-    return "ws://127.0.0.1:7411/ws";
+    return "ws://127.0.0.1:6769/ws";
   }
   if ((protocol === "http:" || protocol === "https:") && hostname.includes(".")) {
     return `${protocol === "https:" ? "wss" : "ws"}://${window.location.host}/ws`;
   }
-  return "ws://127.0.0.1:7411/ws";
+  return "ws://127.0.0.1:6769/ws";
 }
 
 const SOCKET_URL = resolveSocketUrl(host?.socket);
@@ -207,7 +207,8 @@ export default function App(): ReactElement {
   // only way to see why it refused to start when the socket never opens.
   async function loadLog(): Promise<void> {
     try {
-      const response = await fetch("http://127.0.0.1:7413/log");
+      // One port: the daemon serves the log next to the UI and the socket.
+      const response = await fetch(`${window.location.protocol}//${window.location.host}/log`);
       const text = await response.text();
       setLogText(text.trim().length === 0 ? "the daemon wrote nothing yet" : text.slice(-8000));
     } catch (error) {

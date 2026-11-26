@@ -1,9 +1,11 @@
 /**
  * Peering for the daemon.
  *
- * Inbound: `startPeerServer` from `../transport/server.js` listens on 7412. It
- * does the transport handshake (token, chain, hello with both heads) and hands
- * every established socket to a `ReplicationSession` from `../sync/replicate.js`.
+ * Inbound: `startPeerServer` from `../transport/server.js` does the transport
+ * handshake (token, chain, hello with both heads) and hands every established
+ * socket to a `ReplicationSession` from `../sync/replicate.js`. The daemon does
+ * not give it a port of its own: it mounts the peer upgrade on `/peer` of the
+ * one HTTP server the app already talks to, so a machine exposes one port.
  *
  * Outbound: `PeerClient` from `../transport/client.js` keeps a link alive to
  * every joined peer, reconnecting with backoff, and its frames feed a second
@@ -28,11 +30,16 @@ import { PeerClient } from "../transport/client.js";
 import type { Logger as WireLogger } from "../transport/logger.js";
 import type { Frame as WireFrame } from "../transport/protocol.js";
 import { startPeerServer, type Peer, type PeerServer } from "../transport/server.js";
+import type { IncomingMessage } from "node:http";
+import type { Duplex } from "node:stream";
 import { ReplicationSession } from "../sync/replicate.js";
 import type { ConflictReport, Frame, Logger, NodeStore, PeerTransport } from "../sync/types.js";
 
-/** Port the app and the invite code assume for the peer server. */
-export const DEFAULT_PEER_PORT = 7412;
+/** Path peers connect to on the app's port. Not a second listener. */
+export const PEER_PATH = "/peer";
+
+/** One upgrade for `/peer`, handed over by the HTTP server that owns the port. */
+export type PeerUpgradeHandler = (req: IncomingMessage, socket: Duplex, head: Buffer) => void;
 
 /** How often an outbound link is checked for "connected"; the client emits no event. */
 const CONNECT_POLL_MS = 100;
@@ -58,9 +65,15 @@ export interface PeersOptions {
   readonly store: NodeStore;
   /** Shared chain token. Never logged. */
   readonly token: string;
-  /** Listen address; defaults to all interfaces. */
+  /**
+   * Routes the inbound peer upgrade on an HTTP server the caller already runs.
+   * The daemon passes `control.mountUpgrade`; a test may pass its own or omit it
+   * and let the peer server listen on `port` instead.
+   */
+  readonly mount?: (handler: PeerUpgradeHandler) => () => void;
+  /** Standalone listen address; only used when `mount` is absent. */
   readonly host?: string;
-  /** Defaults to 7412, or 0 for a free port (read back from `peerPort()`). */
+  /** Standalone port; 0 asks the kernel, read it back with `peerPort()`. */
   readonly port?: number;
   readonly logger?: Logger;
   /** Same-seq-different-id. The chain diverged; nothing is picked. */
@@ -167,6 +180,8 @@ interface PeersState {
   readonly inbound: Map<string, InboundLink>;
   readonly outbound: Map<string, OutboundLink>;
   readonly port: number;
+  /** Removes `/peer` from the caller's HTTP server again; null when standalone. */
+  readonly unmount: (() => void) | null;
   readonly onConflict?: (report: ConflictReport) => void;
   readonly onError?: (error: Error) => void;
 }
@@ -194,14 +209,24 @@ function endpointOf(target: PeerAddress): string {
   if (typeof target === "string") {
     const text = target.trim();
     if (text === "") throw new Error("peer address is empty");
-    return text.includes("://") ? text : `ws://${text}`;
+    const withScheme = text.includes("://") ? text : `ws://${text}`;
+    try {
+      const url = new URL(withScheme);
+      // An address without a path means "the peer endpoint on that machine's
+      // one port"; an explicit path is taken as given.
+      if (url.pathname === "" || url.pathname === "/") url.pathname = PEER_PATH;
+      return url.toString();
+    } catch {
+      const base = withScheme.replace(/\/+$/, "");
+      return base.endsWith(PEER_PATH) ? base : base + PEER_PATH;
+    }
   }
   const host = target.host.trim();
   if (host === "") throw new Error("peer address has no host");
   if (!Number.isInteger(target.port) || target.port < 1 || target.port > 65_535) {
     throw new Error(`peer address has no usable port: ${target.port}`);
   }
-  return `ws://${host}:${target.port}`;
+  return `ws://${host}:${target.port}${PEER_PATH}`;
 }
 
 function hostOf(endpoint: string): string {
@@ -213,7 +238,9 @@ function hostOf(endpoint: string): string {
 }
 
 /**
- * Starts listening for peers on `port` (7412 by default). Outbound links are
+ * Starts peering. With `mount` the inbound upgrade is routed on the caller's
+ * HTTP server (`/peer` of the daemon's one port); without it the peer server
+ * listens on `host:port` itself, which is what a test uses. Outbound links are
  * added with `addPeer`. Throws when called twice; call `stopPeers()` first when
  * the chain changes.
  */
@@ -235,7 +262,10 @@ export async function startPeers(options: PeersOptions): Promise<void> {
     chain: store.chain,
     token: options.token,
     host: options.host,
-    port: options.port ?? DEFAULT_PEER_PORT,
+    port: options.port ?? 0,
+    // Mounted on the app's port by the daemon; standalone only in a test that
+    // asks for a listener of its own.
+    listen: options.mount === undefined,
     logger: toWireLogger(logger),
     // Device control is opt-in per link and only ever runs a command the chain
     // granted; without this the frame is logged and ignored.
@@ -271,6 +301,8 @@ export async function startPeers(options: PeersOptions): Promise<void> {
     },
   });
 
+  const unmount = options.mount === undefined ? null : options.mount(server.upgrade);
+
   state = {
     store,
     token: options.token,
@@ -279,6 +311,7 @@ export async function startPeers(options: PeersOptions): Promise<void> {
     inbound,
     outbound,
     port: server.port,
+    unmount,
     onConflict: options.onConflict,
     onError: options.onError,
   };
@@ -397,9 +430,11 @@ export function peers(): readonly string[] {
   return [...names].sort();
 }
 
-/** Port the server actually listens on (useful when `port: 0` was requested). */
+/** Port the server listens on; null when it is mounted on the app's port. */
 export function peerPort(): number | null {
-  return state?.port ?? null;
+  const current = state;
+  if (current === null) return null;
+  return current.unmount === null ? current.port : null;
 }
 
 /** Closes every link and the listener. Safe to call when nothing is running. */
@@ -407,6 +442,8 @@ export async function stopPeers(): Promise<void> {
   const current = state;
   if (current === null) return;
   state = null;
+
+  current.unmount?.();
 
   const outbound = [...current.outbound.values()];
   current.outbound.clear();

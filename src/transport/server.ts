@@ -1,4 +1,5 @@
 import type { IncomingMessage } from "node:http";
+import type { Duplex } from "node:stream";
 import { execFile as execFileCallback } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
@@ -171,6 +172,12 @@ export interface PeerServerOptions {
   host?: string;
   /** 0 (default) picks a free port; read it back from `PeerServer.port`. */
   port?: number;
+  /**
+   * Listen on `host:port` (the default). `false` binds nothing: the caller
+   * mounts `PeerServer.upgrade` on an HTTP server it already runs, so peers
+   * share the app's port instead of opening one of their own.
+   */
+  listen?: boolean;
   logger?: Logger;
   /** Last sequence number this node has for the chain, for hello. */
   getHaveSeq?: () => number;
@@ -192,6 +199,12 @@ export interface PeerServer {
   readonly host: string;
   readonly port: number;
   readonly peers: readonly Peer[];
+  /**
+   * Handles one HTTP upgrade for a peer socket. Used when the server was
+   * created with `listen: false` and the caller routes `/peer` on its own
+   * HTTP server.
+   */
+  readonly upgrade: (req: IncomingMessage, socket: import("node:stream").Duplex, head: Buffer) => void;
   /** Send to every established peer. Returns how many accepted the frame. */
   broadcast(frame: Frame): number;
   close(): Promise<void>;
@@ -217,12 +230,17 @@ export function startPeerServer(options: PeerServerOptions): Promise<PeerServer>
   const sockets = new Map<string, WebSocket>();
   let counter = 0;
 
-  const wss = new WebSocketServer({
-    host,
-    port: requestedPort,
-    maxPayload,
-    perMessageDeflate: false,
-  });
+  const standalone = options.listen !== false;
+  const wss = new WebSocketServer(
+    standalone
+      ? { host, port: requestedPort, maxPayload, perMessageDeflate: false }
+      : { noServer: true, maxPayload, perMessageDeflate: false },
+  );
+
+  /** One upgrade handed over by the caller's HTTP server; it routed the path. */
+  const upgrade = (request: IncomingMessage, socket: Duplex, head: Buffer): void => {
+    wss.handleUpgrade(request, socket, head, (client) => wss.emit("connection", client, request));
+  };
 
   const haveSeq = (): number => {
     if (options.getHaveSeq === undefined) return 0;
@@ -361,6 +379,42 @@ export function startPeerServer(options: PeerServerOptions): Promise<PeerServer>
     });
   }
 
+  const facade = (boundPort: number): PeerServer => ({
+    host,
+    port: boundPort,
+    get peers(): readonly Peer[] {
+      return [...peers.values()];
+    },
+    upgrade,
+    broadcast(frame: Frame): number {
+      let accepted = 0;
+      for (const peer of peers.values()) {
+        if (peer.send(frame)) accepted += 1;
+      }
+      return accepted;
+    },
+    close(): Promise<void> {
+      for (const socket of sockets.values()) {
+        socket.close(1001, "server closing");
+      }
+      return new Promise<void>((done) => {
+        const timer = setTimeout(() => {
+          for (const socket of sockets.values()) socket.terminate();
+        }, SHUTDOWN_GRACE_MS);
+        wss.close(() => {
+          clearTimeout(timer);
+          sockets.clear();
+          peers.clear();
+          done();
+        });
+      });
+    },
+  });
+
+  // Shared-port mode: nothing to bind and nothing to wait for. The caller holds
+  // the HTTP server and calls `upgrade` for the peer path.
+  if (!standalone) return Promise.resolve(facade(0));
+
   return new Promise<PeerServer>((resolve, reject) => {
     const onError = (error: Error): void => {
       reject(new Error(`peer server failed to listen on ${host}:${requestedPort}: ${error.message}`));
@@ -372,37 +426,7 @@ export function startPeerServer(options: PeerServerOptions): Promise<PeerServer>
 
       const address = wss.address();
       const boundPort = typeof address === "object" && address !== null ? address.port : requestedPort;
-
-      resolve({
-        host,
-        port: boundPort,
-        get peers(): readonly Peer[] {
-          return [...peers.values()];
-        },
-        broadcast(frame: Frame): number {
-          let accepted = 0;
-          for (const peer of peers.values()) {
-            if (peer.send(frame)) accepted += 1;
-          }
-          return accepted;
-        },
-        close(): Promise<void> {
-          for (const socket of sockets.values()) {
-            socket.close(1001, "server closing");
-          }
-          return new Promise<void>((done) => {
-            const timer = setTimeout(() => {
-              for (const socket of sockets.values()) socket.terminate();
-            }, SHUTDOWN_GRACE_MS);
-            wss.close(() => {
-              clearTimeout(timer);
-              sockets.clear();
-              peers.clear();
-              done();
-            });
-          });
-        },
-      });
+      resolve(facade(boundPort));
     });
   });
 }
