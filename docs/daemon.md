@@ -1,34 +1,65 @@
 # The daemon
 
 The daemon is the process that owns this machine's chain: it opens the SQLite
-store, holds the identity, and runs one turn at a time. It is not a server in
-the network sense. Everything below is what `src/daemon/` does today; section 5
-lists what it does not do yet.
+store, holds the identity, listens for peers, and runs one turn at a time. It is
+not a server in the network sense. Everything below is what `src/daemon/` does
+today; section 6 lists what it does not do yet.
 
 ## 1. Startup
 
-`src/daemon/main.ts` is the entry point. `src-tauri/src/lib.rs` only boots
-Tauri — it spawns no child process, so the app does not currently start the
-daemon. The only script in `package.json` that launches it is the dev script
-`npm run dev` (`tsx src/daemon/main.ts`).
+`src/daemon/main.ts` is the entry point. Three things start it:
 
-`main()` runs in this order:
+- the Tauri desktop shell, as a sidecar (`spawn_daemon` in
+  `src-tauri/src/lib.rs`, binary `roan-daemon`; output is forwarded to the
+  shell's stderr and the child is killed on window exit);
+- the Android service, through `RoanNode.kt`, which sets `ROAN_SHELL=android`
+  before handing the event loop to Node;
+- `npm run dev` (`tsx src/daemon/main.ts`) on a dev machine.
 
-1. `resolvePaths()` and `await ensurePaths(paths)` — creates the directories.
-2. `await loadSettings(paths)` — provider settings from `config.json`.
-3. `await loadIdentity(paths)` — if `secrets/identity.json` exists, the session
-   is `{ identity, store: EventStore.open(paths.database) }`; otherwise it stays
-   `null` and `DaemonState.onboarding` is `true`.
-4. `startControlServer({ port: CONTROL_PORT, ... })`, which binds
-   `127.0.0.1` (the `host` default in `control.ts`) and resolves with the port
-   actually bound.
-5. One line to stderr: `roan daemon: waiting for a chain (control port N)` or
-   `roan daemon: chain …, node …, control port N`.
+`src/daemon/autostart.ts` can start and stop a detached daemon after probing the
+control port, but nothing imports it: the sidecar and the systemd unit in
+`docs/webui.md` are the real startups.
 
-Ports come from the environment: `ROAN_CONTROL_PORT` (default `7411`),
-`ROAN_PEER_PORT` (default `7412`, used only inside an invite code),
-`ROAN_PEER_BIND`: `tailscale` (default — the tailnet address, loopback without one), `lan` (every interface, the old listen-all), `loopback`, or a specific address. `ROAN_PEER_HOST` still works as an address. `ROAN_HOME` overrides the state root.
-Provider settings never come from the environment; they come from `config.json`.
+`main()` runs in this order (`main.ts`, `main()`):
+
+1. `resolvePaths()` and `migrateLegacyHome(paths)` — a pre-capital `~/.roan` is
+   renamed to `~/.Roan` once, before anything opens the database.
+2. `setWebConfigSource()`, `loadPlugins(paths.home)` — bundled plugins first,
+   then `<home>/plugins/<id>/plugin.json`. A broken plugin is reported and
+   skipped; boot never depends on one.
+3. `migrateStateSplit(paths)` — `workspace/chain.db` (+ `-wal`, `-shm`) moves to
+   `state/chain.db` once; `workspace/` becomes the agent's own desk.
+4. `ensureBootstrapFiles(paths)` — on a fresh home it writes `SOUL.md`,
+   `IDENTITY.md` and `AGENTS.md`, never over an existing file.
+5. `ensurePaths(paths)` — creates `home`, `secrets`, `workspace`,
+   `synced-workspace`, `state`.
+6. `loadSettings(paths)` — provider settings from `config.json`. If
+   `settings.engine` is `hermes` and no `hermes` binary answers, it falls back to
+   `builtin` and says so in one log line.
+7. The agent's context: `MemoryStore`, `SkillLibrary`, `allTools()` +
+   `contextTools()`, and an `McpRuntime`. `agentContext.prompt()` rebuilds the
+   system prompt per turn from `SOUL.md`, `AGENTS.md`, memory, user profile and
+   the skill index.
+8. `loadIdentity(paths)` — with `secrets/identity.json` the session is
+   `{ identity, store: EventStore.open(paths.database) }`; without it `session`
+   stays `null` and `DaemonState.onboarding` is `true`.
+9. `startReplication()` (only with a session) — peer listener, discovery, live
+   broadcast of events a peer appends.
+10. `startEnvLoop()`, `startWorkspaceLoop()`, `startCron()` (only with a
+    session) — the three timers that keep this copy equal to the chain.
+11. `startControlServer({ port, host, ... })` — `127.0.0.1` by default.
+12. One line to stderr: `roan daemon: waiting for a chain (control port N)` or
+    `roan daemon: chain …, node …, control port N`.
+
+Ports and switches come from the environment: `ROAN_CONTROL_PORT` (default
+`7411`), `ROAN_CONTROL_HOST` (default `127.0.0.1`; set it deliberately if the
+app has to reach the daemon from another machine), `ROAN_PEER_PORT` (default
+`7412`), `ROAN_PEER_BIND`: `tailscale` (default — the tailnet address, loopback
+without one), `lan` (every interface), `loopback`, or a specific address;
+`ROAN_PEER_HOST` still works as an address. `ROAN_DISCOVERY=off` disables the
+Tailscale scan. `ROAN_HOME` overrides the state root. `ROAN_SHELL=android`
+changes shutdown behaviour (section 4). Provider settings never come from the
+environment; they come from `config.json`.
 
 On the other side, `web/src/App.tsx` builds a `ChainClient` against
 `ws://127.0.0.1:7411/ws` unless `window.__ROAN__.socket` says otherwise. The
@@ -37,34 +68,58 @@ On the other side, `web/src/App.tsx` builds a `ChainClient` against
 ## 2. The control protocol
 
 One WebSocket, JSON text per frame, local only — this is not the peer protocol
-and a peer never sees these frames. Types live in `control-protocol.ts`.
+and a peer never sees these frames. `control.ts` routes, `control-protocol.ts`
+types, `docs/api.md` documents every kind.
 
-App → daemon:
+Client → daemon:
 
-| frame | fields | handler |
+| frame | fields | what happens |
 | --- | --- | --- |
 | `state` | `t` | reply with `StateResponse` |
-| `create_chain` | `t` | `onCreate()`, then reply + `greet()` |
-| `join_chain` | `t`, `code` | `onJoin(code)`, then reply + `greet()` |
-| `append` | `t`, `event` | append a user message, broadcast, run a turn |
-| `hello` | `t`, `v`, `chain`, `node`, `haveSeq` | ignored |
+| `create_chain` | `t` | `onCreate()`, then the reply + `greet()`; twice is still one chain |
+| `join_chain` | `t`, `code` | `onJoin(code)`, then the reply + `greet()` |
+| `append` | `t`, `event` | `event.data.text` must be a non-empty string; the daemon picks the session, keeps `event.id` as the echo id, broadcasts, runs a turn |
+| `new_session` | `t`, `title?` | starts a conversation, never touches the old one |
+| `rename_session` | `t`, `session`, `title` | appends a `session_title` event |
+| `rename_node` | `t`, `node`, `name` | appends a fresh `node` announcement |
+| `checkpoint` | `t`, `label?` | appends a `checkpoint` event at the head |
+| `rewind` | `t`, `seq` | starts a new conversation from that point; nothing is deleted |
+| `leave_chain` | `t` | archives identity + chain, then stops into onboarding |
+| anything else | `req?` | goes to `onRequest(kind, data, reply)`; the answer is `{ t: "reply", id, data }` with `id` echoing `req` |
 
-`append` is strict: `event.type` must be `"message"`, `event.data.text` must be
-a non-empty string, and the id is `event.id` when it is a string, else
-`` `${st.node}-${Date.now()}` `` from the current `DaemonState`.
+`append` is no longer strict about `event.type`: only `event.data.text` is
+checked, and the daemon writes the `message` event itself — with
+`data.session` resolved here and the client's id reused, so the app's pending
+bubble clears on the echo instead of showing the message twice.
 
-Daemon → app, three plain replies:
+The request kinds (`main.ts`, `onRequest`):
+
+`workspace_list`, `workspace_read`, `workspace_write`, `cron_list`,
+`cron_save`, `regenerate`, `cancel_turn`, `skills_list`, `tools_list`,
+`mcp_list`, `mcp_save`, `mcp_server_save`, `mcp_server_delete`, `tools_state`,
+`tool_rule`, `tool_approve`, `tool_approval_reset`, `providers_list`,
+`provider_save`, `provider_remove`, `provider_pick`, `models_list`,
+`models_search`, `settings_save`, `model_set`, `checkpoints_list`, `export`,
+`storage_window`, `take_shared`, `import_discover`, `import_plan`, `steer`,
+`session_archive`, `session_delete`, `goal`, `goal_update`, `effort`,
+`plan_mode`. Anything else is answered `{ error: "unknown request: <kind>" }`.
+
+Daemon → client, three plain replies:
 
 ```
-{ t: "state", data: { onboarding, chain, node, head, peers } }
+{ t: "state", data: { onboarding, chain, node, head, peers, nodes, invite,
+                      model, provider, sessions, activeSession } }
 { t: "chain", chain, node, invite? }        // invite only after create_chain
 { t: "control_error", message }
 ```
 
-`peers` is typed `readonly string[]` and is always `[]` in `main.ts`. `head` is
-`store.head(chain)`, `0` for an empty chain.
+`peers` is `peerList()` from `peers.ts`: the node ids linked right now, inbound
+and outbound. `nodes` is the roster folded from `node` events, each with
+`live: true` for this machine, for a connected peer, or for one that spoke
+within the presence TTL. `head` is `store.head(chain)`, `0` for an empty chain.
+`invite` is a v2 join code carrying every dialable host.
 
-Daemon → app, chain frames go through `encodeFrame` from
+Daemon → client, chain frames go through `encodeFrame` from
 `src/protocol/codec.ts`, which validates and version-checks them:
 
 ```
@@ -78,6 +133,12 @@ On connect, `greet()` sends `hello` + `state` + one `events` frame with
 client says it is missing. With no store it sends only `state`, and
 `onboarding` is `true`.
 
+Every event the daemon appends itself is broadcast as `{ t: "append", event }`
+through `onAppend`, including `turn_start` and `turn_end` (the turn lock writes
+through an adapter that calls `onAppend`). Events a peer appends are broadcast
+the same way by the replication watcher, and a `session` / `session_title` event
+from anywhere also triggers a fresh `state`.
+
 The socket has no authentication: any local process that can open the port can
 send these frames, including `append`.
 
@@ -88,13 +149,20 @@ All of it hangs off `RoanPaths` in `paths.ts`, rooted at
 
 | `RoanPaths` field | path | written by |
 | --- | --- | --- |
-| `home` | `~/.Roan` | `ensurePaths` |
+| `home` | `~/.Roan` | `ensurePaths`, `migrateLegacyHome` |
 | `secrets` | `~/.Roan/secrets` | `ensurePaths` |
-| `workspace` | `~/.Roan/workspace` | `ensurePaths` |
+| `workspace` | `~/.Roan/workspace` | `ensurePaths`; holds `cron-state.json` |
 | `syncedWorkspace` | `~/.Roan/synced-workspace` | `ensurePaths`; the turn's `cwd` |
-| `database` | `~/.Roan/workspace/chain.db` | `EventStore` — one SQLite file, every chain |
-| `configFile` | `~/.Roan/config.json` | `loadSettings` reads `baseUrl`, `model`, `apiKey`, `provider`, `effort` |
+| `state` | `~/.Roan/state` | `ensurePaths`, `migrateStateSplit` |
+| `database` | `~/.Roan/state/chain.db` | `EventStore` — one SQLite file, every chain |
+| `configFile` | `~/.Roan/config.json` | `loadSettings` reads `baseUrl`, `model`, `apiKey`, `provider`, `effort`, `engine`; `saveSettings` writes it |
 | `identityFile` | `~/.Roan/secrets/identity.json` | `saveIdentity`, mode `0600` |
+
+Other files in the home, written by the handler that needs them:
+`cron.json` (`cron_save`; also part of the env), `hooks.json` (read at every
+turn), `mcp.json` (`mcp_save`), `providers.json` (`provider_save`/`_remove`/
+`_pick`), `plugins/<id>/plugin.json`, `exports/` (`export`), and
+`shared-inbox.txt` next to the home (`take_shared`, the Android share slot).
 
 `loadSettings` returns `DEFAULTS` when the file is missing or not JSON, and
 falls back per field when a value is not a string. `loadIdentity` returns
@@ -105,60 +173,103 @@ when a required field is absent. `identity.json` holds `nodeId`, `chainId`,
 `history.ts` stores nothing: `historyFromEvents` maps a slice of the chain into
 `ChatMessage[]` — `message` to `user`, `assistant` to `assistant`,
 `tool_result` to `tool` with `tool_call_id: replay-<id>`. `tool_call` is not
-replayed.
+replayed. `runTurn` prefers `sessionMessages(events, session)` when a session
+is known, so a turn only sees its own conversation.
 
-`log-rotate.ts` stores nothing either. `parsePolicy` and `planRotation` are pure
-and return `renames` / `remove`; no daemon code calls them and `paths.ts` has no
-log path. The daemon writes to stderr only.
+`log-rotate.ts` stores nothing. `parsePolicy` and `planRotation` are pure;
+`logging.ts` wraps them into a scrubbed, rotated `roan.log`, but nothing imports
+`logging.ts` — the daemon writes to stderr only.
 
 ## 4. One turn end to end
 
-1. The app sends `{ t: "append", event: { type: "message", data: { text } } }`.
-2. `control.ts` appends the `message` event, broadcasts
-   `{ t: "append", event: stored }` to every client, then calls `onMessage(text)`.
-3. `main.ts` `runMessage` returns if there is no session. Otherwise it calls
-   `runTurn({ store, chain, node, provider, cwd: paths.syncedWorkspace,
-   systemPrompt: SYSTEM_PROMPT, onAppend }, text)` and does not await it.
-4. `runTurn` calls `acquire(asTurnStore(store), chain, node)`: it reads the last
-   `1_000` events, derives the open turn, and compare-appends `turn_start` with
-   `data: { ttlMs }` at the next free seq. If another node holds the turn, it
-   appends an `error` event — `<owner> is already working on this chain` — and
-   returns without calling the model.
-5. It builds history with `historyFromEvents(store.read(chain, 1, 10_000))` and
-   constructs `new Agent({ provider, tools: builtinTools, systemPrompt, cwd,
-   history, onEvent })`.
-6. `agent.send(text)` drives `model → tool → model`. Its events become chain
+1. The app sends `{ t: "append", event: { id, data: { text, session?, image? } } }`.
+2. `control.ts` validates the text, lifts `data.session`, `event.id` (echo id)
+   and an optional image (mime + base64 under 1.6 M), then calls
+   `onMessage(text, session, echoId, image)`.
+3. `main.ts` `runMessage` resolves the conversation (`resolveSession`, else a
+   new one titled after the first words), appends the `message` event with the
+   client's id, broadcasts it, and auto-titles a conversation on its first
+   message (`autoTitleFor` → `session_title`).
+4. It folds goals (`foldGoals` → `goalContext`) into the front of the system
+   prompt, runs `turn_start` hooks from `hooks.json`, and creates an
+   `AbortController` plus a steer inbox before calling `runTurn` (not awaited).
+5. `runTurn` calls `acquire()`, which reads the last `1_000` events, derives the
+   open turn, and compare-appends `turn_start` with `data: { ttlMs }` at the
+   next free seq. If another node holds the turn it appends an `error` event —
+   `<owner> is already working on this chain` — and returns without calling the
+   model.
+6. It builds history (`sessionMessages`), compacts past 40 messages into a
+   digest attached to the prompt (`compactMessages`), and gates the tool list:
+   in plan mode only `planModeTools` are offered, the rest are answered with a
+   refusal sentence (`planModeForbidden` / `planModeRefusal`), and the turn runs
+   on the builtin loop even when the device normally uses the hermes engine.
+7. `new Agent({ provider, tools, systemPrompt, cwd, history, effort, signal,
+   onBeforeRequest })` drives `model → tool → model`. Its events become chain
    events: `tool_start` → `tool_call` `{ name, args }`, `tool_end` →
    `tool_result` `{ name, ok, output }`, `error` → `error` `{ message }`.
    Assistant text is accumulated, not streamed to the chain.
-7. When `send` returns, the accumulated text is appended once as
-   `assistant` `{ text }` if it is not blank.
-8. `finally` calls `release(turns, chain, node)`, which appends `turn_end`; a
-   throw there is swallowed because the turn already ended.
+8. A steer arriving mid-turn is only injected after a round's tool results and
+   before the next request (`onBeforeRequest`), never on top of the live
+   question. It is recorded as a `message` event flagged `steer`, so it stays in
+   the conversation where it was typed.
+9. When the loop returns, the accumulated text is appended once as `assistant`
+   `{ text }` if it is not blank; an empty return appends an `error` saying so.
+10. `finally` calls `release()`, which appends `turn_end` — through the same
+    adapter, so the turn's `usage` (tokens and cost, when the provider reported
+    them) rides on that event and the app can print a line under the answer.
+11. Back in `runMessage`: `activeTurn`/`activeSteer` are cleared, the line
+    `notify:turn-done` goes to stderr (the Android service tails it), the
+    `turn_end` hooks run, and `distilMemories` writes at most three durable
+    facts as `memory` events plus a folded `MEMORY.md`. A failed distil is
+    logged and never breaks the turn.
 
-Events appended by `runTurn`'s own `append` helper — `tool_call`,
-`tool_result`, `error`, `assistant` — go through `onAppend`, so every open
-window receives `{ t: "append", event }` for them. `turn_start` and `turn_end`
-are written through `asTurnStore`, which never calls `onAppend`, so a connected
-window only sees them when it reconnects.
+Shutdown: `SIGINT`/`SIGTERM` stop discovery and the peer links and exit.
+`stopDaemon("left the chain")` closes the control server and peers; on
+`ROAN_SHELL=android` it returns without `process.exit`, because exiting from the
+node thread there aborts the whole app.
 
-## 5. Not built yet
+## 5. Peers, discovery and the background loops
 
-- The desktop shell does not start or supervise the daemon, and there is no
-  port handshake — the client hardcodes `7411`.
-- No handler for the `peers` request; `DaemonState.peers` is always `[]`.
-- The daemon starts no peer listener. `startPeerServer` in
-  `src/transport/server.ts` is never called here, and `ROAN_PEER_HOST` /
-  `ROAN_PEER_PORT` only fill the invite string.
-- `tool_req` / `tool_res` are unused: no remote tools, no forwarding.
-- `onJoin` writes the chain id and token from the code but dials nothing and
-  pulls nothing. It also overwrites an existing `identity.json` without parking
-  the old state aside (`AGENTS.md` rule 10).
+`startReplication()` (once per process) builds a `ChainNodeStore` over the
+store, watches applied events (presence, broadcast to the app windows, workspace
+and blob application, `serveDelegation` for `run_on_node`), then
+`startPeers({ store, token, host: bindListenHost(bind), port: PEER_PORT })` —
+`startPeerServer` on 7412, replication handshake included, plus an outbound
+`PeerClient` per joined peer with backoff.
+
+With `ROAN_DISCOVERY` not `off`, `startDiscovery` asks Tailscale for the
+network every 20 s, probes the peer port on every address, and calls `addPeer`
+for whatever answers. The invitation is not a security boundary: the handshake
+refuses a wrong token or a different chain.
+
+Three timers keep this device's copy equal to the chain:
+`startEnvLoop` (10 s, adopts a peer's env snapshot and publishes this one, then
+announces the node), `startWorkspaceLoop` (5 s, scan → `workspace` and `blob`
+events for changed files, applies events that arrive), and `startCron` (30 s,
+`dueJobs` from `cron.json`, each job runs as a turn in a conversation named
+after it; `cron-state.json` in `workspace/` is per machine, so two awake
+devices do not both fire).
+
+## 6. Not built yet
+
+- The control socket has no authentication. `ROAN_CONTROL_HOST` can widen it,
+  but there is no token on the frame.
+- There is no handler for the `peers` request type (`control-protocol.ts`
+  declares it); the live list rides on `state` instead. A `{ t: "peers" }` frame
+  is answered `unknown request: peers`.
 - The client's `hello` / `haveSeq` is ignored; catch-up is always the first
   `10_000` events.
-- No authentication on the control socket.
-- The replayed history already contains the message just appended, and
-  `Agent.send` pushes the same text again, so the model sees it twice.
-- `turn_start` / `turn_end` are the only lifecycle events written; no `env`
-  events. `ControlServer.sendState()` is exported and never called.
-- `log-rotate.ts` is policy only: no log file is opened, written or rotated.
+- `health.ts` and `diagnostics.ts` exist and have no caller: there is no
+  `health` or `diagnostics` request kind, and both modules are untested, so the
+  daemon cannot report its own state beyond `state`.
+- `logging.ts` (scrubbed, rotated `roan.log`) and `log-rotate.ts` are not called
+  by the daemon; it writes stderr, and on Android the service tails it.
+- No HTTP server: `webhooks` (`dispatch.ts`, `sign.ts`) and `connectors`
+  (`github.ts`) are reachable only if something else routes to them, and nothing
+  does. Both start nothing.
+- `autostart.ts` (probe, spawn, stop, pid file) is not imported by the app.
+- `tool_req` / `tool_res` events exist and `serveDelegation` answers them for
+  `run_on_node`, but there is no forwarding hop: a tool call the target node
+  cannot run is not relayed a second time.
+- `onJoin` writes the chain id and token from the code; it does not park an
+  existing identity aside before overwriting it (`AGENTS.md` rule 10).
