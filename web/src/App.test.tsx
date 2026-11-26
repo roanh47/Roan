@@ -144,7 +144,7 @@ describe("the daemon's state in the window", () => {
     await act(async () => {
       socket().close();
     });
-    expect(query(".connbanner").textContent).toContain("the connection to the daemon closed");
+    expect(query(".connbanner").textContent).toContain("the daemon closed the connection");
     expect(query(".connbanner__retry").textContent).toBe("Retry");
   });
 

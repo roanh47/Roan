@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import type { ConnectionStatus } from "../chain.js";
 
 /**
@@ -6,10 +6,14 @@ import type { ConnectionStatus } from "../chain.js";
  *
  * It is chrome, not a chat message: a compact banner pinned to the top of the
  * window, above the conversation, with the reason and the one thing the user
- * can do about it. The transcript and the composer keep their normal shape
- * underneath, so nothing looks as if the conversation was replaced by a
- * connection screen. As soon as the socket opens the banner renders nothing
- * at all — it never lingers to announce the recovery.
+ * can do about it. Two rules keep it from becoming noise:
+ *
+ * - It does not blink. A reconnect loop flips the status several times a second,
+ *   so every "down" status says the same thing: the text only changes when the
+ *   situation really changes (down → open, or a different reason).
+ * - It can be dismissed. Someone who has read it may close it, and it stays
+ *   closed until the connection has actually been open again — a fresh failure
+ *   is news, the same failure is not.
  */
 export interface ConnectionBannerProps {
   status: ConnectionStatus;
@@ -21,21 +25,28 @@ export interface ConnectionBannerProps {
 /** The status in the words a reader needs, never the internal name. */
 export function connectionDetail(status: ConnectionStatus): string {
   switch (status) {
-    case "connecting":
-      return "looking for the daemon on this device";
-    case "reconnecting":
-      return "reconnecting to the daemon";
     case "closed":
-      return "the connection to the daemon closed";
-    default:
+      return "the daemon closed the connection";
+    case "open":
+    case "idle":
       return "the daemon has not answered yet";
+    default:
+      // connecting and reconnecting are the same situation seen twice a second.
+      return "the daemon on this device is not answering";
   }
 }
 
 export function ConnectionBanner({ status, reason, onRetry }: ConnectionBannerProps): ReactElement | null {
-  // `idle` is the first paint, before the client has started connecting:
-  // showing a warning there would flash on every launch.
+  const [dismissed, setDismissed] = useState(false);
+
+  // A real connection clears the dismissal: the next failure is new news.
+  useEffect(() => {
+    if (status === "open") setDismissed(false);
+  }, [status]);
+
+  // `idle` is the first paint; `open` means there is nothing to say.
   if (status === "open" || status === "idle") return null;
+  if (dismissed) return null;
 
   const detail = connectionDetail(status);
   const why = typeof reason === "string" && reason.trim().length > 0 ? reason.trim() : null;
@@ -49,6 +60,14 @@ export function ConnectionBanner({ status, reason, onRetry }: ConnectionBannerPr
       </span>
       <button type="button" className="connbanner__retry" onClick={onRetry}>
         Retry
+      </button>
+      <button
+        type="button"
+        className="connbanner__close"
+        aria-label="Dismiss"
+        onClick={() => setDismissed(true)}
+      >
+        ×
       </button>
     </div>
   );

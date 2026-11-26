@@ -213,6 +213,17 @@ pre {
   color: var(--muted);
 }
 
+.connbanner__close {
+  background: none;
+  border: none;
+  color: var(--muted-foreground, #9aa0a6);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+.connbanner__close:hover { color: var(--foreground, #e6e6e6); }
+
 .connbanner__retry {
   flex: none;
   padding: 6px 14px;

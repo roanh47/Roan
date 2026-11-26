@@ -26,21 +26,21 @@ describe("the daemon banner", () => {
 
   it("names the wait instead of pretending to be a chat state", () => {
     const markup = html("connecting");
-    expect(markup).toContain("looking for the daemon on this device");
+    expect(markup).toContain("the daemon on this device is not answering");
     expect(markup).not.toContain("Message Roan");
   });
 
   it("says what is wrong and offers the one action when the connection closed", () => {
     const markup = html("closed");
     expect(markup).toContain("Daemon not connected");
-    expect(markup).toContain("the connection to the daemon closed");
+    expect(markup).toContain("the daemon closed the connection");
     expect(markup).toContain("Retry");
     expect(markup).toContain('role="status"');
   });
 
   it("carries the client's reason next to the status", () => {
     const markup = html("reconnecting", "the daemon connection reported an error");
-    expect(markup).toContain("reconnecting to the daemon");
+    expect(markup).toContain("the daemon on this device is not answering");
     expect(markup).toContain("the daemon connection reported an error");
   });
 });
