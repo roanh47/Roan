@@ -54,6 +54,41 @@ komt hier per versie terug.
 
 ## 0.0.27
 
+- [ ] **Composer-tekst precies in het midden.** De regel in het invoerveld staat
+      nu te laag; tekst en placeholder moeten verticaal gecentreerd zijn, ook met
+      een meerregelig bericht.
+- [ ] **Ruimte voor de statusbalk komt van Android, niet uit de HTML.** De HTML is
+      op elke build identiek; de shell levert de insets (of de webview staat niet
+      edge-to-edge) en de CSS gebruikt ze alleen. Geen eigen `padding-top` meer.
+- [ ] **Zijbalk op grote schermen uitgeklapt kunnen blijven**, zoals andere
+      AI-apps: een vaste, ingeklapte rail op smal, een open zijbalk op breed, met
+      een knop om te wisselen.
+- [ ] **"Connecting to daemon" verdwijnt.** De wrapper start zijn daemon en houdt
+      hem in de lucht; als hij toch wegvalt, komt er een popup bovenin met de
+      reden en een herstart-knop — geen wachttekst in de chat.
+- [ ] **New chat werkt.** Eerste beurt, lege staat en de rail moeten alle drie
+      het nieuwe gesprek meteen als actief tonen.
+- [ ] **Elk device kan andere devices uit de keten verwijderen.** Een
+      `node_remove`-event met tombstone; het verwijderde device verdwijnt uit de
+      lijst en komt terug zodra het opnieuw verbindt (en de keten weer ziet).
+- [ ] **Werkplek als echte file explorer.** `workspace/` én `workspace/synced/`
+      zichtbaar, per node zijn eigen mappen, met sync-status per bestand
+      (gesynct / lokaal / conflict / in afwachting).
+- [ ] **Roan komt overal bij op elke machine.** geen kunstmatige grens op paden
+      buiten de workspace voor de eigenaar; wat de agent leest, leest hij met de
+      rechten van de daemon.
+- [ ] **Admin/sudo per node als instelling**, bij voorkeur via een commando dat de
+      regels zet (`/etc/sudoers.d` of polkit) in plaats van een wachtwoord in de
+      app te vragen. Zonder die instelling weigert de daemon elevated werk met een
+      eerlijke melding.
+- [ ] **De UI responsief maken** — één layout die klopt op pc, tablet en telefoon.
+      Vandaag is er één breedte-aanname: smal geeft een bovenbalk die er niet
+      hoort, breed laat dezelfde balk staan. Klaar als pc, tablet en telefoon
+      elk hun eigen maat krijgen zonder dat een element buiten beeld valt.
+- [ ] **Geen eigen statusbar-ruimte.** De app mag de statusbalk van Android niet
+      zelf nadoen met padding: de systeem-insets bepalen die ruimte
+      (`WindowInsets` / safe-area). Nu reserveert de UI zelf een strook, en
+      daardoor ziet de desktop er ook uit als een telefoon met een balk erboven.
 - [ ] **MCP-servers automatisch vinden** in de gebruikelijke configmappen (#10).
 - [ ] **Basiskennis vanaf één plek** bijwerken (#18).
 - [ ] **Zonder API-sleutels lezen** — alleen anonieme bronnen (#17).

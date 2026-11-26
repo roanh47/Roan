@@ -12,7 +12,7 @@
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { collectEnvEntries, hashEnvEntries, type CollectOptions } from "./pack.js";
+import { collectEnvEntries, hashEnvEntries, sanitizeEnvEntry, type CollectOptions } from "./pack.js";
 import { parkEnv } from "./park.js";
 import { decodeEnvEntry, parseEnvSnapshot } from "./snapshot.js";
 import {
@@ -79,6 +79,11 @@ export async function applyEnvSnapshot(
     return { hash: parsed.hash, applied: false, parkedPath: null, written: [], removed: [] };
   }
 
+  // A peer that predates the secret redaction still ships the provider key in
+  // config.json. Drop it here, so both the write and the read-back agree.
+  const safeEntries = parsed.entries.map((entry) => sanitizeEnvEntry(entry));
+  const expectedHash = hashEnvEntries(safeEntries);
+
   const localByPath = new Map(local.map((entry) => [entry.path, entry] as const));
   const targetPaths = new Set(parsed.entries.map((entry) => entry.path));
   const written = parsed.entries
@@ -94,10 +99,10 @@ export async function applyEnvSnapshot(
   });
 
   try {
-    for (const entry of parsed.entries) {
+    for (const entry of safeEntries) {
       if (entry.kind === "dir") await writeEntry(home, entry);
     }
-    for (const entry of parsed.entries) {
+    for (const entry of safeEntries) {
       if (entry.kind === "file") await writeEntry(home, entry);
     }
 
@@ -106,11 +111,11 @@ export async function applyEnvSnapshot(
     const appliedResidue: string[] = [];
     const applied = await collectEnvEntries({ ...collectOptions, skipped: appliedResidue });
     const appliedHash = hashEnvEntries(applied);
-    if (appliedHash !== parsed.hash || appliedResidue.length > 0) {
+    if (appliedHash !== expectedHash || appliedResidue.length > 0) {
       const extra =
         appliedResidue.length === 0 ? "" : `; leftover entries: ${appliedResidue.join(", ")}`;
       throw new Error(
-        `env did not apply cleanly: expected ${parsed.hash}, found ${appliedHash}${extra}`,
+        `env did not apply cleanly: expected ${expectedHash}, found ${appliedHash}${extra}`,
       );
     }
   } catch (err) {

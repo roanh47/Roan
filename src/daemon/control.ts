@@ -4,7 +4,7 @@ import { WebSocketServer, type WebSocket } from "ws";
 import type { EventStore } from "../chain/store.js";
 import { encodeFrame, PROTOCOL_VERSION, type TransportFrame } from "../protocol/index.js";
 import type { ChainResponse, ControlRequest, DaemonState } from "./control-protocol.js";
-import { createWebHandler, defaultWebDist, isLoopbackAddress } from "./control-http.js";
+import { createWebHandler, defaultWebDist, isLoopbackAddress, isTailnetAddress } from "./control-http.js";
 
 /** One WebSocket protocol on the shared port. Same shape `ws` hands to `upgrade`. */
 export type UpgradeHandler = (req: IncomingMessage, socket: Duplex, head: Buffer) => void;
@@ -123,7 +123,7 @@ function presentsChainToken(req: IncomingMessage): boolean {
  */
 export function startControlServer(options: ControlServerOptions): Promise<ControlServer> {
   const host = options.host ?? "127.0.0.1";
-  const isLocal = options.isLocal ?? isLoopbackAddress;
+  const isLocal = options.isLocal ?? ((address: string | undefined) => isLoopbackAddress(address) || isTailnetAddress(address));
   const mounts = new Map<string, UpgradeHandler>();
   const clients = new Set<WebSocket>();
 

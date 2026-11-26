@@ -97,6 +97,19 @@ function redactSecrets(fileName: string, text: string): string {
   }
 }
 
+/**
+ * The same redaction as at pack time, applied to an entry that came from a peer.
+ * A build that predates the redaction still publishes the key, so applying it
+ * has to drop the key instead of failing the hash check.
+ */
+export function sanitizeEnvEntry(entry: EnvEntry): EnvEntry {
+  if (entry.kind !== "file" || entry.path !== "config.json" || typeof entry.content !== "string") return entry;
+  const cleaned = redactSecrets(entry.path, entry.content);
+  if (cleaned === entry.content) return entry;
+  const bytes = Buffer.from(cleaned, "utf8");
+  return { ...entry, content: cleaned, size: bytes.byteLength, sha256: sha256Hex(bytes) };
+}
+
 async function readFileEntry(
   relPath: string,
   absolute: string,

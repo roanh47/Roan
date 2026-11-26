@@ -70,6 +70,22 @@ export function defaultWebDist(): string {
  * dual-stack socket reports for an IPv4 loopback caller, and the whole
  * `127.0.0.0/8` block counts: every address in it is this host.
  */
+/**
+ * The tailnet is the private network this agent is meant to be reached on
+ * (100.64.0.0/10, Tailscale's CGNAT range). Control from it is trusted the same
+ * way loopback is; anything else still needs the operator's opt-in.
+ */
+export function isTailnetAddress(address: string | undefined): boolean {
+  if (address === undefined) return false;
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(address);
+  const ipv4 = mapped === null ? address : (mapped[1] ?? address);
+  const parts = ipv4.split(".");
+  if (parts.length !== 4) return false;
+  const first = Number(parts[0]);
+  const second = Number(parts[1]);
+  return first === 100 && second >= 64 && second <= 127;
+}
+
 export function isLoopbackAddress(address: string | undefined): boolean {
   if (address === undefined || address.length === 0) return false;
   if (address === "::1" || address === "0:0:0:0:0:0:0:1") return true;

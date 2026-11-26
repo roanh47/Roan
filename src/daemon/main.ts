@@ -71,7 +71,9 @@ import { saveSettings } from "./settings-write.js";
  * work, so an existing unit file keeps starting.
  */
 const PORT = Number(process.env["ROAN_PORT"] ?? process.env["ROAN_CONTROL_PORT"] ?? 6769);
-const HOST = process.env["ROAN_HOST"] ?? process.env["ROAN_CONTROL_HOST"] ?? "127.0.0.1";
+// Listen on every interface: an app on a phone, a laptop and a server has to be
+// reachable from the same machine (loopback) and from the tailnet at once.
+const HOST = process.env["ROAN_HOST"] ?? process.env["ROAN_CONTROL_HOST"] ?? "0.0.0.0";
 
 /** The last stretch of the daemon's own output, served at `/log` on the port. */
 const LOG_RING_CHARS = 64 * 1024;
@@ -90,8 +92,8 @@ interface Session {
 
 /**
  * Where the one port listens, phrased the way the invite and the announcement
- * understand it. The daemon binds exactly one address: `127.0.0.1` unless the
- * operator set `ROAN_HOST` (an address, or `lan` / `tailscale` resolved here).
+ * understand it. The daemon binds every interface (`0.0.0.0`) unless the
+ * operator narrowed it with `ROAN_HOST` (an address, or `lan` / `tailscale`).
  */
 function peerBind(): PeerBind {
   const choice = HOST.trim();
