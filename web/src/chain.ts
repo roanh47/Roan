@@ -633,6 +633,10 @@ export class ChainClient {
   }
 
   /** Opens a new conversation from an earlier point; nothing is deleted. */
+  steer(text: string): Promise<unknown> {
+    return this.request("steer", { text });
+  }
+
   rewind(seq: number): void {
     this.send({ t: "rewind", seq });
   }

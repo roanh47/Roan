@@ -638,6 +638,8 @@ export default function App(): ReactElement {
           client={client}
           planMode={planMode}
           onPlanModeChange={setPlanMode}
+          steerable={turn !== null && !disabled}
+          onSteer={(text) => void client.steer(text)}
         />
       </footer>
 

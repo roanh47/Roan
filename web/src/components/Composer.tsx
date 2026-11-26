@@ -57,6 +57,9 @@ interface ComposerProps {
    * pill still shows the state but cannot be pressed.
    */
   onPlanModeChange?: (enabled: boolean) => void;
+  /** A turn is running: the draft steers it instead of starting a new one. */
+  steerable?: boolean;
+  onSteer?: (text: string) => void;
   /**
    * Starts (or stops) voice input. The microphone, the permission prompt and
    * the transcription round-trip live in the app; this button only reports the
@@ -72,7 +75,7 @@ interface ComposerProps {
 export const MIC_UNAVAILABLE_HINT =
   "Voice input needs a speech-to-text provider; none is set up on this device.";
 
-export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, client, planMode = false, onPlanModeChange, onRecord, recording = false }: ComposerProps): ReactElement {
+export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, client, planMode = false, onPlanModeChange, onRecord, recording = false, steerable = false, onSteer }: ComposerProps): ReactElement {
   // The plus always exists: a photo needs neither workspace nor dictation.
   const hasMenu = true;
   const planning = planMode === true;
@@ -97,11 +100,17 @@ export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, c
     }
   }, [prefill?.at]);
 
-  const ready = (value.trim().length > 0 || image !== null) && !disabled;
+  const ready = (value.trim().length > 0 && (!disabled || steerable)) || (image !== null && !disabled);
 
   function submit(): void {
     const text = value.trim();
     if (disabled || (text.length === 0 && image === null)) return;
+    // Mid-turn the draft steers the running turn instead of starting a new one.
+    if (steerable && onSteer !== undefined && text.length > 0) {
+      onSteer(text);
+      setValue("");
+      return;
+    }
     onSend(text.length > 0 ? text : "[afbeelding]", image ?? undefined);
     setValue("");
     setImage(null);
@@ -340,7 +349,7 @@ export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, c
         className="composer__send"
         type="submit"
         disabled={!ready}
-        aria-label={planning ? "Send message (plan mode is read-only)" : "Send message"}
+        aria-label={steerable ? "Steer the running turn" : planning ? "Send message (plan mode is read-only)" : "Send message"}
       >
         <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
           <path

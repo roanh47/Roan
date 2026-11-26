@@ -81,3 +81,124 @@ test("the first message names a default-titled conversation after itself", () =>
   // No text, no rename.
   assert.equal(autoTitleFor("New chat", "   "), null);
 });
+
+/** Archiving is a later event about a session, never an edit to its events. */
+test("archiving hides a session from the list, not from the chain", () => {
+  const events = [...chain, event(7, "session", { id: "s1", archived: true })];
+  const index = readSessions(events);
+  assert.deepEqual(index.sessions.map((s) => s.id), ["s2"]);
+  assert.deepEqual(index.archived.map((s) => s.id), ["s1"]);
+  assert.equal(index.archived[0]?.archived, true);
+  // Readable, counted and findable by id — the list is the only thing shorter.
+  assert.equal(index.archived[0]?.messages, 1);
+  assert.deepEqual(index.all.map((s) => s.id), ["s1", "s2"]);
+  assert.deepEqual(sessionMessages(events, "s1").map((m) => m.text), ["hoi", "hey"]);
+  assert.equal(events.length, 7);
+});
+
+test("unarchiving brings a session back without starting it again", () => {
+  const events = [
+    ...chain,
+    event(7, "session", { id: "s1", archived: true }),
+    event(8, "session", { id: "s1", archived: false }),
+  ];
+  const index = readSessions(events);
+  assert.deepEqual(index.sessions.map((s) => s.id), ["s1", "s2"]);
+  assert.deepEqual(index.archived, []);
+  // A flag is folded into the session that is already there: start, count and
+  // place in the order stay what they were.
+  assert.equal(index.sessions[0]?.startedSeq, 1);
+  assert.equal(index.sessions[0]?.messages, 1);
+  assert.equal(index.active?.id, "s2");
+});
+
+test("a delete tombstone hides the session and keeps every event", () => {
+  const events = [...chain, event(7, "session", { id: "s1", deleted: true })];
+  const index = readSessions(events);
+  assert.deepEqual(index.sessions.map((s) => s.id), ["s2"]);
+  assert.deepEqual(index.archived, []);
+  assert.deepEqual(index.all.map((s) => s.id), ["s2"]);
+  // Append-only: nothing was erased, the session is only not listed.
+  assert.deepEqual(sessionMessages(events, "s1").map((m) => m.text), ["hoi", "hey"]);
+  assert.equal(events.filter((e) => e.type === "message" || e.type === "assistant").length, 4);
+});
+
+test("a tombstone is final: nothing later turns a deleted session back on", () => {
+  const events = [
+    ...chain,
+    event(7, "session", { id: "s1", deleted: true }),
+    event(8, "session", { id: "s1", deleted: false, archived: false, title: "Toch" }),
+    event(9, "session_title", { session: "s1", title: "Weer" }),
+  ];
+  const index = readSessions(events);
+  assert.deepEqual(index.sessions.map((s) => s.id), ["s2"]);
+  assert.deepEqual(index.archived, []);
+  assert.deepEqual(index.all.map((s) => s.id), ["s2"]);
+});
+
+test("a later rename of an archived session still folds", () => {
+  const events = [
+    ...chain,
+    event(7, "session", { id: "s1", archived: true }),
+    event(8, "session_title", { session: "s1", title: "Bewaard" }),
+    event(9, "message", { text: "en toch", session: "s1" }),
+  ];
+  const index = readSessions(events);
+  // The rename does not resurrect it in the default list…
+  assert.deepEqual(index.sessions.map((s) => s.id), ["s2"]);
+  // …but the archived entry carries the new name and the new message.
+  const row = index.archived[0];
+  assert.equal(row?.id, "s1");
+  assert.equal(row?.title, "Bewaard");
+  assert.equal(row?.archived, true);
+  assert.equal(row?.messages, 2);
+});
+
+test("an archive event does not move unnamed messages to the archived session", () => {
+  const events = [
+    ...chain,
+    event(7, "session", { id: "s1", archived: true }),
+    event(8, "message", { text: "nog hier" }),
+  ];
+  const index = readSessions(events);
+  const s2 = index.sessions.find((s) => s.id === "s2");
+  assert.equal(s2?.messages, 2);
+  assert.deepEqual(sessionMessages(events, "s1").map((m) => m.text), ["hoi", "hey"]);
+});
+
+test("a tombstone for a session that never started adds nothing", () => {
+  const events = [...chain, event(7, "session", { id: "zz", deleted: true })];
+  const index = readSessions(events);
+  assert.deepEqual(index.sessions.map((s) => s.id), ["s1", "s2"]);
+  assert.deepEqual(index.archived, []);
+  assert.deepEqual(index.all.map((s) => s.id), ["s1", "s2"]);
+});
+
+/** A temporary chat is a conversation you are in, not one you keep. */
+test("a temporary chat is listed while it is the one you are in", () => {
+  const events = [...chain, event(7, "session", { id: "t1", title: "Tijdelijk", ephemeral: true })];
+  const index = readSessions(events);
+  assert.deepEqual(index.sessions.map((s) => s.id), ["s1", "s2", "t1"]);
+  assert.equal(index.sessions[2]?.ephemeral, true);
+  assert.equal(index.active?.id, "t1");
+});
+
+test("a temporary chat leaves the history when it ends, its events stay in the chain", () => {
+  const events = [
+    ...chain,
+    event(7, "session", { id: "t1", title: "Tijdelijk", ephemeral: true }),
+    event(8, "message", { text: "geheim" }),
+    event(9, "assistant", { text: "ok" }),
+    event(10, "session", { id: "s3", title: "Daarna" }),
+    event(11, "message", { text: "verder" }),
+  ];
+  const index = readSessions(events);
+  assert.deepEqual(index.sessions.map((s) => s.id), ["s1", "s2", "s3"]);
+  assert.deepEqual(index.all.map((s) => s.id), ["s1", "s2", "s3"]);
+  assert.deepEqual(index.archived, []);
+  assert.equal(index.active?.id, "s3");
+  // Its messages are counted nowhere in the listing any more.
+  assert.equal(index.sessions.reduce((sum, s) => sum + s.messages, 0), 3);
+  // And it is still in the chain, question and answer intact.
+  assert.deepEqual(sessionMessages(events, "t1").map((m) => m.text), ["geheim", "ok"]);
+});

@@ -35,6 +35,7 @@ import { foldGoals, goalContext } from "../chain/goals.js";
 import { distilMemories, memoryTexts } from "../memory/index.js";
 import { foldMemoryMd, writeMemoryMd } from "../context/memory-md.js";
 import { approvePlan, planModeEnabled, planModeEvent } from "./plan.js";
+import { createSteerInbox, type SteerInbox } from "../turn/index.js";
 import { chat } from "../provider.js";
 import { discoverInstructionFiles } from "../import/discover.js";
 import { toSnapshotEntries } from "../import/parse.js";
@@ -208,6 +209,7 @@ async function main(): Promise<void> {
               id: s.id,
               title: s.title,
               messages: s.messages,
+              ...(s.ephemeral ? { ephemeral: true } : {}),
             })),
       activeSession:
         session === null
@@ -246,6 +248,7 @@ async function main(): Promise<void> {
   let control: Awaited<ReturnType<typeof startControlServer>> | null = null;
   /** The turn in flight, so "stop" has something to abort. */
   let activeTurn: AbortController | null = null;
+  let activeSteer: SteerInbox | null = null;
   let replicating = false;
 
   /**
@@ -741,7 +744,7 @@ async function main(): Promise<void> {
     if (session === null) return null;
     const current = session;
     const index = readSessions(current.store.read(current.identity.chainId, 1, 100_000));
-    if (wanted !== undefined && index.sessions.some((entry) => entry.id === wanted)) return wanted;
+    if (wanted !== undefined && index.all.some((entry) => entry.id === wanted)) return wanted;
     const active = index.active;
     if (active !== null) return active.id;
     return null;
@@ -814,7 +817,9 @@ async function main(): Promise<void> {
       if (result.exitCode !== 0) log(`hook turn_start failed (${String(result.exitCode)}): ${result.command}`);
     }
     const controller = new AbortController();
+    const inbox = createSteerInbox();
     activeTurn = controller;
+    activeSteer = inbox;
     await runTurn(
       {
         ...(image !== undefined ? { image } : {}),
@@ -835,6 +840,7 @@ async function main(): Promise<void> {
         tools: toolsForTurn(),
         engine: settings.engine,
         planMode: planModeEnabled(current.store.read(current.identity.chainId, 1, 100_000), sessionId),
+        steer: inbox,
         session: sessionId,
         onAppend: (event) => {
           control?.broadcast({ t: "append", event });
@@ -850,6 +856,7 @@ async function main(): Promise<void> {
       text,
     );
     activeTurn = null;
+    activeSteer = null;
     // The Android service tails the log for this line: a closed app still
     // learns that the turn of its owner is done.
     log("notify:turn-done");
@@ -1405,7 +1412,7 @@ async function main(): Promise<void> {
             reply({ ok: true, path, shared, count: result.count });
             return;
           }
-          const known = readSessions(allEvents).sessions.some((entry) => entry.id === what);
+          const known = readSessions(allEvents).all.some((entry) => entry.id === what);
           if (!known) {
             reply({ ok: false, error: "unknown conversation" });
             return;
@@ -1628,6 +1635,33 @@ async function main(): Promise<void> {
           reply({ ok: true, plan });
           return;
         }
+        if (kind === "steer") {
+          if (activeSteer === null) {
+            reply({ ok: false, error: "no turn is running" });
+            return;
+          }
+          const text = typeof data["text"] === "string" ? data["text"] : "";
+          reply({ ok: true, ...activeSteer.push(text) });
+          return;
+        }
+        if (kind === "session_archive" || kind === "session_delete") {
+          const current = session;
+          const wanted = typeof data["id"] === "string" ? data["id"] : "";
+          if (current === null || wanted.length === 0) {
+            reply({ ok: false, error: "no chain or session id" });
+            return;
+          }
+          const event = current.store.append(current.identity.chainId, {
+            id: uuid(),
+            node: current.identity.nodeId,
+            type: "session",
+            data: kind === "session_delete" ? { id: wanted, deleted: true } : { id: wanted, archived: data["archived"] !== false },
+          });
+          control?.broadcast({ t: "append", event });
+          control?.sendState();
+          reply({ ok: true });
+          return;
+        }
         if (kind === "goal") {
           const current = session;
           const text = typeof data["text"] === "string" ? data["text"].trim() : "";
@@ -1766,7 +1800,7 @@ async function main(): Promise<void> {
       if (session === null) return;
       const current = session;
       const index = readSessions(current.store.read(current.identity.chainId, 1, 100_000));
-      if (!index.sessions.some((entry) => entry.id === wanted)) return;
+      if (!index.all.some((entry) => entry.id === wanted)) return;
       current.store.append(current.identity.chainId, {
         id: uuid(),
         node: current.identity.nodeId,

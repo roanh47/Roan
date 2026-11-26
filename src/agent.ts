@@ -5,7 +5,7 @@ import type { ChatAdapter } from "./providers/adapter.js";
 import type { EffortLevel } from "./providers/effort.js";
 import { sessionTotal, type TokenUsage } from "./usage.js";
 import { toToolSpecs } from "./tools.js";
-import type { AgentEvent, ChatMessage, Tool, ToolContext } from "./types.js";
+import type { AgentEvent, ChatMessage, ContentPart, Tool, ToolContext } from "./types.js";
 
 export interface AgentOptions {
   provider: ProviderConfig;
@@ -26,6 +26,13 @@ export interface AgentOptions {
    * tool", so the transcript explains the mode rather than sounding broken.
    */
   refusedTools?: ReadonlyMap<string, string>;
+  /**
+   * Called with the live message list immediately before every request. The
+   * turn runner uses it to append a steer the owner sent mid-turn; the loop
+   * checks the role invariant right after, so a hook that appends in the wrong
+   * place fails loudly instead of sending a request a provider would reject.
+   */
+  onBeforeRequest?: (messages: ChatMessage[]) => void;
   onEvent?: (event: AgentEvent) => void;
   signal?: AbortSignal;
 }
@@ -52,6 +59,100 @@ function buildAdapter(provider: ProviderConfig): ChatAdapter {
 }
 
 /**
+ * One message's content as parts, so two owner messages can be folded into
+ * one without dropping a photo that rode along.
+ */
+function toParts(content: ChatMessage["content"]): ContentPart[] {
+  if (typeof content === "string") {
+    return content.length === 0 ? [] : [{ type: "text", text: content }];
+  }
+  return content ?? [];
+}
+
+/** Folds two adjacent owner messages into the first, keeping both texts. */
+function foldUserMessages(first: ChatMessage, second: ChatMessage): ChatMessage {
+  if (typeof first.content === "string" && typeof second.content === "string") {
+    const joined = [first.content, second.content].filter((text) => text.length > 0).join("\n\n");
+    return { ...first, content: joined };
+  }
+  return { ...first, content: [...toParts(first.content), ...toParts(second.content)] };
+}
+
+/**
+ * Replayed history can hold two owner messages in a row: a steer recorded by a
+ * turn that then failed is one. A provider treats such a run as a single
+ * block, so it is folded here — the chat the model sees keeps the same
+ * alternation the live flow enforces.
+ */
+function normalizeHistory(history: readonly ChatMessage[]): ChatMessage[] {
+  const out: ChatMessage[] = [];
+  for (const message of history) {
+    const last = out[out.length - 1];
+    if (last !== undefined && last.role === "user" && message.role === "user") {
+      out[out.length - 1] = foldUserMessages(last, message);
+      continue;
+    }
+    out.push({ ...message });
+  }
+  return out;
+}
+
+/** A tool round whose results are not all in yet. */
+interface OpenRound {
+  readonly index: number;
+  readonly pending: Set<string>;
+}
+
+/**
+ * The shape rule every provider agrees on: user and assistant alternate, and a
+ * tool round is never interrupted. A user message may follow tool results
+ * (that is where a steer lands) but never another user message, and never an
+ * assistant call whose results are still outstanding.
+ *
+ * One pair is inherited rather than created: the chain records the owner's
+ * question before the turn starts, so replayed history can already end with
+ * the very text the live turn carries. `inheritedUserPair` names that live
+ * message when it repeats the history's last user message, and only that pair
+ * is allowed — a turn without a steer must send exactly what it always did.
+ *
+ * Replayed tool results without their call block are tolerated — the chain
+ * stores results, not call ids that no longer exist — so the check is about
+ * what the live loop can get wrong, not about rewriting history.
+ */
+function assertAlternating(messages: readonly ChatMessage[], inheritedUserPair = -1): void {
+  let open: OpenRound | null = null;
+  for (let i = 0; i < messages.length; i++) {
+    const message = messages[i];
+    if (message === undefined) continue;
+
+    if (open !== null) {
+      if (message.role !== "tool") {
+        throw new Error(
+          `agent: a ${message.role} message at index ${String(i)} interrupts the tool round opened at index ${String(open.index)}; a steer lands after the tool results`,
+        );
+      }
+      if (message.tool_call_id !== undefined) open.pending.delete(message.tool_call_id);
+      if (open.pending.size === 0) open = null;
+      continue;
+    }
+
+    if (message.role === "user" && messages[i - 1]?.role === "user" && i !== inheritedUserPair) {
+      throw new Error(
+        `agent: two user messages in a row at index ${String(i)}; a steer can only be appended after tool results`,
+      );
+    }
+    if (message.role === "assistant" && (message.tool_calls?.length ?? 0) > 0) {
+      open = { index: i, pending: new Set(message.tool_calls?.map((call) => call.id) ?? []) };
+    }
+  }
+  if (open !== null) {
+    throw new Error(
+      `agent: the tool round opened at index ${String(open.index)} is missing results for ${[...open.pending].join(", ")}`,
+    );
+  }
+}
+
+/**
  * The agent loop: model → tool → model, until the model is done or the step budget runs out.
  * Knows nothing about the UI; everything goes through onEvent, so the app and the daemon
  * share the same core.
@@ -68,7 +169,7 @@ export class Agent {
     this.maxSteps = opts.maxSteps ?? 24;
     this.adapter = buildAdapter(opts.provider);
     this.messages.push({ role: "system", content: opts.systemPrompt });
-    if (opts.history) this.messages.push(...opts.history);
+    if (opts.history) this.messages.push(...normalizeHistory(opts.history));
   }
 
   get history(): ChatMessage[] {
@@ -99,6 +200,12 @@ export class Agent {
     });
     const emit = this.opts.onEvent ?? (() => {});
     const specs = toToolSpecs(this.opts.tools);
+    // The chain already holds the owner's question when the turn starts, so
+    // the replayed history may end with the same message this send() just
+    // added. That one pair is inherited; naming it keeps the invariant strict
+    // everywhere the loop and a steer can actually add a message.
+    const live = this.messages.length - 1;
+    const inheritedUserPair = this.messages[live - 1]?.role === "user" ? live : -1;
     let stappen = 0;
     let laatsteTekst = "";
 
@@ -106,6 +213,11 @@ export class Agent {
       stappen++;
       let antwoord: ChatMessage;
       try {
+        // The hook is the one seam a steer enters through. It runs before the
+        // invariant check, so text appended at the wrong point is refused here
+        // rather than by the provider halfway through the turn.
+        this.opts.onBeforeRequest?.(this.messages);
+        assertAlternating(this.messages, inheritedUserPair);
         const response = await this.adapter.send(this.messages, {
           tools: specs,
           signal: this.opts.signal,

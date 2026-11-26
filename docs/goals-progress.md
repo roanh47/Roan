@@ -19,17 +19,17 @@ Owner of this file: the orchestrator (not the children).
 | 12 | Import | done | discover/parse/plan/apply + `imported/` env root + import_discover/plan frames; ImportPanel unwired | 1 |
 | 11 | Spraak invoer | pending | — | 0 |
 | 12 | Import | pending | — | 0 |
-| 13 | Steer mid-turn | in-progress | — | 1 |
-| 14 | Deep research | in-progress | — | 1 |
+| 13 | Steer mid-turn | done | inbox + alternation guard + turn-runner hook; frame, client.steer and composer Steer button wired | 1 |
+| 14 | Deep research | done | bounded plan→search→extract→report with citation guard, 39 tests; tool not registered yet (open) | 1 |
 | 15 | Device control | blocked | module + 16 tests ready; protocol wiring (device_req frame, transport handlers, device_grant/device_result event types) deferred | 1 |
-| 16 | Zijvragen en queueing | in-progress | — | 1 |
-| 17 | Delen en exporteren | in-progress | — | 1 |
-| 18 | Archief en tijdelijke chats | in-progress | — | 1 |
-| 19 | Veiligheid | pending | — | 0 |
-| 20 | Kennis | pending | — | 0 |
-| 21 | Commando's en hooks | pending | — | 0 |
-| 22 | Server en SDK | pending | — | 0 |
-| 23 | Leren en rollen | pending | — | 0 |
+| 16 | Zijvragen en queueing | done | queue + side-session ids + QueueBar component; daemon queueing not wired (open) | 1 |
+| 17 | Delen en exporteren | done | self-contained escaped HTML export + markdown header; export frame still writes markdown only (open) | 1 |
+| 18 | Archief en tijdelijke chats | done | append-only tombstones, `.all` lookups, archive/delete frames, SessionRow component | 1 |
+| 19 | Veiligheid | in-progress | — | 1 |
+| 20 | Kennis | in-progress | — | 1 |
+| 21 | Commando's en hooks | in-progress | — | 1 |
+| 22 | Server en SDK | in-progress | — | 1 |
+| 23 | Leren en rollen | in-progress | — | 1 |
 | 24 | Browser | pending | — | 0 |
 | 25 | Computer use | pending | — | 0 |
 | 26 | Generatie | pending | — | 0 |

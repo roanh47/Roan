@@ -1,4 +1,5 @@
 import type { Event } from "../protocol/types.js";
+import { formatStamp, sessionModel } from "./export-html.js";
 import { readSessions, sessionEvents } from "./sessions.js";
 
 /**
@@ -63,8 +64,16 @@ export function linkify(text: string): string {
 export function sessionMarkdown(events: readonly Event[], session: string): string {
   const index = readSessions(events);
   const info = index.sessions.find((entry) => entry.id === session);
-  const title = info?.title ?? "Conversation";
+  // A title is one line: a newline in it would break the heading it rides.
+  const title = (info?.title ?? "Conversation").replace(/\s+/g, " ").trim() || "Conversation";
   const lines: string[] = [`# ${title}`, ""];
+  const turns = info?.messages ?? 0;
+  const header: string[] = [];
+  if (info !== undefined) header.push(`Started ${formatStamp(info.startedAt)}`);
+  header.push(`${String(turns)} ${turns === 1 ? "turn" : "turns"}`);
+  const model = sessionModel(events, session);
+  if (model !== null) header.push(`model ${model}`);
+  lines.push(`*${header.join(" · ")}*`, "");
   for (const message of sessionEvents(events, session)) {
     const data = message.data as { text?: unknown } | null;
     const text = typeof data?.text === "string" ? data.text.trim() : "";

@@ -3,8 +3,8 @@ import { Agent } from "../agent.js";
 import type { EventStore } from "../chain/store.js";
 import type { Event } from "../protocol/types.js";
 import { allTools } from "../tools.js";
-import type { Tool } from "../types.js";
-import { acquire, release, SeqConflictError } from "../turn/index.js";
+import type { ChatMessage as AgentMessage, Tool } from "../types.js";
+import { acquire, release, SeqConflictError, type SteerInbox } from "../turn/index.js";
 import type { Event as TurnEvent, TurnEventDraft, TurnStore } from "../turn/types.js";
 import { historyFromEvents } from "./history.js";
 import { runHermesTurn } from "../engine/hermes.js";
@@ -47,6 +47,13 @@ export interface TurnRunnerOptions {
    * engine — that one owns its tools in a subprocess and cannot be gated.
    */
   readonly planMode?: boolean;
+  /**
+   * Where a message the owner sends while this turn runs waits. After each
+   * tool round the loop takes it and appends it as the next user message, so a
+   * correction lands between the tool results and the model's answer instead
+   * of opening a second turn over the first one's head.
+   */
+  readonly steer?: SteerInbox;
   /** Called for every event the run produces, after it is durable. */
   readonly onAppend: (event: Event) => void;
   /** Aborts the turn; set by the cancel request the app sends. */
@@ -112,6 +119,24 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
     const event = store.append(chain, { id: randomUUID(), node, type: input.type, data: input.data });
     options.onAppend(event);
     return event;
+  };
+
+  const steer = options.steer;
+  /**
+   * A steer is the owner's words, so the chain keeps them like any other
+   * message — as an ordinary `message` event flagged `steer`, which is what the
+   * app renders inline. The session tag keeps it in the conversation it was
+   * typed into, so the next turn's replay sees it where it happened.
+   */
+  const recordSteer = (text: string): void => {
+    append({
+      type: "message",
+      data: {
+        text,
+        steer: true,
+        ...(options.session !== undefined ? { session: options.session } : {}),
+      },
+    });
   };
 
   const lock = await acquire(turns, chain, node);
@@ -197,6 +222,24 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
       ...(options.effort !== undefined ? { effort: options.effort } : {}),
       ...(refused.size > 0 ? { refusedTools: refused } : {}),
       ...(options.signal !== undefined ? { signal: options.signal } : {}),
+      ...(steer !== undefined
+        ? {
+            /**
+             * The one legal place for a steer: after a round's tool results and
+             * before the next request. The first request still ends with the
+             * live question, and appending there would put two user messages in
+             * a row — the agent refuses that, so this guard keeps it from ever
+             * happening instead of relying on that refusal.
+             */
+            onBeforeRequest: (messages: AgentMessage[]) => {
+              if (messages[messages.length - 1]?.role !== "tool") return;
+              const pending = steer.take();
+              if (pending === null) return;
+              messages.push({ role: "user", content: pending });
+              recordSteer(pending);
+            },
+          }
+        : {}),
       onEvent: (event) => {
         switch (event.type) {
           case "assistant_text":
@@ -241,5 +284,11 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
     } catch {
       // the turn already ended or was reclaimed; the chain is still consistent
     }
+    // A steer that arrived after the last request could not be seen by this
+    // turn — the answer was already on its way. It is not dropped: it joins
+    // the chain after the turn closed, exactly where the model reads the
+    // owner's next message. The subprocess engine lands here too, because it
+    // owns its loop and cannot be steered between requests.
+    for (const text of steer?.drain() ?? []) recordSteer(text);
   }
 }

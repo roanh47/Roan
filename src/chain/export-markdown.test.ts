@@ -54,6 +54,28 @@ test("sessionAttachments lists the photos ready to write", () => {
   assert.deepEqual(sessionAttachments(events, "s1"), []);
 });
 
+test("the header names the start, the model and the number of turns", () => {
+  const named: Event[] = [
+    event(1, "session", { id: "s1", title: "Poortvraag", model: "stub-model" }),
+    event(2, "message", { text: "wat is 7412?", session: "s1" }),
+    event(3, "assistant", { text: "de peer-poort.", session: "s1" }),
+  ];
+  const markdown = sessionMarkdown(named, "s1");
+  assert.ok(markdown.startsWith("# Poortvraag\n\n*Started 1970-01-01 00:00 UTC · 1 turn · model stub-model*\n\n"));
+  assert.ok(markdown.includes("## Owner"));
+  assert.ok(markdown.includes("de peer-poort."));
+});
+
+test("a header without a date or a model says only what it knows", () => {
+  const unknown = sessionMarkdown(events, "zz");
+  assert.ok(unknown.startsWith("# Conversation\n\n*0 turns*\n\n"));
+  assert.ok(!unknown.includes(" · model "));
+  // The recorded conversation has a start even though no model was recorded.
+  const plain = sessionMarkdown(events, "s1");
+  assert.ok(plain.includes("Started 1970-01-01 00:00 UTC · 1 turn*"));
+  assert.ok(!plain.includes(" · model "));
+});
+
 test("linkify leaves wired links alone and extension mapping is honest", () => {
   assert.equal(linkify("zie [iets](https://voorbeeld.nl) hier"), "zie [iets](https://voorbeeld.nl) hier");
   assert.equal(linkify("bron https://a.b/c en http://d.e"), "bron [https://a.b/c](https://a.b/c) en [http://d.e](http://d.e)");
