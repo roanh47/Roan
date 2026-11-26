@@ -25,15 +25,15 @@ Owner of this file: the orchestrator (not the children).
 | 16 | Zijvragen en queueing | done | queue + side-session ids + QueueBar component; daemon queueing not wired (open) | 1 |
 | 17 | Delen en exporteren | done | self-contained escaped HTML export + markdown header; export frame still writes markdown only (open) | 1 |
 | 18 | Archief en tijdelijke chats | done | append-only tombstones, `.all` lookups, archive/delete frames, SessionRow component | 1 |
-| 19 | Veiligheid | in-progress | — | 1 |
-| 20 | Kennis | in-progress | — | 1 |
-| 21 | Commando's en hooks | in-progress | — | 1 |
-| 22 | Server en SDK | in-progress | — | 1 |
-| 23 | Leren en rollen | in-progress | — | 1 |
-| 24 | Browser | pending | — | 0 |
-| 25 | Computer use | pending | — | 0 |
-| 26 | Generatie | pending | — | 0 |
-| 27 | Spraakgesprek | pending | — | 0 |
+| 19 | Veiligheid | done | sandbox detect/wrap (bwrap/landlock/sandbox-exec), one-time elevation, untrusted blocks; 41 tests; exec.ts hook open | 1 |
+| 20 | Kennis | done | memory/session search with sources (1053-suite) + projects store; tool/prompt wiring open | 1 |
+| 21 | Commando's en hooks | done | command parse/fold/expand + isolated hooks + SlashMenu; `command` event type added; turn wiring open | 1 |
+| 22 | Server en SDK | done | docs/api.md from code, typed ws client (12 tests), deferred tools; sdk has its own tsconfig | 1 |
+| 23 | Leren en rollen | done | proposals inert until approval, env-carried; roleModel() planner/executor/side; 30 tests | 1 |
+| 24 | Browser | in-progress | — | 1 |
+| 25 | Computer use | in-progress | — | 1 |
+| 26 | Generatie | in-progress | — | 1 |
+| 27 | Spraakgesprek | in-progress | — | 1 |
 | 28 | Werkplek | pending | — | 0 |
 | 29 | Code en git | pending | — | 0 |
 | 30 | Surfaces | pending | — | 0 |

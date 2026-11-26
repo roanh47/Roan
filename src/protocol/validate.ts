@@ -70,6 +70,7 @@ const EVENT_TYPES = {
   memory: true,
   plan_mode: true,
   cron_job: true,
+  command: true,
 } as const satisfies { readonly [K in EventType]: true };
 
 const FRAME_TYPES = {

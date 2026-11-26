@@ -144,8 +144,11 @@ function collectStrings(
 /**
  * One-line excerpt of `text` around the match at `index`. Whitespace runs
  * become single spaces; `…` is added on a side where text was dropped.
+ *
+ * Exported because `src/knowledge/search.ts` reuses it: a long memory or message
+ * that matches should be shown around the match, not cut at the front.
  */
-function makeSnippet(
+export function makeSnippet(
   text: string,
   index: number,
   matchLength: number,

@@ -52,7 +52,9 @@ export type EventType =
   /** A conversation is in read-only plan mode until the plan is approved. */
   | "plan_mode"
   /** A scheduled task: schedule, prompt, enabled. */
-  | "cron_job";
+  | "cron_job"
+  /** A user-defined slash command: name, prompt, tombstone. */
+  | "command";
 
 /**
  * One entry in the append-only chain.
