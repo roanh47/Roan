@@ -20,7 +20,7 @@ Datum: 2026-11-26. Repo `/home/roan/Roan`, branch `main`. **Niets gepusht, geen 
 | 12 | Import | done | discover/parse/plan/apply + `imported/`-env-root + `import_discover`/`import_plan`-frames |
 | 13 | Steer mid-turn | done | inbox + alternation-guard + `steer`-frame + Steer-knop in de composer |
 | 14 | Deep research | done | bounded plan→search→extract→report met citation-guard (39 tests); tool niet geregistreerd (open) |
-| 15 | Device control | **blocked** | module + 16 tests; protocol-wiring (`device_req`, transport, `device_grant`) niet gedaan |
+| 15 | Device control | done | module + 16 tests, `device_req`-frame + validatie + codec, `device_grant`/`device_result` in alle vijf registries, grant-gated receiver in beide transports (35 tests), daemon zet `device: {store}` op beide links |
 | 16 | Zijvragen en queueing | done | queue + side-sessie-ids + QueueBar; daemon-queueing open |
 | 17 | Delen en exporteren | done | zelfstandige, volledig ge-escaped HTML-export + markdown-kop; HTML wordt nu ook geschreven bij export |
 | 18 | Archief en tijdelijke chats | done | tombstones in de fold, `.all`-lookups, archive/delete-frames, SessionRow-component |
@@ -52,7 +52,7 @@ Datum: 2026-11-26. Repo `/home/roan/Roan`, branch `main`. **Niets gepusht, geen 
 
 ## Wat bewust open bleef
 
-1. **Device control (15)**: protocol-wiring. Exacte lijst staat in de ledger.
+1. ~~Device control (15)~~ — inmiddels afgemaakt en gecommit (`9da2778`).
 2. **UI-mounts**: ImportPanel, SessionRow in de rail, BackgroundPanel, GitPanel, QueueBar, computer-grant-scherm. De componenten bestaan en zijn getest; de app toont ze nog niet.
 3. **Mic/speaker-capture** voor spraak (STT/TTS/lus staan; de shell moet audio leveren).
 4. **Deep-research- en generate_image-tools** zijn modules, nog geen model-tools.
