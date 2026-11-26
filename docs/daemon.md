@@ -93,7 +93,7 @@ All of it hangs off `RoanPaths` in `paths.ts`, rooted at
 | `workspace` | `~/.Roan/workspace` | `ensurePaths` |
 | `syncedWorkspace` | `~/.Roan/synced-workspace` | `ensurePaths`; the turn's `cwd` |
 | `database` | `~/.Roan/workspace/chain.db` | `EventStore` — one SQLite file, every chain |
-| `configFile` | `~/.Roan/config.json` | `loadSettings` reads `baseUrl`, `model`, `apiKey`, `provider` |
+| `configFile` | `~/.Roan/config.json` | `loadSettings` reads `baseUrl`, `model`, `apiKey`, `provider`, `effort` |
 | `identityFile` | `~/.Roan/secrets/identity.json` | `saveIdentity`, mode `0600` |
 
 `loadSettings` returns `DEFAULTS` when the file is missing or not JSON, and

@@ -9,6 +9,7 @@
 import { ProviderError } from "./adapter.js";
 import type { AdapterConfig, ChatAdapter, ChatOptions, ChatResponse, Usage } from "./adapter.js";
 import type { ChatMessage, ToolCall } from "../types.js";
+import { effortParams } from "./effort.js";
 
 /** Header value the Messages API requires. */
 const ANTHROPIC_VERSION = "2023-06-01";
@@ -185,16 +186,31 @@ export function createAnthropicAdapter(cfg: AdapterConfig): ChatAdapter {
     async send(messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatResponse> {
       const { system, messages: wireMessages } = mapMessages(messages);
       const tools = mapTools(opts.tools);
+      const effort = effortParams(cfg.providerId ?? "anthropic", cfg.model, opts.effort ?? "normal");
+
+      // The Messages API refuses a thinking budget at or above `max_tokens`, so
+      // the cap is lifted only as far as the budget requires. Without a budget
+      // the caller's cap (or the adapter default) stands untouched.
+      const thinking = effort["thinking"];
+      const budget =
+        typeof thinking === "object" && thinking !== null && !Array.isArray(thinking)
+          ? asNumber((thinking as Record<string, unknown>)["budget_tokens"])
+          : null;
+      const requested = opts.maxTokens ?? DEFAULT_MAX_TOKENS;
+      const maxTokens = budget === null ? requested : Math.max(requested, budget + 1024);
 
       const body: Record<string, unknown> = {
         model: cfg.model,
-        max_tokens: opts.maxTokens ?? DEFAULT_MAX_TOKENS,
+        max_tokens: maxTokens,
         stream: true,
         messages: wireMessages,
       };
       if (system !== null) body["system"] = system;
       if (tools !== null) body["tools"] = tools;
       if (opts.temperature !== undefined) body["temperature"] = opts.temperature;
+      // A thinking budget is Anthropic's spelling of effort; `normal` adds
+      // nothing and leaves the model on its own default.
+      Object.assign(body, effort);
 
       let res: Response;
       try {

@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import type { RoanPaths } from "./paths.js";
+import { isEffortLevel, type EffortLevel } from "../providers/effort.js";
 
 /** What the user picked in the app. Never environment variables. */
 export interface Settings {
@@ -9,6 +10,13 @@ export interface Settings {
   readonly engine: "builtin" | "hermes";
   readonly apiKey: string;
   readonly provider: string;
+  /**
+   * How hard the model should think on every turn. A conversation-level
+   * preference, not a per-message knob: it lives here so it survives a restart
+   * and reaches the adapter as `ChatOptions.effort`. `normal` puts nothing on
+   * the wire, which keeps every provider on its own default.
+   */
+  readonly effort: EffortLevel;
 }
 
 const DEFAULTS: Settings = {
@@ -17,6 +25,7 @@ const DEFAULTS: Settings = {
   engine: "hermes",
   apiKey: "",
   provider: "lmstudio",
+  effort: "normal",
 };
 
 export async function loadSettings(paths: RoanPaths): Promise<Settings> {
@@ -33,12 +42,16 @@ export async function loadSettings(paths: RoanPaths): Promise<Settings> {
       return typeof value === "string" ? value : DEFAULTS[key];
     };
     const engine = pick("engine") === "builtin" || process.env["ROAN_ENGINE"] === "builtin" ? "builtin" : "hermes";
+    // A hand-edited config may hold anything; an unknown level falls back to
+    // the default instead of reaching a provider as a nonsense knob.
+    const level: unknown = parsed["effort"];
     return {
       engine,
       baseUrl: pick("baseUrl"),
       model: pick("model"),
       apiKey: pick("apiKey"),
       provider: pick("provider"),
+      effort: isEffortLevel(level) ? level : DEFAULTS.effort,
     };
   } catch {
     return DEFAULTS;

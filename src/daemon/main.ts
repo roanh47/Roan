@@ -36,6 +36,10 @@ import { distilMemories, memoryTexts } from "../memory/index.js";
 import { foldMemoryMd, writeMemoryMd } from "../context/memory-md.js";
 import { approvePlan, planModeEnabled, planModeEvent } from "./plan.js";
 import { chat } from "../provider.js";
+import { discoverInstructionFiles } from "../import/discover.js";
+import { toSnapshotEntries } from "../import/parse.js";
+import { planImport } from "../import/apply.js";
+import { collectEnvEntries } from "../env/pack.js";
 import { exportChain } from "../chain/export.js";
 import { sessionAttachments, sessionMarkdown } from "../chain/export-markdown.js";
 import { diffWorkspace, hashContent, scanWorkspace, type FileEntry } from "../workspace/scan.js";
@@ -45,7 +49,8 @@ import { randomUUID as uuid } from "node:crypto";
 import { existsSync } from "node:fs";
 import { copyFile, cp, mkdir, readFile as readFileAsync, rm, writeFile as writeFileAsync } from "node:fs/promises";
 import { runHooks, type HookConfig } from "../hooks/run.js";
-import { dueJobs, loadCron } from "../cron/jobs.js";
+import { dueJobs, loadCron, unparseableSchedule } from "../cron/jobs.js";
+import { isEffortLevel } from "../providers/effort.js";
 import { engineAvailable, runHermesTurn } from "../engine/hermes.js";
 import { McpRuntime } from "./mcp-runtime.js";
 import { approvedToolsFromEvents, mcpServersFromEvents, toolRulesFromEvents } from "../chain/gates.js";
@@ -550,6 +555,8 @@ async function main(): Promise<void> {
   const cronStatePath = join(paths.workspace, "cron-state.json");
   const lastRun = new Map<string, number>();
   let cronTimer: NodeJS.Timeout | null = null;
+  /** A bad schedule is reported once, not every thirty seconds. */
+  const warnedSchedules = new Set<string>();
 
   const readCronState = async (): Promise<void> => {
     try {
@@ -565,6 +572,13 @@ async function main(): Promise<void> {
     if (session === null) return;
     const jobs = await loadCron(paths.home);
     if (jobs.length === 0) return;
+    // A `schedule` that does not parse is skipped, never rounded to a
+    // near-enough rhythm: one line says which job and why, once.
+    for (const job of unparseableSchedule(jobs)) {
+      if (warnedSchedules.has(job.id)) continue;
+      warnedSchedules.add(job.id);
+      log(`cron: skipping "${job.title}" — cannot parse schedule "${job.schedule ?? ""}"`);
+    }
     const due = dueJobs(jobs, lastRun, Date.now());
     for (const job of due) {
       lastRun.set(job.id, Date.now());
@@ -808,7 +822,14 @@ async function main(): Promise<void> {
         store: current.store,
         chain: current.identity.chainId,
         node: current.identity.nodeId,
-        provider: { baseUrl: settings.baseUrl, apiKey: settings.apiKey, model: settings.model },
+        provider: {
+          baseUrl: settings.baseUrl,
+          apiKey: settings.apiKey,
+          model: settings.model,
+          // The id decides the adapter and how effort is spelled on the wire.
+          providerId: settings.provider,
+        },
+        effort: settings.effort,
         cwd: paths.syncedWorkspace,
         systemPrompt,
         tools: toolsForTurn(),
@@ -1587,6 +1608,26 @@ async function main(): Promise<void> {
           reply({ checkpoints: list.reverse() });
           return;
         }
+        if (kind === "import_discover" || kind === "import_plan") {
+          const current = session;
+          if (current === null) {
+            reply({ ok: false, error: "no chain" });
+            return;
+          }
+          const candidates = Array.isArray(data["candidates"])
+            ? (data["candidates"] as unknown[]).filter((entry): entry is string => typeof entry === "string")
+            : [];
+          const found = await discoverInstructionFiles(candidates);
+          if (kind === "import_discover") {
+            reply({ ok: true, files: found });
+            return;
+          }
+          const entries = await toSnapshotEntries(found);
+          const existing = await collectEnvEntries({ home: paths.home });
+          const plan = planImport(existing.map((entry: { path: string }) => entry.path), entries);
+          reply({ ok: true, plan });
+          return;
+        }
         if (kind === "goal") {
           const current = session;
           const text = typeof data["text"] === "string" ? data["text"].trim() : "";
@@ -1620,6 +1661,32 @@ async function main(): Promise<void> {
           });
           control?.broadcast({ t: "append", event });
           reply({ ok: true });
+          return;
+        }
+        if (kind === "effort") {
+          // A preference, not chain state: it appends nothing and only changes
+          // how the next turn is asked. Invalid values are rejected here so a
+          // typo never becomes a request field.
+          const requested = typeof data["effort"] === "string" ? data["effort"] : "";
+          if (!isEffortLevel(requested)) {
+            reply({ ok: false, error: "effort must be low, normal or high" });
+            return;
+          }
+          settings = await saveSettings(paths, { effort: requested });
+          // The config travels: the level is part of how the agent behaves, so
+          // the other devices should run their turns the same way. The file is
+          // what publishes it — an `effort` event would be chain state, and
+          // this is not.
+          if (session !== null) {
+            const current = session;
+            void publishEnv({
+              store: current.store,
+              chain: current.identity.chainId,
+              node: current.identity.nodeId,
+              home: paths.home,
+            }).catch(() => undefined);
+          }
+          reply({ ok: true, effort: settings.effort });
           return;
         }
         if (kind === "plan_mode") {

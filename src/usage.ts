@@ -35,6 +35,9 @@ const COUNT_PAIRS: readonly (readonly [string, string])[] = Object.freeze([
   ["prompt_tokens", "completion_tokens"], // OpenAI
   ["input_tokens", "output_tokens"], // Anthropic
   ["promptTokenCount", "candidatesTokenCount"], // Google
+  // Already-normalised counts, as a turn records them: normalising twice must
+  // give the same answer, so the UI can hand a stored usage back in as-is.
+  ["input", "output"],
 ]);
 
 /** Reads one family's pair from a flat object; at least one side must exist. */
@@ -50,7 +53,8 @@ function readPair(record: Record<string, unknown>): TokenUsage | null {
 }
 
 /**
- * Normalises usage from an OpenAI, Anthropic or Google payload.
+ * Normalises usage from an OpenAI, Anthropic or Google payload, or from a
+ * payload this module already produced.
  *
  * Accepts the flat usage object and the common wrappers (`usage`,
  * `usageMetadata`, `tokenUsage`) so callers can hand in a whole response

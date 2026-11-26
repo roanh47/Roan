@@ -10,6 +10,8 @@ import { historyFromEvents } from "./history.js";
 import { runHermesTurn } from "../engine/hermes.js";
 import { sessionMessages } from "../chain/sessions.js";
 import { compactMessages, type ChatMessage } from "../chain/compaction.js";
+import type { EffortLevel } from "../providers/effort.js";
+import type { TokenUsage } from "../usage.js";
 import { PLAN_MODE_PROMPT, planModeForbidden, planModeRefusal, planModeTools } from "./plan.js";
 
 export interface TurnRunnerOptions {
@@ -18,7 +20,15 @@ export interface TurnRunnerOptions {
   readonly node: string;
   /** An image attached to this turn, base64; rides on the live message only. */
   readonly image?: { readonly mime: string; readonly data: string };
-  readonly provider: { baseUrl: string; apiKey: string; model: string };
+  readonly provider: {
+    baseUrl: string;
+    apiKey: string;
+    model: string;
+    /** Catalog id, so the loop can pick the right adapter and effort spelling. */
+    readonly providerId?: string;
+  };
+  /** How hard the model should think this turn; omitted means "normal". */
+  readonly effort?: EffortLevel;
   readonly cwd: string;
   readonly systemPrompt: string;
   /** Tools this turn may use; the built-ins when a caller does not say. */
@@ -43,8 +53,18 @@ export interface TurnRunnerOptions {
   readonly signal?: AbortSignal;
 }
 
-/** Adapts the event store to the narrower shape the turn lock expects. */
-function asTurnStore(store: EventStore, options: TurnRunnerOptions): TurnStore {
+/**
+ * Adapts the event store to the narrower shape the turn lock expects.
+ *
+ * `usage` is read when the lock closes the turn: the `turn_end` event is the
+ * only place a turn's cost belongs, and this adapter is the one seam both the
+ * lock's and the loop's appends pass through. No event type is added.
+ */
+function asTurnStore(
+  store: EventStore,
+  options: TurnRunnerOptions,
+  usage: () => TokenUsage | null,
+): TurnStore {
   const adapter: TurnStore = {
     tail(chain: string, limit: number) {
       const head = store.head(chain);
@@ -56,11 +76,12 @@ function asTurnStore(store: EventStore, options: TurnRunnerOptions): TurnStore {
       if (actual !== expectedSeq) {
         throw new SeqConflictError(expectedSeq, actual);
       }
+      const measured = usage();
       const event = store.append(chain, {
         id: randomUUID(),
         node: draft.node,
         type: draft.type,
-        data: draft.data,
+        data: draft.type === "turn_end" && measured !== null ? { ...draft.data, usage: measured } : draft.data,
       }) as unknown as TurnEvent;
       // The lock's own turn_start/turn_end land in the chain through this
       // adapter. Without the broadcast the app never learns a turn opened,
@@ -83,7 +104,10 @@ export interface AppendInput {
  */
 export async function runTurn(options: TurnRunnerOptions, userText: string): Promise<void> {
   const { store, chain, node } = options;
-  const turns = asTurnStore(store, options);
+  // Filled once the loop has run; read by the store adapter when the lock
+  // writes turn_end, which is the only event that can carry a turn's cost.
+  const measured: { current: TokenUsage | null } = { current: null };
+  const turns = asTurnStore(store, options, () => measured.current);
   const append = (input: AppendInput): Event => {
     const event = store.append(chain, { id: randomUUID(), node, type: input.type, data: input.data });
     options.onAppend(event);
@@ -170,6 +194,7 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
       systemPrompt: guidedPrompt,
       cwd: options.cwd,
       history: compacted.recent as typeof history,
+      ...(options.effort !== undefined ? { effort: options.effort } : {}),
       ...(refused.size > 0 ? { refusedTools: refused } : {}),
       ...(options.signal !== undefined ? { signal: options.signal } : {}),
       onEvent: (event) => {
@@ -193,7 +218,13 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
       },
     });
 
-    await agent.send(userText, options.image);
+    try {
+      await agent.send(userText, options.image);
+    } finally {
+      // Also on a failed or cancelled turn: the requests that did reach the
+      // model were still billed.
+      measured.current = agent.usage;
+    }
     if (answer.trim()) append({ type: "assistant", data: { text: answer } });
     else if (!failed) append({ type: "error", data: { message: "the turn ended without an answer" } });
   } catch (err) {

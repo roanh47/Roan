@@ -115,6 +115,17 @@ export function supportedProviders(): readonly string[] {
 }
 
 /**
+ * The config an adapter receives: the caller's, plus the provider id.
+ *
+ * Effort is spelled per family and a model can be non-reasoning on one
+ * provider only, so an adapter needs the catalog id, not just its protocol.
+ * The caller's object is copied, never mutated.
+ */
+export function adapterConfigFor(providerId: string, cfg: AdapterConfig): AdapterConfig {
+  return { ...cfg, providerId };
+}
+
+/**
  * Build the adapter for `providerId`.
  *
  * Throws `ProviderError` for an unknown id and for a known provider whose
@@ -143,12 +154,13 @@ export function createAdapter(
     );
   }
 
+  const full = adapterConfigFor(providerId, cfg);
   switch (protocol) {
     case "anthropic":
-      return createAnthropicAdapter(cfg);
+      return createAnthropicAdapter(full);
     case "google":
-      return createGoogleAdapter(cfg);
+      return createGoogleAdapter(full);
     case "openai-compat":
-      return createOpenAiCompatAdapter(cfg);
+      return createOpenAiCompatAdapter(full);
   }
 }

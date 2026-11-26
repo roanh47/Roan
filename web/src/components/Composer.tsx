@@ -57,49 +57,31 @@ interface ComposerProps {
    * pill still shows the state but cannot be pressed.
    */
   onPlanModeChange?: (enabled: boolean) => void;
+  /**
+   * Starts (or stops) voice input. The microphone, the permission prompt and
+   * the transcription round-trip live in the app; this button only reports the
+   * press. Without it the button stays visible but disabled, so nobody taps a
+   * control that cannot work.
+   */
+  onRecord?: () => void;
+  /** True while a recording is running, so the button can show it. */
+  recording?: boolean;
 }
 
-// The WebView on Android does not reliably ship SpeechRecognition; the mic
-// button only exists where the feature does, so the UI never shows a control
-// that cannot work.
-interface DictationEvent {
-  resultIndex: number;
-  results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal: boolean }>;
-}
-interface Dictation {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  onresult: ((event: DictationEvent) => void) | null;
-  onerror: (() => void) | null;
-  onend: (() => void) | null;
-  start(): void;
-  stop(): void;
-}
-type DictationCtor = new () => Dictation;
+/** What the disabled mic says, and why it says nothing else. */
+export const MIC_UNAVAILABLE_HINT =
+  "Voice input needs a speech-to-text provider; none is set up on this device.";
 
-function dictationCtor(): DictationCtor | null {
-  const scope = globalThis as typeof globalThis & {
-    SpeechRecognition?: DictationCtor;
-    webkitSpeechRecognition?: DictationCtor;
-  };
-  return scope.SpeechRecognition ?? scope.webkitSpeechRecognition ?? null;
-}
-
-const DICTATION = dictationCtor();
-
-export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, client, planMode = false, onPlanModeChange }: ComposerProps): ReactElement {
+export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, client, planMode = false, onPlanModeChange, onRecord, recording = false }: ComposerProps): ReactElement {
   // The plus always exists: a photo needs neither workspace nor dictation.
   const hasMenu = true;
   const planning = planMode === true;
   const [value, setValue] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [files, setFiles] = useState<WorkspaceFile[] | null>(null);
-  const [listening, setListening] = useState(false);
   const [image, setImage] = useState<AttachedImage | null>(null);
   const photoInput = useRef<HTMLInputElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
-  const recognition = useRef<Dictation | null>(null);
 
   useEffect(() => {
     const element = input.current;
@@ -107,13 +89,6 @@ export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, c
     element.style.height = "auto";
     element.style.height = `${Math.min(element.scrollHeight, 140)}px`;
   }, [value]);
-
-  useEffect(() => {
-    return () => {
-      recognition.current?.stop();
-      recognition.current = null;
-    };
-  }, []);
 
   // A share-sheet hand-over fills the box once, stamp by stamp.
   useEffect(() => {
@@ -186,32 +161,10 @@ export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, c
     input.current?.focus();
   }
 
-  function toggleDictation(): void {
-    if (DICTATION === null) return;
+  function toggleRecording(): void {
+    if (disabled || onRecord === undefined) return;
     setMenuOpen(false);
-    if (listening) {
-      recognition.current?.stop();
-      return;
-    }
-    const engine = new DICTATION();
-    engine.continuous = false;
-    engine.interimResults = true;
-    engine.lang = navigator.language;
-    engine.onresult = (event) => {
-      let text = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (result === undefined) continue;
-        const first = result[0];
-        if (first !== undefined) text += first.transcript;
-      }
-      if (text.length > 0) setValue((current) => `${current}${current.length > 0 ? " " : ""}${text.trim()}`);
-    };
-    engine.onerror = () => setListening(false);
-    engine.onend = () => setListening(false);
-    recognition.current = engine;
-    engine.start();
-    setListening(true);
+    onRecord();
   }
 
   return (
@@ -318,11 +271,6 @@ export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, c
           ) : client !== undefined ? (
             <span className="composer__menuempty">Loading files…</span>
           ) : null}
-          {DICTATION !== null ? (
-            <button type="button" className="composer__menuitem" onClick={toggleDictation}>
-              <span className="composer__menupath">{listening ? "Stop dictation" : "Dictate"}</span>
-            </button>
-          ) : null}
           <button type="button" className="composer__menuitem" onClick={() => photoInput.current?.click()}>
             <span className="composer__menupath">Photo</span>
           </button>
@@ -363,25 +311,31 @@ export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, c
         onChange={(event: ChangeEvent<HTMLTextAreaElement>) => setValue(event.target.value)}
         onKeyDown={onKeyDown}
       />
-      {DICTATION !== null ? (
-        <button
-          type="button"
-          className={listening ? "composer__mic composer__mic--on" : "composer__mic"}
-          aria-label={listening ? "Stop dictation" : "Dictate"}
-          disabled={disabled}
-          onClick={toggleDictation}
-        >
-          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" focusable="false">
-            <path
-              d="M8 1.5a2 2 0 0 1 2 2v4a2 2 0 1 1-4 0v-4a2 2 0 0 1 2-2ZM4.5 7.5a3.5 3.5 0 0 0 7 0M8 11v3M6 14h4"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.4"
-              strokeLinecap="round"
-            />
-          </svg>
-        </button>
-      ) : null}
+      <button
+        type="button"
+        className={recording ? "composer__mic composer__mic--on" : "composer__mic"}
+        aria-label={recording ? "Stop recording" : "Record a voice message"}
+        aria-pressed={recording}
+        title={
+          onRecord === undefined
+            ? MIC_UNAVAILABLE_HINT
+            : recording
+              ? "Stop recording and transcribe it"
+              : "Record a voice message"
+        }
+        disabled={disabled || onRecord === undefined}
+        onClick={toggleRecording}
+      >
+        <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" focusable="false">
+          <path
+            d="M8 1.5a2 2 0 0 1 2 2v4a2 2 0 1 1-4 0v-4a2 2 0 0 1 2-2ZM4.5 7.5a3.5 3.5 0 0 0 7 0M8 11v3M6 14h4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+          />
+        </svg>
+      </button>
       <button
         className="composer__send"
         type="submit"

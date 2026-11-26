@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { chmod, mkdir, open, rename, unlink } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { RoanPaths } from "./paths.js";
+import { isEffortLevel, type EffortLevel } from "../providers/effort.js";
 import { loadSettings, type Settings } from "./settings.js";
 
 /**
@@ -9,12 +10,14 @@ import { loadSettings, type Settings } from "./settings.js";
  * disk: an unknown key in the app's payload is a bug in the app, and writing it
  * through would make the config file describe settings nothing reads.
  */
-const SETTINGS_KEYS = ["baseUrl", "model", "apiKey", "provider"] as const satisfies readonly (keyof Settings)[];
+const SETTINGS_KEYS = ["baseUrl", "model", "apiKey", "provider", "effort"] as const satisfies readonly (keyof Settings)[];
 
 type SettingsKey = (typeof SETTINGS_KEYS)[number];
 
 /** A patch of settings the app sent over the local socket. Untrusted. */
-export type SettingsPatch = Partial<Record<SettingsKey, string>>;
+export type SettingsPatch = Partial<
+  Record<Exclude<SettingsKey, "effort">, string> & { effort: EffortLevel }
+>;
 
 function isSettingsKey(key: string): key is SettingsKey {
   return (SETTINGS_KEYS as readonly string[]).includes(key);
@@ -23,7 +26,8 @@ function isSettingsKey(key: string): key is SettingsKey {
 /**
  * Validate an untrusted patch. Values are checked by type only and never echoed
  * back in an error: one of these keys holds an API key, and a leaked key in a
- * log line is a leaked key.
+ * log line is a leaked key. `effort` is the one value with a closed set; a
+ * string the adapter would not understand must not reach a request body.
  */
 function parsePatch(input: unknown): SettingsPatch {
   if (typeof input !== "object" || input === null || Array.isArray(input)) {
@@ -31,13 +35,18 @@ function parsePatch(input: unknown): SettingsPatch {
     throw new Error(`settings patch must be an object, got ${kind}`);
   }
 
-  const patch: Partial<Record<SettingsKey, string>> = {};
+  const patch: SettingsPatch = {};
   for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
     if (!isSettingsKey(key)) {
       throw new Error(`unknown setting: ${key}`);
     }
     if (typeof value !== "string") {
       throw new Error(`setting ${key} must be a string, got ${value === null ? "null" : typeof value}`);
+    }
+    if (key === "effort") {
+      if (!isEffortLevel(value)) throw new Error("effort must be low, normal or high");
+      patch.effort = value;
+      continue;
     }
     patch[key] = value;
   }

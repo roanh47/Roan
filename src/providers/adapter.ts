@@ -7,6 +7,7 @@
  * wire format.
  */
 import type { ChatMessage } from "../types.js";
+import type { EffortLevel } from "./effort.js";
 
 /** How to reach a provider: where, with which key, for which model. */
 export interface ProviderConfig {
@@ -18,6 +19,15 @@ export interface ProviderConfig {
   readonly model: string;
   /** Extra request headers this provider requires beyond the bearer token. */
   readonly headers?: Readonly<Record<string, string>>;
+  /**
+   * The catalog provider id this configuration came from. `createAdapter`
+   * fills it in so an adapter can hand the id to `effortParams`: `openai` and
+   * `anthropic` spell the same intent differently, and a model can be
+   * non-reasoning on one provider only. Optional, because hand-built configs
+   * (and the `chat` compatibility shim) predate it; when absent the adapter
+   * falls back to its own protocol name.
+   */
+  readonly providerId?: string;
 }
 
 /** `AdapterConfig` is an alias so adapter files can be read on their own. */
@@ -40,6 +50,12 @@ export interface ChatOptions {
   maxTokens?: number | undefined;
   /** Optional sampling temperature. */
   temperature?: number | undefined;
+  /**
+   * How hard the model should think this turn. Each adapter turns the level
+   * into its own wire spelling through `effortParams`; `normal` (and a missing
+   * value) sends nothing at all, so the provider keeps its default.
+   */
+  effort?: EffortLevel | undefined;
 }
 
 /** One model answer plus whatever usage the provider disclosed. */

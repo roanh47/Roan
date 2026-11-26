@@ -1,5 +1,7 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
-import { buildRows } from "./components/Transcript.js";
+import { buildRows, Transcript } from "./components/Transcript.js";
 import type { ChainEvent } from "./chain.js";
 
 let seq = 0;
@@ -110,5 +112,49 @@ describe("buildRows", () => {
     );
     expect(rows.filter((row) => row.kind === "steps").length).toBe(1);
     expect(rows.filter((row) => row.kind === "tool").length).toBe(1);
+  });
+});
+
+describe("turn usage", () => {
+  test("the usage on turn_end lands under the answer it closed", () => {
+    const rows = buildRows(
+      [
+        ev("message", { text: "hi" }),
+        ev("assistant", { text: "answer" }),
+        ev("turn_end", { reason: "released", usage: { input: 1234, output: 567 } }),
+      ],
+      "pc",
+    );
+    const answer = rows.find((row) => row.kind === "assistant");
+    expect(answer !== undefined && answer.kind === "assistant" ? answer.usage : null).toEqual({
+      input: 1234,
+      output: 567,
+    });
+  });
+
+  test("a turn_end without usage adds nothing to the row", () => {
+    const rows = buildRows(
+      [ev("message", { text: "hi" }), ev("assistant", { text: "answer" }), ev("turn_end", { reason: "released" })],
+      "pc",
+    );
+    const answer = rows.find((row) => row.kind === "assistant");
+    expect(answer !== undefined && answer.kind === "assistant" ? answer.usage : "missing").toBeUndefined();
+  });
+
+  test("the line under the answer is the formatted cost", () => {
+    // `createElement` rather than JSX: this file is `.ts`, and the point is the
+    // markup, not the syntax.
+    const html = renderToStaticMarkup(
+      createElement(Transcript, {
+        events: [
+          ev("message", { text: "hi" }),
+          ev("assistant", { text: "answer" }),
+          ev("turn_end", { reason: "released", usage: { input: 1234, output: 567 } }),
+        ],
+        pending: [],
+        node: "pc",
+      }),
+    );
+    expect(html).toContain("1,234 in · 567 out");
   });
 });

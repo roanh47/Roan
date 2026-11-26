@@ -3,6 +3,9 @@ import type { ReactElement } from "react";
 import { openTurn } from "../chain.js";
 import type { ChainEvent, PendingMessage } from "../chain.js";
 import { Markdown } from "./Markdown.js";
+// Formatting lives in the core, next to the payloads it formats; the transcript
+// only decides where the line goes.
+import { normalizeUsage, usageLine, type TokenUsage } from "../../../src/usage.js";
 
 interface TranscriptProps {
   events: readonly ChainEvent[];
@@ -39,7 +42,15 @@ type ToolRow = {
 
 type Row =
   | { kind: "user"; key: string; text: string; image?: { mime: string; data: string } }
-  | { kind: "assistant"; key: string; text: string; seq: number; actions: boolean }
+  | {
+      kind: "assistant";
+      key: string;
+      text: string;
+      seq: number;
+      actions: boolean;
+      /** Tokens this answer cost, when the turn closed with a usage record. */
+      usage?: TokenUsage;
+    }
   | ToolRow
   | { kind: "steps"; key: string; tools: ToolRow[] }
   | { kind: "notice"; key: string; text: string }
@@ -186,6 +197,21 @@ export function buildRows(events: readonly ChainEvent[], local: string): Row[] {
           last.text = last.text.length > 0 ? `${last.text}\n${text}` : text;
         } else {
           rows.push({ kind: "assistant", key: event.id, text, seq: event.seq, actions: false });
+        }
+        break;
+      }
+      case "turn_end": {
+        // A turn's cost rides its `turn_end` event — no extra type — and it
+        // belongs under the answer that just finished.
+        flush();
+        const usage = normalizeUsage(isRecord(data) ? data["usage"] : null);
+        if (usage === null) break;
+        for (let index = rows.length - 1; index >= 0; index--) {
+          const row = rows[index];
+          if (row !== undefined && row.kind === "assistant") {
+            row.usage = usage;
+            break;
+          }
         }
         break;
       }
@@ -388,11 +414,14 @@ function RowView({
     case "assistant":
       return (
         <div className="answer">
-          {row.text.length === 0 ? (
-            <span className="answer__caret" aria-label="Roan is answering" />
-          ) : (
+          {row.text.length > 0 ? (
             <Markdown source={row.text} />
+          ) : (
+            <span className="answer__caret" aria-label="Roan is answering" />
           )}
+          {row.usage !== undefined ? (
+            <p className="answer__usage">{usageLine(row.usage)}</p>
+          ) : null}
           {row.text.length > 0 ? (
             <div className="answer__actions">
               <CopyChip text={row.text} />

@@ -18,6 +18,7 @@ import type {
 } from "./adapter.js";
 import { ProviderError } from "./adapter.js";
 import type { ChatMessage, ContentPart, ToolCall } from "../types.js";
+import { effortParams } from "./effort.js";
 
 /* ------------------------------------------------------------------ */
 /* Wire shapes: only the fields this adapter reads or writes.          */
@@ -275,6 +276,26 @@ function scrub(text: string, apiKey: string): string {
   return text.split(apiKey).join("[redacted]");
 }
 
+/**
+ * Folds effort's `generationConfig` into the one we build.
+ *
+ * Effort is a nested object (`generationConfig.thinkingConfig.thinkingBudget`),
+ * so assigning the top level would drop `maxOutputTokens` and `temperature`
+ * that this turn already asked for. One level of nesting is merged; that is
+ * exactly the depth Gemini's config has.
+ */
+function mergeGenerationConfig(
+  generationConfig: Record<string, unknown>,
+  params: Record<string, unknown>,
+): void {
+  const extra = params["generationConfig"];
+  if (!isRecord(extra)) return;
+  for (const [key, value] of Object.entries(extra)) {
+    const current = generationConfig[key];
+    generationConfig[key] = isRecord(current) && isRecord(value) ? { ...current, ...value } : value;
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Adapter                                                             */
 /* ------------------------------------------------------------------ */
@@ -294,6 +315,12 @@ export function createGoogleAdapter(cfg: AdapterConfig): ChatAdapter {
       const generationConfig: Record<string, unknown> = {};
       if (opts.maxTokens !== undefined) generationConfig["maxOutputTokens"] = opts.maxTokens;
       if (opts.temperature !== undefined) generationConfig["temperature"] = opts.temperature;
+      // Effort lands inside generationConfig, so it is merged rather than
+      // spread over the body: the caps above must survive it.
+      mergeGenerationConfig(
+        generationConfig,
+        effortParams(cfg.providerId ?? "google", cfg.model, opts.effort ?? "normal"),
+      );
 
       const body: Record<string, unknown> = { contents: history.contents };
       if (history.systemInstruction !== undefined) {

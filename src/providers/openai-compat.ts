@@ -17,6 +17,7 @@ import {
   type ProviderConfig,
   type Usage,
 } from "./adapter.js";
+import { effortParams } from "./effort.js";
 
 /** `id` of this adapter; names the wire protocol, not the vendor. */
 const ADAPTER_ID = "openai-compat";
@@ -163,6 +164,9 @@ function requestBody(
   }
   if (opts.maxTokens !== undefined) body.max_tokens = opts.maxTokens;
   if (opts.temperature !== undefined) body.temperature = opts.temperature;
+  // `normal` (the default) yields `{}` and changes nothing. The provider id
+  // comes from `createAdapter`; without one the protocol name stands in.
+  Object.assign(body, effortParams(cfg.providerId ?? ADAPTER_ID, cfg.model, opts.effort ?? "normal"));
   return body;
 }
 

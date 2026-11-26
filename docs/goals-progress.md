@@ -12,17 +12,19 @@ Owner of this file: the orchestrator (not the children).
 | 5 | Plan mode | done | plan.ts/plan-tools + turn gating tests + frame + composer toggle, wired by orchestrator | 1 |
 | 6 | Auto-memory | done | distil + MEMORY.md fold + turn-end wiring (fails silently) | 1 |
 | 7 | Goals en standing orders | done | fold + context in system prompt + goal frames + GoalsPanel mounted | 1 |
-| 8 | Effort levels | in-progress | module + 11 tests ready; provider plumbing (providerId, ChatOptions.extra) not wired | 2 |
-| 9 | Kosten en tokens | in-progress | usage.ts + 16 tests ready; ChatResponse.usage not surfaced in turn_end yet | 2 |
-| 10 | Achtergrondtaken | in-progress | schedule.ts + scheduler + panel ready; old cron loop still runs only `every` | 2 |
+| 8 | Effort levels | done | providerId + ChatOptions.effort, per-family body mapping incl. google merge, `effort` frame writes settings | 2 |
+| 9 | Kosten en tokens | done | usage in turn_end (summed per turn) + line under the answer; session total needs App.tsx (open) | 2 |
+| 10 | Achtergrondtaken | done | `schedule` (daily HH:MM / every 30m) in the existing cron loop, bad schedules logged once; BackgroundPanel not mounted | 2 |
+| 11 | Spraak invoer | done | SttProvider + registry + local openai-compat plugin, 30+ tests; mic button honest-disabled (capture unwired) | 1 |
+| 12 | Import | done | discover/parse/plan/apply + `imported/` env root + import_discover/plan frames; ImportPanel unwired | 1 |
 | 11 | Spraak invoer | pending | — | 0 |
 | 12 | Import | pending | — | 0 |
-| 13 | Steer mid-turn | pending | — | 0 |
-| 14 | Deep research | pending | — | 0 |
-| 15 | Device control | pending | — | 0 |
-| 16 | Zijvragen en queueing | pending | — | 0 |
-| 17 | Delen en exporteren | pending | — | 0 |
-| 18 | Archief en tijdelijke chats | pending | — | 0 |
+| 13 | Steer mid-turn | in-progress | — | 1 |
+| 14 | Deep research | in-progress | — | 1 |
+| 15 | Device control | blocked | module + 16 tests ready; protocol wiring (device_req frame, transport handlers, device_grant/device_result event types) deferred | 1 |
+| 16 | Zijvragen en queueing | in-progress | — | 1 |
+| 17 | Delen en exporteren | in-progress | — | 1 |
+| 18 | Archief en tijdelijke chats | in-progress | — | 1 |
 | 19 | Veiligheid | pending | — | 0 |
 | 20 | Kennis | pending | — | 0 |
 | 21 | Commando's en hooks | pending | — | 0 |

@@ -29,7 +29,7 @@ export const ENV_ROOT_FILES = [
 ] as const;
 
 /** Root directories of the agent home that belong to the env. */
-export const ENV_ROOT_DIRS = ["memory", "skills", "mcp"] as const;
+export const ENV_ROOT_DIRS = ["memory", "skills", "mcp", "imported"] as const;
 
 export const ENV_ROOT_FILE_SET: ReadonlySet<string> = new Set(ENV_ROOT_FILES);
 export const ENV_ROOT_DIR_SET: ReadonlySet<string> = new Set(ENV_ROOT_DIRS);

@@ -47,6 +47,12 @@ describe("normalizeUsage: provider shapes", () => {
     assert.deepEqual(normalizeUsage({ input_tokens: 8 }), { input: 8, output: 0 });
     assert.deepEqual(normalizeUsage({ candidatesTokenCount: 9 }), { input: 0, output: 9 });
   });
+
+  it("accepts its own output, so a stored turn usage can be handed back in", () => {
+    const stored = { input: 1234, output: 567 };
+    assert.deepEqual(normalizeUsage(stored), stored);
+    assert.deepEqual(normalizeUsage({ usage: stored }), stored);
+  });
 });
 
 describe("normalizeUsage: missing usage", () => {

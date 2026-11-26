@@ -427,6 +427,14 @@ pre {
   margin-top: 8px;
 }
 
+/* The turn's token cost: one quiet line, never competing with the answer. */
+.answer__usage {
+  margin: 6px 0 0;
+  color: var(--faint);
+  font-size: 11px;
+  letter-spacing: 0.01em;
+}
+
 .answer__action {
   padding: 4px 12px;
   border: 1px solid var(--line-soft);
