@@ -5,8 +5,10 @@ wat de volgende stap is in gewone taal; hier staan de punten als afvinkbare take
 met de plek waar het werk zit. De volledige feature-vergelijking met andere agents
 staat in `docs/feature-parity.md` — dit zijn de rondes die daaruit volgen.
 
-Een punt gaat pas op `[x]` als het werkt op een echte machine, niet als de code is
-geschreven.
+Een punt gaat pas op `[x]` als het werkt — op een echte machine, of met een test
+die de hele route aflegt — niet als de code is geschreven. Elk `[x]` hieronder
+noemt het bestand en de test waar het op rust; bij een `[ ]` staat wat er nog
+mist. Laatst tegen de code gelegd: 2026-11-26, op de 0.0.23-branch.
 
 ## Ronde 1 — het gesprek zelf (transcript-hygiëne)
 
@@ -68,7 +70,10 @@ sectie in `docs/feature-groups.md` voor de volledige basislijst.
       rendert invoer en potlood; de Enter via adb's synthetische toets
       werd door Gboard opgegeten, dus daar reed het bewijs via de
       directe frame-toets.
-- [ ] **Sessies zoeken.** Ctrl-K door de eigen geschiedenis. (ronde 2a: state/ maakt het één query)
+- [x] **Sessies zoeken.** Ctrl-K opent de drawer op het zoekveld en de filter
+      matcht titels én berichttekst (`web/src/App.tsx`, `sessionText`), over de
+      events die de client heeft (de eerste 10.000). `src/chain/search.ts` doet
+      hetzelfde als pure module met tests, maar de UI gebruikt die nog niet.
 - [x] **Export/backup-knop.** ⤓ per gesprek in de drawer (markdown, mét de
       hernoemde titel) en "Export the whole chain" op de Sync-pagina (JSONL).
       Beide ook naar de Android download-map als het storage-venster open
@@ -76,17 +81,34 @@ sectie in `docs/feature-groups.md` voor de volledige basislijst.
       /storage/emulated/0/Download. (0.0.19)
 - [x] **Notificatie als beurt klaar is.** De foreground service tailt de
       log op de "notify:turn-done"-regel en tikt "Roan is done". (0.0.19)
-- [ ] **Midden-beurt sturen.** Stop bestaat; antwoord bijsturen terwijl hij
-      denkt nog niet. (SOON)
+- [x] **Midden-beurt sturen.** Stop bestaat en bijsturen nu ook: een bericht
+      tijdens een beurt wordt ná de tool-resultaten en vóór de volgende request
+      ingevoegd (`src/turn/steer.ts`, `steer`-frame, `onSteer` in de composer),
+      en staat als `message` met `steer: true` in de keten.
+      `steer.test.ts`, `turn-runner.test.ts`.
 - [x] **Bijlagen buiten de workspace** (foto's). De composer heeft een
       Photo-knop: de foto wordt vóór verzenden naar 1024px jpeg
       geschroond, reist als base64 op het bericht-event en verschijnt in
       de bubbel. Bewezen 0.0.20: emulator-screenshot met de bewijsfoto
-      zichtbaar in de chat. Bestanden (niet-foto's) boven 512 kB blijven
-      open — het blob-kanaal hieronder.
-- [ ] **Gebruik per beurt.** Tokens/kosten zichtbaar onder een antwoord. (SOON)
-- [ ] **Tijdelijke chats** die niet in de historie blijven. (LATER)
-- [ ] **Gesprek delen** als read-only link. (LATER)
+      zichtbaar in de chat. Bestanden (niet-foto's) boven 512 kB gaan sinds
+      deze branch via het blob-kanaal — zie "Bestanden boven 512 kB" onder
+      Keten en sync.
+- [x] **Gebruik per beurt.** Tokens en kosten reizen op het `turn_end`-event en
+      staan als regel onder het antwoord (`src/usage.ts`, `usageLine` in
+      `Transcript.tsx`); `tests/turn-usage.test.ts`. Een sessietotaal is er niet.
+- [ ] **Tijdelijke chats** die niet in de historie blijven. De fold kent
+      `ephemeral` (`src/chain/sessions.ts`) maar niets schrijft het en er is
+      geen knop.
+- [ ] **Gesprek delen** als read-only link. Het bestanddeel is er: de export
+      schrijft markdown én één zelfstandige, geëscapete HTML-file
+      (`src/chain/export-html.ts`). Er is geen host en geen intrekbare link.
+- [ ] **API-sleutel buiten de keten.** `settings_save` schrijft `apiKey` in
+      `config.json` (`src/daemon/settings-write.ts`) en `config.json` zit in de
+      env die `publishEnv` elke 10 s in de keten zet (`env-sync.ts`,
+      `env/types.ts`) — dus de sleutel reist mee naar elk device en staat in elke
+      `chain.db`. Versleuteld is hij ook niet: het bestand is gewoon JSON op
+      0600. Nodig: de sleutel naar `secrets/`, of een strip in de packer. Zie
+      `docs/security.md` §1.
 
 ## SOON-golf — de agent krijgt handen (0.0.20)
 
@@ -100,11 +122,15 @@ sectie in `docs/feature-groups.md` voor de volledige basislijst.
 - [x] **Web fetch als tool.** `web_fetch` leest één pagina tot 64 kB in
       10 s en geeft de leesbare tekst; privé- en loopback-adressen
       geweigerd, https-only.
-- [ ] **MCP echt starten** en **learned approvals**: een tool-vraag die
-      een keer goedgekeurd wordt, vraagt daarna niet meer (per tool,
-      als keten-event). (SOON-golf deel 2)
-- [ ] **Per-tool regels**: aan/uit per tool en of hij vragen moet
-      stellen, in een scherm, meereizend over de keten. (SOON-golf deel 2)
+- [x] **MCP echt starten** en **learned approvals**. `McpRuntime` dialt elke
+      ingeschakelde server per beurt (http en stdio, `src/mcp/client.ts`) en de
+      tools gaan door dezelfde regels; een allow wordt een `tool_approval`-event
+      en de volgende keer vraagt hij niet meer. `mcp/client.test.ts`,
+      `chain/gates.test.ts`.
+- [x] **Per-tool regels**: aan/uit per tool en of hij vragen moet stellen, in een
+      scherm en meereizend over de keten. `tool_rule`-events, gezet door de
+      Tools-pagina (`ToolsPanel.tsx`, `tool_rule`/`tools_state` in `main.ts`).
+      `chain/gates.test.ts`.
 
 ## Ronde 2 — de agent-home (workspace-verbouwing)
 
@@ -119,10 +145,10 @@ sectie in `docs/feature-groups.md` voor de volledige basislijst.
       gebruiker, "daemon" in code en logs. Bonus: Ctrl-K opent de drawer op
       het zoekveld en zoek vindt ook berichttekst, niet alleen titels.
 
-- [ ] **`~/.Roan` met hoofdletter.** Code, migratie en docs zitten erin:
-      `paths.ts` hernoemt een bestaand `~/.roan` één keer bij de start,
-      `RoanNode.kt` doet hetzelfde vóór `ROAN_HOME` op Android. Bewijs rijdt
-      mee in de 0.0.13-emulatorronde (verse install start in `.Roan`).
+- [x] **`~/.Roan` met hoofdletter.** `paths.ts` hernoemt een bestaand `~/.roan`
+      één keer bij de start (`migrateLegacyHome`), `RoanNode.kt` doet hetzelfde
+      vóór `ROAN_HOME` op Android, en de keten-db verhuist tegelijk naar
+      `state/` (`migrateStateSplit`). `tests/paths-migration.test.ts`.
 - [x] **`state/` nieuw.** chain.db verhuist bij de start naar `~/.Roan/state/`
       (WAL en SHM mee, één keer, niets gekopieerd). `workspace/` is de agent z'n
       eigen bureau; `synced-workspace/` blijft de map waarvan de inhoud als
@@ -134,9 +160,12 @@ sectie in `docs/feature-groups.md` voor de volledige basislijst.
       weigert met een duidelijke reden als All files access ontbreekt
       (MANAGE_EXTERNAL_STORAGE zit in de build). Puur getest; de echte grant
       test de eigenaar op z'n telefoon.
-- [ ] **Schrijfstijl-skill upstream.** `skills/writing-style/` gecloned in de repo,
-      remote `upstream` → `github.com/roanh47/Roans-Writing-Style-Skill`, als
-      regel geladen in de turn-prompt — zie ook het schrijfstijl-punt boven.
+- [ ] **Schrijfstijl-skill upstream.** `skills/writing-style/` staat **niet** in de
+      repo (gecontroleerd: `src/skills/` heeft alleen fold/parse/proposal; er is
+      geen top-level `skills/`). Wat er wel is: de eerste start schrijft SOUL.md,
+      IDENTITY.md en AGENTS.md en de turn-prompt draagt ze als "Who you are" en
+      de regels (`bootstrap.ts`, `context/prompt.ts`). Wat mist: de geclonede
+      skill met remote `upstream` → `github.com/roanh47/Roans-Writing-Style-Skill`.
 - [x] **Foreground service op Android.** De service bezit de daemon met een
       zichtbare notificatie ("Roan is running — One agent, everywhere"); de app
       dicht op de achtergrond en de node ademt door (bewezen: state via adb
@@ -156,16 +185,19 @@ sectie in `docs/feature-groups.md` voor de volledige basislijst.
 
 ## Telefoon is een node
 
-- [ ] **Daemon in de apk.** `libnode.so` in `jniLibs`, de JNI-brug
-      (`src-tauri/android/`) en de gebundelde daemon in `assets`, gewired door
+- [x] **Daemon in de apk.** `libnode.so` zit in `jniLibs` (arm64-v8a + x86_64), de
+      JNI-brug en `start-node.cpp` in `src-tauri/android/`, de gebundelde daemon
+      als `assets/roan-daemon.js` (geladen door `RoanNode.kt`), gewired door
       `scripts/android-daemon.sh` (ook in `build-local.sh` en de Android-CI-job).
-      De bundel is bewezen op gewone Node: lege `ROAN_HOME` geeft
-      `onboarding:true`, `create_chain` maakt een echte keten. Nog niet op het
-      toestel zelf.
+      In `local/builds/Roan-0.0.23-arm64.apk` staan `lib/arm64-v8a/libnode.so` en
+      `assets/roan-daemon.js` (met `unzip -l` gecontroleerd). Dat hij op een
+      toestel ook start is het punt hieronder.
 - [ ] **Installeren en een keten beginnen op de telefoon.** Apk erop, app open,
       create a chain, en `roan-daemon.log` in de app-data laten zien dat de
       daemon daar draait.
-- [ ] **Foreground service** zodat de daemon blijft draaien als de app weg is.
+- [x] **Foreground service** zodat de daemon blijft draaien als de app weg is —
+      zie het punt hierboven: `RoanService.kt` bezit de node met een zichtbare
+      notificatie, en met de app dicht antwoordt de daemon nog (0.0.19).
 - [ ] **Sync tussen telefoon en server bewijzen** met beide online.
 - [x] **Share-sheet** en de notificatiechannel zoals in `docs/mobile.md`.
       Bewezen 0.0.20: ACTION_SEND text/plain staat in het manifest van de
@@ -180,16 +212,21 @@ sectie in `docs/feature-groups.md` voor de volledige basislijst.
 Alles hieronder is lokaal gebouwd en getest, niet gepusht. Een versie gaat pas
 naar GitHub als Roan hem zelf op zijn machines heeft gehad.
 
-- [x] **Updater in de app.** `tauri-plugin-updater` plus een tegel in de
-      instellingen: versie tonen, controleren, downloaden, installeren en
-      herstarten. Kruist de feed op GitHub, dus werkt op Windows, macOS, Linux en
-      Android.
+- [ ] **Updater in de app.** De plugin, de publieke sleutel en het feed-adres
+      staan in `tauri.conf.json` en `web/src/update.ts` is getest — maar de tegel
+      (`UpdateCard.tsx`) zit in `SettingsPanel`, dat nergens gemount is, en de
+      About-pagina toont alleen de versie. Er is dus nog geen scherm dat hem
+      aanbiedt. Op Android is er geen apk-updatepad: `installUpdate` is de
+      Tauri-updater (desktop), er is geen download-and-install van een apk.
 - [x] **Signeersleutel.** Keypair gegenereerd, publieke sleutel in
       `tauri.conf.json`, privésleutel en wachtwoord in de CI-secrets
       (`TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`).
-- [x] **Update-feed als aparte release** met vaste tag `update-feed`, zodat
+- [ ] **Update-feed als aparte release** met vaste tag `update-feed`, zodat
       `latest.json` altijd dezelfde URL houdt en de versie-release precies vier
-      bestanden blijft houden.
+      bestanden blijft houden. `src/packaging/update-feed.ts` kan dat bestand
+      lezen en schrijven (`update-feed.test.ts`), maar niets roept het aan en
+      `.github/workflows/release.yml` publiceert die tag niet — die bouwt alleen
+      de vier installatiebestanden bij een versietag.
 - [ ] **Updater echt testen** met een tweede versie: 0.0.1 erop, 0.0.2 publiceren,
       knop indrukken, kijken of hij bijwerkt en herstart.
 - [x] **RUN THIS FIRST in de dmg.** `scripts/dmg/RUN THIS FIRST.command` zet de
@@ -207,37 +244,58 @@ naar GitHub als Roan hem zelf op zijn machines heeft gehad.
 
 ## Updates
 
-- [ ] **Updater voor alle vier de installaties.** De app haalt de laatste versie
-      op uit de GitHub-releases en kan zichzelf bijwerken op Windows, macOS,
-      Linux en Android.
-- [ ] **Signeersleutel voor de updater.** Privésleutel in de CI-secrets, publieke
-      sleutel in `tauri.conf.json`, zodat een update alleen van jou kan komen.
-- [ ] **Update-feed.** De `latest.json` en de updatebundels worden per versie
-      gepubliceerd, los van de vier installatiebestanden in de release.
-- [ ] **Knop in de app.** Instellingen toont de versie, kan controleren en kan
-      installeren zonder de terminal.
-- [ ] **Android-update.** De apk downloaden en de installatie starten, met de
-      vraag om onbekende bronnen.
+Dezelfde punten als onder v0.0.2, hier met de stand van de code erbij.
+
+- [ ] **Updater voor alle vier de installaties.** Desktop: plugin + feed-adres
+      staan klaar (`tauri.conf.json`, `web/src/update.ts`). Android: geen
+      apk-updatepad in deze code, dus daar werkt het nog niet.
+- [x] **Signeersleutel voor de updater.** Publieke sleutel in
+      `tauri.conf.json` (`plugins.updater.pubkey`), privésleutel en wachtwoord in
+      de CI-secrets (`release.yml`).
+- [ ] **Update-feed.** `.github/workflows/release.yml` publiceert geen
+      `latest.json` en geen `update-feed`-tag; alleen de vier
+      installatiebestanden per versietag.
+- [ ] **Knop in de app.** `UpdateCard.tsx` bestaat en is getest, maar zit in
+      `SettingsPanel` dat niets mount; de About-pagina toont alleen de versie.
+- [ ] **Android-update.** Geen download- en installatiepad voor een apk: het
+      manifest heeft geen `REQUEST_INSTALL_PACKAGES` en er is geen
+      PackageInstaller-code.
 
 ## Releases
 
-- [ ] **Slankere apk.** Nu 455 MB door debug en vier architecturen. Doel: 40 tot
-      60 MB met een release-build en ABI-splitsing per toestel.
-- [ ] **Apk echt installeren** op de telefoon en laten starten.
-- [ ] **Ondertekenen van de desktop-apps.** Zonder certificaat waarschuwen
-      SmartScreen en Gatekeeper bij elke nieuwe gebruiker.
+- [ ] **Slankere apk.** De zwaarste build was 455 MB (debug, vier
+      architecturen). Een per-ABI release-build is nu 93 MB
+      (`local/builds/Roan-0.0.23-arm64.apk`); het doel van 40–60 MB is nog niet
+      gehaald.
+- [ ] **Apk echt installeren** op de telefoon en laten starten — de x86_64-build
+      draait op de emulator (`local/proof/round-0.0.23/app-running.png`) en de
+      apk's worden gebouwd (t/m 0.0.23), maar de start op een echt toestel staat
+      nergens vast.
+- [ ] **Ondertekenen van de desktop-apps.** `src/packaging/notarize.ts` plant de
+      notarisatiestappen en `msix.ts` rendert een manifest (beide met tests),
+      maar `tauri.conf.json` heeft geen `signingIdentity` of
+      Windows-certificaat, niets roept die modules aan en er wordt niets
+      ondertekend; zonder dat waarschuwen SmartScreen en Gatekeeper bij elke
+      nieuwe gebruiker.
 
 ## Keten en sync
 
-- [ ] **Seq-conflicten bij meer dan twee devices.** Twee devices die tegelijk
-      schrijven pakken hetzelfde seq; die link gaat op `conflicted`. Takken apart
-      zetten en later samenvoegen in plaats van de link laten stoppen.
-- [ ] **Discovery op twee online machines bewijzen.** Een machine vindt en koppelt
-      de andere zonder invite-code, heen en terug.
-- [ ] **Bestanden boven 512 kB.** Een blob-kanaal, of een duidelijke weigering in
-      de UI in plaats van stilte.
-- [ ] **Tests voor env, relay en workspace-sync tussen twee daemons** in de suite,
-      nu alleen met de hand bewezen.
+- [x] **Seq-conflicten bij meer dan twee devices.** Twee devices die tegelijk
+      schrijven pakken hetzelfde seq; in plaats van de link op `conflicted` te
+      zetten houden ze hun eigen branch en zet `compareBranches` de siblings in
+      één totale orde (ts, dan node, dan id) die elke node hetzelfde uitrekent.
+      `src/sync/order.ts`, `order.test.ts`, en de 3/4-writer-tests.
+- [ ] **Discovery op twee online machines bewijzen.** De code is er
+      (`src/daemon/discovery.ts`, Tailscale-scan + probe, `discovery.test.ts`);
+      een run met twee echte machines staat niet in `local/proof/`.
+- [x] **Bestanden boven 512 kB.** Het blob-kanaal: een groot of binair bestand
+      reist als gehashte `blob`-chunks en de `workspace`-put verwijst naar de
+      hash (`src/workspace/blob.ts`, `publishWorkspace` in `main.ts`).
+      `workspace/blob.test.ts`, `workspace/sync.test.ts`.
+- [ ] **Tests voor env, relay en workspace-sync tussen twee daemons** in de
+      suite. `tests/integration/two-daemons.test.ts` start twee daemons en
+      bewijst alleen dat ze op dezelfde head uitkomen; env, relay en
+      workspace-sync worden daar niet geassert.
 
 ## App
 
@@ -246,12 +304,22 @@ naar GitHub als Roan hem zelf op zijn machines heeft gehad.
       gesprek als label), het panel onder Settings toont de punten mét
       "Go back here"-knop. Bewezen 0.0.20: emulator-screenshot van het
       panel met "Poortvraag bewijs" (#13) en de terugknop.
-- [ ] **Workspace bekijken en openen** vanuit de app, niet alleen syncen.
-- [ ] **MCP-configuratie in de app**, met een scherm en de config die over de keten
-      meereist.
-- [ ] **Titel van een nieuw gesprek** meteen goed zetten in plaats van "New
-      conversation" tot je hem hernoemt.
+- [x] **Workspace bekijken en openen** vanuit de app, niet alleen syncen. De
+      Workspace-pagina lijst de bestanden, toont een preview, laat tekst
+      bewerken en opslaan (dat reist meteen mee) en biedt een download-link
+      (`WorkspacePanel.tsx`, `workspace_list`/`workspace_read`/`workspace_write`).
+      `WorkspacePanel.test.tsx`.
+- [x] **MCP-configuratie in de app**, met een scherm en de config die over de
+      keten meereist. De Tools-pagina zet servers op (`mcp_server_save`/
+      `mcp_server_delete` worden `mcp_server`-events) en de daemon dialt ze.
+      `ToolsPanel.tsx`, `chain/gates.test.ts`.
+- [x] **Titel van een nieuw gesprek** meteen goed zetten. Het eerste bericht
+      hernoemt de sessie via `autoTitleFor` → `session_title`, en een verse
+      keten opent met "New chat" in plaats van een lege lijst (`main.ts`,
+      `chain/sessions.test.ts`).
 - [ ] **Oude foutregels** uit het transcript halen zodra een beurt opnieuw lukt.
+      Wat er is: twee identieke foutregels na elkaar worden één
+      (`Transcript.tsx`); een geslaagde herkansing ruimt de oude regel niet op.
 
 ## Later
 
@@ -268,13 +336,22 @@ november 2026), zodat alles op één plek staat. Het nummer erbij is het issuenu
 
 - [ ] **#18 De basiskennis bijwerken vanaf één plek.** Eén canonieke bron voor wat
       Roan weet, met een cache lokaal, in plaats van vier losse bestanden die uit
-      elkaar kunnen lopen.
+      elkaar kunnen lopen. Wat er is: `MEMORY.md` wordt gevouwen uit
+      `memory`-events (`context/memory-md.ts`) en `src/knowledge/` heeft een
+      project- en zoekmodule met tests. Wat mist: die kennis als tool of in de
+      prompt, en één bron boven de losse bestanden.
 - [ ] **#17 Zonder API-sleutels dingen bereiken.** Alleen lezen, alleen anonieme
       webaanroepen: GitHub nu, OneDrive en een publieke URL later. Geen
-      credentials in de keten.
-- [ ] **#11 Sessie exporteren** als markdown of JSON, zodat een gesprek deelbaar is.
+      credentials in de keten. Wat er is: `src/connectors/github.ts` leest issues
+      en bestanden read-only, maar met een token uit `secrets/` en zonder route
+      in de daemon — dus geen anoniem pad en nog niet bereikbaar.
+- [x] **#11 Sessie exporteren** als markdown of JSON, zodat een gesprek deelbaar
+      is. De export schrijft markdown, één zelfstandige HTML-file en JSONL voor
+      de hele keten (`chain/export-markdown.ts`, `chain/export-html.ts`,
+      `chain/export.ts`), per gesprek en voor de keten.
 - [ ] **#10 MCP-servers automatisch vinden** in de gebruikelijke configmappen in
-      plaats van ze met de hand aanwijzen.
+      plaats van ze met de hand aanwijzen. `src/import/discover.ts` vindt
+      instructiebestanden (AGENTS.md, CLAUDE.md, …), geen MCP-configuratie.
 
 ### Vervallen, hoort bij de oude TUI/Python-versie
 
@@ -292,9 +369,8 @@ meer, dus ze gaan dicht zodra je zegt dat het mag.
 - **#14** Tien jaar zonder update, alles live: de app haalt providers en modellen al
   live uit models.dev, dus dit is ingelost.
 - **#16** Identiteit en opslag in `~/.Roan` met hoofdletter: **besloten
-  2026-11-18 — hoofdletter wint.** De map heet `~/.Roan` op elk platform
-  (Linux/macOS/Windows: `~/.Roan`; Android: binnen de app-privé map). Eerste
-  start hernoemt een bestaand `~/.roan` één keer naar `~/.Roan`, zodat geen
-  device zijn keten kwijtraakt. Nog niet geïmplementeerd; hoort bij de
-  workspace-ronde.
+  2026-11-18 — hoofdletter wint, en geïmplementeerd.** `paths.ts` heet de map
+  `.Roan` op elk platform en hernoemt een bestaand `~/.roan` één keer bij de
+  start; Android doet hetzelfde in `RoanNode.kt` vóór `ROAN_HOME`. Zie het punt
+  onder ronde 2.
 

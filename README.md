@@ -14,6 +14,33 @@ server, no head agent, no cloud account.
                      direct, encrypted
 ```
 
+## What is in this branch (0.0.23)
+
+The branch turns the design into a working node: the daemon (chain, peers,
+discovery, one turn at a time), the desktop and Android shells, plan mode,
+auto-memory, goals, effort levels, usage per turn, schedules, steer, export,
+the workspace panel, the CLI and the SDK — each wired through the
+daemon or the app, each with tests.
+
+A second set of modules is written and tested but **not yet wired into a turn or
+a screen**: deep research, side questions and message queueing, the safety layer,
+the knowledge store, slash commands, computer use, image generation, the voice
+loop and speech capture, webhooks and connectors, and the git panel. The
+documents below say per feature which half it is in.
+
+Three documents carry the detail:
+
+- [docs/api.md](docs/api.md) — the control port frame by frame, read from
+  `control.ts` / `control-protocol.ts` / `main.ts`, plus the SDK's subset.
+- [docs/a2a.md](docs/a2a.md) — why there is no agent-to-agent protocol here, and
+  what covers the same need (webhooks, peer replication, read-only connectors).
+- [docs/goals-progress.md](docs/goals-progress.md) — the ledger: feature by
+  feature, what was built and which proof or test it rests on.
+
+Per-concept status against every mainstream harness is in
+[docs/feature-groups.md](docs/feature-groups.md); the reasoning per verdict is
+[docs/feature-parity.md](docs/feature-parity.md).
+
 ## What it is
 
 - **One interface, and it is an app.** Roan is a desktop app for Windows, macOS and
@@ -49,7 +76,11 @@ same time; that's a lock, not ownership.
 device doesn't push its local state into the chain; only creating a new chain seeds
 it, once per person.
 
-**Secrets stay local.** Keys are encrypted at rest and never enter the chain.
+**Secrets stay local.** Keys are meant to stay local and never enter the chain.
+Today that rule is not held by the code: a key entered in the app is saved into
+`config.json`, which travels in the env snapshot — see
+[docs/security.md](docs/security.md) §1 for the exact path and TODO.md for the
+open defect.
 
 ## Home folder
 
@@ -102,8 +133,8 @@ src/daemon/main.ts the daemon the app starts; no user-facing command
 You open the app, and the first screen offers two things: **create a chain**, or
 **join one** with a code from a device that already has it.
 
-Provider and model are picked in the app, from the models.dev catalog (235 providers,
-8,940 models). Nothing is configured by environment variable.
+Provider and model are picked in the app, from the live models.dev catalog
+(300+ providers); nothing is configured by environment variable.
 
 The daemon that keeps the chain in sync is started by the app and keeps running when
 you close the window.
@@ -112,14 +143,16 @@ you close the window.
 
 | Part | State |
 |------|-------|
-| Core loop, streaming, tools | **working** |
-| The chain (events, storage, catch-up) | planned |
-| Remote tools between nodes | planned |
-| Desktop app (exe/dmg/AppImage) | planned |
-| Phone app (apk) | planned |
-| Distribution (binaries, npm) | planned |
+| Core loop, streaming, tools | **working** — `src/agent.ts`, `src/tools.ts` |
+| The chain (events, storage, catch-up) | **working** — SQLite in `~/.Roan/state/`, replication over the peer port |
+| Remote tools between nodes | **working** — `run_on_node` over `tool_req`/`tool_res` |
+| Desktop app (exe/dmg/AppImage) | **working** — Tauri shell, daemon as a sidecar; AppImage proven, macOS dmg not built yet |
+| Phone app (apk) | **working** — daemon in the apk via `libnode`, foreground service; the start on a real phone is not proven yet |
+| Distribution (binaries, npm) | **partial** — CI builds four installers; no published release, no npm package |
 
-Neither app is built yet, so there is no way in for now. Nothing is published.
+What each part proves, and what is still open, is in
+[docs/goals-progress.md](docs/goals-progress.md) and
+[docs/feature-groups.md](docs/feature-groups.md). Nothing is published yet.
 
 ## Requirements for the full setup
 

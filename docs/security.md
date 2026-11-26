@@ -6,34 +6,46 @@ machinery that exists to hold that line, file by file, and what each piece does
 not cover.
 
 One caveat changes how everything below reads: most of this machinery is written
-and tested but not on the path a turn takes. `src/tools/policy.ts`,
-`src/protocol/redact.ts`, `src/tools/secrets-scan.ts` and
-`src/tools/shell-allowlist.ts` each have a test file and no production caller. The
-sections say so where it matters, and section 8 lists it in one place. What
-actually keeps a key out of the chain today is the first section.
+and tested but not on the path a turn takes. `src/tools/policy.ts` (its
+`decide()`), `src/tools/secrets-scan.ts` and `src/tools/shell-allowlist.ts` have
+a test file and no caller that matters: `policy.ts` is imported only for its
+`isInsideWorkspace` path helper (by `tools/exec.ts`, `tools/move.ts` and
+`workspace/library.ts`, none of which is the `run_shell` the model gets), and
+`src/protocol/redact.ts` is imported only by `connectors/github.ts` and
+`daemon/logging.ts`, two modules nothing else calls. The sections say so where
+it matters, and section 8 lists it in one place. What actually keeps a key out of
+the chain today is the first section.
 
 ## 1. What travels, and what stays
 
-The env is the part of `~/.Roan` that goes into the chain: five root files
-(`AGENTS.md`, `SOUL.md`, `USER.md`, `MEMORY.md`, `config.json`) plus everything
-under `memory/`, `skills/` and `mcp/`. That list is
+The env is the part of `~/.Roan` that goes into the chain: nine root files
+(`AGENTS.md`, `SOUL.md`, `IDENTITY.md`, `USER.md`, `MEMORY.md`, `config.json`,
+`cron.json`, `hooks.json`, `providers.json`) plus everything under `memory/`,
+`skills/`, `mcp/` and `imported/`. That list is
 `ENV_ROOT_FILES`/`ENV_ROOT_DIRS` in `src/env/types.ts`, and it is exhaustive: the
 comment there says `secrets/`, `workspace/` and `synced-workspace/` are never
 read, written or moved by anything in `src/env/`, and `collectEnvEntries` in
-`src/env/pack.ts` walks only those two lists.
+`src/env/pack.ts` walks only those two lists. The daemon publishes this snapshot
+every ten seconds when it changed (`publishEnv` in `src/daemon/env-sync.ts`,
+started by `main.ts`), so the env really does travel now.
 
 `secrets/` is where the per-machine material lives. `src/daemon/paths.ts` puts
 `identity.json` at `~/.Roan/secrets/identity.json`, and `saveIdentity` in
 `src/daemon/identity.ts` writes it with mode `0600` and chmods it to `0600`
 afterwards, so the chain token is not world-readable.
 
-**Does not cover:** exclusion is by *filename*, not by content. `config.json` is
-in the travelling set, and `src/daemon/settings.ts` reads an optional `apiKey`
-field out of it — `readFileEntry` in `src/env/pack.ts` copies a file's bytes with
-no scan, so a `config.json` that holds a key would be packed and sent. Nothing in
-`src/` currently writes that file, so the field is only reachable if something
-else writes it, but the packer will not stop it. Directory permissions on
-`secrets/` are not checked, only the file's.
+**Does not cover — and this one is live:** exclusion is by *filename*, not by
+content, and `config.json` is in the travelling set. `src/daemon/settings.ts`
+reads an `apiKey` field out of it, `saveSettings` writes that field back
+verbatim when the app sends one (`settings_save` → `src/daemon/settings-write.ts`,
+atomic write at `0600`), and `readFileEntry` in `src/env/pack.ts` copies the
+bytes with no scan. So an API key entered in the app ends up in `config.json`,
+in the next env snapshot, in every device's `chain.db` and in the chain's
+history — the same file the agent itself can read with `read_file`. The key is
+not encrypted at rest either; the file is plain JSON at `0600`. Until the key
+moves to `secrets/` (or the packer learns to strip it), "keys never enter the
+chain" is a rule the code does not hold. Directory permissions on `secrets/` are
+not checked, only the file's.
 
 ## 2. What a leak would look like
 
@@ -88,9 +100,12 @@ as the loop is concerned.
 **Does not cover:** nothing calls `policy.decide`. `src/tools/registry.ts` has its
 own `decide` that looks only at `policy.tools[name]` — it never sees the
 arguments, so it cannot apply the path rules in section 4 — and `buildRegistry`
-has no caller in `src/`. A tool that is allowed and a tool that is merely
-listed as `ask` are indistinguishable to the code that runs a turn; approval is
-a UI concept that the daemon does not enforce.
+has no caller in `src/`. The live `run_shell` (`src/tools.ts`) and the `delegate`
+tool do not consult a policy at all. A tool that is allowed and a tool that is
+merely listed as `ask` are indistinguishable to the code that runs a turn;
+approval is a chain event the daemon enforces one layer up (`askPermission` →
+`approval_request` → `tool_approve`), and only for tools whose `tool_rule` says
+`ask`.
 
 ## 4. Path rules, including `secrets/`
 
@@ -158,12 +173,15 @@ or a hex key in prose all pass through unchanged. `redactDeep` returns class
 instances, Maps and Dates by reference untouched, so strings inside them are not
 scrubbed. `collapseHome` only knows one home, and only whole occurrences.
 
-The larger gap is reach: nothing in `src/` imports `src/protocol/redact.ts`
-except its own test, and `src/protocol/index.ts` — the protocol's single import
-surface — does not re-export it. `src/daemon/diagnostics.ts` carries a private
-copy of a few patterns plus its own `collapseHome`, with a comment saying
-`redact.ts` "does not exist yet"; diagnose snapshots are scrubbed, event payloads
-are not.
+The larger gap is reach: `src/protocol/redact.ts` is imported by
+`src/connectors/github.ts` and `src/daemon/logging.ts` and nothing else, and
+neither of those is on the turn path — the connector has no route and the log
+writer has no caller. `src/protocol/index.ts` — the protocol's single import
+surface — does not re-export it. `src/daemon/diagnostics.ts` still carries a
+private copy of a few patterns plus its own `collapseHome`, with a comment saying
+`redact.ts` "does not exist yet"; that comment is now wrong, but the module has
+no caller either, so nothing is scrubbed through either path. Event payloads are
+never redacted.
 
 ## 6. The secrets scanner
 
@@ -235,26 +253,47 @@ And the decisive gap: `runShell` in `src/tools.ts` — the `run_shell` the agent
 actually has — calls `exec` with `shell: "/bin/bash"` and never calls
 `classifyCommand`. Only `src/tools/shell-allowlist.test.ts` does.
 
-## 8. What holds, and what is written but unwired
+## 8. What holds, what is written but unwired, and what does not hold
+
+**Holds at runtime:**
 
 | Piece | File | Called by |
 | --- | --- | --- |
-| `secrets/` out of the travelling env | `src/env/types.ts`, `src/env/pack.ts` | `packEnv`, which no code outside `src/env/` calls |
 | identity at `0600` | `src/daemon/identity.ts` | `createIdentity` in the daemon |
-| allow/ask/deny + path rules | `src/tools/policy.ts` | nothing |
-| registry built from a policy | `src/tools/registry.ts` | nothing |
-| redaction, home collapse | `src/protocol/redact.ts` | its own test |
-| secrets scanner | `src/tools/secrets-scan.ts` | its own test |
-| shell allowlist | `src/tools/shell-allowlist.ts` | its own test |
-| provider key scrub | `src/providers/{anthropic,google}.ts` | their error paths |
+| `secrets/` outside the env packer | `src/env/types.ts`, `src/env/pack.ts` | `packEnv` (live: `publishEnv` every 10 s) |
+| provider key scrub | `src/providers/{anthropic,google}.ts` | their own error paths |
+| path containment for the app's file routes | `src/workspace/library.ts` (`isInsideWorkspace`) + the prefix check in `main.ts` | `workspace_read` / `workspace_write` |
+| approval gate for tools with a `tool_rule` ask | `src/daemon/main.ts` (`askPermission`) | every turn's tool list |
 
-So today the guarantees that are actually enforced at runtime are narrow and worth
+**Written and tested, but no caller that a turn reaches:**
+
+| Piece | File | Called by |
+| --- | --- | --- |
+| `decide()` allow/ask/deny + path rules | `src/tools/policy.ts` | nothing calls `decide`; `exec.ts`, `move.ts` and `workspace/library.ts` import only `isInsideWorkspace` |
+| registry built from a policy | `src/tools/registry.ts` | nothing |
+| redaction, home collapse | `src/protocol/redact.ts` | `connectors/github.ts`, `daemon/logging.ts` — both unwired |
+| secrets scanner | `src/tools/secrets-scan.ts` | its own test |
+| shell allowlist | `src/tools/shell-allowlist.ts` | its own test; the live `run_shell` calls `exec` directly |
+| sandbox, untrusted blocks, elevation, audit log | `src/safety/{sandbox,untrusted,elevation,audit-log}.ts` | nothing |
+| signed webhooks in and out | `src/webhooks/dispatch.ts`, `src/webhooks/sign.ts` | nothing — no HTTP route in the daemon, no trigger kind |
+| GitHub connector | `src/connectors/github.ts` | nothing — no route and no tool; the token is read from `secrets/` |
+| device control | `src/sync/device-control.ts` | nothing — no `device_req` frame |
+| health + diagnostics snapshot | `src/daemon/health.ts`, `src/daemon/diagnostics.ts` | nothing and no test |
+
+**Does not hold:** an API key entered in the app is written into `config.json`,
+which is part of the env the daemon publishes into the chain (section 1). So
+today the one guarantee the README states — keys never enter the chain — is not
+enforced anywhere in the code.
+
+So the guarantees that are actually enforced at runtime are narrow and worth
 stating plainly: `secrets/` is outside the set the env packer walks, the identity
 file is written `0600`, two of the provider adapters strip the configured key from
-their own error text, and every tool resolves its path against the workspace
-(`resolveInside` in `src/tools.ts`, which rejects `..` and absolute escapes for
-`read_file`, `write_file` and `list_dir`). The policy, the path deny list, the
-scrubber and the scanner are all real, tested modules waiting for the calls that
+their own error text, the app's workspace routes cannot leave the workspace, a
+tool whose rule says `ask` waits for an approval event, and
+every tool resolves its path against the workspace (`resolveInside` in
+`src/tools.ts`, which rejects `..` and absolute escapes for `read_file`,
+`write_file` and `list_dir`). The policy, the path deny list, the scrubber, the
+scanner and the sandbox are real, tested modules waiting for the calls that
 `docs/architecture.md` also notes are missing.
 
 A turn that needs a key inside `secrets/` will still be able to read it through

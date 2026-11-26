@@ -9,11 +9,17 @@ note at the bottom, not treated as features.
 Every row carries a Roan status — **including the rejected ones**, so this list can be
 filtered without re-deciding anything:
 
-- **DONE** — works on a real machine
-- **BUILD** — in the current rounds (TODO.md round 1/2)
+- **DONE** — wired end to end: the app or a turn actually reaches it, and a test
+  or a recorded proof backs the claim (the note names it)
+- **BUILD** — the module exists with tests, but nothing in the app or the turn
+  calls it yet; the note says what is missing
 - **SOON** — decided, next after the current rounds
 - **LATER** — wanted, not scheduled
 - **WON'T** — rejected by design (one agent, local-first, the app is the product)
+
+Statuses were last checked against the tree on the 0.0.23 branch (2026-11-26):
+every DONE below was read back from `src/` or `web/src/`, and every "module
+only" names the file that exists and has no caller.
 
 ## Two lanes — basis versus feature
 
@@ -58,7 +64,7 @@ GEM=Gemini.
 | Cross-surface session continuity | sync across devices (GPT), cross-surface sessions (OCW), shared settings across surfaces (AG) | DONE — the chain syncs every peer |
 | Fork / branch / edit-resend | session branching & forking (CC, CX, OC), tree sessions `/tree` (PI), conversation branching (OH), edit a sent message / regenerate (GPT, CLD, GEM) | DONE — round 1 proven: regenerate branches via checkpoint, append-only intact; a turn never ends in silence anymore (0.0.14) |
 | Compaction | `/compact` & autocompact (CC, GC, OC, PI, OCW), recap (CX), condenser (OH, ROO), snapcompact (OMP) | DONE — chain compaction, gc and summary with tests |
-| Session search | session search (OCW), chat search (CLD, GEM), history search (GPT) | DONE — Ctrl-K over titles and message text |
+| Session search | session search (OCW), chat search (CLD, GEM), history search (GPT) | DONE — Ctrl-K opens the drawer on the search field and the filter matches titles and message text (over the events the client holds, the first 10,000) |
 | Session names / auto-titles | session naming (CC), automatic session names (OCW, DSH) | DONE — rename event plus the first-turn auto title |
 | Side questions without polluting context | `/btw` (CC, OC, AG), side chats (CX, OCW) | SOON — module only: `src/side/side-question.ts` (derived `side:<parent>:<n>` ids, `sideOf` marker) with 2 test files; no daemon frame, nothing renders the quote |
 | Message queueing while the agent works | queue messages (CC, CX, GC, ROO) | SOON — module only: `src/side/queue.ts` + a `QueueBar` component; the daemon never reads the queue |
@@ -74,12 +80,12 @@ GEM=Gemini.
 | Plan mode (read-only planning first) | plan mode (CC, QW, CP, CRU, GC, AG, CUR), Plan/Act (CL, ROO), plan agent (OC) | DONE — tool list gated per turn (`plan.ts`, `plan-tools.ts`), `plan_mode` frame, composer toggle, `tests/plan-mode.test.ts` |
 | Approvals that learn | once/always approvals (OC), persistent permission grants (AG), trusted directories/folders (CP, GC), workspace/project trust (CC, CX, PI) | DONE — tool_approval events, folded everywhere, resettable in the Tools panel |
 | Per-tool allow/deny rules | permission rules (CC), allow/deny/ask + shell scanner (OC), action(target) engine (AG), tool permissions (ZED), command rules (CX), policy engine (GC) | DONE — tool_rule events on the chain, toggled per tool in the app |
-| OS-level sandbox | Seatbelt/Landlock (CC, GC), Bubblewrap (QW, ZED), sandbox presets (AG), sandbox backend (DSH, GOO, CP), containerization (PI, OCW) | LATER — exec allowlist first |
+| OS-level sandbox | Seatbelt/Landlock (CC, GC), Bubblewrap (QW, ZED), sandbox presets (AG), sandbox backend (DSH, GOO, CP), containerization (PI, OCW) | BUILD — module only: `src/safety/sandbox.ts` (bwrap/landlock/sandbox-exec detect + wrap) with tests; `run_shell` does not go through it |
 | Cloud sandbox / orbs | orbs (AMP), cloud environments (CX, CP), cloud agents (CL, CUR, OH) | WON'T — local only, every device is a peer |
 | Protected paths & ignore files | protected/critical paths (CC), `.clineignore`, QwenIgnore, `.rooignore`, path guard | DONE — home-bounded path guard |
-| Secrets management | secrets tool (OCW), secrets settings (OH), credentials file (DSH), `.env` (AID), auth token for CI (CC) | DONE — keys travel via chain-env |
-| Elevated / managed execution | elevated exec (OCW) | LATER |
-| Injection & abuse protections | prompt-injection detection, adversary mode (GOO), safety monitoring (CX), bot-loop protection, DM pairing (OCW), security analyzer (OH), supply-chain hardening (PI) | LATER — exec guard exists; content checks follow |
+| Secrets management | secrets tool (OCW), secrets settings (OH), credentials file (DSH), `.env` (AID), auth token for CI (CC) | partial — `secrets/identity.json` is `0600` and never packed, but a provider key entered in the app is written into `config.json`, which *is* part of the env that travels (see `docs/security.md` §1) |
+| Elevated / managed execution | elevated exec (OCW) | BUILD — module only: `src/safety/elevation.ts` (one-time grant) + tests; no screen and no caller |
+| Injection & abuse protections | prompt-injection detection, adversary mode (GOO), safety monitoring (CX), bot-loop protection, DM pairing (OCW), security analyzer (OH), supply-chain hardening (PI) | BUILD — modules only: `src/safety/untrusted.ts` (untrusted-content blocks) and `audit-log.ts`, with tests; the turn does not call either |
 
 ## C. Memory & instructions
 
@@ -107,8 +113,8 @@ GEM=Gemini.
 | Agent teams / swarm / board | agent teams (CC, CL, DSH, QW), `/boost` `/swarm` `/teamwork` (AG), swarm (OCW), hub-spoke (CL), parallel agents (ZED), multiplayer (OCW) | WON'T |
 | Dynamic agent-written workflows | dynamic workflows (CC), `/run-workflow` (AG) | WON'T |
 | Everything-is-a-plugin (incl. the loop) | plugin-composed loop & runtimes (DSH), agent runtimes as plugins (OCW) | WON'T |
-| Self-learning skills | Skill Workshop + self-learning skills (OCW), Record & Replay (CX) | LATER |
-| Deferred / searchable tools | Tool Search (OCW) | LATER — small tool core is the point |
+| Self-learning skills | Skill Workshop + self-learning skills (OCW), Record & Replay (CX) | SOON — module only: `src/skills/proposal.ts` (proposals stay inert until approved) + tests; no screen |
+| Deferred / searchable tools | Tool Search (OCW) | BUILD — module only: `src/tools/deferred.ts` + tests; nothing is deferred at runtime |
 
 ## E. Models & providers
 
@@ -197,7 +203,7 @@ GEM=Gemini.
 | Config files | config & profiles (CX), opencode.json (OC), YAML (GOO), `.aider.conf.yml` (AID), settings.json (AG, GC), crushrc (CRU) | DONE — `config.json` in the home |
 | Natural-language config | configure by asking (CRU) | LATER |
 | Doctor / self-diagnostics | doctor (CC, CX, OCW), self-diagnostics (CC), trajectory view (DSH) | BUILD — `src/daemon/health.ts` and `diagnostics.ts` exist, have no caller and no test; no request kind serves them |
-| Updater / release channels | update channels (CC, CX, GC, ROO nightly) | BUILD — the plugin, pubkey and feed endpoint are configured (`tauri.conf.json`), `web/src/update.ts` is tested, but the card lives in a `SettingsPanel` nothing mounts and no second version has been published |
+| Updater / release channels | update channels (CC, CX, GC, ROO nightly) | BUILD — the plugin, pubkey and feed endpoint are configured (`tauri.conf.json`), `web/src/update.ts` and `src/packaging/update-feed.ts` are tested, but no CI step publishes `latest.json`, the card lives in a `SettingsPanel` nothing mounts, and no second version has been published |
 | Telemetry policy | telemetry opt-in (GC, AID), version-check-only (OCW), privacy mode (CUR) | DONE — zero, stricter than all of them |
 | Accessibility | screen-reader & reduced-motion (CC) | LATER |
 | i18n / multiple UI languages | 18 UI languages (ROO), language setting (GEM, CLD) | WON'T — English only, standing rule |
@@ -210,10 +216,10 @@ GEM=Gemini.
 |---|---|---|
 | Artifacts / canvas / side documents | Artifacts (CC, CLD), Canvas (GEM, GPT), Docs/Sheets/Whiteboards/Design/Science (CLD), Space pages (GPT) | LATER — markdown and attachments first |
 | Custom assistant store | GPTs + GPT Store (GPT, retiring), Gems → replaced by skills (GEM) | WON'T — one agent; Gemini itself replaced this with skills |
-| Deep research mode | deep research (GPT, GEM, CLD) | SOON — after web search lands |
-| Connectors (Gmail, Drive, Slack…) | connected apps (GPT, GEM), connectors (CLD, CX, CL), Hermes connectors | LATER |
-| Inter-agent protocols (A2A/Reef) | A2A channel, Reef (OCW), cross-session messaging (CC), agent send (OCW) | LATER — own chain first |
-| Device control between own nodes | node devices & computer use (OCW), device assistance (GEM) | SOON after round 2 — full peers, never thin clients |
+| Deep research mode | deep research (GPT, GEM, CLD) | SOON — module only: bounded plan→search→extract→report with a citation guard (`src/research/`, 3 test files); no tool registered |
+| Connectors (Gmail, Drive, Slack…) | connected apps (GPT, GEM), connectors (CLD, CX, CL), Hermes connectors | SOON — module only: read-only GitHub issues and files (`src/connectors/github.ts`, token from `secrets/`) + tests; no route and no tool |
+| Inter-agent protocols (A2A/Reef) | A2A channel, Reef (OCW), cross-session messaging (CC), agent send (OCW) | WON'T — the reasoning, what covers the same need and what an adapter would have to do are in [`docs/a2a.md`](a2a.md) |
+| Device control between own nodes | node devices & computer use (OCW), device assistance (GEM) | SOON — module only: `src/sync/device-control.ts` (request/grant/result shapes) with 16 tests; no `device_req` frame and no transport handler |
 | Consumer verticals (shopping, wallet, health, law, study, CarPlay, office suites, Sites) | shopping/wallet/finances/health/law/flashcards/CarPlay/office integrations/Sites (GPT), purchases (GEM), smart home (GEM), Google Docs (CLD) | WON'T — personal integrations happen through tools, not product features |
 | Ambient room events | ambient room events (OCW) | WON'T — no channels |
 | Copy/paste web-chat fallback | copy-paste mode (AID) | WON'T |

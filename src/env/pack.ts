@@ -80,6 +80,23 @@ async function statLoose(target: string) {
   }
 }
 
+/**
+ * The env travels the chain, so a file that holds a secret must lose it here.
+ * config.json legitimately carries settings, never the provider key.
+ */
+function redactSecrets(fileName: string, text: string): string {
+  if (fileName !== "config.json") return text;
+  try {
+    const parsed = JSON.parse(text) as Record<string, unknown>;
+    if (!Object.prototype.hasOwnProperty.call(parsed, "apiKey")) return text;
+    const { apiKey: _dropped, ...rest } = parsed;
+    return `${JSON.stringify(rest, null, 2)}\n`;
+  } catch {
+    // Unreadable config: nothing is published rather than the raw text.
+    return "{}\n";
+  }
+}
+
 async function readFileEntry(
   relPath: string,
   absolute: string,
@@ -92,8 +109,9 @@ async function readFileEntry(
         "large assets belong in synced-workspace/, not in the chain",
     );
   }
-  const bytes = await fs.readFile(absolute);
-  const textual = isUtf8(bytes);
+  const raw = await fs.readFile(absolute);
+  const textual = isUtf8(raw);
+  const bytes = textual ? Buffer.from(redactSecrets(relPath, raw.toString("utf8")), "utf8") : raw;
   return {
     path: relPath,
     kind: "file",
