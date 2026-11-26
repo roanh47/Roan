@@ -18,6 +18,7 @@ import { findNode, readNodes } from "../chain/nodes.js";
 import os from "node:os";
 import { createHash } from "node:crypto";
 import type { Logger } from "../sync/types.js";
+import { Presence } from "../sync/presence.js";
 import { runTurn } from "./turn-runner.js";
 import { allTools } from "../tools.js";
 import { loadWebConfig, setWebConfigSource } from "../web/config.js";
@@ -163,46 +164,74 @@ async function main(): Promise<void> {
   const identity = await loadIdentity(paths);
   if (identity) session = { identity, store: EventStore.open(paths.database) };
 
-  const state = (): DaemonState => ({
-    model: settings.model,
-    provider: settings.provider,
-    onboarding: session === null,
-    sessions:
-      session === null
-        ? []
-        : readSessions(session.store.read(session.identity.chainId, 1, 10_000)).sessions.map((s) => ({
-            id: s.id,
-            title: s.title,
-            messages: s.messages,
-          })),
-    activeSession:
-      session === null
-        ? null
-        : (readSessions(session.store.read(session.identity.chainId, 1, 10_000)).active?.id ?? null),
-    chain: session?.identity.chainId ?? null,
-    node: session?.identity.nodeId ?? null,
-    head: session ? session.store.head(session.identity.chainId) : 0,
-    peers: peerList(),
-    nodes:
-      session === null
-        ? []
-        : readNodes(session.store.read(session.identity.chainId, 1, 100_000)).map((n) => ({
-            node: n.node,
-            name: n.name,
-            host: n.host,
-            port: n.port,
-          })),
-    invite:
-      session === null
-        ? null
-        : encodeJoinCode({
-            v: 2,
-            chain: session.identity.chainId,
-            token: session.identity.token,
-            hosts: dialHosts(paths),
-            port: PEER_PORT,
-          }),
-  });
+  /**
+   * Who is alive in this chain. The local node never depends on a heartbeat:
+   * while this process runs it is live, and its head is the chain on this disk.
+   * A peer counts as live when it is connected right now or spoke within the
+   * TTL, so an idle machine is not mistaken for a gone one.
+   */
+  let presence: Presence | null = null;
+  const presenceNow = (): Presence | null => {
+    if (session === null) return null;
+    const current = session;
+    if (presence === null || presence.self !== current.identity.nodeId || presence.chain !== current.identity.chainId) {
+      presence = new Presence({
+        self: { node: current.identity.nodeId, chain: current.identity.chainId },
+      });
+    }
+    presence.seeSelf(current.store.head(current.identity.chainId));
+    return presence;
+  };
+
+  const state = (): DaemonState => {
+    const connected = peerList();
+    const who = presenceNow();
+    const self = session?.identity.nodeId ?? null;
+    return {
+      model: settings.model,
+      provider: settings.provider,
+      onboarding: session === null,
+      sessions:
+        session === null
+          ? []
+          : readSessions(session.store.read(session.identity.chainId, 1, 10_000)).sessions.map((s) => ({
+              id: s.id,
+              title: s.title,
+              messages: s.messages,
+            })),
+      activeSession:
+        session === null
+          ? null
+          : (readSessions(session.store.read(session.identity.chainId, 1, 10_000)).active?.id ?? null),
+      chain: session?.identity.chainId ?? null,
+      node: self,
+      head: session ? session.store.head(session.identity.chainId) : 0,
+      peers: connected,
+      nodes:
+        session === null
+          ? []
+          : readNodes(session.store.read(session.identity.chainId, 1, 100_000)).map((n) => ({
+              node: n.node,
+              name: n.name,
+              host: n.host,
+              port: n.port,
+              // This machine is live by definition; a peer that is connected
+              // right now or spoke within the TTL is too. Nothing here makes
+              // the local node depend on hearing from someone else.
+              live: n.node === self || connected.includes(n.node) || (who?.isLive(n.node) ?? false),
+            })),
+      invite:
+        session === null
+          ? null
+          : encodeJoinCode({
+              v: 2,
+              chain: session.identity.chainId,
+              token: session.identity.token,
+              hosts: dialHosts(paths),
+              port: PEER_PORT,
+            }),
+    };
+  };
 
   let control: Awaited<ReturnType<typeof startControlServer>> | null = null;
   /** The turn in flight, so "stop" has something to abort. */
@@ -240,6 +269,8 @@ async function main(): Promise<void> {
     // A tool request that another device addressed to us arrives as a replicated
     // event; it is carried out here, on this machine, and answered in the chain.
     node.watchApplied((event) => {
+      // A peer that just appended is alive, and its event says how far it is.
+      presenceNow()?.seeEvent(event);
       // Everything a peer appends is as real here as on the device that wrote
       // it: the app windows on this machine see the message live, and session
       // metadata (a new conversation, a rename) also refreshes the drawer.

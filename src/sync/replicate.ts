@@ -1,3 +1,4 @@
+import { compareBranches } from "./order.js";
 import type {
   AppendOutcome,
   ConflictReport,
@@ -125,15 +126,27 @@ function parseFrame(raw: string): Parsed {
  *    answers with the events the other is missing. An explicit request frame
  *    is therefore unnecessary: the hello is the request.
  * 3. At equal seq the leading side sends one overlap event (the anchor). If
- *    the other has a different id there, that is a hard conflict.
+ *    the other has a different id there, the chain has two branches.
  * 4. Loose `append` frames keep the live flow going after that.
+ *
+ * Two writers may take the same seq. Nothing is dropped and nothing is
+ * rewritten: the local branch stays where it is and the other is rebased
+ * behind it. A local event that no longer fits the peer's seq space (because
+ * the peer is ahead, or because that seq is already someone else's) is sent
+ * as it is — the peer rebases it — instead of being skipped by a catch-up
+ * that had nothing left to send.
+ *
+ * Siblings that arrive together, before the gap below them is closed, are
+ * placed with `compareBranches` from `order.ts`, so the placement does not
+ * depend on which frame happened to arrive first.
  */
 export class ReplicationSession {
   private statusValue: ReplicationStatus = "idle";
   private peerNode: string | undefined;
   /** Highest seq we know the peer has. */
   private lastSentSeq = 0;
-  private readonly pending = new Map<number, Event>();
+  /** Events waiting for a missing seq, grouped: two writers may share one seq. */
+  private readonly pending = new Map<number, Event[]>();
   /** Ids we received from this peer; prevents sending them back. */
   private readonly remoteIds = new Set<string>();
   private readonly requested = new Set<string>();
@@ -165,7 +178,9 @@ export class ReplicationSession {
 
   /** Number of events waiting for a missing seq. */
   get buffered(): number {
-    return this.pending.size;
+    let count = 0;
+    for (const group of this.pending.values()) count += group.length;
+    return count;
   }
 
   /** Sends the first hello. Idempotent; calling it again is a new request. */
@@ -293,7 +308,13 @@ export class ReplicationSession {
 
     // Merge mode: the peer's stream rebase onto our head, in arrival order.
     // Their ids keep them deduped; their events become our tail.
-    if (this.mergeMode) return this.rebaseRemote(event);
+    if (this.mergeMode) {
+      const ok = this.rebaseRemote(event);
+      // A rebased event may be exactly the seq a buffered group was waiting
+      // for; without this the group would sit there for ever.
+      if (ok) this.flushPending();
+      return ok;
+    }
 
     const head = this.opts.store.head();
     if (event.seq > head + 1) {
@@ -340,9 +361,11 @@ export class ReplicationSession {
       return true;
     }
     const rebased: Event = { ...event, seq: this.opts.store.head() + 1 };
+    // Before the append, like `appendRemote`: a rebased event is still the
+    // peer's event, and it must not be echoed back at it.
+    this.rememberRemoteId(event.id);
     const outcome: AppendOutcome = this.opts.store.append(rebased);
     if (outcome.status === "appended") {
-      this.rememberRemoteId(event.id);
       this.opts.logger.debug("branch rebased", { id: event.id, seq: rebased.seq, vanSeq: event.seq });
       return true;
     }
@@ -352,22 +375,29 @@ export class ReplicationSession {
   }
 
   private buffer(event: Event): void {
-    const queued = this.pending.get(event.seq);
-    if (queued !== undefined) {
-      if (queued.id !== event.id) {
-        // Two different events for the same seq, before we could even
-        // append: here too the branch survives instead of getting stuck.
-        this.reportDivergence(event.seq, queued.id, event.id, event.node);
-        this.pending.delete(event.seq);
-        this.rebaseRemote(event);
-      }
+    const group = this.pending.get(event.seq) ?? [];
+    if (group.some((queued) => queued.id === event.id)) return;
+    group.push(event);
+    // Siblings are kept in the one order every node computes, so the placement
+    // does not depend on which of them happened to arrive first.
+    group.sort(compareBranches);
+    this.pending.set(event.seq, group);
+    if (group.length === 1) {
+      this.opts.logger.debug("event buffered until the gap closes", {
+        seq: event.seq,
+        head: this.opts.store.head(),
+      });
       return;
     }
-    this.pending.set(event.seq, event);
-    this.opts.logger.debug("event buffered until the gap closes", {
-      seq: event.seq,
-      head: this.opts.store.head(),
-    });
+    // A second event for the same seq is not a gap but a branch: two writers
+    // picked one place. Both are kept; `flushPending` puts the first at that
+    // seq and rebases the rest behind it.
+    const first = group[0];
+    const second = group[1];
+    if (first !== undefined && second !== undefined) {
+      this.reportDivergence(event.seq, first.id, second.id, second.node);
+    }
+    this.flushPending();
   }
 
   private appendRemote(event: Event): boolean {
@@ -388,13 +418,21 @@ export class ReplicationSession {
   }
 
   private flushPending(): void {
-    let next = this.opts.store.head() + 1;
-    let event = this.pending.get(next);
-    while (event !== undefined) {
+    for (;;) {
+      const next = this.opts.store.head() + 1;
+      const group = this.pending.get(next);
+      if (group === undefined) return;
       this.pending.delete(next);
-      if (!this.appendRemote(event)) return;
-      next = this.opts.store.head() + 1;
-      event = this.pending.get(next);
+      const first = group[0];
+      if (first === undefined) continue;
+      if (!this.appendRemote(first)) return;
+      // Everything else in the group competed for the same seq; it was sorted
+      // by the shared rule, so it lands in the same order on every node.
+      for (let index = 1; index < group.length; index++) {
+        const sibling = group[index];
+        if (sibling === undefined) continue;
+        if (!this.rebaseRemote(sibling)) return;
+      }
     }
   }
 
@@ -445,6 +483,15 @@ export class ReplicationSession {
       return;
     }
 
+    if (event.seq <= this.lastSentSeq) {
+      // The peer claims this seq already, with another event: two writers took
+      // the same place and we only now notice. A catch-up would silently skip
+      // ours, so this event goes out as it is and the peer rebases it.
+      this.enterMergeMode(event);
+      this.opts.transport.send({ t: "append", event });
+      return;
+    }
+
     if (event.seq !== this.lastSentSeq + 1) {
       // The peer is missing history (or we know no better): send the sequence again
       // instead of a loose event it cannot place anyway.
@@ -459,6 +506,21 @@ export class ReplicationSession {
 
     this.lastSentSeq = event.seq;
     this.opts.transport.send({ t: "append", event });
+  }
+
+  /**
+   * From here on this peer's seq numbers are hints, not positions: every event
+   * it has that we do not know is rebased onto our tail, and the other way
+   * round. Both sides do it, so no branch is lost and no event is quietly
+   * skipped because the peer "should already have" that seq.
+   */
+  private enterMergeMode(event: Event): void {
+    if (this.mergeMode) return;
+    this.mergeMode = true;
+    this.opts.logger.warn(
+      `local event ${event.id} at seq ${event.seq} does not fit what peer ${this.peerNode ?? this.opts.transport.label} reports (${this.lastSentSeq}); from now on branches are rebased`,
+      { peer: this.opts.transport.label, seq: event.seq, peerHas: this.lastSentSeq },
+    );
   }
 
   // --- shutting down ----------------------------------------------------

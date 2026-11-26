@@ -41,7 +41,12 @@ export type EventType =
   | "tool_rule"
   | "tool_approval"
   | "approval_request"
-  | "blob";
+  | "blob"
+  | "goal"
+  | "goal_update"
+  | "memory"
+  | "plan_mode"
+  | "cron_job";
 
 export interface Event {
   v: 1;
@@ -99,6 +104,11 @@ const EVENT_TYPES: ReadonlySet<string> = new Set<EventType>([
   "tool_approval",
   "approval_request",
   "blob",
+  "goal",
+  "goal_update",
+  "memory",
+  "plan_mode",
+  "cron_job",
 ]);
 
 const DEFAULT_LIMIT = 1000;

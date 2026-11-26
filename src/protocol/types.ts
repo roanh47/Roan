@@ -43,7 +43,16 @@ export type EventType =
   /** The agent asking the owner to let one tool call through. */
   | "approval_request"
   /** One base64 chunk of a file too big for a single event, under its hash. */
-  | "blob";
+  | "blob"
+  /** A standing order with a status; progress arrives as goal_update. */
+  | "goal"
+  | "goal_update"
+  /** One durable fact distilled from a finished session. */
+  | "memory"
+  /** A conversation is in read-only plan mode until the plan is approved. */
+  | "plan_mode"
+  /** A scheduled task: schedule, prompt, enabled. */
+  | "cron_job";
 
 /**
  * One entry in the append-only chain.

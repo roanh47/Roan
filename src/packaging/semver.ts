@@ -104,6 +104,100 @@ export function formatVersion(v: SemVer): string {
   return v.prerelease === undefined ? base : `${base}-${v.prerelease}`;
 }
 
+/** Ordering the updater and `Array.prototype.sort` both speak. */
+export type VersionOrdering = -1 | 0 | 1;
+
+/** A prerelease identifier is numeric only when it is digits all the way. */
+const NUMERIC_IDENTIFIER = /^\d+$/;
+
+/**
+ * Numeric identifiers compare by value, not by text length: `10` is after
+ * `9`. Leading zeros are stripped first so the comparison stays numeric even
+ * for a hand-written `01`, which the strict parser does not produce.
+ */
+function compareNumericIdentifiers(a: string, b: string): VersionOrdering {
+  const left = a.replace(/^0+(?=\d)/, "");
+  const right = b.replace(/^0+(?=\d)/, "");
+  if (left.length !== right.length) {
+    return left.length < right.length ? -1 : 1;
+  }
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+/**
+ * Prerelease precedence, per the semantic-versioning spec: identifiers are
+ * compared one by one, numeric identifiers numerically, alphanumeric ones in
+ * code-unit order, numeric always below alphanumeric, and a shorter list wins
+ * when it is a prefix of the longer one (`alpha` before `alpha.1`).
+ */
+function comparePrerelease(a: string, b: string): VersionOrdering {
+  const left = a.split(".");
+  const right = b.split(".");
+  const shared = Math.min(left.length, right.length);
+
+  for (let index = 0; index < shared; index += 1) {
+    const leftPart = left[index];
+    const rightPart = right[index];
+    if (leftPart === undefined || rightPart === undefined) {
+      // Unreachable: the loop is bounded by the shorter list.
+      break;
+    }
+
+    const leftNumeric = NUMERIC_IDENTIFIER.test(leftPart);
+    const rightNumeric = NUMERIC_IDENTIFIER.test(rightPart);
+    if (leftNumeric && rightNumeric) {
+      const order = compareNumericIdentifiers(leftPart, rightPart);
+      if (order !== 0) return order;
+      continue;
+    }
+    // Numeric identifiers always have lower precedence than alphanumeric ones.
+    if (leftNumeric) return -1;
+    if (rightNumeric) return 1;
+    if (leftPart !== rightPart) {
+      return leftPart < rightPart ? -1 : 1;
+    }
+  }
+
+  if (left.length === right.length) return 0;
+  return left.length < right.length ? -1 : 1;
+}
+
+/**
+ * Compares two strict versions: -1 when `a` precedes `b`, 0 when they are
+ * equal, 1 when `a` follows `b`.
+ *
+ * A release outranks every prerelease of the same `major.minor.patch`
+ * (`1.0.0` after `1.0.0-rc.1`), and prereleases order by their dot-separated
+ * identifiers. Build metadata is not part of this parser.
+ *
+ * @throws Error when either input is not a strict version (see
+ *   `parseVersion`); the message names the offending string.
+ */
+export function compareVersions(a: string, b: string): VersionOrdering {
+  const left = parseVersion(a);
+  const right = parseVersion(b);
+
+  if (left.major !== right.major) return left.major < right.major ? -1 : 1;
+  if (left.minor !== right.minor) return left.minor < right.minor ? -1 : 1;
+  if (left.patch !== right.patch) return left.patch < right.patch ? -1 : 1;
+
+  const leftPre = left.prerelease;
+  const rightPre = right.prerelease;
+  if (leftPre === undefined && rightPre === undefined) return 0;
+  if (leftPre === undefined) return 1;
+  if (rightPre === undefined) return -1;
+  return comparePrerelease(leftPre, rightPre);
+}
+
+/**
+ * True when `candidate` is strictly newer than `current`. Equal versions and
+ * older candidates are not newer, so a feed can never make the app "update"
+ * to what it already runs.
+ */
+export function isNewerVersion(candidate: string, current: string): boolean {
+  return compareVersions(candidate, current) > 0;
+}
+
 /**
  * Bumps one part and zeroes everything below it: `major` clears minor and
  * patch, `minor` clears patch, `patch` only advances patch.

@@ -346,6 +346,49 @@ describe("replication", () => {
     session.close();
   });
 
+  it("a local event is pushed even when the peer says it is ahead", () => {
+    // The outbound link is seeded with the peer's head, so a peer that joined
+    // with more history makes `lastSentSeq` jump ahead of what we hold. A local
+    // append then no longer looks like "the next seq" — and used to be dropped
+    // as a catch-up that had nothing to send.
+    const local = createMemoryStore({ chain: "gesprek", nodeId: "a" });
+    const transport = new FakeTransport("peer");
+    const session = new ReplicationSession({ store: local, transport, logger: quietLogger });
+    session.start();
+
+    transport.deliver({ t: "hello", v: 1, chain: "gesprek", node: "b", haveSeq: 7 });
+    local.append(event(1, "a"));
+
+    const appends = transport.sent.filter((f) => f.t === "append");
+    assert.equal(appends.length, 1, "the local event never left the node");
+    assert.equal(appends[0]?.t === "append" ? appends[0].event.id : "", "a-1");
+    assert.equal(session.status, "live");
+    session.close();
+  });
+
+  it("a local event written after catching up with a peer that was ahead is pushed", () => {
+    const local = createMemoryStore({ chain: "gesprek", nodeId: "a" });
+    const remote = createMemoryStore({ chain: "gesprek", nodeId: "b" });
+    seed(remote, 7);
+    const [ta, tb] = link();
+    const session = replicate({ store: local, transport: ta, logger: quietLogger });
+    const peer = replicate({ store: remote, transport: tb, logger: quietLogger });
+
+    // Catching up from 0 to 7 happens in the handshake, so `lastSentSeq` ends
+    // up at 7 while our own chain starts at 8.
+    assert.equal(local.head(), 7);
+    local.append(event(8, "a", "a-1"));
+    local.append(event(9, "a", "a-2"));
+
+    assert.equal(remote.head(), 9, "our events never reached the peer");
+    assert.equal(remote.idAt(8), "a-1");
+    assert.equal(remote.idAt(9), "a-2");
+    assert.equal(local.head(), 9);
+
+    session.close();
+    peer.close();
+  });
+
   it("foreign frames (tool_req) are ignored", () => {
     const local = createMemoryStore({ chain: "gesprek", nodeId: "a" });
     const transport = new FakeTransport("peer");

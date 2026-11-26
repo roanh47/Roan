@@ -17,6 +17,12 @@ export interface PresenceOptions {
   ttlMs?: number;
   /** Clock in ms; defaults to `Date.now`. */
   now?: () => number;
+  /**
+   * This node. While the daemon runs it is alive by definition: nobody sends
+   * it a heartbeat, so without this it would be the one entry that expires in
+   * its own node list.
+   */
+  self?: { readonly node: string; readonly chain?: string };
 }
 
 export interface PresenceEntry {
@@ -54,6 +60,9 @@ export class Presence {
   private readonly records = new Map<string, PresenceRecord>();
   /** The chain this presence belongs to; `null` until the first report. */
   private chainValue: string | null = null;
+  /** This node; always live, its head is reported by the daemon itself. */
+  private readonly selfNode: string | null;
+  private selfHead = 0;
 
   constructor(options: PresenceOptions = {}) {
     const ttlMs = options.ttlMs ?? DEFAULT_PRESENCE_TTL_MS;
@@ -62,11 +71,45 @@ export class Presence {
     }
     this.ttlMs = ttlMs;
     this.clock = options.now ?? Date.now;
+    this.selfNode = options.self?.node ?? null;
+    if (this.selfNode !== null && options.self?.chain !== undefined) {
+      this.chainValue = options.self.chain;
+    }
   }
 
   /** Chain name as it came from the first hello or the first event. */
   get chain(): string | null {
     return this.chainValue;
+  }
+
+  /** This node's id, or `null` when presence was not told who it belongs to. */
+  get self(): string | null {
+    return this.selfNode;
+  }
+
+  /**
+   * The local head, so this node's own entry shows how far the chain on this
+   * machine has come. Does not touch the TTL: the process running is the sign
+   * of life.
+   */
+  seeSelf(head: number): void {
+    if (!Number.isInteger(head) || head < 0) {
+      throw new RangeError(`invalid local head: ${String(head)}`);
+    }
+    this.selfHead = head;
+  }
+
+  /** Whether `node` is this machine. */
+  isSelf(node: string): boolean {
+    return this.selfNode !== null && node === this.selfNode;
+  }
+
+  /** Whether `node` counts as alive right now: this node always does. */
+  isLive(node: string): boolean {
+    if (this.isSelf(node)) return true;
+    const record = this.records.get(node);
+    if (record === undefined) return false;
+    return this.isLiveRecord(record, this.clock());
   }
 
   /**
@@ -122,6 +165,8 @@ export class Presence {
 
   /** A transport to this node is closed; the node is no longer present. */
   drop(node: string): void {
+    // This node is not going anywhere while its daemon runs.
+    if (this.isSelf(node)) return;
     this.records.delete(node);
   }
 
@@ -137,12 +182,14 @@ export class Presence {
 
   /**
    * Highest seq of a node, or `undefined` if we do not know it or if it has
-   * expired: the head of a dead node is not a live state.
+   * expired: the head of a dead node is not a live state. This node's own head
+   * is what the daemon last reported through `seeSelf`.
    */
   head(node: string): number | undefined {
+    if (this.isSelf(node)) return this.selfHead;
     const record = this.records.get(node);
     if (record === undefined) return undefined;
-    if (!this.isLive(record, this.clock())) return undefined;
+    if (!this.isLiveRecord(record, this.clock())) return undefined;
     return record.head;
   }
 
@@ -171,7 +218,7 @@ export class Presence {
   }
 
   /** Exactly at the TTL boundary counts as live; only after that is a node old. */
-  private isLive(record: PresenceRecord, now: number): boolean {
+  private isLiveRecord(record: PresenceRecord, now: number): boolean {
     return now - record.lastSeen <= this.ttlMs;
   }
 
@@ -181,17 +228,31 @@ export class Presence {
     for (const node of nodes) {
       const record = this.records.get(node);
       if (record === undefined) continue;
-      const live = this.isLive(record, now);
+      // This node never expires: its sign of life is the daemon running.
+      const live = this.isSelf(node) ? true : this.isLiveRecord(record, now);
       if (live !== wantLive) continue;
       entries.push({
         node: record.node,
         chain: record.chain,
-        head: record.head,
+        head: this.isSelf(node) ? this.selfHead : record.head,
         transportLabel: record.transportLabel,
-        lastSeen: record.lastSeen,
+        lastSeen: this.isSelf(node) ? now : record.lastSeen,
         live,
       });
     }
+    // A node that never announced itself yet still belongs in its own list.
+    if (this.selfNode !== null && wantLive && !this.records.has(this.selfNode)) {
+      const chain = this.chainValue ?? "";
+      entries.push({
+        node: this.selfNode,
+        chain,
+        head: this.selfHead,
+        transportLabel: undefined,
+        lastSeen: now,
+        live: true,
+      });
+    }
+    entries.sort((left, right) => (left.node < right.node ? -1 : left.node > right.node ? 1 : 0));
     return entries;
   }
 }

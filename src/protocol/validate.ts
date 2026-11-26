@@ -65,6 +65,11 @@ const EVENT_TYPES = {
   tool_approval: true,
   approval_request: true,
   blob: true,
+  goal: true,
+  goal_update: true,
+  memory: true,
+  plan_mode: true,
+  cron_job: true,
 } as const satisfies { readonly [K in EventType]: true };
 
 const FRAME_TYPES = {

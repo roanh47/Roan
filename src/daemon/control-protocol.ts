@@ -27,7 +27,17 @@ export interface DaemonState {
   readonly head: number;
   readonly peers: readonly string[];
   /** Every node that ever announced itself in this chain, newest fact per node. */
-  readonly nodes: readonly { readonly node: string; readonly name: string; readonly host: string; readonly port: number }[];
+  readonly nodes: readonly {
+    readonly node: string;
+    readonly name: string;
+    readonly host: string;
+    readonly port: number;
+    /**
+     * Whether this node counts as present now. The local node is live while its
+     * daemon runs; a peer is live when it is connected or recently spoke.
+     */
+    readonly live?: boolean;
+  }[];
   /** The code another device pastes in; null before there is a chain. */
   readonly invite: string | null;
   readonly model?: string;

@@ -187,6 +187,8 @@ export interface NodeSummary {
   readonly name: string;
   readonly host: string;
   readonly port: number;
+  /** The daemon says this node is alive (self, or a peer with a fresh sign of life). */
+  readonly live?: boolean;
 }
 
 export interface SessionSummary {
@@ -317,7 +319,15 @@ export function parseFrame(raw: unknown): ServerFrame | null {
               typeof (entry as { node?: unknown }).node === "string" &&
               typeof (entry as { name?: unknown }).name === "string",
           )
-          .map((entry) => ({ node: entry.node, name: entry.name, host: entry.host ?? "", port: entry.port ?? 0 }))
+          .map((entry) => ({
+            node: entry.node,
+            name: entry.name,
+            host: entry.host ?? "",
+            port: entry.port ?? 0,
+            ...(typeof (entry as unknown as { live?: unknown }).live === "boolean"
+              ? { live: (entry as unknown as { live: boolean }).live }
+              : {}),
+          }))
       : undefined;
     const sessions = Array.isArray(data.sessions)
       ? data.sessions

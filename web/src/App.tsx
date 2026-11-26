@@ -664,7 +664,8 @@ function DevicesPage({
       <h3 className="panel__label">Nodes in this chain</h3>
       <ul className="panel__list">
         {snapshot.nodes.map((entry) => {
-          const live = snapshot.peers.includes(entry.node) || snapshot.peers.includes(entry.name);
+          // The daemon knows best (it reports self as live); peers are the fallback.
+          const live = entry.live ?? (snapshot.peers.includes(entry.node) || snapshot.peers.includes(entry.name));
           const here = entry.node === snapshot.node;
           return (
             <li key={entry.node} className="sync__node">

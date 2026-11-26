@@ -71,9 +71,13 @@ export class ChainNodeStore implements NodeStore {
     if (event.seq !== head + 1) {
       return { status: "conflict", existingId: "" };
     }
-    // notify:false — this came *from* a peer. The store must stay quiet so
-    // replication does not send what it just received back out again.
-    this.store.append(this.chain, event as never, { notify: false });
+    // Notify like any other append. The event came *from* a peer, so the
+    // session that received it recognises the id and stays quiet; every other
+    // session (a link to a third node, or a second link to the same one) has
+    // never seen it and forwards it. That is the difference between a mesh
+    // where only direct neighbours converge and one where the chain reaches
+    // nodes that never spoke to each other.
+    this.store.append(this.chain, event as never);
     this.onApplied?.(event);
     return { status: "appended" };
   }
