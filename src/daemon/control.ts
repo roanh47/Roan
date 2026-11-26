@@ -9,6 +9,11 @@ import { createWebHandler, defaultWebDist, isLoopbackAddress, isTailnetAddress }
 /** One WebSocket protocol on the shared port. Same shape `ws` hands to `upgrade`. */
 export type UpgradeHandler = (req: IncomingMessage, socket: Duplex, head: Buffer) => void;
 
+/** What the control socket needs to know about a removal: done, or why not. */
+export type RemoveOutcome =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly message: string };
+
 export interface ControlServerOptions {
   readonly port: number;
   readonly host?: string;
@@ -48,6 +53,14 @@ export interface ControlServerOptions {
   readonly onLeaveChain?: () => void;
   /** Names a node differently; a fresh announcement, so it rides the chain. */
   readonly onRenameNode?: (node: string, name: string) => void;
+  /**
+   * Takes another device out of the chain: one `node_remove` event that every
+   * device folds. The device itself is never removable from here — a machine
+   * that is running is not a ghost, and its own announcement would put it back
+   * on the next fold. A refusal is returned rather than thrown, because the app
+   * shows the reason.
+   */
+  readonly onRemoveNode?: (node: string) => RemoveOutcome;
   /** Marks a point in the current conversation you can come back to. */
   readonly onCheckpoint?: (label?: string) => void;
   /** Starts a new conversation from an earlier point; nothing is deleted. */
@@ -293,6 +306,7 @@ export function startControlServer(options: ControlServerOptions): Promise<Contr
         type !== "rename_session" &&
         type !== "leave_chain" &&
         type !== "rename_node" &&
+        type !== "node_remove" &&
         type !== "checkpoint" &&
         type !== "rewind"
       ) {
@@ -331,6 +345,23 @@ export function startControlServer(options: ControlServerOptions): Promise<Contr
         const node = typeof frame["node"] === "string" ? frame["node"] : "";
         const name = typeof frame["name"] === "string" ? frame["name"].trim() : "";
         if (node.length > 0 && name.length > 0) options.onRenameNode?.(node, name);
+      }
+      if (type === "node_remove") {
+        const wanted = typeof frame["node"] === "string" ? frame["node"].trim() : "";
+        if (wanted.length === 0) {
+          send(socket, {
+            t: "control_error",
+            message: "node_remove needs the id of the device to remove",
+          });
+          return;
+        }
+        const result = options.onRemoveNode?.(wanted) ?? {
+          ok: false,
+          message: "this daemon cannot remove devices",
+        };
+        // Only a refusal says anything: on success the chain itself is the
+        // answer, and the app sees it as the usual append plus state push.
+        if (!result.ok) send(socket, { t: "control_error", message: result.message });
       }
     });
 

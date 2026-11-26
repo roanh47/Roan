@@ -136,7 +136,8 @@ not among the keys, which means `run_shell` can `cat` a file the read tool would
 have refused. Nesting deeper than 4 is not walked. Only `*.pem` is caught by
 extension; a private key named `id_rsa` or a `.env` is not. And per section 3,
 `decide` has no caller: the check that would deny `secrets/` is not invoked by
-`agent.ts`, `turn-runner.ts` or `registry.ts`.
+`agent.ts`, `turn-runner.ts` or `registry.ts`. Section 9 describes the one
+setting that relaxes the containment rule, and what it still refuses.
 
 ## 5. Redaction and the home directory
 
@@ -300,3 +301,177 @@ A turn that needs a key inside `secrets/` will still be able to read it through
 `run_shell`, and the result will be appended to the chain as a `tool_result`.
 Until `policy.decide` sits in front of the tool call and `redactDeep` sits in
 front of `append`, that is the honest description of this page.
+
+## 9. Full-disk access (`access.fullDisk`)
+
+The owner can lift the workspace containment for the agent's file tools. It is
+one setting, default **off**:
+
+```json
+{ "access": { "fullDisk": false } }
+```
+
+`src/daemon/settings.ts` types it as `AccessSettings` and `parseAccess` accepts
+only the literal boolean `true`; the string `"true"`, `1` and any other shape
+read as off. `saveSettings` (`src/daemon/settings-write.ts`) accepts a patch of
+the form `{"access":{"fullDisk":true}}`, rejects every other key and every
+non-boolean, and merges the flag instead of replacing the object, so an
+unrelated `settings_save` does not reset it. The file stays `0600` because the
+existing atomic writer owns the write.
+
+When the flag is off, `pathViolation` in `src/tools/policy.ts` behaves exactly as
+before, except that the refusal now names the setting:
+
+> path "/etc/hostname" escapes the workspace /home/roan/Roan;
+> set access.fullDisk=true in the settings to allow access outside the workspace
+
+When it is on, the workspace containment check is skipped for paths outside the
+workspace. Everything else still refuses:
+
+- process and kernel memory — `/proc/<pid>/mem`, `/proc/self/mem`,
+  `/proc/kcore`, `/proc/kallsyms`, `/dev/mem`, `/dev/kmem`, `/dev/port`;
+- every path under `/dev` (a device node is not a file read);
+- **writes** under `/boot`, `/sys`, `/proc` and `/dev`. Reading `/boot` is
+  allowed; writing the bootloader is not;
+- any path whose segments include `secrets`, `.ssh` or `.gnupg`, and any
+  `extraDenyDirs` entry;
+- any path ending in `.pem`.
+
+The same verdict is available as `pathAccessViolation(policy, path, write)` for
+callers that resolve one path themselves, and `defaultPolicy(workspace, {
+fullDisk: true })` builds the policy from the setting.
+
+**Threat model, honestly.** This is a permission, not a sandbox escape. The
+agent already runs `run_shell` with the daemon user's full OS rights (section 3
+notes the live shell does not consult the policy at all), so turning the setting
+on grants no new operating-system right; it stops Roan's own path check from
+refusing reads and writes the OS already allows. What that means in practice:
+
+- a prompt-injected turn can read anything the user can read — browser profiles,
+  `~/.ssh`, mail, documents, other checkouts — and the contents land in the
+  chain as `tool_result` events;
+- it can also write outside the workspace (except the trap list above), which is
+  equivalent to code execution as that user: `~/.bashrc`, a cron entry, a unit
+  file, `authorized_keys`. The path policy cannot tell "read one payslip" from
+  "exfiltrate the home directory";
+- the protected-directory and `.pem` rules are policy-level only. They stop the
+  file tools, not `run_shell`, which can still `cat` the same file. If the goal
+  is to keep a secret out of the agent's reach, the answer is OS permissions,
+  not this flag.
+
+So the flag is owner-only, default-off, and should be treated as "this machine
+is now a full-disk agent" rather than as a per-request convenience. The chain
+still records every tool call and result, which is the only after-the-fact
+control that exists. It is also not a per-machine secret: the flag lives in
+`config.json`, which section 1 lists as part of the env that travels, so other
+devices in the fleet see it and an env import can carry it along. Decide it per
+fleet, knowing that.
+
+**Wiring note.** The setting is honoured wherever a policy is used:
+`policy.decide` and `pathAccessViolation`. The builtin tools in `src/tools.ts`
+(`read_file`, `write_file`, `list_dir`) currently resolve paths with their own
+`resolveInside` and do not call either, so they do not see the flag until that
+call is added — the same unwired status section 8 records for the rest of the
+policy. The daemon should build its policy with
+`defaultPolicy(workspace, { fullDisk: settings.access.fullDisk })`.
+
+## 10. Passwordless elevation by rule, not by password
+
+`src/sudo/install.ts` implements the owner-side switch. The owner runs it once,
+as root; the agent never sees, stores or types a password. Afterwards the
+`run_elevated` tool (`src/tools/elevated.ts`) invokes `sudo -n` — the `-n` means
+"fail instead of prompting" — and only for a command line that is byte-for-byte
+in the installed allowlist.
+
+### sudoers (default, Linux)
+
+The generated file is `/etc/sudoers.d/roan-elevation`, mode `0440`, owned by
+root, with no `ALL` token and no wildcard:
+
+```
+# Managed by Roan. Do not edit by hand; remove with Roan's elevation uninstall.
+# Scope: NOPASSWD for exactly the command lines below. No wildcards, no blanket grant.
+roan <hostname>=(root) NOPASSWD: /usr/bin/systemctl restart roan-daemon, /usr/bin/journalctl -u roan-daemon -n 100
+```
+
+The allowlist is injected (`InstallSudoersOptions.commands`), not read from the
+environment by the library. Every entry must be an absolute path; entries with
+`*`, `?`, `[`, `]`, the word `ALL`, a leading `!`, a `#`, a double quote or a
+control character are refused before a file is written. Commas, colons, equals
+and backslashes in arguments are escaped. The rule targets `(root)` and one
+host, so it cannot be widened to another target or matched by prefix.
+
+Install writes a temp file in the *same* directory, runs `visudo -cf <temp>`,
+and only on exit 0 chmods it and renames it over the target. A visudo failure
+removes the temp file, leaves any previous rule untouched and returns a generic
+reason — visudo's stderr is discarded on purpose because it can echo rule text.
+Uninstall unlinks exactly `roan-elevation`; it never globs or removes other
+files in `sudoers.d`, and is idempotent.
+
+Owner commands (from the repo, with the built `dist/`):
+
+```sh
+cat > /tmp/roan-elevated.json <<'JSON'
+["/usr/bin/systemctl restart roan-daemon"]
+JSON
+sudo node dist/sudo/cli.js install --commands-file /tmp/roan-elevated.json
+node dist/sudo/cli.js status          # {"supported":true,"installed":true,...}
+sudo node dist/sudo/cli.js uninstall  # removes only our file
+```
+
+### polkit (desktop Linux alternative)
+
+`installPolkitRule` writes `/etc/polkit-1/rules.d/50-roan-elevation.rules`, mode
+`0644`:
+
+```js
+polkit.addRule(function(action, subject) {
+    var allowed = [
+        "org.freedesktop.systemd1.manage-units"
+    ];
+    if (allowed.indexOf(action.id) !== -1 && subject.user === "roan") {
+        return polkit.Result.YES;
+    }
+});
+```
+
+The actions come from an injected list and must be dotted action ids;
+`org.freedesktop.policykit.exec` is refused because it runs an arbitrary
+program. Enable it with `sudo node dist/sudo/cli.js install --polkit
+--actions-file <file>`; uninstall with `--polkit`.
+
+**What polkit does not cover.** polkit authorizes *actions*, not command lines.
+A rule for `manage-units` lets the agent manage any systemd unit, not just
+`roan-daemon`; the action is the coarsest unit polkit offers. Use it when a
+desktop policy service is already the machine's authority; prefer sudoers when
+"these exact commands" is the requirement.
+
+### Platforms without a mechanism
+
+- **Android** — no sudoers and no polkit inside the app sandbox; root is granted
+  per action through adb/Shizuku, not a drop-in file. Refused with that reason.
+- **macOS** — no `/etc/sudoers.d` model; the single `/etc/sudoers` is edited
+  with `visudo`, which Roan will not rewrite. Refused with that reason.
+- **Windows** — no sudoers; run the agent as a service account with the rights
+  it needs.
+
+`elevationStatus()` returns `{supported, installed, mechanism, commands}` (plus a
+`reason` when unsupported) without reading the rule body; the daemon or UI can
+show it directly. `installed` is one existence check on the documented path.
+
+### Threat model and limits
+
+- A NOPASSWD rule for `/usr/bin/systemctl restart roan-daemon` is still root
+  execution of that binary with those arguments. Do not allowlist a shell,
+  interpreter, editor or anything in a directory the agent user can write: a
+  writable binary turns the rule into arbitrary root. Choose system binaries in
+  root-owned paths.
+- `visudo -cf` checks syntax, not safety. Wildcards are refused because a
+  sudoers wildcard is a pattern; argument matching still has sudoers' own
+  subtleties (a command that accepts an option file can be steered by it).
+- The sudoers file is the authority, not the injected list in the process. The
+  tool also checks the injected list, so removing an entry takes both a rule
+  reinstall and a restart; the status call reports what the caller believes, not
+  what the file says.
+- Nothing here logs the rule body. Errors name the directory and the fix
+  (`run this once as root`), never a command line.

@@ -3,9 +3,9 @@
 
    One stylesheet, one design system: tokens, the shell (header / content /
    dock), the drawer, the conversation, the composer, the panels, onboarding.
-   Android's WebView reports env(safe-area-inset-*) as 0 even when the app
-   draws edge to edge, so the mobile block carries floors instead of trusting
-   the insets. Nothing else in the app declares colours.
+   Status-bar space is the shell's business: this file only ever reads
+   `env(safe-area-inset-*, 0px)`, never a literal floor, so the page is the
+   same on a phone and on the desktop. Nothing else declares colours.
    ========================================================================== */
 
 :root {
@@ -106,6 +106,9 @@ pre {
 .app {
   height: 100dvh;
   box-sizing: border-box;
+  /* Edge-to-edge is opt-in per platform: with no notch the inset is 0 and the
+     page starts at the top, exactly like a browser tab. */
+  padding-top: env(safe-area-inset-top, 0px);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto;
@@ -143,6 +146,82 @@ pre {
 .titlebar__menu[aria-expanded="true"] {
   background: var(--surface-2);
   color: var(--fg);
+}
+
+/* The fold toggle only exists where there is a column to fold (>= 1024 px). */
+.titlebar__railtoggle {
+  display: none;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.titlebar__railtoggle:active {
+  background: var(--surface-2);
+  color: var(--fg);
+}
+
+/* ---------------------------------------------------------- daemon banner */
+
+/* Compact, at the top, out of the conversation's way: a warning about the
+   socket is chrome, not a message from Roan. */
+.connbanner {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 54px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 26;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(calc(100vw - 24px), 520px);
+  padding: 9px 10px 9px 14px;
+  border: 1px solid rgba(240, 198, 116, 0.35);
+  border-radius: var(--radius);
+  background: #1a1712;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  color: var(--fg);
+}
+
+.connbanner__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--warn);
+}
+
+.connbanner__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+
+.connbanner__headline {
+  font-weight: 650;
+}
+
+.connbanner__detail {
+  color: var(--muted);
+}
+
+.connbanner__retry {
+  flex: none;
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--fg);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .titlebar__title {
@@ -187,12 +266,6 @@ pre {
 .titlebar__name {
   font-size: 14px;
   font-weight: 600;
-}
-
-.titlebar__wait {
-  margin-left: auto;
-  color: var(--faint);
-  font-size: 11.5px;
 }
 
 .conversation {
@@ -637,6 +710,8 @@ pre {
 
 .composer {
   display: flex;
+  /* One row of controls; a grown textarea keeps the buttons on its last line
+     instead of dragging them to the middle of the box. */
   align-items: flex-end;
   gap: 8px;
   padding: 7px 7px 7px 16px;
@@ -651,17 +726,21 @@ pre {
   box-shadow: 0 0 0 3px rgba(126, 226, 184, 0.09);
 }
 
+/* The text is centred in the control row, not padded down to the bottom: the
+   line box is 24 px and the padding is 7 px top and bottom, so one line is
+   exactly as tall as the 38 px send button next to it. Every extra line adds
+   24 px, which is why the JS grows the box in whole lines. */
 .composer__input {
   flex: 1;
   min-width: 0;
-  min-height: 26px;
+  min-height: 38px;
   max-height: 140px;
   padding: 7px 0;
   border: 0;
   background: transparent;
   caret-color: var(--accent);
   font-size: 16px;
-  line-height: 1.45;
+  line-height: 24px;
   resize: none;
   outline: none;
   user-select: text;
@@ -697,13 +776,6 @@ pre {
   transform: scale(0.92);
 }
 
-@media (pointer: coarse) {
-  .composer__send {
-    width: 42px;
-    height: 42px;
-  }
-}
-
 /* ---------------------------------------------------------------- drawer */
 
 .rail__scrim {
@@ -728,7 +800,7 @@ pre {
   overflow-y: auto;
   background: #101317;
   border-right: 1px solid var(--line-soft);
-  padding: 8px 12px max(env(safe-area-inset-bottom, 0px), 14px);
+  padding: calc(8px + env(safe-area-inset-top, 0px)) 12px max(env(safe-area-inset-bottom, 0px), 14px);
 }
 
 .rail--open {
@@ -1675,45 +1747,45 @@ pre {
 
 /* ---------------------------------------------------------- mobile shell */
 
-@media (max-width: 860px) {
+/* Below 1024 px the rail is a drawer: the titlebar's ☰ opens it over the
+   conversation and it never takes a column of its own. */
+@media (max-width: 1023px) {
   .app {
-    padding-top: 0;
+    padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: max(env(safe-area-inset-bottom, 0px), 10px);
   }
 
   .rail {
     width: min(86vw, 360px);
-    padding-top: 14px;
   }
 
   .transcript {
     padding: 16px 12px 6px;
   }
-
-  /* Only the native shells draw edge to edge under the system bars. Their
-     webview reports the insets as 0, so the floors keep the content below
-     the status bar. A browser sits inside its own chrome already: no dead
-     strip at the top of the page. */
-  .app-shell .app {
-    padding-top: max(env(safe-area-inset-top, 0px), 30px);
-  }
-
-  .app-shell .rail {
-    padding-top: max(env(safe-area-inset-top, 0px), 34px);
-  }
 }
 
-/* Desktop: the drawer parks open on the left, like the reference apps. */
-@media (min-width: 900px) {
+/* From 1024 px the rail is a real column, and the titlebar toggle folds it
+   away. The choice is remembered (rail.ts), and folding never overlays the
+   transcript: the column simply stops existing. */
+@media (min-width: 1024px) {
   .app {
-    grid-template-columns: 300px minmax(0, 1fr);
+    --rail-width: clamp(240px, 20vw, 300px);
+    grid-template-columns: var(--rail-width) minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
     grid-template-areas:
       "rail bar"
       "rail main"
       "rail dock";
-    padding-top: 0;
+    padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: 0;
+  }
+
+  .app--rail-collapsed {
+    grid-template-columns: 0 minmax(0, 1fr);
+  }
+
+  .app--rail-collapsed .rail {
+    display: none;
   }
 
   .rail__scrim {
@@ -1726,16 +1798,21 @@ pre {
     width: auto;
     border-right: 1px solid var(--line-soft);
     background: #0c0e11;
-    padding: 18px 16px;
+    padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* The drawer button belongs to the phone; the fold toggle to the desk. A
+     settings subpage keeps its back arrow. */
+  .titlebar__menu--drawer {
+    display: none;
+  }
+
+  .titlebar__railtoggle {
+    display: grid;
   }
 
   .titlebar {
     padding: 10px 22px;
-  }
-
-  .rail__brand,
-  .rail__new {
-    display: none;
   }
 
   .rail__list {
@@ -1932,8 +2009,9 @@ pre {
   flex: none;
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  /* The same square as the send button: one control row, one height. */
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   color: var(--muted);
 }
@@ -2032,4 +2110,329 @@ pre {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
+}
+
+/* ------------------------------------------------------- workspace explorer */
+
+.explorer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.explorer__summary {
+  margin: 0;
+}
+
+.explorer__summaryroots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 0;
+  color: var(--faint);
+  font-size: 12.5px;
+}
+
+.explorer__summaryroot {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.explorer__summaryrootname {
+  font-family: var(--mono);
+  color: var(--muted);
+}
+
+.explorer__node {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.explorer__node--open {
+  border-color: var(--line);
+}
+
+.explorer__nodehead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 13px;
+  text-align: left;
+}
+
+.explorer__nodehead:active {
+  background: var(--surface-2);
+}
+
+.explorer__nodename {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--fg);
+}
+
+.explorer__tag {
+  flex: none;
+  padding: 1px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.explorer__count {
+  flex: none;
+  margin-left: auto;
+  color: var(--faint);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.explorer__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 12px;
+  padding: 0 13px 13px;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .explorer__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.explorer__browse {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.explorer__roots {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.explorer__root {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 7px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.explorer__root--active {
+  color: var(--fg);
+  border-color: var(--accent);
+  background: rgba(126, 226, 184, 0.06);
+}
+
+.explorer__crumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  min-height: 26px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.explorer__crumbwrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.explorer__crumbsep {
+  color: var(--faint);
+}
+
+.explorer__crumbstep {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  padding: 3px 4px;
+  border-radius: 6px;
+}
+
+.explorer__crumbstep--current {
+  color: var(--fg);
+}
+
+.explorer__rows {
+  min-height: 120px;
+  max-height: 46vh;
+  overflow-y: auto;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: var(--bg);
+  padding: 4px;
+}
+
+.explorer__rows:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.explorer__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.explorer__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--fg);
+}
+
+.explorer__row--cursor {
+  border-color: var(--line);
+  background: var(--surface);
+}
+
+.explorer__row--selected {
+  border-color: var(--accent);
+  background: rgba(126, 226, 184, 0.06);
+}
+
+.explorer__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.explorer__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.explorer__size {
+  color: var(--faint);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.explorer__chip {
+  padding: 1px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 10.5px;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.explorer__chip--synced {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.explorer__chip--local {
+  color: var(--muted);
+  border-color: var(--line);
+}
+
+.explorer__chip--pending {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
+.explorer__chip--conflict {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.explorer__chip--remote {
+  color: var(--faint);
+  border-style: dotted;
+  border-color: var(--faint);
+}
+
+.explorer__preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.explorer__previewhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.explorer__path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.explorer__pre {
+  margin: 0;
+  min-height: 200px;
+  max-height: 46vh;
+  overflow: auto;
+  padding: 11px 13px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+}
+
+.explorer__empty {
+  padding: 10px 8px;
+  color: var(--faint);
+  font-size: 13px;
+}
+
+.explorer__status {
+  margin: 0;
+  color: var(--danger);
+  font-size: 12.5px;
 }

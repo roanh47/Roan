@@ -33,6 +33,18 @@ komt hier per versie terug.
       het OS kan niet zien dat twee releases van dezelfde maker zijn. Vraagt een
       code-signing-certificaat (Windows) en een Apple Developer ID (macOS).
 
+## 0.0.28 (doorgeschoven)
+
+- [ ] **Libnode per ABI meebundelen** (of per-ABI splitsen): de universele apk heeft
+      alleen arm64-libnode, dus op een x86_64-emulator start geen daemon
+      (`no libnode in this apk`).
+- [ ] **Wrapper start en herstart zijn daemon** en toont bij falen de log — de
+      banner meldt het nu, maar de herstart is nog handwerk.
+- [ ] **Echte responsiviteit** voor pc/tablet/telefoon als geheel (de rail heeft
+      nu een breakpoint; de rest van de layout nog niet).
+- [ ] **Admin-instelling in de app** bovenop `src/sudo/install.ts` (het commando
+      bestaat; het scherm nog niet).
+
 ## 0.0.26
 
 - [ ] **Eigen bericht bewerken** — de handler bestaat; het emulator-bewijs
@@ -54,30 +66,30 @@ komt hier per versie terug.
 
 ## 0.0.27
 
-- [ ] **Composer-tekst precies in het midden.** De regel in het invoerveld staat
+- [x] **Composer-tekst precies in het midden.** De regel in het invoerveld staat
       nu te laag; tekst en placeholder moeten verticaal gecentreerd zijn, ook met
       een meerregelig bericht.
-- [ ] **Ruimte voor de statusbalk komt van Android, niet uit de HTML.** De HTML is
+- [x] **Ruimte voor de statusbalk komt van Android, niet uit de HTML.** De HTML is
       op elke build identiek; de shell levert de insets (of de webview staat niet
       edge-to-edge) en de CSS gebruikt ze alleen. Geen eigen `padding-top` meer.
-- [ ] **Zijbalk op grote schermen uitgeklapt kunnen blijven**, zoals andere
+- [x] **Zijbalk op grote schermen uitgeklapt kunnen blijven**, zoals andere
       AI-apps: een vaste, ingeklapte rail op smal, een open zijbalk op breed, met
       een knop om te wisselen.
-- [ ] **"Connecting to daemon" verdwijnt.** De wrapper start zijn daemon en houdt
+- [x] **"Connecting to daemon" verdwijnt.** De wrapper start zijn daemon en houdt
       hem in de lucht; als hij toch wegvalt, komt er een popup bovenin met de
       reden en een herstart-knop — geen wachttekst in de chat.
-- [ ] **New chat werkt.** Eerste beurt, lege staat en de rail moeten alle drie
+- [x] **New chat werkt.** Eerste beurt, lege staat en de rail moeten alle drie
       het nieuwe gesprek meteen als actief tonen.
-- [ ] **Elk device kan andere devices uit de keten verwijderen.** Een
+- [x] **Elk device kan andere devices uit de keten verwijderen.** Een
       `node_remove`-event met tombstone; het verwijderde device verdwijnt uit de
       lijst en komt terug zodra het opnieuw verbindt (en de keten weer ziet).
-- [ ] **Werkplek als echte file explorer.** `workspace/` én `workspace/synced/`
+- [x] **Werkplek als echte file explorer.** `workspace/` én `workspace/synced/`
       zichtbaar, per node zijn eigen mappen, met sync-status per bestand
       (gesynct / lokaal / conflict / in afwachting).
-- [ ] **Roan komt overal bij op elke machine.** geen kunstmatige grens op paden
+- [x] **Roan komt overal bij op elke machine.** geen kunstmatige grens op paden
       buiten de workspace voor de eigenaar; wat de agent leest, leest hij met de
       rechten van de daemon.
-- [ ] **Admin/sudo per node als instelling**, bij voorkeur via een commando dat de
+- [x] **Admin/sudo per node als instelling**, bij voorkeur via een commando dat de
       regels zet (`/etc/sudoers.d` of polkit) in plaats van een wachtwoord in de
       app te vragen. Zonder die instelling weigert de daemon elevated werk met een
       eerlijke melding.

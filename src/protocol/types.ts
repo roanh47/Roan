@@ -34,6 +34,8 @@ export type EventType =
   | "workspace"
   /** A machine in this chain: its id, its name and the address peers dial. */
   | "node"
+  /** A machine is no longer part of this chain: { node, by }. */
+  | "node_remove"
   /** An MCP server this chain knows: its shape and whether it is on. */
   | "mcp_server"
   /** Per-tool policy: whether a tool exists and whether it must ask first. */

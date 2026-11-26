@@ -37,6 +37,7 @@ export type EventType =
   | "checkpoint"
   | "workspace"
   | "node"
+  | "node_remove"
   | "mcp_server"
   | "tool_rule"
   | "tool_approval"
@@ -102,6 +103,7 @@ const EVENT_TYPES: ReadonlySet<string> = new Set<EventType>([
   "checkpoint",
   "workspace",
   "node",
+  "node_remove",
   "mcp_server",
   "tool_rule",
   "tool_approval",

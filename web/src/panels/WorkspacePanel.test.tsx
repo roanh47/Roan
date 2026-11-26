@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { WorkspacePanelView, type WorkspaceEntryView, type WorkspacePreview } from "./WorkspacePanel";
+import { WorkspaceHost, WorkspacePanel, WorkspacePanelView, type WorkspaceEntryView, type WorkspacePreview } from "./WorkspacePanel";
 
 /**
  * The panel is props-only, so static markup proves every state a person sees:
@@ -104,5 +104,45 @@ describe("WorkspacePanelView", () => {
 
   it("keeps the search box but filters nothing while typing is unavailable", () => {
     expect(render()).toContain("Search files");
+  });
+});
+
+describe("WorkspaceHost", () => {
+  it("frames the explorer with both roots and one honest summary line", () => {
+    const nodes = [
+      {
+        node: "pc",
+        name: "pc",
+        folders: [
+          { root: "workspace" as const, entries: [{ path: "lokaal.md", kind: "file" as const, bytes: 4, status: "local" as const }] },
+          {
+            root: "synced" as const,
+            entries: [
+              { path: "notulen", kind: "dir" as const, bytes: 0, status: "synced" as const },
+              { path: "notulen/a.md", kind: "file" as const, bytes: 4, status: "synced" as const },
+              { path: "b.md", kind: "file" as const, bytes: 4, status: "conflict" as const },
+              { path: "b.md.conflict-pc-1", kind: "file" as const, bytes: 4, status: "conflict" as const },
+            ],
+          },
+        ],
+      },
+    ];
+
+    const html = renderToStaticMarkup(
+      <WorkspaceHost nodes={nodes} self="pc" loadPreview={() => ({ path: "", text: "" })} />,
+    );
+
+    // A conflict copy is not a fourth file; the base path carries the conflict.
+    expect(html).toContain("3 files · 1 synced · 1 conflicts");
+    expect(html).toContain("workspace/synced");
+    expect(html).toContain("this device");
+    expect(html).toContain("explorer__chip--conflict");
+  });
+
+  it("keeps the legacy flat props working through the same export", () => {
+    const html = renderToStaticMarkup(<WorkspacePanel files={FILES} onSelect={() => {}} />);
+
+    expect(html).toContain("Search files");
+    expect(html).toContain("omzet.csv");
   });
 });

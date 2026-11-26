@@ -194,6 +194,25 @@ export function readSessions(events: readonly Event[]): SessionIndex {
   };
 }
 
+/**
+ * The newest conversation, when it is still empty and nothing has been said in
+ * it yet. That is the conversation a fresh "new chat" may adopt instead of
+ * starting a second empty one. `issued` holds the ids this daemon already
+ * handed out for a new chat: asking twice is a real request for a second
+ * conversation, so a conversation this process opened is never adopted again —
+ * it would answer the second request with the first id.
+ */
+export function vacantSession(
+  index: SessionIndex,
+  issued: ReadonlySet<string> = new Set<string>(),
+): SessionInfo | null {
+  const newest = index.active;
+  if (newest === null) return null;
+  if (newest.messages > 0) return null;
+  if (issued.has(newest.id)) return null;
+  return newest;
+}
+
 /** The events of one session, in order. */
 export function sessionEvents(events: readonly Event[], session: string): Event[] {
   const out: Event[] = [];

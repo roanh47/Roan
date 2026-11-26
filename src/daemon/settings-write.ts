@@ -10,17 +10,51 @@ import { loadSettings, type Settings } from "./settings.js";
  * disk: an unknown key in the app's payload is a bug in the app, and writing it
  * through would make the config file describe settings nothing reads.
  */
-const SETTINGS_KEYS = ["baseUrl", "model", "apiKey", "provider", "effort"] as const satisfies readonly (keyof Settings)[];
+const SETTINGS_KEYS = [
+  "baseUrl",
+  "model",
+  "apiKey",
+  "provider",
+  "effort",
+  "access",
+] as const satisfies readonly (keyof Settings)[];
 
 type SettingsKey = (typeof SETTINGS_KEYS)[number];
 
-/** A patch of settings the app sent over the local socket. Untrusted. */
-export type SettingsPatch = Partial<
-  Record<Exclude<SettingsKey, "effort">, string> & { effort: EffortLevel }
->;
+/**
+ * A patch of settings the app sent over the local socket. Untrusted. `access`
+ * is the one nested value: a capability flag, never a string, and never
+ * anything but the exact boolean `true` to turn it on.
+ */
+export interface SettingsPatch {
+  baseUrl?: string;
+  model?: string;
+  apiKey?: string;
+  provider?: string;
+  effort?: EffortLevel;
+  access?: { fullDisk?: boolean };
+}
 
 function isSettingsKey(key: string): key is SettingsKey {
   return (SETTINGS_KEYS as readonly string[]).includes(key);
+}
+
+function parseAccessPatch(input: unknown): { fullDisk?: boolean } {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) {
+    throw new Error("setting access must be an object");
+  }
+  const access: { fullDisk?: boolean } = {};
+  for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+    if (key !== "fullDisk") {
+      throw new Error(`unknown access setting: ${key}`);
+    }
+    if (typeof value !== "boolean") {
+      const kind = value === null ? "null" : typeof value;
+      throw new Error(`access.fullDisk must be a boolean, got ${kind}`);
+    }
+    access.fullDisk = value;
+  }
+  return access;
 }
 
 /**
@@ -40,6 +74,10 @@ function parsePatch(input: unknown): SettingsPatch {
     if (!isSettingsKey(key)) {
       throw new Error(`unknown setting: ${key}`);
     }
+    if (key === "access") {
+      patch.access = parseAccessPatch(value);
+      continue;
+    }
     if (typeof value !== "string") {
       throw new Error(`setting ${key} must be a string, got ${value === null ? "null" : typeof value}`);
     }
@@ -48,7 +86,20 @@ function parsePatch(input: unknown): SettingsPatch {
       patch.effort = value;
       continue;
     }
-    patch[key] = value;
+    switch (key) {
+      case "baseUrl":
+        patch.baseUrl = value;
+        break;
+      case "model":
+        patch.model = value;
+        break;
+      case "apiKey":
+        patch.apiKey = value;
+        break;
+      case "provider":
+        patch.provider = value;
+        break;
+    }
   }
   return patch;
 }
@@ -95,7 +146,14 @@ async function writeAtomically(file: string, contents: string): Promise<void> {
 export async function saveSettings(paths: RoanPaths, input: unknown): Promise<Settings> {
   const patch = parsePatch(input);
   const current = await loadSettings(paths);
-  const next: Settings = { ...current, ...patch };
+  const { access: accessPatch, ...flat } = patch;
+  const next: Settings = {
+    ...current,
+    ...flat,
+    // A patch may carry only one access flag; merge instead of replacing the
+    // whole object so a later capability does not reset an earlier one.
+    access: { fullDisk: accessPatch?.fullDisk ?? current.access.fullDisk },
+  };
 
   // Reads happen above; the write itself is one atomic step.
   await writeAtomically(paths.configFile, `${JSON.stringify(next, null, 2)}\n`);

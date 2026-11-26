@@ -16,6 +16,14 @@ export interface Policy {
   workspace: string;
   /** Extra directories (name or path) that may never be written or read. */
   extraDenyDirs?: string[];
+  /**
+   * Owner opt-in (`access.fullDisk` in the settings store): file tools may
+   * reach paths outside the workspace. Defaults to `false`, which keeps the
+   * pre-existing workspace-only behaviour. This is a permission, not a
+   * sandbox: the checks below still refuse kernel/process memory, device
+   * nodes, writes into system roots, protected directories and `.pem` files.
+   */
+  fullDisk?: boolean;
 }
 
 export interface PolicyVerdict {
@@ -28,6 +36,20 @@ const WRITE_TOOLS: readonly string[] = ["write_file", "apply_patch", "run_shell"
 
 /** Directory names that are always denied, wherever they sit in the working directory. */
 const PROTECTED_DIRS: readonly string[] = ["secrets", ".ssh", ".gnupg"];
+
+/**
+ * Roots that stay off limits for writes even when the owner turned full-disk
+ * access on. Reading `/boot` is allowed (the owner asked for the disk), writing
+ * into it or into the kernel's interface is never.
+ */
+const WRITE_FORBIDDEN_ROOTS: readonly string[] = ["/boot", "/sys", "/proc", "/dev"];
+
+/** Process/kernel memory devices: reading one is a memory disclosure, not a file read. */
+const MEMORY_TRAPS: readonly RegExp[] = [
+  /^\/proc\/(?:self|\d+|thread-self)\/mem$/,
+  /^\/proc\/(?:kcore|kmem|kallsyms)$/,
+  /^\/dev\/(?:mem|kmem|port)$/,
+];
 
 /** Keys in the tool arguments that contain a path. */
 const PATH_KEYS: ReadonlySet<string> = new Set([
@@ -135,17 +157,52 @@ function collectPaths(args: unknown, depth = 0): string[] {
   return found;
 }
 
+/**
+ * Refuses the handful of paths that are not files at all: process memory,
+ * kernel interfaces, and device nodes. Checked even with `fullDisk` on.
+ */
+function trapViolation(resolved: string, raw: string, write: boolean): string | null {
+  for (const trap of MEMORY_TRAPS) {
+    if (trap.test(resolved)) {
+      return `path "${raw}" is process or kernel memory and is never accessible`;
+    }
+  }
+  if (isWithin("/dev", resolved)) {
+    return `path "${raw}" is a device node and is never accessible`;
+  }
+  if (write) {
+    for (const root of WRITE_FORBIDDEN_ROOTS) {
+      if (isWithin(root, resolved)) {
+        return `path "${raw}" is under ${root} and is never writable, even with access.fullDisk`;
+      }
+    }
+  }
+  return null;
+}
+
 /** Returns the denial reason for a path, or `null` if the path is allowed. */
-function pathViolation(policy: Policy, raw: string): string | null {
+function pathViolation(policy: Policy, raw: string, write: boolean): string | null {
   const root = resolvePath(policy.workspace);
   const resolved = resolvePath(path.resolve(root, raw));
+  const fullDisk = policy.fullDisk === true;
 
-  if (!isWithin(root, resolved)) {
-    return `path "${raw}" escapes the workspace ${root}`;
+  const trap = trapViolation(resolved, raw, write);
+  if (trap !== null) return trap;
+
+  const inside = isWithin(root, resolved);
+  if (!inside && !fullDisk) {
+    return (
+      `path "${raw}" escapes the workspace ${root}; ` +
+      `set access.fullDisk=true in the settings to allow access outside the workspace`
+    );
   }
 
-  const relative = path.relative(root, resolved);
-  const segments = relative.split(path.sep).filter((segment) => segment !== "");
+  // Inside the workspace the old relative-segment rule applies, so a workspace
+  // that itself lives under a directory named e.g. "secrets" keeps working.
+  // Outside it (full-disk mode) every absolute segment is judged instead.
+  const segments = inside
+    ? path.relative(root, resolved).split(path.sep).filter((segment) => segment !== "")
+    : resolved.split(path.sep).filter((segment) => segment !== "");
 
   const deniedNames = new Set<string>(PROTECTED_DIRS);
   const deniedRoots: string[] = [];
@@ -198,7 +255,7 @@ export function decide(
   const writeCapable = WRITE_TOOLS.includes(toolName);
 
   for (const raw of collectPaths(toolArgs)) {
-    const violation = pathViolation(policy, raw);
+    const violation = pathViolation(policy, raw, writeCapable);
     if (violation !== null) {
       return { decision: "deny", reason: `tool "${toolName}": ${violation}` };
     }
@@ -228,7 +285,10 @@ export function decide(
 }
 
 /** Default policy: reading and searching is allowed, writing and executing needs confirmation. */
-export function defaultPolicy(workspace: string): Policy {
+export function defaultPolicy(
+  workspace: string,
+  options: { readonly fullDisk?: boolean } = {},
+): Policy {
   return {
     tools: {
       read_file: "allow",
@@ -243,5 +303,15 @@ export function defaultPolicy(workspace: string): Policy {
     },
     workspace: path.resolve(workspace),
     extraDenyDirs: [],
+    fullDisk: options.fullDisk === true,
   };
+}
+
+/**
+ * The same path verdict `decide` uses, for callers that resolve one path
+ * themselves (the live file tools do). `write` selects the stricter trap list.
+ * Returns `null` when the path may be used.
+ */
+export function pathAccessViolation(policy: Policy, target: string, write: boolean): string | null {
+  return pathViolation(policy, target, write);
 }

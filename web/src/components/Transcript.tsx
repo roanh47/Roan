@@ -321,7 +321,11 @@ export function Transcript({
     stick.current = distance < 56;
   }
 
-  const empty = rows.length === 0 && pending.length === 0;
+  // A fresh conversation may already carry its own `session` marker (the chain
+  // keeps one for every chat). Markers are history, not content: an otherwise
+  // empty chat still gets the invitation instead of a lone "new chat" line.
+  const hasContent = rows.some((row) => row.kind !== "meta");
+  const empty = !hasContent && pending.length === 0;
 
   return (
     <div className="transcript" ref={scroller} onScroll={onScroll}>
@@ -337,17 +341,19 @@ export function Transcript({
           </div>
         ) : null}
 
-        {rows.map((row) => (
-          <RowView
-            key={row.key}
-            row={row}
-            turn={turn}
-            onRegenerate={onRegenerate}
-            onCheckpoint={onCheckpoint}
-            onApprove={onApprove}
-            onEditMessage={onEditMessage}
-          />
-        ))}
+        {empty ? null : (
+          rows.map((row) => (
+            <RowView
+              key={row.key}
+              row={row}
+              turn={turn}
+              onRegenerate={onRegenerate}
+              onCheckpoint={onCheckpoint}
+              onApprove={onApprove}
+              onEditMessage={onEditMessage}
+            />
+          ))
+        )}
 
         {pending.map((item) => (
           <div className="bubble bubble--out bubble--pending" key={item.id}>

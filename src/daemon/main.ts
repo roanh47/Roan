@@ -14,7 +14,7 @@ import { startControlServer } from "./control.js";
 import { ChainNodeStore } from "./peer-store.js";
 import { addPeer, peers as peerList, PEER_PATH, startPeers, stopPeers } from "./peers.js";
 import { probe, startDiscovery, tailscaleHosts } from "./discovery.js";
-import { findNode, readNodes } from "../chain/nodes.js";
+import { foldNodeRoster, nodesFromEvents, readNodes } from "../chain/nodes.js";
 import os from "node:os";
 import { createHash } from "node:crypto";
 import type { Logger } from "../sync/types.js";
@@ -31,6 +31,8 @@ import { adoptEnv, adoptEnvEvent, latestEnv, publishEnv } from "./env-sync.js";
 import { dirname, join, resolve } from "node:path";
 import { createRunOnNodeTool, serveDelegation, type RelayOptions } from "./relay.js";
 import { autoTitleFor, readSessions, sessionMessages } from "../chain/sessions.js";
+import { openSession } from "./session-open.js";
+import { removeNode } from "./membership.js";
 import { foldGoals, goalContext } from "../chain/goals.js";
 import { distilMemories, memoryTexts } from "../memory/index.js";
 import { foldMemoryMd, writeMemoryMd } from "../context/memory-md.js";
@@ -44,6 +46,7 @@ import { collectEnvEntries } from "../env/pack.js";
 import { listWorkspace, readWorkspaceFile } from "../workspace/library.js";
 import { renderConversationHtml } from "../chain/export-html.js";
 import { VERSION } from "../version.js";
+import { setFullDiskAccess } from "../tools.js";
 import { checkGithubAndPrepareUpdate } from "../packaging/update-flow.js";
 import { exportChain } from "../chain/export.js";
 import { sessionAttachments, sessionMarkdown } from "../chain/export-markdown.js";
@@ -173,6 +176,9 @@ async function main(): Promise<void> {
   // travel in `config.json`, so a device that joins mid-run has to pick them up
   // without a restart.
   let settings = await loadSettings(paths);
+  // The file tools resolve paths through the policy, so the setting has to be
+  // live in this process from the first turn, not just written to disk.
+  setFullDiskAccess(settings.access.fullDisk);
   // A packaged app on a machine without the hermes binary must still answer:
   // erroring on every turn would make it a dead window. The in-process loop is
   // the fallback, and the log says which one is running.
@@ -255,7 +261,7 @@ async function main(): Promise<void> {
       nodes:
         session === null
           ? []
-          : readNodes(session.store.read(session.identity.chainId, 1, 100_000)).map((n) => ({
+          : nodesFromEvents(session.store.read(session.identity.chainId, 1, 100_000)).map((n) => ({
               node: n.node,
               name: n.name,
               host: n.host,
@@ -324,7 +330,25 @@ async function main(): Promise<void> {
       // metadata (a new conversation, a rename) also refreshes the drawer.
       const chainEvent = event as unknown as import("../protocol/types.js").Event;
       control?.broadcast({ t: "append", event: chainEvent });
-      if (chainEvent.type === "session" || chainEvent.type === "session_title") control?.sendState();
+      if (
+        chainEvent.type === "session" ||
+        chainEvent.type === "session_title" ||
+        chainEvent.type === "node" ||
+        chainEvent.type === "node_remove"
+      ) {
+        control?.sendState();
+      }
+      if (chainEvent.type === "node_remove") {
+        // A tombstone is a statement about a device that stopped answering. If
+        // it names this device, then this device is answering right now, so it
+        // announces itself again: a live device is not a ghost. That is also
+        // how a machine that was removed while it was away comes back the
+        // moment it connects and catches up.
+        const target = (chainEvent.data as { node?: unknown } | null)?.node;
+        if (typeof target === "string" && target === session?.identity.nodeId) {
+          void announceNode().catch((error: unknown) => log("node: " + String(error)));
+        }
+      }
       if (event.type === "blob") {
         blobSlate.add(chainEvent);
         return;
@@ -402,10 +426,26 @@ async function main(): Promise<void> {
     }
     const data = { node: current.identity.nodeId, name: os.hostname(), host, port: PORT };
     const id = `node-${createHash("sha256").update(JSON.stringify(data)).digest("hex")}`;
-    if (current.store.read(chain, 1, 100_000).some((event) => event.id === id)) return;
-    const event = current.store.append(chain, { id, node: current.identity.nodeId, type: "node", data });
+    const events = current.store.read(chain, 1, 100_000);
+    const announced = events.some((event) => event.id === id);
+    // A restart must not fill the chain with the same announcement again, but a
+    // removal must not outlive a live device either: when this node is
+    // tombstoned the same fact is written once more under a fresh event id, and
+    // the fold takes the newest statement. That is how a device that was removed
+    // while it was away comes back the moment it runs (and connects) again.
+    if (announced && !foldNodeRoster(events).removed.has(data.node)) return;
+    const event = current.store.append(chain, {
+      id: announced ? uuid() : id,
+      node: current.identity.nodeId,
+      type: "node",
+      data,
+    });
     control?.broadcast({ t: "append", event });
-    log(`node: announced ${data.name}${host.length > 0 ? " at " + host : " without an address"}`);
+    control?.sendState();
+    log(
+      `node: announced ${data.name}${host.length > 0 ? " at " + host : " without an address"}` +
+        (announced ? " (back in the chain)" : ""),
+    );
   };
 
   const syncEnv = async (): Promise<void> => {
@@ -789,21 +829,46 @@ async function main(): Promise<void> {
     return null;
   };
 
+  /**
+   * The ids this process already handed out for a "new chat". It is what keeps
+   * two presses of that button two conversations while still letting the first
+   * one adopt an untouched chat that is already there.
+   */
+  const newSessionIssued = new Set<string>();
+
   const startSession = (title?: string, branchOf?: { session: string; seq: number }): string | null => {
     if (session === null) return null;
     const current = session;
-    const id = uuid();
-    current.store.append(current.identity.chainId, {
-      id: uuid(),
-      node: current.identity.nodeId,
-      type: "session",
-      data: {
-        id,
-        title: title ?? `Conversation ${String(readSessions(current.store.read(current.identity.chainId, 1, 100_000)).sessions.length + 1)}`,
-        ...(branchOf !== undefined ? { branchOf } : {}),
+    return openSession(
+      current.store,
+      current.identity.chainId,
+      current.identity.nodeId,
+      newSessionIssued,
+      {
+        ...(title === undefined ? {} : { title }),
+        ...(branchOf === undefined ? {} : { branchOf }),
       },
-    });
-    return id;
+    ).id;
+  };
+
+  /** A new chat from the app: adopt an untouched one, otherwise start one. */
+  const openNewSession = (title?: string): string | null => {
+    if (session === null) return null;
+    const current = session;
+    const opened = openSession(
+      current.store,
+      current.identity.chainId,
+      current.identity.nodeId,
+      newSessionIssued,
+      {
+        ...(title === undefined ? {} : { title }),
+        reuseEmpty: true,
+      },
+    );
+    if (opened.event !== null) control?.broadcast({ t: "append", event: opened.event });
+    log(`session: ${opened.created ? "started" : "adopted"} ${opened.id.slice(0, 8)}`);
+    control?.sendState();
+    return opened.id;
   };
 
   const runMessage = async (
@@ -953,6 +1018,9 @@ async function main(): Promise<void> {
     }
     const created = await createIdentity(paths);
     session = { identity: created, store: EventStore.open(paths.database) };
+    // A fresh chain has its own conversations: what was issued for the previous
+    // one means nothing here.
+    newSessionIssued.clear();
     const invite = joinCode(created);
     await startReplication();
     await startEnvLoop();
@@ -960,8 +1028,11 @@ async function main(): Promise<void> {
     await startCron();
     // The first conversation exists from the start: an empty session list in
     // the drawer reads as a bug, and every reference app opens a conversation
-    // the moment you create an account/chain.
-    startSession("New chat");
+    // the moment you create an account/chain. It is a placeholder, not a
+    // conversation somebody asked for, so it stays adoptable: the first "new
+    // chat" takes it over instead of leaving two empty conversations behind.
+    const seed = startSession("New chat");
+    if (seed !== null) newSessionIssued.delete(seed);
     return { t: "chain", chain: created.chainId, node: created.nodeId, ...(invite === null ? {} : { invite }) };
   };
 
@@ -977,6 +1048,7 @@ async function main(): Promise<void> {
     const { saveIdentity } = await import("./identity.js");
     await saveIdentity(paths, joined);
     session = { identity: joined, store: EventStore.open(paths.database) };
+    newSessionIssued.clear();
     await startReplication();
     // Give replication a moment to hand over the chain: a joining device must
     // adopt the copy that already exists before it considers publishing its own,
@@ -1029,12 +1101,22 @@ async function main(): Promise<void> {
           return;
         }
         if (kind === "workspace_list") {
-          const entries = await listWorkspace(paths.syncedWorkspace);
+          // Two roots the owner can look at: the free workspace and the copy that
+          // syncs between devices. The hash is what makes "synced" exact, so it
+          // travels with every entry.
+          const wanted = data["root"] === "workspace" ? "workspace" : "synced";
+          const root = wanted === "workspace" ? paths.workspace : paths.syncedWorkspace;
+          const entries = await listWorkspace(root);
+          const scanned = new Map<string, { hash: string }>();
+          const scan = await scanWorkspace(root);
+          for (const entry of scan.files.values()) scanned.set(entry.path, entry);
           reply({
+            root: wanted,
             files: entries.map((entry: { path: string; bytes: number; kind: string }) => ({
               path: entry.path,
               bytes: entry.bytes,
               kind: entry.kind,
+              hash: scanned.get(entry.path)?.hash ?? null,
             })),
           });
           return;
@@ -1613,6 +1695,8 @@ async function main(): Promise<void> {
           }
           await saveSettings(paths, patch);
           settings = await loadSettings(paths);
+          // Turning the setting on or off takes effect for the next tool call.
+          setFullDiskAccess(settings.access.fullDisk);
           if (session !== null) {
             const current = session;
             void publishEnv({
@@ -1861,9 +1945,29 @@ async function main(): Promise<void> {
       });
       control?.sendState();
     },
+    onRemoveNode: (wanted: string) => {
+      if (session === null) {
+        return { ok: false as const, message: "this device is not in a chain yet" };
+      }
+      const current = session;
+      const removed = removeNode(
+        current.store,
+        current.identity.chainId,
+        current.identity.nodeId,
+        wanted,
+      );
+      if (!removed.ok) return removed;
+      if (removed.event !== null) {
+        // Membership is a chain fact like any other: the event travels to every
+        // device, and the fold is what decides who is still here.
+        control?.broadcast({ t: "append", event: removed.event });
+        control?.sendState();
+        log("node: removed " + (removed.name ?? removed.node) + " (" + removed.node + ")");
+      }
+      return { ok: true as const };
+    },
     onNewSession: (title?: string) => {
-      const id = startSession(title);
-      if (id !== null) log("session: started " + id.slice(0, 8));
+      const id = openNewSession(title);
       return id;
     },
     onCreate,

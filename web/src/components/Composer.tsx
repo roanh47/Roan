@@ -14,13 +14,41 @@ export interface AttachedImage {
   data: string;
 }
 
+/**
+ * The height of one control row, and therefore of a one-line composer.
+ *
+ * The send button, the plus and the mic are all this square (styles.css), so
+ * a one-line textarea of exactly this height puts its line box in the same
+ * band as the button icons instead of sitting low against them. Every extra
+ * line adds one 24 px line box; past the cap the textarea scrolls.
+ */
+export const COMPOSER_CONTROL_SIZE = 38;
+export const COMPOSER_LINE_HEIGHT = 24;
+export const COMPOSER_MAX_HEIGHT = 140;
+
+/**
+ * The textarea height the DOM asks for, clamped to the control row it shares.
+ *
+ * `scrollHeight` includes the textarea's own vertical padding, so a single
+ * line already measures one control row. The floor matters for the first
+ * paint and for hosts that report 0 before layout: the field must never be
+ * shorter than the send button beside it.
+ */
+export function composerFieldHeight(scrollHeight: number): number {
+  if (!Number.isFinite(scrollHeight) || scrollHeight <= 0) return COMPOSER_CONTROL_SIZE;
+  return Math.min(Math.max(Math.round(scrollHeight), COMPOSER_CONTROL_SIZE), COMPOSER_MAX_HEIGHT);
+}
+
 /** The sentence the composer shows while the conversation may not act. */
 export const PLAN_MODE_HINT =
   "read-only — Roan researches and writes a plan. It cannot write files or run commands until you approve it.";
 
 const PLAN_PILL: CSSProperties = {
   flex: "none",
-  alignSelf: "center",
+  // Bottom-aligned with the control row, with a hair of lift so a one-line
+  // composer centres the pill on the same axis as the send button.
+  alignSelf: "flex-end",
+  marginBottom: 6,
   padding: "5px 10px",
   border: "1px solid var(--line-soft)",
   borderRadius: 999,
@@ -69,13 +97,19 @@ interface ComposerProps {
   onRecord?: () => void;
   /** True while a recording is running, so the button can show it. */
   recording?: boolean;
+  /**
+   * Bumped by the app when a *new* conversation opens: the composer takes the
+   * focus so the next thing typed lands in the conversation you just started.
+   * 0/undefined means "nothing to focus yet".
+   */
+  focusSignal?: number;
 }
 
 /** What the disabled mic says, and why it says nothing else. */
 export const MIC_UNAVAILABLE_HINT =
   "Voice input needs a speech-to-text provider; none is set up on this device.";
 
-export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, client, planMode = false, onPlanModeChange, onRecord, recording = false, steerable = false, onSteer }: ComposerProps): ReactElement {
+export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, client, planMode = false, onPlanModeChange, onRecord, recording = false, steerable = false, onSteer, focusSignal = 0 }: ComposerProps): ReactElement {
   // The plus always exists: a photo needs neither workspace nor dictation.
   const hasMenu = true;
   const planning = planMode === true;
@@ -90,8 +124,19 @@ export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, c
     const element = input.current;
     if (!element) return;
     element.style.height = "auto";
-    element.style.height = `${Math.min(element.scrollHeight, 140)}px`;
+    element.style.height = `${String(composerFieldHeight(element.scrollHeight))}px`;
   }, [value]);
+
+  // A new conversation opens with the caret in it: the point of "New chat" is
+  // to type the next thing, not to look at an empty screen.
+  useEffect(() => {
+    if (focusSignal === 0) return;
+    const element = input.current;
+    if (element === null || element.disabled) return;
+    element.focus();
+    const end = element.value.length;
+    element.setSelectionRange(end, end);
+  }, [focusSignal]);
 
   // A share-sheet hand-over fills the box once, stamp by stamp.
   useEffect(() => {

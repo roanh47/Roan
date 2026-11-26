@@ -9,7 +9,15 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { Composer, MIC_UNAVAILABLE_HINT, PLAN_MODE_HINT } from "./Composer.js";
+import {
+  COMPOSER_CONTROL_SIZE,
+  COMPOSER_LINE_HEIGHT,
+  COMPOSER_MAX_HEIGHT,
+  Composer,
+  MIC_UNAVAILABLE_HINT,
+  PLAN_MODE_HINT,
+  composerFieldHeight,
+} from "./Composer.js";
 
 function render(props: { planMode?: boolean; disabled?: boolean; onRecord?: () => void; recording?: boolean }): string {
   return renderToStaticMarkup(
@@ -103,5 +111,36 @@ describe("the mic button in the composer", () => {
     const html = render({ onRecord: () => undefined });
     expect(html).not.toMatch(/SpeechRecognition/i);
     expect(html).not.toContain("Dictate");
+  });
+});
+
+/**
+ * The one line of text must sit in the same band as the send button, and a
+ * grown draft must grow by whole lines instead of by a scrollHeight that
+ * belongs to a different box. That is arithmetic, so it is checked as such.
+ */
+describe("the composer's row height", () => {
+  it("is the send button's own square for a single line", () => {
+    expect(COMPOSER_CONTROL_SIZE).toBe(38);
+    // scrollHeight includes 7 px padding above and below the 24 px line box.
+    expect(composerFieldHeight(7 + COMPOSER_LINE_HEIGHT + 7)).toBe(COMPOSER_CONTROL_SIZE);
+  });
+
+  it("never measures shorter than the control beside it, even before layout", () => {
+    expect(composerFieldHeight(0)).toBe(COMPOSER_CONTROL_SIZE);
+    expect(composerFieldHeight(Number.NaN)).toBe(COMPOSER_CONTROL_SIZE);
+    expect(composerFieldHeight(20)).toBe(COMPOSER_CONTROL_SIZE);
+  });
+
+  it("adds exactly one line box per extra line", () => {
+    const one = composerFieldHeight(COMPOSER_CONTROL_SIZE);
+    expect(composerFieldHeight(COMPOSER_CONTROL_SIZE + COMPOSER_LINE_HEIGHT)).toBe(one + COMPOSER_LINE_HEIGHT);
+    expect(composerFieldHeight(COMPOSER_CONTROL_SIZE + 2 * COMPOSER_LINE_HEIGHT)).toBe(
+      one + 2 * COMPOSER_LINE_HEIGHT,
+    );
+  });
+
+  it("stops at the cap and lets the textarea scroll instead", () => {
+    expect(composerFieldHeight(10_000)).toBe(COMPOSER_MAX_HEIGHT);
   });
 });

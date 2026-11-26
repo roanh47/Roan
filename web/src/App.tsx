@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { ReactElement } from "react";
 import { ChainClient, openTurn, turnPhase, turnQuietMs } from "./chain.js";
-import type { ChainSnapshot } from "./chain.js";
+import type { ChainSnapshot, SessionSummary } from "./chain.js";
 import pkg from "../package.json";
 import { Composer } from "./components/Composer.js";
 import { WorkspacePanel } from "./panels/WorkspacePanel.js";
@@ -15,6 +15,8 @@ import { ToolsPanel } from "./panels/ToolsPanel.js";
 import { CheckpointsPanel } from "./panels/CheckpointsPanel.js";
 import { Transcript } from "./components/Transcript.js";
 import { ModelSheet } from "./components/ModelSheet.js";
+import { ConnectionBanner } from "./components/ConnectionBanner.js";
+import { browserStorage, readRailExpanded, writeRailExpanded } from "./rail.js";
 
 /**
  * The shell (Tauri / Android) injects this before the bundle runs:
@@ -93,12 +95,31 @@ const SETTINGS_ROWS: readonly [SettingsPage, string, string][] = [
   ["about", "About", "chain, node and version"],
 ];
 
-export default function App(): ReactElement {
-  const client = useMemo(() => new ChainClient({ url: SOCKET_URL, node: NODE }), []);
+export default function App({ client: injected }: { client?: ChainClient } = {}): ReactElement {
+  // The app owns one client; a test may hand in its own with a fake socket.
+  const client = useMemo(
+    () => injected ?? new ChainClient({ url: SOCKET_URL, node: NODE }),
+    [injected],
+  );
   const snapshot = useSyncExternalStore(client.subscribe, client.getSnapshot);
   const turn = useMemo(() => openTurn(snapshot.events), [snapshot.events]);
   const phase = useMemo(() => turnPhase(snapshot.events, turn), [snapshot.events, turn]);
   const activeSession = snapshot.activeSession ?? snapshot.sessions.at(-1)?.id ?? null;
+
+  /**
+   * The daemon names a new conversation in its next state frame, a moment
+   * after it hands the id back. Until then that id is the only fact here — and
+   * the rail still needs a row to mark active, or "New chat" would look like
+   * nothing happened. The synthesized row is replaced by the daemon's own
+   * summary as soon as it arrives.
+   */
+  const sessions = useMemo<readonly SessionSummary[]>(() => {
+    const active = snapshot.activeSession;
+    if (active === null || snapshot.sessions.some((entry) => entry.id === active)) {
+      return snapshot.sessions;
+    }
+    return [...snapshot.sessions, { id: active, title: "New chat", messages: 0 }];
+  }, [snapshot.sessions, snapshot.activeSession]);
 
   // Plan mode is per conversation; the newest plan_mode event for this one wins.
   const planMode = useMemo(() => {
@@ -146,6 +167,10 @@ export default function App(): ReactElement {
   /** Text the Android share sheet parked for us, with a fresh stamp per share. */
   const [shared, setShared] = useState<{ text: string; at: number } | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  /** Wide screens: the rail is a column the user can keep open or fold away. */
+  const [railExpanded, setRailExpanded] = useState(() => readRailExpanded(browserStorage()));
+  /** Bumped for every new conversation so the composer takes the focus. */
+  const [focusSignal, setFocusSignal] = useState(0);
 
   // The share inbox is one slot: ask whenever the app becomes visible, and
   // the daemon hands the text over exactly once.
@@ -230,11 +255,7 @@ export default function App(): ReactElement {
   const blocked = snapshot.status !== "open";
   const disabled = blocked || turn !== null;
 
-  const placeholder = turn
-    ? `${turn.owner} is working…`
-    : blocked
-      ? "Waiting for the daemon…"
-      : "Message Roan";
+  const placeholder = turn ? `${turn.owner} is working…` : "Message Roan";
 
   function send(text: string, image?: { mime: string; data: string }): void {
     try {
@@ -252,6 +273,30 @@ export default function App(): ReactElement {
       .catch((error: unknown) => {
         setNotice(error instanceof Error ? error.message : "could not regenerate");
       });
+  }
+
+  // The banner's one action: drop whatever half-open socket there is and look
+  // for the daemon again. `connect` on an open client would leave the old
+  // socket's handlers attached, so the disconnect comes first.
+  function retryConnection(): void {
+    client.disconnect();
+    client.connect();
+  }
+
+  // The choice is a preference, not a per-window whim: it survives a reload.
+  function toggleRail(): void {
+    const next = !railExpanded;
+    setRailExpanded(next);
+    writeRailExpanded(browserStorage(), next);
+  }
+
+  // A new conversation opens on the chat view with the caret already in it;
+  // the daemon answers with its id, and the rail marks that row active.
+  function newChat(): void {
+    client.newSession();
+    setView("chat");
+    setMenuOpen(false);
+    setFocusSignal((signal) => signal + 1);
   }
 
   // How long the running turn has been silent. Reported, not judged: a
@@ -278,10 +323,9 @@ export default function App(): ReactElement {
               Roan
             </span>
           </div>
-          <span className="titlebar__wait" data-tauri-drag-region>
-            {snapshot.status === "open" ? "" : "waiting for the daemon…"}
-          </span>
         </header>
+
+        <ConnectionBanner status={snapshot.status} reason={snapshot.error} onRetry={retryConnection} />
 
         <main className="onboarding">
           <h1 className="onboarding__title">Start on this device</h1>
@@ -353,7 +397,7 @@ export default function App(): ReactElement {
           <p className="onboarding__hint">
             {snapshot.status === "open"
               ? "The daemon is running on this device."
-              : "Waiting for the daemon to answer."}
+              : "Create a chain to start, or join one with a code."}
           </p>
 
           <details className="onboarding__daemon">
@@ -371,13 +415,13 @@ export default function App(): ReactElement {
   const inSettingsSubpage = view === "settings" && settingsPage !== "menu";
   const pageTitle =
     view === "chat"
-      ? (snapshot.sessions.find((entry) => entry.id === activeSession)?.title ?? "New chat")
+      ? (sessions.find((entry) => entry.id === activeSession)?.title ?? "New chat")
       : settingsPage === "menu"
         ? "Settings"
         : (SETTINGS_ROWS.find(([id]) => id === settingsPage)?.[1] ?? "Settings");
 
   return (
-    <div className="app">
+    <div className={railExpanded ? "app" : "app app--rail-collapsed"}>
       <header className="titlebar" data-tauri-drag-region>
         {inSettingsSubpage ? (
           <button
@@ -391,7 +435,7 @@ export default function App(): ReactElement {
         ) : (
           <button
             type="button"
-            className="titlebar__menu"
+            className="titlebar__menu titlebar__menu--drawer"
             aria-label="Menu"
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((open) => !open)}
@@ -399,6 +443,16 @@ export default function App(): ReactElement {
             ☰
           </button>
         )}
+        <button
+          type="button"
+          className="titlebar__railtoggle"
+          aria-label={railExpanded ? "Hide sidebar" : "Show sidebar"}
+          aria-expanded={railExpanded}
+          aria-controls="rail"
+          onClick={toggleRail}
+        >
+          ☰
+        </button>
         <span className="titlebar__title" data-tauri-drag-region>
           {pageTitle}
         </span>
@@ -412,6 +466,8 @@ export default function App(): ReactElement {
         </button>
       </header>
 
+      <ConnectionBanner status={snapshot.status} reason={snapshot.error} onRetry={retryConnection} />
+
       <main className={view === "chat" ? "conversation" : "conversation conversation--panel"} aria-label="Conversation">
         {view === "chat" ? (
           <Transcript
@@ -420,7 +476,7 @@ export default function App(): ReactElement {
             node={snapshot.node}
             onRegenerate={regenerate}
             onCheckpoint={() => {
-              const title = snapshot.sessions.find((entry) => entry.id === activeSession)?.title ?? "chat";
+              const title = sessions.find((entry) => entry.id === activeSession)?.title ?? "chat";
               client.checkpoint(title);
             }}
             onApprove={(req, allow) => {
@@ -496,7 +552,7 @@ export default function App(): ReactElement {
         />
       ) : null}
 
-      <aside className={menuOpen ? "rail rail--open" : "rail"}>
+      <aside id="rail" className={menuOpen ? "rail rail--open" : "rail"} aria-label="Conversations">
         <div className="rail__brand">
           <span className="rail__mark" aria-hidden="true" />
           <span className="rail__name">Roan</span>
@@ -506,11 +562,7 @@ export default function App(): ReactElement {
           type="button"
           className="rail__new"
           disabled={disabled}
-          onClick={() => {
-            client.newSession();
-            setView("chat");
-            setMenuOpen(false);
-          }}
+          onClick={newChat}
         >
           ＋ New chat
         </button>
@@ -526,7 +578,7 @@ export default function App(): ReactElement {
         {exportNote !== null ? <p className="rail__exportnote">{exportNote}</p> : null}
         <div className="rail__sessions">
           <ul className="rail__list">
-            {snapshot.sessions
+            {sessions
               .filter((session) => {
                 const needle = sessionQuery.trim().toLowerCase();
                 if (needle.length === 0) return true;
@@ -563,6 +615,7 @@ export default function App(): ReactElement {
                       <button
                         type="button"
                         className="rail__session"
+                        aria-current={session.id === activeSession ? "true" : undefined}
                         onClick={() => {
                           client.selectSession(session.id);
                           setView("chat");
@@ -642,6 +695,7 @@ export default function App(): ReactElement {
           onPlanModeChange={setPlanMode}
           steerable={turn !== null && !disabled}
           onSteer={(text) => void client.steer(text)}
+          focusSignal={focusSignal}
         />
       </footer>
 

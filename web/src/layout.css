@@ -5,10 +5,14 @@
  * this file owns only where the panes sit. No colours are declared here — every
  * value comes from the `:root` custom properties projected from `theme.ts`.
  *
- * Three panes from 900 px up: sessions on the left, the conversation in the
- * middle, the status rail on the right. Below 900 px there is a single column:
+ * Three panes from 1024 px up: sessions on the left, the conversation in the
+ * middle, the status rail on the right. Below 1024 px there is a single column:
  * the conversation, with the status line under it and the composer docked at
  * the bottom. The sidebar becomes a drawer there instead of taking width.
+ *
+ * Status-bar space is the shell's business: every inset here is
+ * `env(safe-area-inset-*, 0px)` with no literal floor, so a desktop with no
+ * notch has no strip above the content.
  *
  * Nothing here may cause a horizontal scrollbar. Every track is `minmax(0, …)`,
  * every pane has `min-width: 0`, and the shell clips on the x axis, so a long
@@ -31,6 +35,7 @@
     "dock";
   height: 100vh;
   height: 100dvh;
+  padding-top: env(safe-area-inset-top, 0px);
   max-width: 100vw;
   overflow-x: clip;
   background: var(--bg);
@@ -80,8 +85,8 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: calc(12px + env(safe-area-inset-top)) 12px
-    calc(12px + env(safe-area-inset-bottom));
+  padding: calc(12px + env(safe-area-inset-top, 0px)) 12px
+    calc(12px + env(safe-area-inset-bottom, 0px));
   border-right: 1px solid var(--line-soft);
   background: var(--surface-2);
   overflow-y: auto;
@@ -146,7 +151,7 @@
 
 /* ---------- three panes ---------- */
 
-@media (min-width: 900px) {
+@media (min-width: 1024px) {
   .app {
     grid-template-columns: var(--pane-side) minmax(0, 1fr) var(--pane-rail);
     grid-template-rows: auto minmax(0, 1fr) auto;

@@ -2,6 +2,19 @@ import { readFile } from "node:fs/promises";
 import type { RoanPaths } from "./paths.js";
 import { isEffortLevel, type EffortLevel } from "../providers/effort.js";
 
+/**
+ * Owner-granted capabilities. Every flag defaults to off; a hand-edited config
+ * can only turn one on by writing the boolean `true`, never a string.
+ */
+export interface AccessSettings {
+  /**
+   * `access.fullDisk`: the agent's file tools may reach paths outside the
+   * workspace. Default off. A permission, not a sandbox escape — see
+   * docs/security.md.
+   */
+  readonly fullDisk: boolean;
+}
+
 /** What the user picked in the app. Never environment variables. */
 export interface Settings {
   readonly baseUrl: string;
@@ -17,6 +30,7 @@ export interface Settings {
    * the wire, which keeps every provider on its own default.
    */
   readonly effort: EffortLevel;
+  readonly access: AccessSettings;
 }
 
 const DEFAULTS: Settings = {
@@ -26,7 +40,17 @@ const DEFAULTS: Settings = {
   apiKey: "",
   provider: "lmstudio",
   effort: "normal",
+  access: { fullDisk: false },
 };
+
+/** Only a literal `true` turns a capability on; `"true"` and `1` stay off. */
+function parseAccess(raw: unknown): AccessSettings {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return { fullDisk: false };
+  }
+  const fullDisk = (raw as Record<string, unknown>)["fullDisk"];
+  return { fullDisk: fullDisk === true };
+}
 
 export async function loadSettings(paths: RoanPaths): Promise<Settings> {
   let raw: string;
@@ -37,9 +61,10 @@ export async function loadSettings(paths: RoanPaths): Promise<Settings> {
   }
   try {
     const parsed = JSON.parse(raw) as Partial<Record<keyof Settings, unknown>>;
-    const pick = (key: keyof Settings): string => {
+    const pick = (key: "baseUrl" | "model" | "apiKey" | "provider" | "engine"): string => {
       const value = parsed[key];
-      return typeof value === "string" ? value : DEFAULTS[key];
+      if (typeof value === "string") return value;
+      return DEFAULTS[key];
     };
     const engine = pick("engine") === "builtin" || process.env["ROAN_ENGINE"] === "builtin" ? "builtin" : "hermes";
     // A hand-edited config may hold anything; an unknown level falls back to
@@ -52,6 +77,7 @@ export async function loadSettings(paths: RoanPaths): Promise<Settings> {
       apiKey: pick("apiKey"),
       provider: pick("provider"),
       effort: isEffortLevel(level) ? level : DEFAULTS.effort,
+      access: parseAccess(parsed["access"]),
     };
   } catch {
     return DEFAULTS;

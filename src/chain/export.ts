@@ -25,6 +25,13 @@ import {
 /** Mirrors the store's page cap; larger requests are clamped there anyway. */
 const PAGE_SIZE = 10_000;
 
+/**
+ * Every event type the chain can hold, mirroring `store.ts`.
+ *
+ * A chain may contain any of them — a goal, a permission rule, a file chunk —
+ * so import has to accept the whole set; refusing one would make the export it
+ * came from unreadable.
+ */
 const EVENT_TYPES: ReadonlySet<string> = new Set<EventType>([
   "message",
   "assistant",
@@ -39,7 +46,18 @@ const EVENT_TYPES: ReadonlySet<string> = new Set<EventType>([
   "checkpoint",
   "workspace",
   "node",
-  "env",
+  "node_remove",
+  "mcp_server",
+  "tool_rule",
+  "tool_approval",
+  "approval_request",
+  "blob",
+  "goal",
+  "goal_update",
+  "memory",
+  "plan_mode",
+  "cron_job",
+  "command",
   "device_grant",
   "device_result",
 ]);

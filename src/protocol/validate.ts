@@ -60,6 +60,7 @@ const EVENT_TYPES = {
   checkpoint: true,
   workspace: true,
   node: true,
+  node_remove: true,
   env: true,
   mcp_server: true,
   tool_rule: true,

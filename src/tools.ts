@@ -6,18 +6,30 @@ import type { Tool } from "./types.js";
 import { ensureBundledPlugins } from "./plugins/index.js";
 import { toolSurface } from "./tools/surface.js";
 import { defineBrowserTool } from "./browser/provider.js";
+import { defaultPolicy, pathAccessViolation } from "./tools/policy.js";
 
 const execAsync = promisify(exec);
 
-/** Turn a path into one inside the working directory; reject paths that point outside it. */
-function resolveInside(cwd: string, target: unknown): string {
+/**
+ * Resolve a tool path against the working directory and let the policy decide.
+ * With `access.fullDisk` on, the owner has said the agent works with the
+ * daemon's own rights, so a path outside the workspace is allowed (the policy
+ * still refuses device nodes, /proc memory and writes into /boot and /sys).
+ * With it off, this is the old "inside the workspace only" refusal.
+ */
+function resolveInside(cwd: string, target: unknown, write = false): string {
   const raw = typeof target === "string" && target.length > 0 ? target : ".";
   const full = path.resolve(cwd, raw);
-  const rel = path.relative(cwd, full);
-  if (rel.startsWith("..") || path.isAbsolute(rel)) {
-    throw new Error(`path falls outside the working directory: ${raw}`);
-  }
+  const policy = defaultPolicy(cwd, { fullDisk: fullDiskAccess });
+  const violation = pathAccessViolation(policy, full, write);
+  if (violation !== null) throw new Error(violation);
   return full;
+}
+
+/** Set by the daemon from settings.access.fullDisk; read once per process. */
+let fullDiskAccess = false;
+export function setFullDiskAccess(enabled: boolean): void {
+  fullDiskAccess = enabled;
 }
 
 export const readFile: Tool = {

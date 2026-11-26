@@ -26,7 +26,11 @@ export interface DaemonState {
   readonly node: string | null;
   readonly head: number;
   readonly peers: readonly string[];
-  /** Every node that ever announced itself in this chain, newest fact per node. */
+  /**
+   * The devices this chain shows now, newest fact per node, with the ones a
+   * `node_remove` took out left out. A device that announces itself again comes
+   * back: a tombstone is "nobody heard from it", not "gone for good".
+   */
   readonly nodes: readonly {
     readonly node: string;
     readonly name: string;

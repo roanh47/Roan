@@ -7,6 +7,11 @@ import type { Event } from "../protocol/types.js";
  * can dial and the peer port. Every device folds the same events, so the list is
  * identical everywhere and needs no server to hold it. The address is only a
  * hint — reachability is decided by probing it, never assumed.
+ *
+ * Membership is a fold too: a `node_remove` event hides a node, and the next
+ * `node` announcement from that node brings it back. A tombstone therefore only
+ * means "nobody has heard from this device since", never "this device is gone
+ * for good" — a live device that reconnects is not a ghost.
  */
 export interface NodeInfo {
   readonly node: string;
@@ -23,6 +28,17 @@ interface NodeData {
   port?: unknown;
 }
 
+/** The membership fold: who is visible, and which ids a tombstone still hides. */
+export interface NodeRoster {
+  /** Announcements still in force, oldest first, without the removed ones. */
+  readonly visible: readonly NodeInfo[];
+  /**
+   * Ids whose newest statement is a removal. Lets a device notice that it has
+   * been taken out of the chain and announce itself again.
+   */
+  readonly removed: ReadonlySet<string>;
+}
+
 function readOne(event: Event, data: NodeData): NodeInfo | null {
   const node = typeof data.node === "string" && data.node.length > 0 ? data.node : event.node;
   if (typeof node !== "string" || node.length === 0) return null;
@@ -32,20 +48,63 @@ function readOne(event: Event, data: NodeData): NodeInfo | null {
   return { node, name, host, port, updatedAt: event.ts };
 }
 
+function asNodeData(value: unknown): NodeData | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as NodeData)
+    : null;
+}
+
 /**
- * The newest announcement per node, oldest first. A node that moved keeps one
- * entry: its latest address wins, because an old address is worse than none.
+ * Folds the chain into a roster: the newest announcement per node, minus the
+ * nodes a later `node_remove` took out.
+ *
+ * Order is what decides: a removal after an announcement hides the node, and an
+ * announcement after a removal shows it again. Removing a node that is already
+ * removed changes nothing, so the fold is idempotent.
+ */
+export function foldNodeRoster(events: readonly Event[]): NodeRoster {
+  const byNode = new Map<string, NodeInfo>();
+  const removed = new Set<string>();
+
+  for (const event of events) {
+    const data = asNodeData(event.data);
+    if (data === null) continue;
+
+    if (event.type === "node_remove") {
+      const target = typeof data.node === "string" && data.node.length > 0 ? data.node : null;
+      if (target !== null) removed.add(target);
+      continue;
+    }
+    if (event.type !== "node") continue;
+
+    const info = readOne(event, data);
+    if (info === null) continue;
+    // A node that moved keeps one entry: its latest address wins, because an
+    // old address is worse than none.
+    byNode.set(info.node, info);
+    // It is here, whatever an earlier tombstone said.
+    removed.delete(info.node);
+  }
+
+  const visible = [...byNode.values()].filter((info) => !removed.has(info.node));
+  return { visible, removed };
+}
+
+/**
+ * The devices this chain shows, oldest first, with the removed ones left out.
+ * This is what the daemon puts in `state` and what a tool may address.
+ */
+export function nodesFromEvents(events: readonly Event[]): NodeInfo[] {
+  return [...foldNodeRoster(events).visible];
+}
+
+/**
+ * The newest announcement per node, oldest first, minus removed nodes.
+ * Kept as the short name every existing caller uses; `nodesFromEvents` is the
+ * same fold under the name membership talks about.
  */
 export function readNodes(events: readonly Event[]): NodeInfo[] {
-  const byNode = new Map<string, NodeInfo>();
-  for (const event of events) {
-    if (event.type !== "node") continue;
-    const data = event.data as NodeData | null;
-    if (data === null || typeof data !== "object") continue;
-    const info = readOne(event, data);
-    if (info !== null) byNode.set(info.node, info);
-  }
-  return [...byNode.values()];
+  return nodesFromEvents(events);
 }
 
 /**
