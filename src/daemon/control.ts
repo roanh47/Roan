@@ -233,12 +233,26 @@ export function startControlServer(options: ControlServerOptions): Promise<Contr
 
       const type = frame["t"];
       if (type === "hello") {
-        // A peer dialed `/ws`: it wants the replication handshake, which lives
-        // on `/peer` behind the chain token. Answering it here would let a
-        // peer read this machine's chain without proving anything.
-        log("control: refused a peer hello on /ws (peers connect on /peer)");
-        socket.close(1008, "peer protocol lives on /peer");
-        clients.delete(socket);
+        // Two different handshakes reach this branch, and only one of them is
+        // a peer: a peer hello carries the chain token and belongs on `/peer`.
+        // The app's own client sends a tokenless hello on `/ws` — answering it
+        // with 1008 is what made every client look disconnected while the
+        // daemon was running perfectly well.
+        if (typeof frame["token"] === "string") {
+          log("control: refused a peer hello on /ws (peers connect on /peer)");
+          socket.close(1008, "peer protocol lives on /peer");
+          clients.delete(socket);
+          return;
+        }
+        const current = options.state();
+        send(socket, {
+          t: "hello",
+          v: 1,
+          chain: current.chain,
+          node: current.node,
+          haveSeq: current.head,
+        });
+        send(socket, { t: "state", data: current });
         return;
       }
       if (type === "state") {

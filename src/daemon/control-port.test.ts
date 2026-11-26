@@ -175,9 +175,15 @@ test("a peer connection on /ws is refused: the control path takes no chain token
   try {
     assert.equal(await refusal(`ws://127.0.0.1:${String(server.port)}/ws?token=${TOKEN}`), 403);
 
-    // Even without a token in the URL, a peer hello is not a control frame.
+    // A client hello WITHOUT a token is the app itself and must be answered.
+    const client = await open(`ws://127.0.0.1:${String(server.port)}/ws`);
+    client.socket.send(JSON.stringify({ t: "hello", v: 1, chain: CHAIN, node: "node-a", haveSeq: 0 }));
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    assert.equal(client.socket.readyState, client.socket.OPEN, "a tokenless hello keeps the control link open");
+
+    // A peer hello (the one carrying the chain token) is not a control frame.
     const peer = await open(`ws://127.0.0.1:${String(server.port)}/ws`);
-    peer.socket.send(JSON.stringify({ t: "hello", v: 1, chain: CHAIN, node: "node-a", haveSeq: 0 }));
+    peer.socket.send(JSON.stringify({ t: "hello", v: 2, chain: CHAIN, token: TOKEN, haveSeq: 0 }));
     assert.equal(await closedWith(peer.socket), 1008);
   } finally {
     await server.close();
