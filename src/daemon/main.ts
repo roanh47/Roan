@@ -41,6 +41,8 @@ import { discoverInstructionFiles } from "../import/discover.js";
 import { toSnapshotEntries } from "../import/parse.js";
 import { planImport } from "../import/apply.js";
 import { collectEnvEntries } from "../env/pack.js";
+import { listWorkspace, readWorkspaceFile } from "../workspace/library.js";
+import { renderConversationHtml } from "../chain/export-html.js";
 import { exportChain } from "../chain/export.js";
 import { sessionAttachments, sessionMarkdown } from "../chain/export-markdown.js";
 import { diffWorkspace, hashContent, scanWorkspace, type FileEntry } from "../workspace/scan.js";
@@ -984,22 +986,24 @@ async function main(): Promise<void> {
     onRequest: async (kind, data, reply) => {
       try {
         if (kind === "workspace_list") {
-          const scanned = await scanWorkspace(paths.syncedWorkspace);
+          const entries = await listWorkspace(paths.syncedWorkspace);
           reply({
-            files: [...scanned.files.values(), ...scanned.blobs.values()]
-              .map((entry) => ({ path: entry.path, bytes: entry.bytes, hash: entry.hash }))
-              .sort((a, b) => a.path.localeCompare(b.path)),
+            files: entries.map((entry: { path: string; bytes: number; kind: string }) => ({
+              path: entry.path,
+              bytes: entry.bytes,
+              kind: entry.kind,
+            })),
           });
           return;
         }
         if (kind === "workspace_read") {
-          const path = typeof data["path"] === "string" ? data["path"] : "";
-          const full = resolve(paths.syncedWorkspace, path);
-          if (!full.startsWith(paths.syncedWorkspace)) {
-            reply({ error: "outside the workspace" });
-            return;
+          const wanted = typeof data["path"] === "string" ? data["path"] : "";
+          try {
+            const file = await readWorkspaceFile(paths.syncedWorkspace, wanted);
+            reply({ path: file.path, content: file.bytes.toString("utf8"), mime: file.mime });
+          } catch (error) {
+            reply({ error: error instanceof Error ? error.message : String(error) });
           }
-          reply({ path, content: await readFileAsync(full, "utf8") });
           return;
         }
         if (kind === "workspace_write") {
@@ -1418,6 +1422,8 @@ async function main(): Promise<void> {
             return;
           }
           const markdown = sessionMarkdown(allEvents, what);
+          // The shareable copy: one self-contained file, no scripts, no external requests.
+          const html = renderConversationHtml(allEvents, what, { now: Date.now() });
           const attachments = sessionAttachments(allEvents, what);
           const window = join(dirname(paths.home), "downloads");
           let shared: string | null = null;
@@ -1428,6 +1434,7 @@ async function main(): Promise<void> {
             await mkdir(join(folder, "attachments"), { recursive: true });
             const path = join(folder, "conversation.md");
             await writeFileAsync(path, markdown, "utf8");
+            await writeFileAsync(join(folder, "conversation.html"), html, "utf8");
             for (const file of attachments) {
               await writeFileAsync(join(folder, "attachments", file.file), Buffer.from(file.data, "base64"));
             }
@@ -1444,6 +1451,8 @@ async function main(): Promise<void> {
           }
           const path = join(exports, `conversation-${stamp}.md`);
           await writeFileAsync(path, markdown, "utf8");
+          const htmlPath = join(exports, `conversation-${stamp}.html`);
+          await writeFileAsync(htmlPath, html, "utf8");
           if (existsSync(window)) {
             try {
               shared = join(window, `roan-conversation-${stamp}.md`);
@@ -1452,7 +1461,7 @@ async function main(): Promise<void> {
               shared = null;
             }
           }
-          reply({ ok: true, path, shared, count: 1 });
+          reply({ ok: true, path, html: htmlPath, shared, count: 1 });
           return;
         }
         if (kind === "storage_window") {
