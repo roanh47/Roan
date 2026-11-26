@@ -34,11 +34,11 @@ Owner of this file: the orchestrator (not the children).
 | 25 | Computer use | done | grant store + gated actions + Linux driver plans, 67 tests; approval UI + daemon grant frames open | 1 |
 | 26 | Generatie | done | provider plugins (OpenAI images, ComfyUI) + registry/runtime, 27 tests; tool + config source wiring open | 1 |
 | 27 | Spraakgesprek | done | TTS provider + listen→think→speak loop, 36 tests; needs mic capture + speaker from the shell (open) | 1 |
-| 28 | Werkplek | in-progress | — | 1 |
-| 29 | Code en git | in-progress | — | 1 |
-| 30 | Surfaces | in-progress | — | 1 |
-| 31 | Koppelingen | in-progress | — | 1 |
-| 32 | Opruimen en docs | pending | — | 0 |
+| 28 | Werkplek | done | safe file library + CSV/TSV/JSON + chart spec, 34 tests; workspace_list/read wiring open | 1 |
+| 29 | Code en git | done | LSP probe/client interface, porcelain+numstat parsers, GitPanel, 40 tests; panel routing + commit path open | 1 |
+| 30 | Surfaces | done | `roan` CLI over the control socket (36 tests, own tsconfig) + deep links (42 tests) | 1 |
+| 31 | Koppelingen | done | signed webhooks in/out with replay guard, read-only GitHub connector, honest A2A note; HTTP route + tool wiring open | 1 |
+| 32 | Opruimen en docs | in-progress | — | 1 |
 | 33 | Bewijsronde | pending | — | 0 |
 | 34 | Eindrapport | pending | — | 0 |
 
