@@ -17,6 +17,51 @@ Legend — **CC** Claude Code · **CX** Codex CLI · **OC** opencode · **GC** G
 Verdicts: **BUILD** (needed for parity, next rounds) · **SOON** (valuable, after BUILD) ·
 **LATER** (real but not near) · **WON'T** (does not fit Roan's model — see the next section).
 
+## Samenvatting — wat af is en wat niet
+
+49 van 66 features werken; 16 staan open en 1 vallen bewust af.
+
+| Onderdeel | af | open |
+|---|---|---|
+| 1. Transcript & messages | 8 | 2 |
+| 2. Composer & input | 3 | 4 |
+| 3. Models & providers | 5 | 2 |
+| 4. Sessions & history | 7 | 1 |
+| 5. Context, memory & skills | 4 | 1 |
+| 6. Tools & permissions | 6 | 2 |
+| 7. Integrations | 1 | 3 |
+| 8. Automation & notifications | 6 | 0 |
+| 9. Devices & surfaces | 6 | 1 |
+| 10. Ops & platform | 3 | 1 |
+
+### Wat nog niet af is
+
+Een lege regel hieronder is geen schande, maar wel de eerlijke stand: dit is
+wat een mainstream-agent doet en Roan nog niet.
+
+- [ ] **Edit your sent message → branch from there** (1) — **SOON**
+- [ ] **Read aloud (TTS)** (1) — SOON
+- [ ] **Dictate (speech → text in composer)** (2) — **BUILD**
+- [ ] **Voice conversation mode (call the agent)** (2) — SOON
+- [ ] **Slash commands (`/models`, `/compact`…)** (2) — **BUILD**
+- [ ] **Command palette / keyboard shortcuts** (2) — LATER
+- [ ] **Per-conversation model (not global)** (3) — **SOON**
+- [ ] **Fallback model when one fails** (3) — LATER
+- [ ] **Archive / delete** (4) — **BUILD** (UI)
+- [ ] **Writing style baked in (his own voice, hardcore)** (5) — **BUILD**
+- [ ] **Policy file (which tool may what)** (6) — **BUILD**
+- [ ] **Sandboxed/container execution** (6) — LATER
+- [ ] **MCP remote (OAuth)** (7) — LATER
+- [ ] **Git integration (commit/PR flows)** (7) — LATER
+- [ ] **Messaging channels (Telegram, Discord…)** (7) — LATER
+- [ ] **Push notifications** (9) — **SOON** (after in-app notification)
+
+### Bewust niet
+
+- [x] ~~Telemetry~~ — WON'T — no telemetry, ever
+
+Elke rij hieronder heeft het bewijs in de Roan-kolom; een ✅ zonder bestand of test bestaat niet.
+
 ## Hard exclusions — Roan's model says no
 
 These exist in mainstream agents and are **deliberately out**:
@@ -123,7 +168,7 @@ These exist in mainstream agents and are **deliberately out**:
 | Phone storage as the user home | — (Termux precedent) | ✅ `storage_window` creates the symlink siblings (`shared/ downloads/ dcim/ documents/ pictures/ music/`) next to `.Roan` in the app's `files/`, and refuses with a reason when All files access is missing (`src/daemon/storage-window.ts`, tests) | done (the grant is the owner's) |
 | Background turns (app closed) | HM, OC | ✅ Android foreground service owns the node (`RoanService.kt`); on desktop the daemon runs as a systemd user service (`docs/webui.md`) | done |
 | Notification when a turn finishes | GPT, CL, HM | ✅ the service tails the daemon's stderr for `notify:turn-done` and posts "Roan is done" | done |
-| Hooks (lifecycle events → script) | CC | `hooks.json` runs shell commands at `turn_start` and `turn_end` (`src/hooks/run.ts`, called from `runMessage`); `before_tool`/`after_tool` are declared and never fired | done for two points |
+| Hooks (lifecycle events → script) | CC | ✅ `hooks.json` runs shell commands at `turn_start` and `turn_end` (`src/hooks/run.ts`, called from `runMessage`); a broken hook does not break the turn. `before_tool`/`after_tool` are declared and never fired | done (two points) |
 
 ## 9. Devices & surfaces
 
@@ -135,14 +180,14 @@ These exist in mainstream agents and are **deliberately out**:
 | One scalable frontend on every surface | GPT, CL (one app per form factor) | ✅ one web frontend embedded by every shell | **BUILD (keep it honest)** — phone, tablet, desktop and the 6769 web UI render the *same* frontend, scaled by viewport; no per-platform fork of the UI |
 | Cross-device sync | GPT, CL (cloud) | ✅ chain (no cloud) | done |
 | Push notifications | GPT, CL | ❌ | **SOON** (after in-app notification) |
-| Updater | CC, HM | plugin + pubkey + feed endpoint configured (`tauri.conf.json`), `web/src/update.ts` tested; the card sits in a `SettingsPanel` nothing mounts | **BUILD** — mount it, then publish a second version |
+| Updater | CC, HM | ✅ every build asks GitHub for `releases/latest`, picks its own asset per platform/arch, verifies the sha256 and installs: AppImage in place, MSI with `msiexec /qn`, APK handed to the package installer. `src/packaging/github-releases.ts`, `update-flow.ts`, `UpdateCard` mounted in About (0.0.24/0.0.25) | done |
 
 ## 10. Ops & platform
 
 | Feature | Mainstream | Roan now | Verdict |
 |---|---|---|---|
 | Runs headless / as a service | CC (headless), HM | ✅ daemon + systemd unit (`docs/webui.md`) | done |
-| Update check in-app | CC, HM | the update module is written and tested (`web/src/update.ts`); no mounted screen calls it | **BUILD** |
+| Update check in-app | CC, HM | ✅ About → Check for updates, through the daemon (`update_check` / `update_download`); an unreachable release is shown as unreachable, never as "newest" | done |
 | Crash/diag log reachable by the user | HM | ✅ `GET /log` on the one port + in-app | done |
 | Telemetry | CC (opt-in), others | — | WON'T — no telemetry, ever |
 

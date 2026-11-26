@@ -4,6 +4,10 @@ Eén lijst, per versie. Een vinkje betekent: het werkt en het is bewezen — op 
 echte machine of met een test die de hele route aflegt. Wat een versie niet haalt,
 schuift naar de volgende versie; er is geen tweede lijst.
 
+De volledige vergelijking met Hermes — 66 features, 49 af, 16 open, 1 bewust niet —
+staat met vinkjes in `docs/feature-parity.md` (§ Samenvatting). Wat daar open staat,
+komt hier per versie terug.
+
 ## 0.0.25 — nu
 
 - [x] **Alles op één poort (6769).** De daemon serveert de UI, `/ws` (control) en
