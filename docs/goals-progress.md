@@ -39,8 +39,8 @@ Owner of this file: the orchestrator (not the children).
 | 30 | Surfaces | done | `roan` CLI over the control socket (36 tests, own tsconfig) + deep links (42 tests) | 1 |
 | 31 | Koppelingen | done | signed webhooks in/out with replay guard, read-only GitHub connector, honest A2A note; HTTP route + tool wiring open | 1 |
 | 32 | Opruimen en docs | in-progress | — | 1 |
-| 33 | Bewijsronde | pending | — | 0 |
-| 34 | Eindrapport | pending | — | 0 |
+| 33 | Bewijsronde | partial | apk arm64 71ccce96…, x86_64 op de emulator, app + RoanService draaien; screenshots app-running/drawer op schijf; de 7 feature-shots, blob-via-adb en twee-node-sync niet gehaald | 1 |
+| 34 | Eindrapport | done | docs/FINAL-0.0.23.md; niets gepusht | 1 |
 
 ## Wave log
 
@@ -48,4 +48,6 @@ Owner of this file: the orchestrator (not the children).
   Integration fix by the orchestrator: web/src/chain.ts + App.tsx now use `nodes[].live` from the daemon.
   Shared contract frozen (orchestrator): event types `goal`, `goal_update`, `memory`, `plan_mode`, `cron_job` added to store.ts, protocol/types.ts and validate.ts — children may not edit those lists.
 - Wave 2 (5-10): 5, 6, 7 DONE and wired by the orchestrator (plan frame, memory at turn end, goals in the system prompt, GoalsPanel). Verified: 724/724, 63/63, 67/67.
-- Wave 2b: fix child for 8+9+10 wiring (providers, turn_end usage, cron schedule in the existing loop) starts next to wave 3.
+- Wave 2b–7: done (8/9/10 wired, 11–14, 16–31 modules + tests, 24 registered as a core tool).
+- Wave 8 (docs, feature 32): done — the sweep found a real leak (apiKey inside config.json rode the env snapshot into every chain.db); packaging now redacts it, with src/env/pack.test.ts pinning it.
+- Final gate: 1382 root / 115 tests/ / 126 web, root+web+cli+sdk typechecks clean. Committed as eb81f56.
