@@ -39,7 +39,7 @@ Owner of this file: the orchestrator (not the children).
 | 30 | Surfaces | done | `roan` CLI over the control socket (36 tests, own tsconfig) + deep links (42 tests) | 1 |
 | 31 | Koppelingen | done | signed webhooks in/out with replay guard, read-only GitHub connector, honest A2A note; HTTP route + tool wiring open | 1 |
 | 32 | Opruimen en docs | in-progress | — | 1 |
-| 33 | Bewijsronde | partial | apk arm64 71ccce96…, x86_64 op de emulator, app + RoanService draaien; screenshots app-running/drawer op schijf; de 7 feature-shots, blob-via-adb en twee-node-sync niet gehaald | 1 |
+| 33 | Bewijsronde | partial | apk arm64 71ccce96…; x86_64 op de emulator met draaiende RoanService; **telefoon-sync beide richtingen bewezen** (node-e16fb890: 20 events in /home/roan/.roan/state/chain.db, en seq 94 — een hernoeming van de server — kwam live op de telefoon aan); 2 screenshots op schijf; de 7 feature-shots en de blob-via-adb-check nog open | 1 |
 | 34 | Eindrapport | done | docs/FINAL-0.0.23.md; niets gepusht | 1 |
 
 ## Wave log

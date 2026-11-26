@@ -38,7 +38,7 @@ Datum: 2026-11-26. Repo `/home/roan/Roan`, branch `main`. **Niets gepusht, geen 
 | 30 | Surfaces | done | `roan`-CLI over de control-socket (36 tests) + deep links (42 tests) |
 | 31 | Koppelingen | done | signed webhooks in/uit met replay-guard, GitHub read-only connector, `docs/a2a.md` |
 | 32 | Opruimen en docs | done | TODO/feature-groups/parity/daemon/security bijgewerkt tegen de code |
-| 33 | Bewijsronde | **partial** | apk arm64 gebouwd, x86_64 op de emulator geïnstalleerd, app + `RoanService` draaien (screenshot `local/proof/round-0.0.23/app-running.png`); de zeven nieuwe-feature-screenshots en de blob-via-adb-check zijn niet meer gehaald |
+| 33 | Bewijsronde | **partial** | apk arm64 `71ccce96…`, x86_64 op de emulator met draaiende `RoanService`; **telefoon-sync in beide richtingen bewezen** — telefoon-node `node-e16fb890` leverde 20 events (waaronder een bericht en een antwoord) aan de server-keten, en een server-side hernoeming (seq 94) kwam live op de telefoon aan; de zeven feature-screenshots en de blob-via-adb-check zijn niet gehaald |
 | 34 | Eindrapport | done | dit bestand |
 
 ## Poort (laatste volledige run)
