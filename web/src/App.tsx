@@ -5,6 +5,7 @@ import type { ChainSnapshot } from "./chain.js";
 import pkg from "../package.json";
 import { Composer } from "./components/Composer.js";
 import { WorkspacePanel } from "./panels/WorkspacePanel.js";
+import { UpdateCard } from "./panels/UpdateCard.js";
 import { SchedulesPanel } from "./panels/SchedulesPanel.js";
 import { GoalsPanel } from "./panels/GoalsPanel.js";
 import { foldGoals } from "../../src/chain/goals.js";
@@ -481,7 +482,7 @@ export default function App(): ReactElement {
         ) : settingsPage === "storage" ? (
           <StorageWindowPage client={client} />
         ) : (
-          <AboutPage snapshot={snapshot} logText={logText} onLoadLog={() => void loadLog()} />
+          <AboutPage snapshot={snapshot} client={client} logText={logText} onLoadLog={() => void loadLog()} />
         )}
       </main>
 
@@ -832,10 +833,12 @@ function StorageWindowPage({ client }: { client: ChainClient }): ReactElement {
 /** The facts about this instance, out of the conversation's way. */
 function AboutPage({
   snapshot,
+  client,
   logText,
   onLoadLog,
 }: {
   snapshot: ChainSnapshot;
+  client: ChainClient;
   logText: string | null;
   onLoadLog: () => void;
 }): ReactElement {
@@ -863,6 +866,7 @@ function AboutPage({
           <span className="panel__src">{snapshot.status === "open" ? "running" : "waiting"}</span>
         </li>
       </ul>
+      <UpdateCard daemon={client} />
       <details className="onboarding__daemon">
         <summary className="panel__label">Daemon log</summary>
         <button type="button" className="panel__secondary panel__secondary--inline" onClick={onLoadLog}>

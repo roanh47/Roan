@@ -87,6 +87,12 @@ export interface DaemonStateFrame {
   };
 }
 
+/** The daemon opened a conversation and says which one it is. */
+export interface NewSessionFrame {
+  t: "new_session";
+  session?: string;
+}
+
 /** The daemon refused: bad code, wrong chain, already onboarding. */
 export interface ControlErrorFrame {
   t: "control_error";
@@ -106,7 +112,9 @@ export type ServerFrame =
   | AppendFrame
   | ChainCreatedFrame
   | DaemonStateFrame
-  | ControlErrorFrame| ReplyFrame;
+  | ControlErrorFrame
+  | NewSessionFrame
+  | ReplyFrame;
 
 export interface ClientHelloFrame {
   t: "hello";
@@ -351,6 +359,13 @@ export function parseFrame(raw: unknown): ServerFrame | null {
         ...(provider !== undefined ? { provider } : {}),
         activeSession,
       },
+    };
+  }
+
+  if (value.t === "new_session") {
+    return {
+      t: "new_session",
+      ...(typeof value.session === "string" ? { session: value.session } : {}),
     };
   }
 
@@ -807,6 +822,11 @@ export class ChainClient {
       return;
     }
 
+    if (frame.t === "new_session") {
+      // The daemon owns the id; until it answers, nothing may guess.
+      if (typeof frame.session === "string") this.update({ activeSession: frame.session });
+      return;
+    }
     if (frame.t === "control_error") {
       this.update({ error: frame.message });
       return;

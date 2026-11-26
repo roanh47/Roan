@@ -17,7 +17,18 @@ import {
  * "newest" and "could not reach the feed" are different sentences, and a failed
  * check clears any earlier update button rather than leaving a stale offer.
  */
-export function UpdateCard(): ReactElement {
+/** The minimum of the control client this card needs; the app passes the real one. */
+export interface UpdateDaemon {
+  request<T = unknown>(kind: string, data?: Record<string, unknown>): Promise<T>;
+}
+
+interface DaemonCheck {
+  check?: { kind?: string; version?: string; current?: string; latest?: string; notes?: string; reason?: string };
+  plan?: { action?: string; notes?: string[] };
+  download?: { ok?: boolean; path?: string; reason?: string } | null;
+}
+
+export function UpdateCard({ daemon }: { daemon?: UpdateDaemon } = {}): ReactElement {
   const [version, setVersion] = useState<string | null>(null);
   const [check, setCheck] = useState<UpdateCheck | null>(null);
   const [busy, setBusy] = useState(false);
@@ -39,8 +50,26 @@ export function UpdateCard(): ReactElement {
     setInstallError(null);
     setProgress(null);
     try {
-      // The result is a conclusion, never a throw: an unreachable feed comes
-      // back as its own status and is rendered as such.
+      // The daemon asks the release on this platform; without a client the card
+      // falls back to the shell's own updater.
+      if (daemon !== undefined) {
+        const answer = await daemon.request<DaemonCheck>("update_check");
+        const kind = answer.check?.kind;
+        if (kind === "update") {
+          setCheck({
+            status: "available",
+            update: {
+              version: String(answer.check?.latest ?? ""),
+              ...(typeof answer.check?.notes === "string" ? { notes: answer.check.notes } : {}),
+            },
+          });
+        } else if (kind === "current") {
+          setCheck({ status: "newest" });
+        } else {
+          setCheck({ status: "unreachable", reason: String(answer.check?.reason ?? "the release could not be read") });
+        }
+        return;
+      }
       setCheck(await checkForUpdate());
     } finally {
       setBusy(false);
@@ -53,6 +82,19 @@ export function UpdateCard(): ReactElement {
     setBusy(true);
     setInstallError(null);
     try {
+      if (daemon !== undefined) {
+        setProgress("Downloading...");
+        const answer = await daemon.request<DaemonCheck>("update_download");
+        const notes = answer.plan?.notes ?? [];
+        if (answer.download?.ok === true) {
+          setProgress(`Downloaded to ${String(answer.download.path ?? "")}`);
+        } else {
+          const reason = answer.download?.reason ?? (notes.join("; ") || "unknown reason");
+          setInstallError("Download failed: " + String(reason));
+        }
+        setBusy(false);
+        return;
+      }
       await installUpdate((done, total) => {
         const mb = (n: number): string => (n / 1_048_576).toFixed(1);
         setProgress(total === null ? `${mb(done)} MB` : `${mb(done)} of ${mb(total)} MB`);
@@ -73,7 +115,7 @@ export function UpdateCard(): ReactElement {
         {version === null ? "This version runs in the browser; updating goes through the app." : `Version ${version}`}
       </p>
 
-      {runsInApp() ? (
+      {runsInApp() || daemon !== undefined ? (
         <div className="panel__row">
           <button className="button" type="button" onClick={() => void controleren()} disabled={busy}>
             {busy && progress === null ? "Working..." : "Check for updates"}

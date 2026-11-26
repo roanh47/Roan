@@ -16,7 +16,7 @@ export interface ControlServerOptions {
     image?: { mime: string; data: string },
   ) => void;
   /** Starts a new conversation without touching the old one. */
-  readonly onNewSession?: (title?: string) => void;
+  readonly onNewSession?: (title?: string) => string | null;
   /** Names a conversation differently; appended, never rewriting history. */
   readonly onRenameSession?: (session: string, title: string) => void;
   /**
@@ -189,7 +189,10 @@ export function startControlServer(options: ControlServerOptions): Promise<Contr
       }
       if (type === "new_session") {
         const title = typeof frame["title"] === "string" ? frame["title"] : undefined;
-        options.onNewSession?.(title);
+        // Tell the caller which conversation it just opened: without the id the
+        // client keeps showing whatever it guessed was the newest one.
+        const session = options.onNewSession?.(title) ?? null;
+        send(socket, { t: "new_session", ...(session !== null ? { session } : {}) });
       }
       if (type === "rename_session") {
         const session = typeof frame["session"] === "string" ? frame["session"] : "";

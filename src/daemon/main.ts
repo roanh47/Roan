@@ -43,6 +43,8 @@ import { planImport } from "../import/apply.js";
 import { collectEnvEntries } from "../env/pack.js";
 import { listWorkspace, readWorkspaceFile } from "../workspace/library.js";
 import { renderConversationHtml } from "../chain/export-html.js";
+import { VERSION } from "../version.js";
+import { checkGithubAndPrepareUpdate } from "../packaging/update-flow.js";
 import { exportChain } from "../chain/export.js";
 import { sessionAttachments, sessionMarkdown } from "../chain/export-markdown.js";
 import { diffWorkspace, hashContent, scanWorkspace, type FileEntry } from "../workspace/scan.js";
@@ -985,6 +987,19 @@ async function main(): Promise<void> {
     onMessage: runMessage,
     onRequest: async (kind, data, reply) => {
       try {
+        if (kind === "update_check" || kind === "update_download") {
+          // Every platform asks its own release, and the answer is whatever the
+          // release really says: no update, an update, or why it could not tell.
+          const target = process.env["ROAN_PLATFORM"] ?? process.platform;
+          const result = await checkGithubAndPrepareUpdate({
+            currentVersion: VERSION,
+            platform: target,
+            arch: process.arch,
+            ...(kind === "update_download" ? { dir: join(paths.home, "updates") } : { download: false }),
+          });
+          reply({ check: result.check, plan: result.plan, download: result.download });
+          return;
+        }
         if (kind === "workspace_list") {
           const entries = await listWorkspace(paths.syncedWorkspace);
           reply({
@@ -1821,6 +1836,7 @@ async function main(): Promise<void> {
     onNewSession: (title?: string) => {
       const id = startSession(title);
       if (id !== null) log("session: started " + id.slice(0, 8));
+      return id;
     },
     onCreate,
     onJoin,
