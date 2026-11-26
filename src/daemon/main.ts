@@ -30,7 +30,12 @@ import { buildSystemPrompt } from "../context/prompt.js";
 import { adoptEnv, adoptEnvEvent, latestEnv, publishEnv } from "./env-sync.js";
 import { dirname, join, resolve } from "node:path";
 import { createRunOnNodeTool, serveDelegation, type RelayOptions } from "./relay.js";
-import { autoTitleFor, readSessions } from "../chain/sessions.js";
+import { autoTitleFor, readSessions, sessionMessages } from "../chain/sessions.js";
+import { foldGoals, goalContext } from "../chain/goals.js";
+import { distilMemories, memoryTexts } from "../memory/index.js";
+import { foldMemoryMd, writeMemoryMd } from "../context/memory-md.js";
+import { approvePlan, planModeEnabled, planModeEvent } from "./plan.js";
+import { chat } from "../provider.js";
 import { exportChain } from "../chain/export.js";
 import { sessionAttachments, sessionMarkdown } from "../chain/export-markdown.js";
 import { diffWorkspace, hashContent, scanWorkspace, type FileEntry } from "../workspace/scan.js";
@@ -781,7 +786,11 @@ async function main(): Promise<void> {
         control?.sendState();
       }
     }
-    const systemPrompt = await agentContext.prompt();
+    // Standing orders ride the system prompt of every new turn: they are the
+    // owner's own words, folded from the chain like everything else.
+    const orders = goalContext(foldGoals(current.store.read(current.identity.chainId, 1, 100_000)));
+    const basePrompt = await agentContext.prompt();
+    const systemPrompt = orders.length > 0 ? `${orders}\n\n${basePrompt}` : basePrompt;
     const hooks = await loadHooks();
     const started = await runHooks(hooks, "turn_start", {
       cwd: paths.syncedWorkspace,
@@ -804,6 +813,7 @@ async function main(): Promise<void> {
         systemPrompt,
         tools: toolsForTurn(),
         engine: settings.engine,
+        planMode: planModeEnabled(current.store.read(current.identity.chainId, 1, 100_000), sessionId),
         session: sessionId,
         onAppend: (event) => {
           control?.broadcast({ t: "append", event });
@@ -828,6 +838,35 @@ async function main(): Promise<void> {
     });
     for (const result of ended) {
       if (result.exitCode !== 0) log(`hook turn_end failed (${String(result.exitCode)}): ${result.command}`);
+    }
+    // Distil at most three durable facts from the finished session. A failed
+    // distil never breaks the turn; the fold is a no-op when nothing changed.
+    try {
+      const all = current.store.read(current.identity.chainId, 1, 100_000);
+      const facts = await distilMemories(
+        { session: sessionId, messages: sessionMessages(all, sessionId) },
+        memoryTexts(all),
+        async (prompt) => {
+          const answer = await chat(
+            { baseUrl: settings.baseUrl, apiKey: settings.apiKey, model: settings.model },
+            [{ role: "user", content: prompt }],
+            { maxTokens: 300 },
+          );
+          return typeof answer.content === "string" ? answer.content : "";
+        },
+      );
+      for (const fact of facts) {
+        const event = current.store.append(current.identity.chainId, {
+          id: uuid(),
+          node: current.identity.nodeId,
+          type: "memory",
+          data: fact,
+        });
+        control?.broadcast({ t: "append", event });
+      }
+      await writeMemoryMd(paths.home, foldMemoryMd(current.store.read(current.identity.chainId, 1, 100_000)));
+    } catch (error) {
+      log(`memory: distil failed: ${String(error)}`);
     }
   };
 
@@ -1548,7 +1587,60 @@ async function main(): Promise<void> {
           reply({ checkpoints: list.reverse() });
           return;
         }
-        reply({ error: "onbekend verzoek: " + kind });
+        if (kind === "goal") {
+          const current = session;
+          const text = typeof data["text"] === "string" ? data["text"].trim() : "";
+          if (current === null || text.length === 0) {
+            reply({ ok: false, error: "no chain or empty goal text" });
+            return;
+          }
+          const event = current.store.append(current.identity.chainId, {
+            id: uuid(),
+            node: current.identity.nodeId,
+            type: "goal",
+            data: { id: uuid(), text, status: "open", createdAt: Date.now() },
+          });
+          control?.broadcast({ t: "append", event });
+          reply({ ok: true });
+          return;
+        }
+        if (kind === "goal_update") {
+          const current = session;
+          const goal = typeof data["id"] === "string" ? data["id"] : "";
+          const status = data["status"] === "done" || data["status"] === "cancelled" || data["status"] === "open" ? data["status"] : null;
+          if (current === null || goal.length === 0 || status === null) {
+            reply({ ok: false, error: "goal_update needs an id and a valid status" });
+            return;
+          }
+          const event = current.store.append(current.identity.chainId, {
+            id: uuid(),
+            node: current.identity.nodeId,
+            type: "goal_update",
+            data: { goal, status, ...(typeof data["note"] === "string" ? { note: data["note"] } : {}) },
+          });
+          control?.broadcast({ t: "append", event });
+          reply({ ok: true });
+          return;
+        }
+        if (kind === "plan_mode") {
+          const current = session;
+          const wanted = typeof data["session"] === "string" && data["session"].length > 0 ? data["session"] : resolveSession();
+          if (current === null || wanted === null) {
+            reply({ ok: false, error: "no chain or session for plan mode" });
+            return;
+          }
+          const payload = data["approve"] === true ? approvePlan(wanted) : planModeEvent(wanted, data["enabled"] === true);
+          const event = current.store.append(current.identity.chainId, {
+            id: uuid(),
+            node: current.identity.nodeId,
+            type: payload.type,
+            data: payload.data,
+          });
+          control?.broadcast({ t: "append", event });
+          reply({ ok: true, session: wanted, enabled: payload.data.enabled });
+          return;
+        }
+        reply({ error: "unknown request: " + kind });
       } catch (error) {
         reply({ error: error instanceof Error ? error.message : String(error) });
       }

@@ -6,6 +6,8 @@ import pkg from "../package.json";
 import { Composer } from "./components/Composer.js";
 import { WorkspacePanel } from "./panels/WorkspacePanel.js";
 import { SchedulesPanel } from "./panels/SchedulesPanel.js";
+import { GoalsPanel } from "./panels/GoalsPanel.js";
+import { foldGoals } from "../../src/chain/goals.js";
 import { ProvidersPanel } from "./panels/ProvidersPanel.js";
 import { CapabilitiesPanel } from "./panels/CapabilitiesPanel.js";
 import { ToolsPanel } from "./panels/ToolsPanel.js";
@@ -96,6 +98,22 @@ export default function App(): ReactElement {
   const turn = useMemo(() => openTurn(snapshot.events), [snapshot.events]);
   const phase = useMemo(() => turnPhase(snapshot.events, turn), [snapshot.events, turn]);
   const activeSession = snapshot.activeSession ?? snapshot.sessions.at(-1)?.id ?? null;
+
+  // Plan mode is per conversation; the newest plan_mode event for this one wins.
+  const planMode = useMemo(() => {
+    for (const event of [...snapshot.events].reverse()) {
+      if (event.type !== "plan_mode") continue;
+      const data = event.data as { session?: unknown; enabled?: unknown } | null;
+      if (data?.session !== activeSession) continue;
+      return data.enabled === true;
+    }
+    return false;
+  }, [snapshot.events, activeSession]);
+
+  const setPlanMode = (enabled: boolean): void => {
+    if (activeSession === null) return;
+    void client.request("plan_mode", enabled ? { session: activeSession, enabled: true } : { session: activeSession, approve: true });
+  };
   // Only one conversation is on screen; the rest of the chain stays where it is.
   const visible = useMemo(() => {
     if (activeSession === null) return snapshot.events;
@@ -442,7 +460,14 @@ export default function App(): ReactElement {
         ) : settingsPage === "workspace" ? (
           <WorkspacePanel client={client} />
         ) : settingsPage === "schedules" ? (
-          <SchedulesPanel client={client} />
+          <>
+            <SchedulesPanel client={client} />
+            <GoalsPanel
+              goals={foldGoals(snapshot.events)}
+              onClose={(id) => void client.request("goal_update", { id, status: "done" })}
+              onCreate={(text) => void client.request("goal", { text })}
+            />
+          </>
         ) : settingsPage === "checkpoints" ? (
           <CheckpointsPanel
             client={client}
@@ -611,6 +636,8 @@ export default function App(): ReactElement {
           prefill={shared}
           onPickFile={() => setView("chat")}
           client={client}
+          planMode={planMode}
+          onPlanModeChange={setPlanMode}
         />
       </footer>
 

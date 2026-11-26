@@ -10,6 +10,7 @@ import { historyFromEvents } from "./history.js";
 import { runHermesTurn } from "../engine/hermes.js";
 import { sessionMessages } from "../chain/sessions.js";
 import { compactMessages, type ChatMessage } from "../chain/compaction.js";
+import { PLAN_MODE_PROMPT, planModeForbidden, planModeRefusal, planModeTools } from "./plan.js";
 
 export interface TurnRunnerOptions {
   readonly store: EventStore;
@@ -29,6 +30,13 @@ export interface TurnRunnerOptions {
   readonly engine?: "builtin" | "hermes";
   /** The conversation this turn belongs to; only its history is sent. */
   readonly session?: string;
+  /**
+   * Read-only plan mode for this turn. The tool list loses everything that
+   * writes or executes, so the gate is the mode rather than the prompt, and the
+   * turn runs the builtin loop even on a device configured for the hermes
+   * engine — that one owns its tools in a subprocess and cannot be gated.
+   */
+  readonly planMode?: boolean;
   /** Called for every event the run produces, after it is durable. */
   readonly onAppend: (event: Event) => void;
   /** Aborts the turn; set by the cancel request the app sends. */
@@ -113,13 +121,30 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
       compacted.digest === null
         ? options.systemPrompt
         : `${options.systemPrompt}\n\n# Earlier in this conversation (condensed)\n\n${compacted.digest}`;
+    // Plan mode is enforced on the tool list, not on the wording: what the
+    // model never sees cannot be called. The instruction rides along because a
+    // planner that is not told it is planning writes a paragraph, not a plan.
+    const planning = options.planMode === true;
+    const offered = options.tools ?? allTools();
+    const turnTools = planning ? [...planModeTools(offered, true)] : [...offered];
+    const refused = new Map<string, string>(
+      planning
+        ? planModeForbidden(offered).map((tool) => [tool.name, planModeRefusal(tool.name)] as const)
+        : [],
+    );
+    const guidedPrompt = planning ? `${PLAN_MODE_PROMPT}\n\n${turnPrompt}` : turnPrompt;
+    // A planning turn runs the loop Roan owns. The hermes engine keeps its own
+    // tool loop in a subprocess, which cannot be gated — promising read-only and
+    // then handing the machine to a process we do not steer would make the mode
+    // a suggestion. Whatever the device normally uses, a plan runs here.
+    const engine = planning ? "builtin" : (options.engine ?? "builtin");
     let answer = "";
     // A turn that ends without an explanation is a silent bug to a reader.
     // The error events of this turn say why it went nowhere; when none did,
     // the turn itself reports that it came back empty.
     let failed = false;
 
-    if (options.engine === "hermes") {
+    if (engine === "hermes") {
       // The engine keeps its own tool loop; the chain keeps the conversation.
       const result = await runHermesTurn({
         prompt: userText,
@@ -141,10 +166,11 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
 
     const agent = new Agent({
       provider: options.provider,
-      tools: [...(options.tools ?? allTools())],
-      systemPrompt: turnPrompt,
+      tools: turnTools,
+      systemPrompt: guidedPrompt,
       cwd: options.cwd,
       history: compacted.recent as typeof history,
+      ...(refused.size > 0 ? { refusedTools: refused } : {}),
       ...(options.signal !== undefined ? { signal: options.signal } : {}),
       onEvent: (event) => {
         switch (event.type) {

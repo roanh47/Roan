@@ -10,6 +10,12 @@ export interface AgentOptions {
   maxSteps?: number;
   /** Earlier turns, replayed from the chain. The system prompt is added here. */
   history?: ChatMessage[];
+  /**
+   * Tools the model may not call this turn, mapped to a sentence saying why.
+   * A hallucinated call is answered with that sentence instead of "unknown
+   * tool", so the transcript explains the mode rather than sounding broken.
+   */
+  refusedTools?: ReadonlyMap<string, string>;
   onEvent?: (event: AgentEvent) => void;
   signal?: AbortSignal;
 }
@@ -80,7 +86,13 @@ export class Agent {
 
         let output: string;
         let ok = true;
-        if (!tool) {
+        const refused = this.opts.refusedTools?.get(call.function.name);
+        if (refused !== undefined) {
+          // Withheld on purpose: never run it, and say so in words the user
+          // can act on instead of feeding back "unknown tool".
+          ok = false;
+          output = refused;
+        } else if (!tool) {
           ok = false;
           output = `unknown tool: ${call.function.name}`;
         } else {

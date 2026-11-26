@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChangeEvent, FormEvent, KeyboardEvent, ReactElement } from "react";
+import type { ChangeEvent, CSSProperties, FormEvent, KeyboardEvent, ReactElement } from "react";
 import type { ChainClient } from "../chain.js";
 
 interface WorkspaceFile {
@@ -14,6 +14,31 @@ export interface AttachedImage {
   data: string;
 }
 
+/** The sentence the composer shows while the conversation may not act. */
+export const PLAN_MODE_HINT =
+  "read-only — Roan researches and writes a plan. It cannot write files or run commands until you approve it.";
+
+const PLAN_PILL: CSSProperties = {
+  flex: "none",
+  alignSelf: "center",
+  padding: "5px 10px",
+  border: "1px solid var(--line-soft)",
+  borderRadius: 999,
+  background: "transparent",
+  color: "var(--faint)",
+  fontSize: 12,
+  fontWeight: 600,
+  letterSpacing: "0.02em",
+  cursor: "pointer",
+};
+
+const PLAN_PILL_ON: CSSProperties = {
+  ...PLAN_PILL,
+  borderColor: "rgba(126, 226, 184, 0.45)",
+  background: "rgba(126, 226, 184, 0.14)",
+  color: "var(--accent)",
+};
+
 interface ComposerProps {
   /** Locked while a turn is open or the chain is not connected. */
   disabled: boolean;
@@ -25,6 +50,13 @@ interface ComposerProps {
   onPickFile?: () => void;
   /** With a client the plus menu lists the workspace; without it stays lean. */
   client?: ChainClient;
+  /** The conversation's plan mode, folded from its `plan_mode` events. */
+  planMode?: boolean;
+  /**
+   * Turns plan mode on, or approves the plan by passing `false`. Without it the
+   * pill still shows the state but cannot be pressed.
+   */
+  onPlanModeChange?: (enabled: boolean) => void;
 }
 
 // The WebView on Android does not reliably ship SpeechRecognition; the mic
@@ -56,9 +88,10 @@ function dictationCtor(): DictationCtor | null {
 
 const DICTATION = dictationCtor();
 
-export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, client }: ComposerProps): ReactElement {
+export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, client, planMode = false, onPlanModeChange }: ComposerProps): ReactElement {
   // The plus always exists: a photo needs neither workspace nor dictation.
   const hasMenu = true;
+  const planning = planMode === true;
   const [value, setValue] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [files, setFiles] = useState<WorkspaceFile[] | null>(null);
@@ -97,6 +130,17 @@ export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, c
     onSend(text.length > 0 ? text : "[afbeelding]", image ?? undefined);
     setValue("");
     setImage(null);
+  }
+
+  /**
+   * The toggle is the whole control: on starts a read-only plan turn, off
+   * approves the plan. The event that records it belongs to the app, not here —
+   * this component only says which way the user flipped it.
+   */
+  function setPlan(next: boolean): void {
+    if (disabled || onPlanModeChange === undefined) return;
+    setMenuOpen(false);
+    onPlanModeChange(next);
   }
 
   /** Downscale before it ever leaves the phone: a photo is readable at 1024px. */
@@ -178,6 +222,67 @@ export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, c
         submit();
       }}
     >
+      {planning && !menuOpen ? (
+        <div
+          className="composer__planhint"
+          role="status"
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: "calc(100% + 8px)",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "8px 10px 8px 12px",
+            border: "1px solid var(--line-soft)",
+            borderRadius: 16,
+            background: "#12151a",
+            boxShadow: "0 12px 32px rgba(0, 0, 0, 0.45)",
+            fontSize: 12.5,
+            lineHeight: 1.4,
+          }}
+        >
+          <span style={{ flex: 1 }}>
+            <strong>Plan mode</strong> · {PLAN_MODE_HINT}
+          </span>
+          <button
+            type="button"
+            style={{
+              flex: "none",
+              padding: "6px 12px",
+              border: "1px solid rgba(126, 226, 184, 0.45)",
+              borderRadius: 999,
+              background: "rgba(126, 226, 184, 0.14)",
+              color: "var(--accent)",
+              fontSize: 12,
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+              cursor: "pointer",
+            }}
+            disabled={disabled || onPlanModeChange === undefined}
+            onClick={() => setPlan(false)}
+          >
+            Approve plan
+          </button>
+        </div>
+      ) : null}
+
+      <button
+        type="button"
+        className={planning ? "composer__plan composer__plan--on" : "composer__plan"}
+        style={planning ? PLAN_PILL_ON : PLAN_PILL}
+        aria-pressed={planning}
+        aria-label={
+          planning ? "Plan mode is on: read-only. Turn it off" : "Plan mode is off: the agent may write and run commands"
+        }
+        title="Plan mode: read-only research, nothing is executed until you approve"
+        disabled={disabled || onPlanModeChange === undefined}
+        onClick={() => setPlan(!planning)}
+      >
+        Plan
+      </button>
+
       {hasMenu ? (
         <button
           type="button"
@@ -281,7 +386,7 @@ export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, c
         className="composer__send"
         type="submit"
         disabled={!ready}
-        aria-label="Send message"
+        aria-label={planning ? "Send message (plan mode is read-only)" : "Send message"}
       >
         <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
           <path
