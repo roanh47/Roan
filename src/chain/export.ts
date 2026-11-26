@@ -40,6 +40,8 @@ const EVENT_TYPES: ReadonlySet<string> = new Set<EventType>([
   "workspace",
   "node",
   "env",
+  "device_grant",
+  "device_result",
 ]);
 
 /**

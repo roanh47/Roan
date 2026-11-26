@@ -237,6 +237,9 @@ export async function startPeers(options: PeersOptions): Promise<void> {
     host: options.host,
     port: options.port ?? DEFAULT_PEER_PORT,
     logger: toWireLogger(logger),
+    // Device control is opt-in per link and only ever runs a command the chain
+    // granted; without this the frame is logged and ignored.
+    device: { store },
     getHaveSeq: () => store.head(),
     onPeer(peer, hello) {
       const transport = new LinkTransport(`inbound:${peer.id}`, logger, {
@@ -301,6 +304,7 @@ export function addPeer(target: PeerAddress): void {
     node: current.store.nodeId,
     haveSeq: () => current.store.head(),
     logger: toWireLogger(logger),
+    device: { store: current.store },
   });
 
   const transport = new LinkTransport(endpoint, logger, {

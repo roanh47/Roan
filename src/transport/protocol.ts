@@ -70,7 +70,27 @@ export interface ToolResFrame {
   output: string;
 }
 
-export type Frame = HelloFrame | EventsFrame | AppendFrame | ToolReqFrame | ToolResFrame;
+/**
+ * One node asking another to run one allowlisted command.
+ *
+ * The frame never carries an argv: the receiver resolves the command through
+ * `ALLOWLIST` in `../sync/device-control.js`. Whether the command actually
+ * runs is decided by the chain, not by this frame.
+ */
+export interface DeviceReqFrame {
+  t: "device_req";
+  chain: string;
+  node: string;
+  command: string;
+}
+
+export type Frame =
+  | HelloFrame
+  | EventsFrame
+  | AppendFrame
+  | ToolReqFrame
+  | ToolResFrame
+  | DeviceReqFrame;
 
 export type ParseResult =
   | { ok: true; frame: Frame }

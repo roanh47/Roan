@@ -3,6 +3,7 @@ import { CLOSE_CODES, PROTOCOL_VERSION, encodeFrame, type Frame, type HelloFrame
 import { decodeFrameData, detectVersionMismatch, parseFrame } from "./parse.js";
 import { TransportError } from "./errors.js";
 import type { Logger } from "./logger.js";
+import { receiveDeviceRequest, type DeviceControlOptions } from "./server.js";
 
 /** One socket, one handshake, no reconnect. `PeerClient` owns the retries. */
 export interface PeerSessionOptions {
@@ -19,6 +20,11 @@ export interface PeerSessionOptions {
   maxEventsPerFrame: number;
   /** Called for every validated frame after hello. */
   onFrame: (frame: Frame) => void;
+  /**
+   * Answer `device_req` frames from the peer this session dialled. Absent means
+   * device control is off: such a frame is logged and ignored, never executed.
+   */
+  device?: DeviceControlOptions;
 }
 
 function closeErrorMessage(code: number, reason: string, endpoint: string): string {
@@ -162,6 +168,31 @@ export class PeerSession {
             return;
           }
           succeed(frame);
+          return;
+        }
+
+        if (frame.t === "device_req") {
+          const device = options.device;
+          if (device === undefined) {
+            options.logger.log(
+              "warn",
+              `ignored device_req from ${options.endpoint}: device control is not enabled on this node`,
+            );
+            return;
+          }
+          void receiveDeviceRequest(frame, {
+            store: device.store,
+            chain: options.chain,
+            self: options.node,
+            run: device.run,
+            maxOutputChars: device.maxOutputChars,
+            logger: options.logger,
+          }).catch((error: unknown) => {
+            options.logger.log(
+              "error",
+              `device_req from ${options.endpoint} failed: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          });
           return;
         }
 

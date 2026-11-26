@@ -54,7 +54,11 @@ export type EventType =
   /** A scheduled task: schedule, prompt, enabled. */
   | "cron_job"
   /** A user-defined slash command: name, prompt, tombstone. */
-  | "command";
+  | "command"
+  /** One node may ask another for allowlisted commands: { node, enabled }. */
+  | "device_grant"
+  /** The outcome of one device request: { node, command, accepted, ... }. */
+  | "device_result";
 
 /**
  * One entry in the append-only chain.
@@ -121,6 +125,14 @@ export interface ToolResultFrame extends ToolResult {
   readonly t: "tool_res";
 }
 
+/** One node asking another to run one allowlisted command. */
+export interface DeviceRequestFrame {
+  readonly t: "device_req";
+  readonly chain: string;
+  readonly node: string;
+  readonly command: string;
+}
+
 /**
  * Everything that can cross the wire between nodes.
  *
@@ -132,6 +144,7 @@ export type TransportFrame =
   | EventsFrame
   | AppendFrame
   | ToolRequestFrame
-  | ToolResultFrame;
+  | ToolResultFrame
+  | DeviceRequestFrame;
 
 export type FrameType = TransportFrame["t"];

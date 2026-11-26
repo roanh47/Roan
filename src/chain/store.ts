@@ -47,7 +47,9 @@ export type EventType =
   | "memory"
   | "plan_mode"
   | "cron_job"
-  | "command";
+  | "command"
+  | "device_grant"
+  | "device_result";
 
 export interface Event {
   v: 1;
@@ -111,6 +113,8 @@ const EVENT_TYPES: ReadonlySet<string> = new Set<EventType>([
   "plan_mode",
   "cron_job",
   "command",
+  "device_grant",
+  "device_result",
 ]);
 
 const DEFAULT_LIMIT = 1000;

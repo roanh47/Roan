@@ -53,6 +53,8 @@ const EVENT_TYPES: readonly string[] = [
   "turn_start",
   "turn_end",
   "env",
+  "device_grant",
+  "device_result",
 ];
 
 function isEventType(value: string): value is EventType {

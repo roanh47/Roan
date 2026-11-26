@@ -10,6 +10,7 @@
 import {
   PROTOCOL_VERSION,
   type AppendFrame,
+  type DeviceRequestFrame,
   type Event,
   type EventType,
   type EventsFrame,
@@ -71,6 +72,8 @@ const EVENT_TYPES = {
   plan_mode: true,
   cron_job: true,
   command: true,
+  device_grant: true,
+  device_result: true,
 } as const satisfies { readonly [K in EventType]: true };
 
 const FRAME_TYPES = {
@@ -79,6 +82,7 @@ const FRAME_TYPES = {
   append: true,
   tool_req: true,
   tool_res: true,
+  device_req: true,
 } as const satisfies { readonly [K in FrameType]: true };
 
 const EVENT_TYPE_SET: ReadonlySet<string> = new Set(Object.keys(EVENT_TYPES));
@@ -348,6 +352,28 @@ function validateToolResultFrame(value: unknown, path: string): ToolResultFrame 
 }
 
 /**
+ * A device request names one allowlisted command and nothing else.
+ *
+ * An `argv` field is refused rather than ignored: the argv belongs to the
+ * receiver's allowlist, so a frame that ships its own is trying to choose what
+ * runs. Unknown extra fields stay dropped, as everywhere else in this file.
+ */
+function validateDeviceRequestFrame(value: unknown, path: string): DeviceRequestFrame {
+  const record = asRecord(value, path, "invalid_frame");
+  const chain = nonEmptyString(record, "chain", path, "invalid_frame");
+  const node = nonEmptyString(record, "node", path, "invalid_frame");
+  const command = nonEmptyString(record, "command", path, "invalid_frame");
+  if (Object.hasOwn(record, "argv")) {
+    throw new ProtocolError(
+      "invalid_frame",
+      `${path}.argv`,
+      "must not be sent: a device request carries one allowlisted command, never an argv",
+    );
+  }
+  return { t: "device_req", chain, node, command };
+}
+
+/**
  * Validate one transport frame. Returns a normalised copy; the exhaustive
  * switch means a new `TransportFrame` member cannot be silently ignored.
  */
@@ -373,6 +399,8 @@ export function validateFrame(value: unknown, path = "frame"): TransportFrame {
       return validateToolRequestFrame(record, path);
     case "tool_res":
       return validateToolResultFrame(record, path);
+    case "device_req":
+      return validateDeviceRequestFrame(record, path);
     default:
       return assertNever(type, `${path}.t`);
   }

@@ -1,17 +1,165 @@
 import type { IncomingMessage } from "node:http";
+import { execFile as execFileCallback } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { promisify } from "node:util";
 import { WebSocketServer, WebSocket } from "ws";
-import { CLOSE_CODES, PROTOCOL_VERSION, encodeFrame, type Frame, type HelloFrame } from "./protocol.js";
+import { CLOSE_CODES, PROTOCOL_VERSION, encodeFrame, type DeviceReqFrame, type Frame, type HelloFrame } from "./protocol.js";
 import { decodeFrameData, detectVersionMismatch, frameChainMismatch, parseFrame } from "./parse.js";
 import { PeerConnection, presentedToken, tokenMatches, type Peer } from "./peer-connection.js";
 import { nullLogger, type Logger } from "./logger.js";
+import {
+  executeRequest,
+  grantsFromEvents,
+  parseRequest,
+  type DeviceRunner,
+} from "../sync/device-control.js";
+import type { Event, NodeStore } from "../sync/types.js";
 
 const DEFAULT_MAX_PAYLOAD_BYTES = 4 * 1024 * 1024;
 const DEFAULT_MAX_BUFFERED_BYTES = 4 * 1024 * 1024;
 const DEFAULT_HANDSHAKE_TIMEOUT_MS = 5_000;
 const DEFAULT_MAX_EVENTS_PER_FRAME = 1_000;
 const SHUTDOWN_GRACE_MS = 2_000;
+/** A device command is one read-only allowlisted program; it may not hang. */
+const DEVICE_COMMAND_TIMEOUT_MS = 10_000;
+/** Output beyond this is killed by execFile, not buffered without bound. */
+const DEVICE_COMMAND_MAX_BYTES = 1 << 20;
 
 export type { Peer } from "./peer-connection.js";
+
+/**
+ * Device control as a receiver offers it: the chain to read grants from and to
+ * write results into, plus the runner.
+ *
+ * `run` exists so tests never spawn anything; production omits it and gets
+ * `execFile`. Either way the runner is only reached after `executeRequest` has
+ * found an enabled grant for the addressed node, and only ever with the argv of
+ * an allowlisted command.
+ */
+export interface DeviceControlOptions {
+  /** Chain events: grants are read here and `device_result` is appended here. */
+  readonly store: NodeStore;
+  /** Injected runner; omit to run the allowlisted program with `execFile`. */
+  readonly run?: DeviceRunner;
+  /** Output cap in characters; defaults to the `device-control` default. */
+  readonly maxOutputChars?: number;
+}
+
+/** What `receiveDeviceRequest` needs beyond `DeviceControlOptions`. */
+export interface DeviceReceiveOptions extends DeviceControlOptions {
+  /** This node's id; a request addressed to any other node is refused. */
+  readonly self: string;
+  /** Chain of this connection; it must be the store's chain. */
+  readonly chain: string;
+  readonly logger?: Logger;
+  /** Clock and id source, injectable so a test can pin the result event. */
+  readonly now?: () => number;
+  readonly nextId?: () => string;
+}
+
+/** Payload of a `device_result` event. A refusal is a result too. */
+export interface DeviceResultPayload {
+  /** Node the request was addressed to. */
+  readonly node: string;
+  /** Command as the frame named it. */
+  readonly command: string;
+  readonly accepted: boolean;
+  /** Runner output, only when `accepted` is true. */
+  readonly output?: string;
+  /** Why it was refused, only when `accepted` is false. */
+  readonly reason?: string;
+}
+
+const execFile = promisify(execFileCallback);
+
+/** The only runner production uses. Never called without a grant. */
+async function runLocalCommand(argv: readonly string[]): Promise<string> {
+  const [file, ...args] = argv;
+  if (file === undefined || file.length === 0) {
+    throw new Error("device control: empty argv");
+  }
+  const { stdout } = await execFile(file, args, {
+    timeout: DEVICE_COMMAND_TIMEOUT_MS,
+    maxBuffer: DEVICE_COMMAND_MAX_BYTES,
+    windowsHide: true,
+    encoding: "utf8",
+  });
+  return typeof stdout === "string" ? stdout : String(stdout);
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Handle one `device_req` frame: parse it again, look up the grant for the
+ * addressed node in the chain, execute only when that grant is enabled, and
+ * record the outcome (accepted or refused) as a `device_result` event.
+ *
+ * Never throws. A bad frame, a disabled or missing grant, a request for
+ * another node and a failing runner all end as a result event; the runner is
+ * not called on any refusal path.
+ */
+export async function receiveDeviceRequest(
+  frame: DeviceReqFrame,
+  options: DeviceReceiveOptions,
+): Promise<void> {
+  const logger = options.logger ?? nullLogger;
+  try {
+    const parsed = parseRequest(frame);
+    const command = typeof frame.command === "string" ? frame.command.trim() : "";
+    const node = parsed.ok ? parsed.request.node : options.self;
+
+    let payload: DeviceResultPayload;
+    if (!parsed.ok) {
+      payload = { node, command, accepted: false, reason: parsed.reason };
+    } else {
+      const grant = grantsFromEvents(options.store.since(1)).get(parsed.request.node);
+      const result = await executeRequest(parsed.request, options.run ?? runLocalCommand, {
+        grant,
+        self: options.self,
+        chain: options.chain,
+        maxOutputChars: options.maxOutputChars,
+      });
+      payload = result.accepted
+        ? { node, command: parsed.request.command, accepted: true, output: result.output }
+        : { node, command: parsed.request.command, accepted: false, reason: result.reason };
+    }
+
+    appendDeviceResult(options, payload, logger);
+  } catch (error: unknown) {
+    // The socket handler calls this fire-and-forget; nothing may escape.
+    logger.log("error", `device_req handling failed: ${messageOf(error)}`);
+  }
+}
+
+/** Append one `device_result` at the store's head + 1. */
+function appendDeviceResult(
+  options: DeviceReceiveOptions,
+  payload: DeviceResultPayload,
+  logger: Logger,
+): void {
+  const store = options.store;
+  const nextId = options.nextId ?? ((): string => `device-${randomUUID()}`);
+  const now = options.now ?? Date.now;
+  const event: Event = {
+    v: 1,
+    chain: store.chain,
+    seq: store.head() + 1,
+    id: nextId(),
+    node: store.nodeId,
+    ts: now(),
+    type: "device_result",
+    data: payload,
+  };
+  const outcome = store.append(event);
+  if (outcome.status !== "appended") {
+    logger.log(
+      "warn",
+      `device_result for ${payload.command} was not written: store said "${outcome.status}"`,
+    );
+  }
+}
 
 export interface PeerServerOptions {
   /** This node's name, sent in hello and used to tag peers. */
@@ -33,6 +181,11 @@ export interface PeerServerOptions {
   onPeer?: (peer: Peer, hello: HelloFrame) => void;
   onFrame?: (peer: Peer, frame: Frame) => void;
   onPeerClose?: (peerId: string) => void;
+  /**
+   * Answer `device_req` frames from peers. Absent means device control is off:
+   * such a frame is logged and ignored, never executed.
+   */
+  device?: DeviceControlOptions;
 }
 
 export interface PeerServer {
@@ -167,6 +320,28 @@ export function startPeerServer(options: PeerServerOptions): Promise<PeerServer>
           peer.close(CLOSE_CODES.chainMismatch, mismatch);
           return;
         }
+
+        if (frame.t === "device_req") {
+          const device = options.device;
+          if (device === undefined) {
+            // Not configured is not an error: the frame is simply not for this
+            // node's abilities, and nothing runs.
+            logger.log("warn", `ignored device_req on ${id}: device control is not enabled on this node`);
+            return;
+          }
+          void receiveDeviceRequest(frame, {
+            store: device.store,
+            chain: options.chain,
+            self: options.node,
+            run: device.run,
+            maxOutputChars: device.maxOutputChars,
+            logger,
+          }).catch((error: unknown) => {
+            logger.log("error", `device_req on ${id} failed: ${messageOf(error)}`);
+          });
+          return;
+        }
+
         options.onFrame?.(peer, frame);
       } catch (error) {
         // A throwing consumer must not take the socket handler down with it.

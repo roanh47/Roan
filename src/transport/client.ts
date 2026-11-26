@@ -3,6 +3,7 @@ import { frameChainMismatch } from "./parse.js";
 import { createBackoff, type BackoffOptions } from "./backoff.js";
 import { BoundedFrameQueue } from "./frame-queue.js";
 import { PeerSession } from "./client-session.js";
+import type { DeviceControlOptions } from "./server.js";
 import { TransportError } from "./errors.js";
 import { nullLogger, type Logger } from "./logger.js";
 
@@ -37,6 +38,8 @@ export interface PeerClientOptions {
   backoff?: BackoffOptions;
   /** Consecutive failed attempts before giving up. Default: retry forever. */
   maxAttempts?: number;
+  /** Answer `device_req` frames from this peer. Absent means device control is off. */
+  device?: DeviceControlOptions;
 }
 
 function toEndpoint(raw: string): string {
@@ -76,6 +79,7 @@ export class PeerClient {
   private readonly maxBufferedBytes: number;
   private readonly maxEventsPerFrame: number;
   private readonly maxAttempts: number;
+  private readonly device?: DeviceControlOptions;
   private readonly haveSeq: () => number;
   private readonly backoff: ReturnType<typeof createBackoff>;
   private readonly queue: BoundedFrameQueue<Frame>;
@@ -110,6 +114,7 @@ export class PeerClient {
     this.maxBufferedBytes = options.maxBufferedBytes ?? DEFAULT_MAX_BUFFERED_BYTES;
     this.maxEventsPerFrame = options.maxEventsPerFrame ?? DEFAULT_MAX_EVENTS_PER_FRAME;
     this.maxAttempts = options.maxAttempts ?? Number.POSITIVE_INFINITY;
+    if (options.device !== undefined) this.device = options.device;
     this.haveSeq = options.haveSeq ?? (() => 0);
     this.backoff = createBackoff(options.backoff);
 
@@ -180,6 +185,7 @@ export class PeerClient {
             handshakeTimeoutMs: this.handshakeTimeoutMs,
             maxPayloadBytes: this.maxPayloadBytes,
             maxBufferedBytes: this.maxBufferedBytes,
+            ...(this.device !== undefined ? { device: this.device } : {}),
             maxEventsPerFrame: this.maxEventsPerFrame,
             onFrame: (frame) => this.onFrame(frame),
           });

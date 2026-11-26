@@ -21,7 +21,7 @@ Owner of this file: the orchestrator (not the children).
 | 12 | Import | pending | — | 0 |
 | 13 | Steer mid-turn | done | inbox + alternation guard + turn-runner hook; frame, client.steer and composer Steer button wired | 1 |
 | 14 | Deep research | done | bounded plan→search→extract→report with citation guard, 39 tests; tool not registered yet (open) | 1 |
-| 15 | Device control | blocked | module + 16 tests ready; protocol wiring (device_req frame, transport handlers, device_grant/device_result event types) deferred | 1 |
+| 15 | Device control | done | module + 16 tests, `device_req` frame + validation + codec, `device_grant`/`device_result` in all five registries, grant-gated receiver in both transports (35 tests), daemon passes `device: {store}` on both links | 2 |
 | 16 | Zijvragen en queueing | done | queue + side-session ids + QueueBar component; daemon queueing not wired (open) | 1 |
 | 17 | Delen en exporteren | done | self-contained escaped HTML export + markdown header; export frame still writes markdown only (open) | 1 |
 | 18 | Archief en tijdelijke chats | done | append-only tombstones, `.all` lookups, archive/delete frames, SessionRow component | 1 |

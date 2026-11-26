@@ -1,4 +1,5 @@
 import { PROTOCOL_VERSION, type Event, type Frame, type ParseOptions, type ParseResult } from "./protocol.js";
+import { frameFor, parseRequest } from "../sync/device-control.js";
 
 const MAX_TEXT = 512;
 const DEFAULT_MAX_EVENTS = 1_000;
@@ -108,6 +109,14 @@ export function parseFrame(raw: string, options: ParseOptions = {}): ParseResult
       }
       return { ok: true, frame: { t: "tool_res", call, ok, output } };
     }
+    case "device_req": {
+      // The allowlist decides here, not the sender: a frame that names an
+      // unknown command, carries a metacharacter or ships its own argv is a
+      // bad frame, not a request the receiver may look at.
+      const request = parseRequest(value);
+      if (!request.ok) return { ok: false, reason: request.reason };
+      return { ok: true, frame: frameFor(request.request, request.chain) };
+    }
     default:
       return { ok: false, reason: `unknown frame type "${kind.slice(0, 32)}"` };
   }
@@ -159,7 +168,9 @@ export function eventsBelongTo(events: readonly Event[], chain: string): boolean
 
 /**
  * Human-readable chain mismatch for a frame, or null when it is consistent.
- * Frames without a chain (tool_req, tool_res, hello) always pass.
+ * Frames without a chain (tool_req, tool_res, hello) always pass. A
+ * `device_req` names a chain as well, but a wrong one is answered with a
+ * refused `device_result` rather than a closed link.
  */
 export function frameChainMismatch(frame: Frame, chain: string): string | null {
   if (frame.t === "append") {

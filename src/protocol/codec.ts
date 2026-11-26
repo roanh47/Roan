@@ -21,8 +21,8 @@ function messageOf(error: unknown): string {
 
 /**
  * The one version gate. Frames that carry events borrow the event version;
- * `tool_req` and `tool_res` carry no version of their own and are only valid
- * inside a session that already agreed on one.
+ * `tool_req`, `tool_res` and `device_req` carry no version of their own and are
+ * only valid inside a session that already agreed on one.
  */
 function assertFrameVersion(frame: TransportFrame): void {
   switch (frame.t) {
@@ -39,6 +39,7 @@ function assertFrameVersion(frame: TransportFrame): void {
       return;
     case "tool_req":
     case "tool_res":
+    case "device_req":
       return;
     default:
       return assertNever(frame, "frame.t");
