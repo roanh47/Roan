@@ -33,6 +33,22 @@ komt hier per versie terug.
       het OS kan niet zien dat twee releases van dezelfde maker zijn. Vraagt een
       code-signing-certificaat (Windows) en een Apple Developer ID (macOS).
 
+## 0.0.29
+
+- [ ] **Gedachten zichtbaar en uitklapbaar.** De dock zegt nu alleen dát hij
+      denkt. De redenering zelf moet opgevangen worden (de reasoning-delta's van
+      de provider, niet de zichtbare tekst), als apart `reasoning`-deel in de
+      beurt bewaard worden en in het transcript als inklapbaar "Thought"-blok
+      verschijnen — dichtgeklapt by default, open te klikken, en nooit
+      meegestuurd als gewoon antwoord. Ook voor providers die het níet leveren:
+      dan is er geen blok, geen leeg blok.
+- [ ] **Libnode niet twee keer initialiseren.** De log van de telefoon toont
+      `Assertion failed: !init_called.exchange(true)` en
+      `pthread_mutex_lock called on a destroyed mutex`: de Node-runtime start
+      twee keer in hetzelfde proces en de app stort dan af. De service moet of
+      één keer starten, of het hele proces herstarten — nooit een tweede
+      runtime in hetzelfde proces.
+
 ## 0.0.28 (doorgeschoven)
 
 - [ ] **Libnode per ABI meebundelen** (of per-ABI splitsen): de universele apk heeft

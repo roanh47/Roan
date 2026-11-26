@@ -84,7 +84,7 @@ These exist in mainstream agents and are **deliberately out**:
 | Copy whole message | GPT, CL, OC | ✅ copy chip under every answer (`CopyChip` in `Transcript.tsx`) | done |
 | Edit your sent message → branch from there | GPT, CL | ❌ (chain is append-only) | **SOON** — implement as a checkpoint + branch, never a mutation |
 | Regenerate answer | GPT, CL, CC | ✅ `regenerate` frame: a checkpoint marks the seam, the same question is asked again, the new answer lands below | done |
-| Thinking / reasoning visibility ("Thinking…", expandable reasoning) | GPT, CL, CC, GC | ✅ the dock opens at `turn_start` (the lock's events are broadcast now) with the phase, and a stuck report after 2 min of silence | done |
+| Thinking / reasoning visibility ("Thinking…", expandable reasoning) | GPT, CL, CC, GC | the dock opens at `turn_start` (phase, stuck report after 2 min) ✅, but the **reasoning text itself is never captured**: nothing reads a provider's reasoning deltas and no `reasoning` event exists, so there is nothing to expand | **BUILD** — capture deltas into a `reasoning` part and show it as a collapsible "Thought" block |
 | Tool traces kept out of the conversation (silent context fetching) | GPT, CL | ✅ ≥3 internal steps collapse into one "internal steps N" pill | done |
 | Message actions row (copy / regenerate / share) | GPT, CL | ✅ copy + regenerate on the answer; no share | done (share below) |
 | Read aloud (TTS) | GPT, CL | module only — `src/voice/tts.ts` with a provider contract and tests; nothing plays it | SOON |
