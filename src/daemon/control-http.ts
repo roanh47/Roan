@@ -48,8 +48,21 @@ const CONTENT_TYPES: Readonly<Record<string, string>> = {
  * `dist/daemon/control-http.js` are both two levels below it, so the same
  * relative walk works in dev (`tsx`) and in the build.
  */
+/** Where `web/dist` sits relative to the running file; never throws. */
+export function webDistFrom(base: string | URL): string {
+  try {
+    return fileURLToPath(new URL("../../web/dist", base));
+  } catch {
+    return resolve(process.cwd(), "web/dist");
+  }
+}
+
 export function defaultWebDist(): string {
-  return fileURLToPath(new URL("../../web/dist", import.meta.url));
+  // The Android build runs this file as one bundled asset, where `import.meta.url`
+  // is not a file URL at all. Resolving it there threw "Invalid URL" and killed the
+  // daemon before it listened, so the phone showed "waiting for the daemon".
+  // A missing dist is not fatal: the server answers an honest page instead.
+  return webDistFrom(import.meta.url);
 }
 
 /**

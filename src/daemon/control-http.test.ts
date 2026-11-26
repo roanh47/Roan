@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { startControlServer } from "./control.js";
-import { isLoopbackAddress } from "./control-http.js";
+import { isLoopbackAddress, webDistFrom } from "./control-http.js";
 
 const INDEX = "<!doctype html><title>roan</title><div id=app>shell</div>";
 const APP_JS = "console.log('roan-asset');";
@@ -151,4 +151,17 @@ test("dotfiles are never served", async () => {
     await control.close();
     await cleanup();
   }
+});
+
+test("the bundled Android build has no file URL, and that must not be fatal", () => {
+  // In the APK this module is one asset file: `import.meta.url` is not a file
+  // URL, and resolving it threw "Invalid URL" before the daemon ever listened.
+  const resolved = webDistFrom("android-asset:roan-daemon.js");
+  assert.ok(resolved.endsWith("web/dist"), resolved);
+  assert.ok(!resolved.includes("android-asset:"), resolved);
+});
+
+test("a real file URL still points next to the module", () => {
+  const resolved = webDistFrom(new URL("file:///opt/roan/dist/daemon/control-http.js"));
+  assert.equal(resolved, "/opt/roan/web/dist");
 });
