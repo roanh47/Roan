@@ -192,6 +192,26 @@ Checklist before the first signed APK:
 - [ ] Install the signed APK on a device that has the debug build installed: Android refuses the swap unless the signing key matches, so the old app has to be uninstalled first.
 - [ ] Verify with `apksigner verify --print-certs Roan-<version>.apk`.
 
+### The Android signing key is permanent
+
+Every published APK must carry the certificate in `signing/android-cert-sha256.txt`
+(SHA-256 of the signing certificate). Android refuses to install a version whose key
+differs, so rotating this key ends the update path for everyone who already has the app:
+they would have to uninstall and lose their local chain data.
+
+CI re-signs the Gradle output with that key (`ANDROID_KEYSTORE_BASE64`,
+`ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`) and fails the
+job when the certificate does not match the pinned value. The keystore itself lives
+outside the repository, at `~/.roan/signing/roan-release.jks` on the machine that made
+it; back it up, never regenerate it.
+
+The same rule applies to the desktop updater key (`TAURI_SIGNING_PRIVATE_KEY`): replacing
+it invalidates updates for every installed desktop build.
+
+`0.0.23` was published before this rule existed and was debug-signed per CI run, so it
+cannot update itself and cannot be updated to. `0.0.24` is the first release with the
+permanent key; from there on updates install in place.
+
 ## Windows: SmartScreen and code signing
 
 Today the NSIS installer is unsigned. SmartScreen shows "Windows protected your

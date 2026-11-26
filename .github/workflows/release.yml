@@ -13,7 +13,7 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   NODE_VERSION: "22"
-  APP_VERSION: "0.0.23"
+  APP_VERSION: "0.0.24"
 
 concurrency:
   group: release-${{ github.ref }}
@@ -239,13 +239,19 @@ jobs:
           retention-days: 7
 
   # ---------------------------------------------------------------- Android --
-  # Debug-signed universal APK: installable on a real phone, no keystore secrets.
+  # One fixed signing key, forever: an APK signed with another key cannot install
+  # over the previous release, so every build is re-signed here and checked
+  # against signing/android-cert-sha256.txt before it is published.
   android:
     name: Android (.apk)
     runs-on: ubuntu-22.04
     env:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -328,14 +334,25 @@ jobs:
       - name: Build debug APK
         run: npx --yes @tauri-apps/cli@^2 android build --apk --debug --ci
 
-      - name: Collect exactly one artifact
+      - name: Sign the APK with the release key and prove it
         run: |
           set -euo pipefail
-          mkdir -p out
+          test -n "${ANDROID_KEYSTORE_BASE64:-}" || { echo "::error::ANDROID_KEYSTORE_BASE64 is not set"; exit 1; }
+          mkdir -p out "$RUNNER_TEMP/signing"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/signing/release.jks"
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          BT="$(ls -d "$SDK"/build-tools/* | sort -V | tail -n 1)"
           apk="$(find src-tauri/gen/android/app/build/outputs/apk -name '*.apk' | grep -i debug | head -n 1 || true)"
           if [ -z "$apk" ]; then apk="$(find src-tauri/gen/android/app/build/outputs/apk -name '*.apk' | head -n 1)"; fi
           test -n "$apk" || { echo "::error::Gradle produced no .apk"; exit 1; }
-          cp "$apk" "out/Roan-${APP_VERSION}.apk"
+          "$BT/zipalign" -f -p 4 "$apk" "$RUNNER_TEMP/signing/aligned.apk"
+          "$BT/apksigner" sign             --ks "$RUNNER_TEMP/signing/release.jks"             --ks-key-alias "$ANDROID_KEY_ALIAS"             --ks-pass "pass:$ANDROID_KEYSTORE_PASSWORD"             --key-pass "pass:$ANDROID_KEY_PASSWORD"             --out "out/Roan-${APP_VERSION}.apk"             "$RUNNER_TEMP/signing/aligned.apk"
+          "$BT/apksigner" verify "out/Roan-${APP_VERSION}.apk"
+          got="$("$BT/apksigner" verify --print-certs "out/Roan-${APP_VERSION}.apk" | grep -i 'SHA-256 digest' | head -n 1 | awk '{print $NF}' | tr 'A-F' 'a-f')"
+          want="$(grep -v '^#' signing/android-cert-sha256.txt | tr -d '[:space:]')"
+          echo "apk signing cert: $got"
+          echo "pinned cert:      $want"
+          test "$got" = "$want" || { echo "::error::the APK is signed with a different key than signing/android-cert-sha256.txt; it would not install over the previous release"; exit 1; }
           rm -rf src-tauri/gen/android/app/build/outputs
           ls -l out
 

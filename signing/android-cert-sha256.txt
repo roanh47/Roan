@@ -1,0 +1,4 @@
+# The one key every Android release is signed with (SHA-256 of the signing certificate).
+# Never rotate it: an APK signed with a different key cannot install over this one.
+# CI verifies the built APK against this value and fails when it does not match.
+d3bc87582fc58a713573c81d792b0de37977e4bbc4f7c7b67395e275730447e8
