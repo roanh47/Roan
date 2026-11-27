@@ -61,6 +61,32 @@ De volledige vergelijking met Hermes staat met vinkjes in
 - [ ] **Update-feed als losse release** — bekijken of `latest.json` iets toevoegt.
 - [ ] **MSIX/Store-kanaal** naast de MSI, met de updater uit in die build.
 
+## Nog niet gebouwd (vergeleken met Hermes, Claude Code, Grok, Codex)
+
+Deze staan nog in geen enkele sectie omdat ze groter zijn dan een punt:
+
+- [ ] **Kanalen** — Telegram, Discord, Slack, Signal, WhatsApp, mail. Hermes is
+      hier omheen gebouwd; Roan heeft er nul. Dit is de grootste leemte.
+- [ ] **Terminal-surface** — een echte TUI naast de app (Claude Code's
+      thuisbasis), zodat de agent ook in een shell te bedienen is.
+- [ ] **IDE-koppeling** — VS Code/JetBrains-extensie die dezelfde daemon gebruikt.
+- [ ] **Plugin-catalogus** — een marktplaats met manifesten, versies en
+      installatie uit de app (Hermes' marketplace; wij hebben alleen de loader).
+- [ ] **Meerdere profielen** — geïsoleerde homes naast elkaar in één installatie.
+- [ ] **Geheugen-curator** — een achtergrondproces dat memory en skills opruimt,
+      consolideert en verouderde feiten voorstelt te verwijderen.
+- [ ] **Prompt-caching en compressie als beleid** — naast `compactMessages` ook
+      cache-bewuste prefixen per provider.
+- [ ] **Live databronnen** — X/Twitter, nieuws, beurs; Grok leeft daarvan, wij
+      hebben alleen web_search en web_fetch.
+- [ ] **Cloud-sandbox en PR-flow** — een run in een wegwerp-container die een
+      branch + pull request oplevert (Codex/Claude Code).
+- [ ] **Worktree-isolatie** — elke taak in een eigen git-worktree.
+- [ ] **Push-notificaties** bij een achtergrondtaak of klaar-zijnde beurt.
+- [ ] **Kosten-totaal per sessie en per maand**, niet alleen per beurt.
+- [ ] **Bestandsbijlagen groter dan 8 MB** — nu reist dat niet mee.
+- [ ] **Semantisch zoeken over de keten** (embeddings), niet alleen substring.
+
 ## Afgerond
 
 - **0.0.31** — de shell overschrijft de daemon-defaults niet meer.
