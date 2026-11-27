@@ -40,7 +40,7 @@ producers write and consumers read. Only `message`, `assistant` and
 | `tool_result` | `{ name: string, ok: boolean, output: string }` | `output` may be empty. |
 | `error` | `{ message: string }` | Provider, tool or lock failure. |
 | `turn_start` | `{ ttlMs: number }` | Opens a turn owned by `event.node`. |
-| `turn_end` | `{ reason: "released" }` | Only the owner may close; `released` is the only value written. |
+| `turn_end` | `{ reason, usage? }` | Only the owner may close; `reason` is one of `completed`, `budget`, `interrupted`, `watchdog`, `empty`, `overflow`, `released`. |
 | `env` | — | Declared and accepted, but nothing in `src/` writes one yet. |
 
 ## Frames

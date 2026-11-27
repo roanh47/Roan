@@ -38,9 +38,18 @@ export interface Tool {
  *  - `budget`      the step budget ran out (the last request was the grace call);
  *  - `interrupted` the owner aborted the turn;
  *  - `watchdog`    the provider went silent past the stall deadline;
+ *  - `empty`       the model answered with nothing twice, even after being told;
+ *  - `overflow`    the conversation did not fit the window and could not shrink;
  *  - `released`    a turn that never reached the loop (the engine path).
  */
-export type TurnEndReason = "completed" | "budget" | "interrupted" | "watchdog" | "released";
+export type TurnEndReason =
+  | "completed"
+  | "budget"
+  | "interrupted"
+  | "watchdog"
+  | "empty"
+  | "overflow"
+  | "released";
 
 export type AgentEvent =
   | { type: "assistant_text"; text: string }

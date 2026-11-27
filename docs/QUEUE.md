@@ -16,12 +16,13 @@ afbreekt, een test met een provider die alleen tools teruggeeft op het budget st
 en `turn_end` in beide gevallen een `reason` heeft.
 **Bewijs:** `src/agent.ts` (poort, `TurnEndReason`, `TurnStallError`), `src/turn/lock.ts` (`ReleaseOptions.reason`), `src/daemon/turn-runner.ts` (reden naar `turn_end`); tests in `src/daemon/turn-gates.test.ts`: “a provider that only calls tools stops on the budget, after exactly one grace call”, “a provider that goes silent is aborted by the watchdog, with a reason”, “an interrupted turn sends no request and ends with reason interrupted”. Gates: tsc 0, build 0, dist 1568/1568, tsx 116/116, web tsc 0 + vitest 156/156.
 
-## Q2 — Leeg antwoord en overflow als eigen faalvormen
+## Q2 — Leeg antwoord en overflow als eigen faalvormen ✅
 Bron: §1 · `agent/turn_empty_response.py`, `agent/turn_overflow.py`
 Vol venster → eerst comprimeren en opnieuw. Leeg antwoord → één herstelpoging met
 expliciete instructie, daarna een eerlijke fout.
 **Klaar als:** een te grote history comprimeert en doorgaat; een leeg antwoord
 precies één herhaal-call doet.
+**Bewijs:** `src/context/overflow.ts` (`isContextOverflow`, `compressForOverflow`), `src/agent.ts` (`EMPTY_RETRY_PROMPT`, één compressie- en één leeg-retry per beurt, `reason` `empty`/`overflow`), `src/types.ts` (`TurnEndReason`), `docs/protocol.md`; tests in `src/daemon/turn-recovery.test.ts`: “a history too large for the window is compressed and the turn continues”, “an empty answer gets exactly one explicit retry, then an honest error”, “a window rejection that cannot shrink ends the turn instead of looping”. Gates: tsc 0, build 0, dist 1571/1571, tsx 116/116, web tsc 0 + vitest 156/156.
 
 ## Q3 — Compressie in twee lagen met een aux-model
 Bron: §2 · `agent/compression_facade.py`, `conversation_compression.py`

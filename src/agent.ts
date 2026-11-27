@@ -5,6 +5,7 @@ import type { ChatAdapter } from "./providers/adapter.js";
 import type { EffortLevel } from "./providers/effort.js";
 import { sessionTotal, type TokenUsage } from "./usage.js";
 import { toToolSpecs } from "./tools.js";
+import { compressForOverflow, isContextOverflow } from "./context/overflow.js";
 import type {
   AgentEvent,
   ChatMessage,
@@ -16,6 +17,14 @@ import type {
 
 /** How long a provider may stay silent before the turn is considered dead. */
 export const DEFAULT_STALL_TIMEOUT_MS = 120_000;
+
+/**
+ * Sent once when the model answered with nothing. It names the failure instead
+ * of hinting at it: a model that returned no text after a tool round tends to
+ * repeat the silence unless the next request says what was missing.
+ */
+export const EMPTY_RETRY_PROMPT =
+  "Your previous reply was empty. Answer now in text: no tool call, and no empty message.";
 
 /**
  * The provider produced nothing for longer than the stall deadline. Not a
@@ -242,6 +251,10 @@ export class Agent {
     // model has one chance to say in words what it was doing. It is one call,
     // never another round — `grace` bounds the loop to a single retry.
     let grace = false;
+    // Both recoveries happen at most once per turn: a provider that keeps
+    // rejecting or keeps answering with nothing must end the turn, not spin.
+    let overflowRetried = false;
+    let emptyRetried = false;
 
     for (;;) {
       // The interrupt gate. Checked before every request, so a turn the owner
@@ -280,6 +293,24 @@ export class Agent {
           reason = "interrupted";
           break;
         }
+        // A window rejection is about the transcript, not the provider: shrink
+        // what every request re-sends and ask once more. When nothing can
+        // shrink, resending would fail identically — say so and stop.
+        if (isContextOverflow(err)) {
+          const shrunk = overflowRetried ? null : compressForOverflow(this.messages);
+          if (shrunk !== null) {
+            this.messages = shrunk;
+            overflowRetried = true;
+            continue;
+          }
+          const detail = err instanceof Error ? err.message : String(err);
+          emit({
+            type: "error",
+            message: `the conversation does not fit the model's window and cannot be shrunk further: ${detail}`,
+          });
+          reason = "overflow";
+          break;
+        }
         const message = err instanceof Error ? err.message : String(err);
         emit({ type: "error", message });
         if (err instanceof TurnStallError) {
@@ -290,6 +321,24 @@ export class Agent {
       }
 
       const calls = antwoord.tool_calls ?? [];
+      const text = typeof antwoord.content === "string" ? antwoord.content.trim() : "";
+      if (calls.length === 0 && text.length === 0) {
+        // No text and no tool call is a failure, not an answer. The empty turn
+        // stays in the transcript so the roles still alternate, then the model
+        // gets exactly one request that names what was missing.
+        this.messages.push({ role: "assistant", content: "" });
+        if (!emptyRetried) {
+          emptyRetried = true;
+          this.messages.push({ role: "user", content: EMPTY_RETRY_PROMPT });
+          continue;
+        }
+        emit({
+          type: "error",
+          message: "the model returned an empty answer twice — there is nothing to show",
+        });
+        reason = "empty";
+        break;
+      }
       if (calls.length === 0) {
         this.messages.push(antwoord);
         if (typeof antwoord.content === "string" && antwoord.content.length > 0) {
