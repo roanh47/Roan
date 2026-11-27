@@ -33,6 +33,22 @@ komt hier per versie terug.
       het OS kan niet zien dat twee releases van dezelfde maker zijn. Vraagt een
       code-signing-certificaat (Windows) en een Apple Developer ID (macOS).
 
+## 0.0.32
+
+- [ ] **Eén build, één waarheid.** Elke build is dezelfde app: een frontend die
+      met de daemon **op dat apparaat** praat, op **dezelfde poort**, met dezelfde
+      env-variabelen. Geen enkele shell (Android-Kotlin, Tauri-sidecar,
+      systemd-unit) zet host, poort of de control-gate — die defaults zijn van de
+      daemon en gelden overal gelijk.
+      Klaar als: op Linux, Windows, macOS en Android de app op `localhost:6769`
+      verbindt zonder platform-specifieke waarden, `grep` in `src-tauri/`,
+      `scripts/` en de unit-files geen host/poort-override meer vindt, en de
+      gegenereerde `gen/android/.../RoanNode.kt` aantoonbaar uit de bron komt
+      (geen oude kopie in de boom).
+- [ ] **De app zegt het als de daemon er niet is.** Geen stilte: bij een
+      onbereikbare daemon krijgt de beurt een fout-event met de reden, en de
+      banner toont dezelfde reden.
+
 ## 0.0.29
 
 - [ ] **Gedachten zichtbaar en uitklapbaar.** De dock zegt nu alleen dát hij
