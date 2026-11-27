@@ -80,9 +80,14 @@ object RoanNode {
     // phone and no way to spawn one.
     setEnvironment("ROAN_ENGINE", "builtin")
     // The app talks to the daemon over loopback; peers reach it on the tailnet.
-    // One port carries the UI, control and peers; the app dials it on loopback.
-    setEnvironment("ROAN_CONTROL_HOST", "127.0.0.1")
+    // One port carries the UI, control and peers, and it must be reachable from
+    // this device (loopback) AND from the other devices on the tailnet — a
+    // loopback-only bind made every invite point at an address nobody listened on.
+    setEnvironment("ROAN_CONTROL_HOST", "0.0.0.0")
     setEnvironment("ROAN_CONTROL_PORT", "6769")
+    // The app is on this machine, so remote control stays closed for everyone
+    // else; peers still prove themselves with the chain token on /peer.
+    setEnvironment("ROAN_ALLOW_REMOTE_CONTROL", "1")
     // The daemon must never call exit() here: a hard exit from the node
     // thread runs static destructors mid-flight and kills the app with a
     // SIGABRT. This flag makes it close its servers, drain the loop and

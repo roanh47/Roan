@@ -9,7 +9,7 @@
 
 export const APP_NAME = "Roan";
 
-export const VERSION = "0.0.29";
+export const VERSION = "0.0.30";
 
 export type SemverOrdering = -1 | 0 | 1;
 
