@@ -97,10 +97,11 @@ rm -rf "$RES/mipmap-anydpi-v26" "$RES"/mipmap-anydpi
 find "$RES" -name 'ic_launcher_foreground.png' -delete
 echo "== launcher icons -> res ($(ls -d "$RES"/mipmap-* 2>/dev/null | wc -l) buckets, adaptive removed)"
 
-if [ ! -f "$ROOT/dist/daemon/main.js" ]; then
-  # A CI job that never ran tsc still needs the bundle; build it here rather
-  # than failing, so the script is the one thing a job has to call.
-  echo "== dist/ ontbreekt, eerst bouwen"
+# A missing dist is not the only stale case: a dist older than src/ ships the
+# previous build inside the apk, which is how a fix looks "not applied" on a
+# device while the code is right there. Rebuild whenever src is newer.
+if [ ! -f "$ROOT/dist/daemon/main.js" ] || [ -n "$(find "$ROOT/src" -newer "$ROOT/dist/daemon/main.js" -name '*.ts' -print -quit)" ]; then
+  echo "== dist/ ontbreekt of is ouder dan src, eerst bouwen"
   (cd "$ROOT" && npm run build >/dev/null) || { echo "npm run build failed" >&2; exit 1; }
 fi
 node "$ROOT/scripts/bundle-daemon.mjs" "$APP/src/main/assets/roan-daemon.js"
