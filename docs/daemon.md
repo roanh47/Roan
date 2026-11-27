@@ -64,7 +64,14 @@ webui proxy process, no log server, no second peer port.
 | variable | default | meaning |
 | --- | --- | --- |
 | `ROAN_PORT` | `6769` | the one port (alias: `ROAN_CONTROL_PORT`) |
-| `ROAN_HOST` | `127.0.0.1` | bind address (alias: `ROAN_CONTROL_HOST`); `lan`/`tailscale` resolve to an interface |
+
+The shell never sets the port or the host. `RoanNode.kt` (Android), the Tauri
+sidecar (desktop) and the systemd unit (server) pass only what they alone know:
+`ROAN_HOME`, `ROAN_LOG_PATH`, `ROAN_ENGINE`, `ROAN_SHELL`. Port, bind address and
+the control gate are the daemon's defaults, identical on every platform —
+overriding them per platform is how the phone ended up listening on loopback
+while its own invite named the tailnet address.
+| `ROAN_HOST` | `0.0.0.0` | bind address — every interface, so loopback and the tailnet both work (alias: `ROAN_CONTROL_HOST`); `lan`/`tailscale` resolve to an interface |
 | `ROAN_WEB_DIST` | `web/dist` next to the package root | where the built UI lives |
 | `ROAN_ALLOW_REMOTE_CONTROL` | unset | `1` lets a non-loopback caller open `/ws` |
 | `ROAN_PEER_ADVERTISE` | unset | comma-separated hosts to put in the invite instead of the derived ones |
