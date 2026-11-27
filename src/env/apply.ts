@@ -38,6 +38,35 @@ export interface ApplyOptions {
   now?: Date;
 }
 
+/**
+ * Keep this device's own provider key when an incoming config has none.
+ * The chain carries settings; the key belongs to the machine, so an apply that
+ * arrives without one is not an instruction to delete the local secret.
+ */
+async function preserveLocalSecret(entry: EnvEntry, home: string): Promise<EnvEntry> {
+  if (entry.kind !== "file" || entry.path !== "config.json" || typeof entry.content !== "string") return entry;
+  let incoming: Record<string, unknown>;
+  try {
+    incoming = JSON.parse(entry.content) as Record<string, unknown>;
+  } catch {
+    return entry;
+  }
+  if (typeof incoming["apiKey"] === "string" && incoming["apiKey"].length > 0) return entry;
+  let local: Record<string, unknown>;
+  try {
+    local = JSON.parse(await fs.readFile(path.join(home, "config.json"), "utf8")) as Record<string, unknown>;
+  } catch {
+    return entry;
+  }
+  const key = local["apiKey"];
+  if (typeof key !== "string" || key.length === 0) return entry;
+  const merged = { ...incoming, apiKey: key };
+  const text = `${JSON.stringify(merged, null, 2)}\n`;
+  const bytes = Buffer.from(text, "utf8");
+  const { createHash } = await import("node:crypto");
+  return { ...entry, content: text, size: bytes.byteLength, sha256: createHash("sha256").update(bytes).digest("hex") };
+}
+
 async function writeEntry(home: string, entry: EnvEntry): Promise<void> {
   const target = absoluteEnvPath(home, entry.path);
   if (entry.kind === "dir") {
@@ -81,8 +110,16 @@ export async function applyEnvSnapshot(
 
   // A peer that predates the secret redaction still ships the provider key in
   // config.json. Drop it here, so both the write and the read-back agree.
-  const safeEntries = parsed.entries.map((entry) => sanitizeEnvEntry(entry));
-  const expectedHash = hashEnvEntries(safeEntries);
+  const sanitized = parsed.entries.map((entry) => sanitizeEnvEntry(entry));
+  // Secrets are per device: the chain carries settings, never keys. An incoming
+  // config that has no key must not erase the one this device already has —
+  // that is what silently left every node without credentials.
+  const safeEntries: EnvEntry[] = [];
+  for (const entry of sanitized) {
+    safeEntries.push(await preserveLocalSecret(entry, home));
+  }
+  // The read-back collects with the same redaction, so compare like with like.
+  const expectedHash = hashEnvEntries(safeEntries.map((entry) => sanitizeEnvEntry(entry)));
 
   const localByPath = new Map(local.map((entry) => [entry.path, entry] as const));
   const targetPaths = new Set(parsed.entries.map((entry) => entry.path));
