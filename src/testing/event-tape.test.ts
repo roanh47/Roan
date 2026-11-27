@@ -8,7 +8,7 @@ const TAPE_SAMPLE: AgentEvent[] = [
   { type: "tool_start", name: "read_file", args: '{"path":"src/types.ts"}' },
   { type: "tool_end", name: "read_file", ok: true, output: "export type Role" },
   { type: "error", message: "tool timed out" },
-  { type: "turn_end", steps: 3 },
+  { type: "turn_end", steps: 3, reason: "completed" },
 ];
 
 describe("recordTape", () => {

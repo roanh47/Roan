@@ -3,7 +3,7 @@ import { Agent } from "../agent.js";
 import type { EventStore } from "../chain/store.js";
 import type { Event } from "../protocol/types.js";
 import { allTools } from "../tools.js";
-import type { ChatMessage as AgentMessage, Tool } from "../types.js";
+import type { ChatMessage as AgentMessage, Tool, TurnEndReason } from "../types.js";
 import { acquire, release, SeqConflictError, type SteerInbox } from "../turn/index.js";
 import type { Event as TurnEvent, TurnEventDraft, TurnStore } from "../turn/types.js";
 import { historyFromEvents } from "./history.js";
@@ -58,6 +58,10 @@ export interface TurnRunnerOptions {
   readonly onAppend: (event: Event) => void;
   /** Aborts the turn; set by the cancel request the app sends. */
   readonly signal?: AbortSignal;
+  /** The loop's step budget; omitted means the loop's own default. */
+  readonly maxSteps?: number;
+  /** How long the provider may stay silent before the turn is aborted. */
+  readonly stallTimeoutMs?: number;
 }
 
 /**
@@ -139,6 +143,13 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
     });
   };
 
+  // Why the loop stopped. The lock writes it into `turn_end`, so a turn that
+  // ends is readable as *how* it ended; the engine path never reaches the
+  // loop and keeps the lock's own word, `released`. A record, not a `let`:
+  // the loop sets it from its event callback, where a plain local would be
+  // narrowed away by the compiler.
+  const outcome: { reason: TurnEndReason } = { reason: "released" };
+
   const lock = await acquire(turns, chain, node);
   if (lock.state === "busy") {
     append({ type: "error", data: { message: `${lock.owner} is already working on this chain` } });
@@ -219,6 +230,8 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
       systemPrompt: guidedPrompt,
       cwd: options.cwd,
       history: compacted.recent as typeof history,
+      ...(options.maxSteps !== undefined ? { maxSteps: options.maxSteps } : {}),
+      ...(options.stallTimeoutMs !== undefined ? { stallTimeoutMs: options.stallTimeoutMs } : {}),
       ...(options.effort !== undefined ? { effort: options.effort } : {}),
       ...(refused.size > 0 ? { refusedTools: refused } : {}),
       ...(options.signal !== undefined ? { signal: options.signal } : {}),
@@ -255,6 +268,9 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
             failed = true;
             append({ type: "error", data: { message: event.message } });
             break;
+          case "turn_end":
+            outcome.reason = event.reason;
+            break;
           default:
             break;
         }
@@ -268,11 +284,15 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
       // model were still billed.
       measured.current = agent.usage;
     }
-    if (answer.trim()) append({ type: "assistant", data: { text: answer } });
+    // A turn the owner stopped says so, and says nothing else: the loop
+    // already dropped whatever it was about to answer.
+    if (outcome.reason === "interrupted") append({ type: "error", data: { message: "stopped by you" } });
+    else if (answer.trim()) append({ type: "assistant", data: { text: answer } });
     else if (!failed) append({ type: "error", data: { message: "the turn ended without an answer" } });
   } catch (err) {
     // A cancelled turn is not a failure: the user stopped it on purpose.
     if (options.signal?.aborted === true) {
+      outcome.reason = "interrupted";
       append({ type: "error", data: { message: "stopped by you" } });
       return;
     }
@@ -280,7 +300,7 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
     append({ type: "error", data: { message } });
   } finally {
     try {
-      await release(turns, chain, node);
+      await release(turns, chain, node, { reason: outcome.reason });
     } catch {
       // the turn already ended or was reclaimed; the chain is still consistent
     }

@@ -67,6 +67,12 @@ export interface ReleaseOptions {
   readonly now?: number;
   readonly tailSize?: number;
   readonly logger?: TurnLogger;
+  /**
+   * Why the turn closed, written into `turn_end`. A caller that knows the
+   * loop stopped for a reason (budget, watchdog, the owner's stop) says so
+   * here; `released` is the answer only when nothing more specific is known.
+   */
+  readonly reason?: string;
 }
 
 interface OpenTurn {
@@ -275,7 +281,7 @@ export async function release(
   const draft: TurnEventDraft = {
     node,
     type: "turn_end",
-    data: { reason: "released" },
+    data: { reason: options.reason ?? "released" },
   };
   const event = await store.append(chain, nextSeq(tail), draft);
   log(options.logger, "debug", "turn released", { chain, node, seq: event.seq });

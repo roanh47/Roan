@@ -31,9 +31,20 @@ export interface Tool {
   run(args: Record<string, unknown>, ctx: ToolContext): Promise<string>;
 }
 
+/**
+ * Why a turn's loop stopped. Every exit names one of these, so a `turn_end`
+ * never has to be read as "it just ended":
+ *  - `completed`   the model answered without asking for more tools;
+ *  - `budget`      the step budget ran out (the last request was the grace call);
+ *  - `interrupted` the owner aborted the turn;
+ *  - `watchdog`    the provider went silent past the stall deadline;
+ *  - `released`    a turn that never reached the loop (the engine path).
+ */
+export type TurnEndReason = "completed" | "budget" | "interrupted" | "watchdog" | "released";
+
 export type AgentEvent =
   | { type: "assistant_text"; text: string }
   | { type: "tool_start"; name: string; args: string }
   | { type: "tool_end"; name: string; ok: boolean; output: string }
   | { type: "error"; message: string }
-  | { type: "turn_end"; steps: number };
+  | { type: "turn_end"; steps: number; reason: TurnEndReason };

@@ -5,7 +5,29 @@ import type { ChatAdapter } from "./providers/adapter.js";
 import type { EffortLevel } from "./providers/effort.js";
 import { sessionTotal, type TokenUsage } from "./usage.js";
 import { toToolSpecs } from "./tools.js";
-import type { AgentEvent, ChatMessage, ContentPart, Tool, ToolContext } from "./types.js";
+import type {
+  AgentEvent,
+  ChatMessage,
+  ContentPart,
+  Tool,
+  ToolContext,
+  TurnEndReason,
+} from "./types.js";
+
+/** How long a provider may stay silent before the turn is considered dead. */
+export const DEFAULT_STALL_TIMEOUT_MS = 120_000;
+
+/**
+ * The provider produced nothing for longer than the stall deadline. Not a
+ * provider error and not the owner's abort: a third way for a turn to die,
+ * and the only one where waiting longer would help nobody.
+ */
+export class TurnStallError extends Error {
+  constructor(timeoutMs: number) {
+    super(`the model produced nothing for ${String(timeoutMs)}ms; the turn was aborted`);
+    this.name = "TurnStallError";
+  }
+}
 
 export interface AgentOptions {
   provider: ProviderConfig;
@@ -35,6 +57,13 @@ export interface AgentOptions {
   onBeforeRequest?: (messages: ChatMessage[]) => void;
   onEvent?: (event: AgentEvent) => void;
   signal?: AbortSignal;
+  /**
+   * How long one request may go without a single delta before the turn is
+   * aborted as stalled. The deadline re-arms on every delta, so a slow stream
+   * that keeps talking is never cut; only silence counts. Omitted (or
+   * non-positive) means no watchdog.
+   */
+  stallTimeoutMs?: number;
 }
 
 /**
@@ -208,9 +237,28 @@ export class Agent {
     const inheritedUserPair = this.messages[live - 1]?.role === "user" ? live : -1;
     let stappen = 0;
     let laatsteTekst = "";
+    let reason: TurnEndReason = "completed";
+    // The request after the budget has run out: tools are withheld, so the
+    // model has one chance to say in words what it was doing. It is one call,
+    // never another round — `grace` bounds the loop to a single retry.
+    let grace = false;
 
-    while (stappen < this.maxSteps) {
+    for (;;) {
+      // The interrupt gate. Checked before every request, so a turn the owner
+      // stopped sends nothing new; a stop that lands mid-stream is caught by
+      // the request below and lands on the same reason.
+      if (this.aborted()) {
+        reason = "interrupted";
+        break;
+      }
+      const atBudget = stappen >= this.maxSteps;
+      if (atBudget && grace) {
+        reason = "budget";
+        break;
+      }
+      grace = atBudget;
       stappen++;
+
       let antwoord: ChatMessage;
       try {
         // The hook is the one seam a steer enters through. It runs before the
@@ -218,12 +266,7 @@ export class Agent {
         // rather than by the provider halfway through the turn.
         this.opts.onBeforeRequest?.(this.messages);
         assertAlternating(this.messages, inheritedUserPair);
-        const response = await this.adapter.send(this.messages, {
-          tools: specs,
-          signal: this.opts.signal,
-          onDelta: (t) => emit({ type: "assistant_text", text: t }),
-          ...(this.opts.effort !== undefined ? { effort: this.opts.effort } : {}),
-        });
+        const response = await this.ask(atBudget ? [] : specs, emit);
         antwoord = response.message;
         // A turn is several requests; each one's usage counts towards it. A
         // provider that reports none simply adds nothing.
@@ -231,18 +274,44 @@ export class Agent {
           this.usages.push({ input: response.usage.inputTokens, output: response.usage.outputTokens });
         }
       } catch (err) {
+        // The owner's stop is not a provider failure, whichever way it
+        // surfaced; it ends the turn without an error of its own here.
+        if (this.aborted()) {
+          reason = "interrupted";
+          break;
+        }
         const message = err instanceof Error ? err.message : String(err);
         emit({ type: "error", message });
+        if (err instanceof TurnStallError) {
+          reason = "watchdog";
+          break;
+        }
         throw err;
+      }
+
+      const calls = antwoord.tool_calls ?? [];
+      if (calls.length === 0) {
+        this.messages.push(antwoord);
+        if (typeof antwoord.content === "string" && antwoord.content.length > 0) {
+          laatsteTekst = antwoord.content;
+        }
+        // An answer after the budget is still an answer, but the stop was the
+        // budget's, and the ledger says so.
+        reason = atBudget ? "budget" : "completed";
+        break;
+      }
+      if (atBudget) {
+        // The grace request had no tools to offer and the model asked anyway:
+        // there is no round left to run, and the call is not accepted into the
+        // transcript because its results will never exist.
+        reason = "budget";
+        break;
       }
 
       this.messages.push(antwoord);
       if (typeof antwoord.content === "string" && antwoord.content.length > 0) {
         laatsteTekst = antwoord.content;
       }
-
-      const calls = antwoord.tool_calls ?? [];
-      if (calls.length === 0) break;
 
       for (const call of calls) {
         const tool = this.opts.tools.find((t) => t.name === call.function.name);
@@ -278,18 +347,69 @@ export class Agent {
           content: output,
         });
       }
-
-      // Running out of budget with tools still queued is the model looping,
-      // not working — silence would read as a bug, so the turn says so.
-      if (stappen >= this.maxSteps) {
-        emit({
-          type: "error",
-          message: `stopped after ${String(this.maxSteps)} steps — the model kept calling tools without finishing`,
-        });
-      }
     }
 
-    emit({ type: "turn_end", steps: stappen });
+    // Running out of budget with tools still queued is the model looping,
+    // not working — silence would read as a bug, so the turn says so.
+    if (reason === "budget") {
+      emit({
+        type: "error",
+        message: `stopped after ${String(this.maxSteps)} steps — the model kept calling tools without finishing`,
+      });
+    }
+    emit({ type: "turn_end", steps: stappen, reason });
     return laatsteTekst;
+  }
+
+  /** The interrupt gate's one test, in a method so no earlier check narrows it. */
+  private aborted(): boolean {
+    return this.opts.signal?.aborted === true;
+  }
+
+  /**
+   * One request, with the stall watchdog around it.
+   *
+   * The deadline is not a request timeout: it re-arms on every delta, so a
+   * provider that streams slowly is fine and only a provider that says
+   * nothing — the "still thinking" that never ends — is cut. When there is no
+   * deadline the adapter is awaited directly, exactly as before.
+   */
+  private ask(specs: unknown[], emit: (event: AgentEvent) => void): Promise<{ message: ChatMessage; usage: { inputTokens: number; outputTokens: number } | null }> {
+    const timeoutMs = this.opts.stallTimeoutMs;
+    if (timeoutMs === undefined || timeoutMs <= 0) {
+      return this.adapter.send(this.messages, {
+        tools: specs,
+        signal: this.opts.signal,
+        onDelta: (t) => emit({ type: "assistant_text", text: t }),
+        ...(this.opts.effort !== undefined ? { effort: this.opts.effort } : {}),
+      });
+    }
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let stall: ((error: Error) => void) | undefined;
+    const silent = new Promise<never>((_resolve, reject) => {
+      stall = reject;
+    });
+    const arm = (): void => {
+      if (timer !== undefined) clearTimeout(timer);
+      timer = setTimeout(() => {
+        stall?.(new TurnStallError(timeoutMs));
+      }, timeoutMs);
+    };
+    arm();
+
+    const request = this.adapter.send(this.messages, {
+      tools: specs,
+      signal: this.opts.signal,
+      onDelta: (t) => {
+        arm();
+        emit({ type: "assistant_text", text: t });
+      },
+      ...(this.opts.effort !== undefined ? { effort: this.opts.effort } : {}),
+    });
+
+    return Promise.race([request, silent]).finally(() => {
+      if (timer !== undefined) clearTimeout(timer);
+    });
   }
 }

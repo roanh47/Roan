@@ -87,8 +87,9 @@ test("a turn records its usage in the turn_end event", async () => {
         await runOneTurn(stub, store, dir);
         const data = turnEnd(store);
         assert.deepEqual(data.usage, { input: 1234, output: 567 });
-        // The lock still owns the closing event; usage rides along.
-        assert.equal(data.reason, "released");
+        // The lock still owns the closing event; usage rides along, and the
+        // reason says the loop finished rather than stopped.
+        assert.equal(data.reason, "completed");
       } finally {
         store.close();
       }
@@ -140,7 +141,7 @@ test("a provider that reports nothing leaves turn_end without usage", async () =
         await runOneTurn(stub, store, dir);
         const data = turnEnd(store);
         assert.equal("usage" in data, false);
-        assert.equal(data.reason, "released");
+        assert.equal(data.reason, "completed");
       } finally {
         store.close();
       }

@@ -7,13 +7,14 @@ als de acceptatieregel groen is **met echte uitvoer**; anders gaat het naar
 Deze lijst is de enige bron voor de zelfwerkende lus (`docs/LOOP.md`). Nieuwe
 ideeën komen onderaan, nooit tussen de eerste drie.
 
-## Q1 — Beurt met budget en noodrem
+## Q1 — Beurt met budget en noodrem ✅
 Bron: `docs/hermes-findings.md` §1 · Hermes: `agent/conversation_loop.py`, `agent/turn_stop_gates.py`, `agent/turn_liveness.py`
 De turn-runner krijgt een iteratiebudget met één respijt-call, een interrupt-poort
 en een watchdog die een stille beurt met een reden afbreekt.
 **Klaar als:** een test met een provider die blijft hangen de beurt binnen de grens
 afbreekt, een test met een provider die alleen tools teruggeeft op het budget stopt,
 en `turn_end` in beide gevallen een `reason` heeft.
+**Bewijs:** `src/agent.ts` (poort, `TurnEndReason`, `TurnStallError`), `src/turn/lock.ts` (`ReleaseOptions.reason`), `src/daemon/turn-runner.ts` (reden naar `turn_end`); tests in `src/daemon/turn-gates.test.ts`: “a provider that only calls tools stops on the budget, after exactly one grace call”, “a provider that goes silent is aborted by the watchdog, with a reason”, “an interrupted turn sends no request and ends with reason interrupted”. Gates: tsc 0, build 0, dist 1568/1568, tsx 116/116, web tsc 0 + vitest 156/156.
 
 ## Q2 — Leeg antwoord en overflow als eigen faalvormen
 Bron: §1 · `agent/turn_empty_response.py`, `agent/turn_overflow.py`
