@@ -1100,6 +1100,27 @@ async function main(): Promise<void> {
           reply({ check: result.check, plan: result.plan, download: result.download });
           return;
         }
+        if (kind === "net_probe") {
+          // A diagnostic the app can call when a model call fails without a
+          // reason: it answers with the real cause instead of "fetch failed".
+          const url = typeof data["url"] === "string" ? data["url"] : "";
+          if (url.length === 0) {
+            reply({ error: "no url" });
+            return;
+          }
+          try {
+            const response = await fetch(url, { method: "GET" });
+            reply({ ok: true, status: response.status });
+          } catch (error) {
+            const cause = error instanceof Error ? (error as { cause?: unknown }).cause : undefined;
+            reply({
+              ok: false,
+              error: error instanceof Error ? error.message : String(error),
+              cause: cause === undefined ? null : String(cause),
+            });
+          }
+          return;
+        }
         if (kind === "workspace_list") {
           // Two roots the owner can look at: the free workspace and the copy that
           // syncs between devices. The hash is what makes "synced" exact, so it
