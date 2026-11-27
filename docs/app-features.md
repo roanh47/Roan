@@ -112,6 +112,35 @@ scherm of de bediening niet · **nee** = ontbreekt.
 | Thema's/skins | ja | deels |
 | Insights/gebruiksdashboard | ja | nee |
 
+## De pagina's die Hermes' dashboard heeft (en Roan niet)
+
+Dit is de echte maat: het Hermes-dashboard is ingedeeld als pagina's die je als
+bestuurder van een agent nodig hebt. Links in de zijbalk, in deze volgorde:
+
+| Pagina | Wat je er doet | Roan |
+|---|---|---|
+| Chat | het gesprek zelf | ja |
+| Sessions | zoeken, hervatten, archiveren, per sessie de bron zien | deels (geen archief, geen semantisch zoeken) |
+| Files | bestanden van de agent bekijken en openen | ja (file explorer) |
+| **Analytics** | tokens, kosten, gebruik per model en per dag | **nee** (alleen per beurt) |
+| Models | providers, keys, modellen, thinking levels per model | deels (keys + lijst; geen niveaus) |
+| **Logs** | de daemon-/agentlog lezen en filteren | **alleen een /log-endpoint**, geen pagina |
+| **Cron** | taken plannen, zien wanneer ze liepen, uitslag | **nee** (scheduler werkt, geen pagina) |
+| **Skills** | bladeren, installeren, zelf maken, aan/uit | **nee** (index + voorstel) |
+| **Plugins** | plugins zien, installeren, aan/uit | **nee** (loader, geen pagina) |
+| **MCP** | servers toevoegen, testen, hun tools zien | **nee** (config + runtime, geen beheer) |
+| Webhooks | in-/uitgaande hooks met signing | nee (module) |
+| Pairing | devices koppelen en intrekken | deels (join/invite) |
+| **Profiles** | meerdere geïsoleerde omgevingen naast elkaar | **nee** |
+| Config | alles wat de agent mag en doet | deels (losse schermen) |
+| Keys | sleutels per provider | ja |
+| System | versie, schijf, gezondheid, herstart | deels (About + opslag) |
+
+Wat daaruit volgt: Roan heeft de *chat* af, en mist de **acht pagina's waarmee je
+de agent bestuurt**: Analytics, Logs, Cron, Skills, Plugins, MCP, Webhooks,
+Profiles. Dat is precies het verschil tussen "een app die praat" en "een agent
+waar je de baas over bent".
+
 ## Wat er dus echt mist, in volgorde van impact
 
 1. **Redenering uitklappen** en **thinking level als knop** — het denkwerk is onzichtbaar.
