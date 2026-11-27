@@ -65,13 +65,17 @@ De volledige vergelijking met Hermes staat met vinkjes in
 
 Deze staan nog in geen enkele sectie omdat ze groter zijn dan een punt:
 
-- [ ] **Kanalen** — Telegram, Discord, Slack, Signal, WhatsApp, mail. Hermes is
-      hier omheen gebouwd; Roan heeft er nul. Dit is de grootste leemte.
-- [ ] **Terminal-surface** — een echte TUI naast de app (Claude Code's
-      thuisbasis), zodat de agent ook in een shell te bedienen is.
-- [ ] **IDE-koppeling** — VS Code/JetBrains-extensie die dezelfde daemon gebruikt.
-- [ ] **Plugin-catalogus** — een marktplaats met manifesten, versies en
-      installatie uit de app (Hermes' marketplace; wij hebben alleen de loader).
+- [ ] **Thinking levels als knop in de app.** De mapping per provider zit er en
+      werkt (`src/providers/effort.ts`, per beurt toegepast), maar er is geen
+      scherm: je kunt laag/normaal/hoog nergens kiezen. Klaar als de keuze per
+      gesprek in de composer staat en dezelfde keten-event-stroom volgt.
+- [ ] **Approval modes als keuze.** Naast de bestaande allow/ask/deny-kaart en
+      per-tool regels: één schakelaar per gesprek — *ask everything*,
+      *auto-allow reads*, *plan only*. Nu is dat impliciet via losse regels.
+- [ ] **Policy echt vóór de tool-call.** `policy.ts`, `shell-allowlist.ts` en
+      `secrets-scan.ts` zijn getest, maar `run_shell` in `src/tools.ts` roept
+      `exec` direct aan en raadpleegt ze niet. Zonder dat is "ask first" een
+      scherm, geen grens.
 - [ ] **Meerdere profielen** — geïsoleerde homes naast elkaar in één installatie.
 - [ ] **Geheugen-curator** — een achtergrondproces dat memory en skills opruimt,
       consolideert en verouderde feiten voorstelt te verwijderen.
