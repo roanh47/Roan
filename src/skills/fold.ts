@@ -26,11 +26,14 @@ export const SKILL_PROPOSAL_KIND = "skill_proposal" as const;
 /** `data.kind` of an approval. */
 export const SKILL_APPROVAL_KIND = "skill_approval" as const;
 
+/** `data.kind` of a person saying no to a proposal. */
+export const SKILL_REJECTION_KIND = "skill_rejection" as const;
+
 /** The event type a proposal rides: skills travel in the env. */
 export const SKILL_PROPOSAL_EVENT = "env" as const;
 
 /** Where a proposal stands. Nothing but `approved` can ever be loaded. */
-export type ProposalStatus = "pending" | "approved";
+export type ProposalStatus = "pending" | "approved" | "rejected";
 
 /** One proposal as folded from the chain. */
 export interface SkillProposal {
@@ -104,10 +107,22 @@ export function foldSkillProposals(events: readonly ProposalEventLike[]): SkillP
         description: description ?? previous?.description ?? deriveDescription(body),
         body,
         // Status is never read from the payload: a proposal event proposes.
-        status: previous?.status ?? "pending",
+        // A reworded proposal the owner once refused is a new question.
+        status: previous?.status === "approved" ? "approved" : "pending",
         seq: previous?.seq ?? seqOf(event, 0),
         ...(previous?.approvedSeq !== undefined ? { approvedSeq: previous.approvedSeq } : {}),
       });
+      continue;
+    }
+
+    if (kind === SKILL_REJECTION_KIND) {
+      // A no only answers a proposal that is still waiting; it never takes
+      // back an approval.
+      const refused = nonEmptyString(data["id"]);
+      const waiting = refused === null ? undefined : byId.get(refused);
+      if (waiting !== undefined && waiting.status === "pending") {
+        byId.set(waiting.id, { ...waiting, status: "rejected" });
+      }
       continue;
     }
 
@@ -116,7 +131,7 @@ export function foldSkillProposals(events: readonly ProposalEventLike[]): SkillP
     const id = nonEmptyString(data["id"]);
     if (id === null) continue;
     const previous = byId.get(id);
-    if (previous === undefined || previous.status === "approved") continue;
+    if (previous === undefined || previous.status !== "pending") continue;
 
     byId.set(id, { ...previous, status: "approved", approvedSeq: seqOf(event, 0) });
   }

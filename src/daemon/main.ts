@@ -35,6 +35,13 @@ import { openSession } from "./session-open.js";
 import { removeNode } from "./membership.js";
 import { foldGoals, goalContext } from "../chain/goals.js";
 import { parseCommandLine, resolveMessage } from "../chain/commands.js";
+import {
+  SKILL_APPROVAL_KIND,
+  SKILL_PROPOSAL_EVENT,
+  SKILL_REJECTION_KIND,
+  foldSkillProposals,
+} from "../skills/fold.js";
+import { createSkillProposeTool, installSkill } from "../skills/propose-tool.js";
 import { distilMemories, memoryTexts } from "../memory/index.js";
 import { foldMemoryMd, writeMemoryMd } from "../context/memory-md.js";
 import { approvePlan, planModeEnabled, planModeEvent } from "./plan.js";
@@ -811,6 +818,21 @@ async function main(): Promise<void> {
         if (session === null) return [];
         const current = session;
         return readNodes(current.store.read(current.identity.chainId, 1, 100_000));
+      }),
+      // Self-improvement: the agent may propose a skill, only the owner saves it.
+      createSkillProposeTool({
+        newId: () => uuid().slice(0, 8),
+        append: (proposal) => {
+          if (session === null) return;
+          const current = session;
+          const event = current.store.append(current.identity.chainId, {
+            id: uuid(),
+            node: current.identity.nodeId,
+            type: proposal.type,
+            data: proposal.data,
+          });
+          control?.broadcast({ t: "append", event });
+        },
       }),
       {
         name: "delegate",
@@ -1835,6 +1857,49 @@ async function main(): Promise<void> {
           control?.broadcast({ t: "append", event });
           control?.sendState();
           reply({ ok: true });
+          return;
+        }
+        if (kind === "skill_approve" || kind === "skill_reject") {
+          // The owner's answer to a skill the agent proposed. A yes writes the
+          // skill to this device; the env loop carries it to the others.
+          const current = session;
+          const id = typeof data["id"] === "string" ? data["id"].trim() : "";
+          if (current === null || id.length === 0) {
+            reply({ ok: false, error: "no chain, or no proposal id" });
+            return;
+          }
+          const events = current.store.read(current.identity.chainId, 1, 100_000);
+          const proposal = foldSkillProposals(events).find((entry) => entry.id === id);
+          if (proposal === undefined || proposal.status !== "pending") {
+            reply({ ok: false, error: "that proposal is not waiting for an answer" });
+            return;
+          }
+          const approve = kind === "skill_approve";
+          if (approve) {
+            await installSkill(paths.home, {
+              name: proposal.name,
+              description: proposal.description,
+              body: proposal.body,
+            });
+          }
+          const event = current.store.append(current.identity.chainId, {
+            id: uuid(),
+            node: current.identity.nodeId,
+            type: SKILL_PROPOSAL_EVENT,
+            data: approve
+              ? { kind: SKILL_APPROVAL_KIND, id, status: "approved" }
+              : { kind: SKILL_REJECTION_KIND, id },
+          });
+          control?.broadcast({ t: "append", event });
+          if (approve) {
+            void publishEnv({
+              store: current.store,
+              chain: current.identity.chainId,
+              node: current.identity.nodeId,
+              home: paths.home,
+            }).catch(() => undefined);
+          }
+          reply({ ok: true, name: proposal.name, saved: approve });
           return;
         }
         if (kind === "command_save" || kind === "command_remove") {

@@ -10,6 +10,8 @@ import { SchedulesPanel } from "./panels/SchedulesPanel.js";
 import { GoalsPanel } from "./panels/GoalsPanel.js";
 import { foldGoals } from "../../src/chain/goals.js";
 import { parseCommandEdit, slashCommands } from "./commands.js";
+import { proposedSkills } from "../../src/skills/fold.js";
+import { SkillProposals } from "./components/SkillProposals.js";
 import { ProvidersPanel } from "./panels/ProvidersPanel.js";
 import { CapabilitiesPanel } from "./panels/CapabilitiesPanel.js";
 import { ToolsPanel } from "./panels/ToolsPanel.js";
@@ -135,6 +137,8 @@ export default function App({ client: injected }: { client?: ChainClient } = {})
 
   // The slash menu: the app's own commands plus the ones the chain defines.
   const commands = useMemo(() => slashCommands(snapshot.events), [snapshot.events]);
+  // Skills the agent proposed and nobody answered yet.
+  const skillProposals = useMemo(() => proposedSkills(snapshot.events), [snapshot.events]);
 
   const setPlanMode = (enabled: boolean): void => {
     if (activeSession === null) return;
@@ -719,6 +723,19 @@ export default function App({ client: injected }: { client?: ChainClient } = {})
             </button>
           </div>
         ) : null}
+        <SkillProposals
+          proposals={skillProposals}
+          onAnswer={(id, approve) => {
+            void client
+              .request<{ ok?: boolean; error?: string }>(approve ? "skill_approve" : "skill_reject", { id })
+              .then((answer) => {
+                if (answer.ok !== true) setNotice(answer.error ?? "could not answer the skill proposal");
+              })
+              .catch((error: unknown) => {
+                setNotice(error instanceof Error ? error.message : "could not answer the skill proposal");
+              });
+          }}
+        />
         <Composer
           disabled={disabled}
           placeholder={placeholder}

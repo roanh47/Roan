@@ -8,8 +8,14 @@ De volledige vergelijking met Hermes — 66 features, 50 af, 15 open, 1 bewust n
 staat met vinkjes in `docs/feature-parity.md` (§ Samenvatting). Wat daar open staat,
 komt hier per versie terug.
 
-## 0.0.32
+## 0.1.0
 
+- [ ] **Subagents zijn Mini Roans.** Een subagent is geen tweede agent en geen
+      Hermes-beurt, maar een kleine Roan: dezelfde identiteit, dezelfde skills
+      en hetzelfde geheugen, met een eigen context voor één afgebakende taak
+      en alleen de samenvatting terug. De `delegate`-tool draait nu een
+      Hermes-beurt (`runHermesTurn` in `src/daemon/main.ts`) en heeft een
+      Nederlandse prompt; dat moet de eigen loop worden (`src/agent.ts`).
 - [ ] **Update-knop repareren.** About → Check for updates doet niet wat hij
       moet. Eerst vaststellen wat er misgaat (de check, de download of het
       installeren, en op welk platform), dan repareren en op een echt apparaat
