@@ -297,6 +297,33 @@ export default function App({ client: injected }: { client?: ChainClient } = {})
         .request<{ ok?: boolean; error?: string }>("goal", { text })
         .then((answer) => setNotice(answer.ok === true ? "goal saved" : (answer.error ?? "could not save the goal")))
         .catch((error: unknown) => setNotice(error instanceof Error ? error.message : "could not save the goal"));
+    } else if (name === "vision" || name === "background") {
+      // One word is a model of the provider in use; two are a saved provider
+      // and its model. "off" hands the job back to the main model.
+      const words = args.trim().split(/\s+/).filter((word) => word.length > 0);
+      const [first, second] = words;
+      const data =
+        first === undefined
+          ? {}
+          : second === undefined
+            ? { slot: name, model: first === "off" ? "" : first }
+            : { slot: name, provider: first, model: second };
+      void client
+        .request<{ ok?: boolean; error?: string; auxiliary?: Record<string, { provider?: string; model?: string } | null> }>(
+          "auxiliary",
+          data,
+        )
+        .then((answer) => {
+          if (answer.ok !== true) {
+            setNotice(answer.error ?? `could not change the ${name} model`);
+            return;
+          }
+          const set = answer.auxiliary?.[name] ?? null;
+          setNotice(set?.model ? `${name} model: ${set.model}` : `no ${name} model set; the main model does it`);
+        })
+        .catch((error: unknown) => {
+          setNotice(error instanceof Error ? error.message : `could not change the ${name} model`);
+        });
     } else if (name === "fallback") {
       const wanted = args.trim();
       const data = wanted.length === 0 ? {} : { model: wanted === "off" ? "" : wanted };

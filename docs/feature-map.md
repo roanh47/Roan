@@ -11,7 +11,7 @@ Roan/
 ├── PLAN.md                     startvolgorde + proofnormen
 ├── docs/
 │   ├── feature-groups.md       114 concepten, 23 oppervlakken, twee lanen
-│   ├── feature-parity.md      Hermes van binnenuit vergeleken
+│   ├── feature-parity.md      status per feature
 │   ├── research/features/      1.024 gesourde rijen uit 23 harnesses
 │   ├── protocol.md + chain.md  frames, keten, append-only, req-correlatie
 │   ├── invite-flow.md         join v1/v2, hosts-lijst, handshake
@@ -25,7 +25,6 @@ Roan/
 │   │   ├── memory.ts           geheugen-distillatie — [F] auto-memory → SOON
 │   │   └── skills.ts           skill-lezer — [F] skills meereizen → ronde 2a
 │   ├── cron/jobs.ts            geplande taken ✔ — [F] naar foreground → 2b
-│   ├── engine/hermes.ts        hermes-engine-pad + eerlijke eindmeldingen ✔
 │   └── providers/
 │       ├── live.ts             304 presets live van models.dev ✔ [B]
 │       └── openai-compat.ts    streaming + tool_calls ✔ [B]

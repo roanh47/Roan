@@ -1,1 +1,0 @@
-`tests/store-append.test.ts` — idempotency and ordering under concurrent appends.

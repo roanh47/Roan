@@ -74,6 +74,16 @@ import { guardTool, type ApprovalAnswer, type GuardOptions } from "../tools/guar
 import { dueJobs, loadCron, unparseableSchedule } from "../cron/jobs.js";
 import { isEffortLevel } from "../providers/effort.js";
 import { runMiniRoan } from "./mini.js";
+import { buildAdapter } from "../agent.js";
+import type { ProviderConfig } from "../providers/adapter.js";
+import {
+  describeImagePrompt,
+  isAuxSlot,
+  resolveAux,
+  withAuxModel,
+  withImageDescription,
+  type AuxSlot,
+} from "./auxiliary.js";
 import { McpRuntime } from "./mcp-runtime.js";
 import { approvedToolsFromEvents, mcpServersFromEvents, toolRulesFromEvents } from "../chain/gates.js";
 import type { Tool } from "../types.js";
@@ -787,6 +797,17 @@ async function main(): Promise<void> {
    * off, ask-flags gate them behind an approval, MCP servers add theirs. A
    * config that arrived from a peer dials here, at the next look.
    */
+  /** How to reach the model of an auxiliary slot, or null for "the main model". */
+  const auxProvider = async (slot: AuxSlot): Promise<ProviderConfig | null> => {
+    if (settings.auxiliary[slot] === null) return null;
+    const accounts = (await loadProviders(paths).catch(() => ({ accounts: [] }))).accounts;
+    return resolveAux(
+      settings.auxiliary,
+      slot,
+      { baseUrl: settings.baseUrl, apiKey: settings.apiKey, model: settings.model, providerId: settings.provider },
+      accounts,
+    );
+  };
   const todoLists = new Map<string, TodoStore>();
   const toolsForTurn = (
     hooks: HookConfig | null = null,
@@ -1019,9 +1040,40 @@ async function main(): Promise<void> {
     const inbox = createSteerInbox();
     activeTurn = controller;
     activeSteer = inbox;
+    // A main model that cannot see gets the image as words: the vision slot
+    // looks at it first. When the slot is empty, or the look fails, the image
+    // goes to the main model as before.
+    let turnText = prompt;
+    let turnImage = image;
+    if (image !== undefined) {
+      const vision = await auxProvider("vision");
+      if (vision !== null) {
+        try {
+          const seen = await buildAdapter(vision).send(
+            [
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: describeImagePrompt(prompt) },
+                  { type: "image_url", image_url: { url: `data:${image.mime};base64,${image.data}` } },
+                ],
+              },
+            ],
+            { maxTokens: 1200, signal: controller.signal },
+          );
+          const description = typeof seen.message.content === "string" ? seen.message.content.trim() : "";
+          if (description.length > 0) {
+            turnText = withImageDescription(prompt, description, vision.model);
+            turnImage = undefined;
+          }
+        } catch (error) {
+          log("vision: " + (error instanceof Error ? error.message : String(error)));
+        }
+      }
+    }
     await runTurn(
       {
-        ...(image !== undefined ? { image } : {}),
+        ...(turnImage !== undefined ? { image: turnImage } : {}),
         signal: controller.signal,
         store: current.store,
         chain: current.identity.chainId,
@@ -1052,7 +1104,7 @@ async function main(): Promise<void> {
           }
         },
       },
-      prompt,
+      turnText,
     );
     activeTurn = null;
     activeSteer = null;
@@ -1074,8 +1126,10 @@ async function main(): Promise<void> {
         { session: sessionId, messages: sessionMessages(all, sessionId) },
         memoryTexts(all),
         async (prompt) => {
+          // Nobody reads this live, so the background slot does it when set.
+          const background = await auxProvider("background");
           const answer = await chat(
-            { baseUrl: settings.baseUrl, apiKey: settings.apiKey, model: settings.model },
+            background ?? { baseUrl: settings.baseUrl, apiKey: settings.apiKey, model: settings.model },
             [{ role: "user", content: prompt }],
             { maxTokens: 300 },
           );
@@ -1898,6 +1952,34 @@ async function main(): Promise<void> {
           control?.broadcast({ t: "append", event });
           control?.sendState();
           reply({ ok: true });
+          return;
+        }
+        if (kind === "auxiliary") {
+          // A model of its own for one job (vision, background). Without a
+          // slot it is a question; an empty model hands the job back to the
+          // main model.
+          if (data["slot"] === undefined) {
+            reply({ ok: true, auxiliary: settings.auxiliary });
+            return;
+          }
+          if (!isAuxSlot(data["slot"]) || typeof data["model"] !== "string") {
+            reply({ ok: false, error: "auxiliary needs a slot (vision or background) and a model" });
+            return;
+          }
+          const provider = typeof data["provider"] === "string" ? data["provider"] : "";
+          settings = await saveSettings(paths, {
+            auxiliary: withAuxModel(settings.auxiliary, data["slot"], data["model"], provider),
+          });
+          if (session !== null) {
+            const current = session;
+            void publishEnv({
+              store: current.store,
+              chain: current.identity.chainId,
+              node: current.identity.nodeId,
+              home: paths.home,
+            }).catch(() => undefined);
+          }
+          reply({ ok: true, auxiliary: settings.auxiliary });
           return;
         }
         if (kind === "fallback_model") {

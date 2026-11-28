@@ -51,7 +51,7 @@ export interface AgentOptions {
  * assumed. The id is dropped on that path: an unknown id would only make
  * `effortParams` refuse to say anything.
  */
-function buildAdapter(provider: ProviderConfig): ChatAdapter {
+export function buildAdapter(provider: ProviderConfig): ChatAdapter {
   if (provider.providerId !== undefined && isSupported(provider.providerId)) {
     return createAdapter(provider.providerId, provider);
   }

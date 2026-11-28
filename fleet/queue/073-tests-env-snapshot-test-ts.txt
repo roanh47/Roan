@@ -1,1 +1,0 @@
-`tests/env-snapshot.test.ts` — pack, apply, park, refuse outside the env paths.

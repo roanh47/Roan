@@ -1,1 +1,0 @@
-`docs/android-share.md` — what the share sheet does with a shared file.

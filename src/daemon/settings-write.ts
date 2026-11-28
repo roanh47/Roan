@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 import type { RoanPaths } from "./paths.js";
 import { isEffortLevel, type EffortLevel } from "../providers/effort.js";
 import { loadSettings, type Settings } from "./settings.js";
+import { parseAuxiliary, type AuxiliarySettings } from "./auxiliary.js";
 
 /**
  * Keys the app may write. Kept next to the type, not derived from the file on
@@ -18,6 +19,7 @@ const SETTINGS_KEYS = [
   "effort",
   "access",
   "fallbackModel",
+  "auxiliary",
 ] as const satisfies readonly (keyof Settings)[];
 
 type SettingsKey = (typeof SETTINGS_KEYS)[number];
@@ -35,6 +37,8 @@ export interface SettingsPatch {
   effort?: EffortLevel;
   access?: { fullDisk?: boolean };
   fallbackModel?: string;
+  /** The whole auxiliary object; the caller merges one slot with `withAuxModel`. */
+  auxiliary?: AuxiliarySettings;
 }
 
 function isSettingsKey(key: string): key is SettingsKey {
@@ -78,6 +82,11 @@ function parsePatch(input: unknown): SettingsPatch {
     }
     if (key === "access") {
       patch.access = parseAccessPatch(value);
+      continue;
+    }
+    if (key === "auxiliary") {
+      // Parsed, never trusted: a malformed slot becomes an empty one.
+      patch.auxiliary = parseAuxiliary(value);
       continue;
     }
     if (typeof value !== "string") {

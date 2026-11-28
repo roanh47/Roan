@@ -1,1 +1,0 @@
-`web/src/components/Skeleton.tsx` — shimmering placeholder rows.

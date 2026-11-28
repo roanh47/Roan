@@ -1,1 +1,0 @@
-`web/src/components/Modal.tsx` — dialog with Escape and backdrop close, focus trap.

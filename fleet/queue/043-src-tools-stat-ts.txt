@@ -1,1 +1,0 @@
-`src/tools/stat.ts` — size, mtime, mode, whether it is a dir, for a list of paths.

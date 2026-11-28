@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import type { RoanPaths } from "./paths.js";
 import { isEffortLevel, type EffortLevel } from "../providers/effort.js";
+import { NO_AUXILIARY, parseAuxiliary, type AuxiliarySettings } from "./auxiliary.js";
 
 /**
  * Owner-granted capabilities. Every flag defaults to off; a hand-edited config
@@ -34,6 +35,8 @@ export interface Settings {
    * first one fails before it answered anything. Empty means none.
    */
   readonly fallbackModel: string;
+  /** A model of its own for a job the main one is wrong for; see auxiliary.ts. */
+  readonly auxiliary: AuxiliarySettings;
 }
 
 const DEFAULTS: Settings = {
@@ -44,6 +47,7 @@ const DEFAULTS: Settings = {
   effort: "normal",
   access: { fullDisk: false },
   fallbackModel: "",
+  auxiliary: NO_AUXILIARY,
 };
 
 /** Only a literal `true` turns a capability on; `"true"` and `1` stay off. */
@@ -80,6 +84,7 @@ export async function loadSettings(paths: RoanPaths): Promise<Settings> {
       effort: isEffortLevel(level) ? level : DEFAULTS.effort,
       access: parseAccess(parsed["access"]),
       fallbackModel: typeof parsed["fallbackModel"] === "string" ? parsed["fallbackModel"].trim() : "",
+      auxiliary: parseAuxiliary(parsed["auxiliary"]),
     };
   } catch {
     return DEFAULTS;

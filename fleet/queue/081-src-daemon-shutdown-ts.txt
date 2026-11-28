@@ -1,1 +1,0 @@
-`src/daemon/shutdown.ts` — handle SIGINT and SIGTERM, close the store and sockets.
