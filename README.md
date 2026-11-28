@@ -139,23 +139,27 @@ What is in it:
 ├── mcp/                 connections and their sign-ins
 ├── imported/            conversations brought in from elsewhere
 ├── synced-workspace/    files that should be on every device
-├── state/               the chain: every conversation and event
-├── secrets/             this device's own id and its key to your other devices
-└── workspace/           this device only: where Roan builds
+├── workspace/           this device only: where Roan builds
+├── state/               how syncing works: this device's copy of the chain
+└── secrets/             how syncing works: the id that tells your devices apart
 ```
 
 ### What is synced
 
-**Everything in `.Roan` is the same on all your devices**, with three exceptions:
+**Everything is synced.** Every setting, key, sign-in, token, permission, skill,
+memory and conversation is the same on all your devices. Change something on
+your phone and it is changed on your PC and your server.
 
-| Folder | Why it is not synced |
-|---|---|
-| `workspace/` | The one folder that is meant to be local. Roan clones, installs and builds here, and none of that should be copied to your phone. |
-| `secrets/` | It identifies this device to your other devices. Each device has its own. |
-| `state/` | It holds the chain itself. It is not copied as a folder: each device keeps its own copy and they end up with the same content. |
+Two things are not synced, and that is the whole list:
 
-Anything outside `.Roan` (a project in `~/code`, your Documents) belongs to that
-device and is not synced.
+- **`workspace/`**, the local workspace. Roan clones, installs and builds here,
+  and none of that should be copied to your phone.
+- **Anything outside `.Roan`** (a project in `~/code`, your Documents). It
+  belongs to that device.
+
+`state/` and `secrets/` are how the syncing itself works: each device's own copy
+of the chain, and the id that tells your devices apart. Nothing you set or save
+lives there, and you never open them.
 
 ### The two workspaces
 

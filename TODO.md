@@ -25,16 +25,20 @@ there comes back here, per version.
       - On Windows the leading dot does not hide `.Roan`; set the hidden flag
         when the folder is created.
 
-- [ ] **The APK is a release build, not a debug one.** Both workflows run
-      `tauri android build --apk --debug` and then sign the result with the
-      release key. So the key is right and the build is not: a debug build is
-      debuggable, unoptimised and much larger than it has to be (part of why
-      the apk is 162 MB). Switch to a release build. What has to be checked
-      first, on a phone: a release build shrinks and renames code, and
-      `RoanNode.kt` is reached by name from native code
-      (`startNodeWithArguments`, `setEnvironment`), so it needs a keep rule
-      for `dev.roan.**` or the app crashes at start. Do it in `release-dry.yml`
-      first, install that apk, then change `release.yml`.
+- [ ] **`secrets/` holds one thing, and then goes away.** Everything is
+      synced. The only per-device fact is the id that tells devices apart.
+      Check what else `src/daemon/identity.ts` and the connectors still write
+      into `secrets/`, move anything that is a key or a token to where the
+      chain carries it, and move the id into `state/` so there is one folder
+      of plumbing and no folder called secrets.
+- [ ] **The APK is a release build: prove it on a phone.** Both workflows now
+      build a release APK and sign it with the release key
+      (`tauri android build --apk`, no `--debug`). A release build shrinks and
+      renames code, and the daemon is started by native code that finds
+      `RoanNode` by name, so a keep rule for `dev.roan.**` and for native
+      methods is written to `roan-keep.pro` before the build. Not proven: the
+      app has to be installed and opened on a phone. If it crashes at start,
+      the keep rule is the first place to look.
 
 - [ ] **Built on 2026-11-28, none of it proven.** Written without being run;
       each needs CI green and a check on a device before it counts.

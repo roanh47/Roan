@@ -12,6 +12,10 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   NODE_VERSION: "22"
+  # The config names an updater key, so every bundle is signed for the updater
+  # and the build stops without the private half. Same secrets as release.yml.
+  TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+  TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
 concurrency:
   group: release-dry-${{ github.ref }}
@@ -241,6 +245,11 @@ jobs:
   android:
     name: Android (.apk)
     runs-on: ubuntu-22.04
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -300,6 +309,11 @@ jobs:
           test -f web/dist/index.html || { echo "::error::web/dist/index.html is missing - the app would open blank"; exit 1; }
           node -e "const c=require('./src-tauri/tauri.conf.json'); if(c.build && c.build.devUrl){console.error('::error::build.devUrl is set; production must use frontendDist only');process.exit(1)}"
 
+      # The Android gradle plugin calls `npm run tauri`, so the root dependencies
+      # (and the tauri CLI they expose) have to be installed, not just web/.
+      - name: Install the app's own dependencies
+        run: npm ci --no-audit --no-fund
+
       - name: Generate the Android project
         run: npx --yes @tauri-apps/cli@^2 android init --ci
 
@@ -319,20 +333,43 @@ jobs:
           chmod +x scripts/android-daemon.sh
           ./scripts/android-daemon.sh arm64-v8a
 
-      # Still a debug build, as in release.yml; see TODO.md (release build).
-      - name: Build debug APK
-        run: npx --yes @tauri-apps/cli@^2 android build --apk --debug --ci
+      # A release build shrinks and renames code. The daemon is started by
+      # native code that finds these classes and methods by name, so they are
+      # kept as written; without this the app would crash at start.
+      - name: Keep the classes native code looks up by name
+        run: |
+          set -euo pipefail
+          printf '%s\n' \
+            '-keep class dev.roan.** { *; }' \
+            '-keepclasseswithmembernames class * { native <methods>; }' \
+            > src-tauri/gen/android/app/roan-keep.pro
+          cat src-tauri/gen/android/app/roan-keep.pro
 
-      - name: Collect the APK
+      - name: Build release APK
+        run: npx --yes @tauri-apps/cli@^2 android build --apk --ci
+
+      # Signed with the release key, exactly as release.yml does, so the apk
+      # from a dry run installs over the published app.
+      - name: Sign the APK with the release key and prove it
         env:
           APP_VERSION: ${{ steps.version.outputs.value }}
         run: |
           set -euo pipefail
-          mkdir -p out
-          apk="$(find src-tauri/gen/android/app/build/outputs/apk -name '*.apk' | grep -i debug | head -n 1 || true)"
-          if [ -z "$apk" ]; then apk="$(find src-tauri/gen/android/app/build/outputs/apk -name '*.apk' | head -n 1)"; fi
-          test -n "$apk" || { echo "::error::Gradle produced no .apk"; exit 1; }
-          cp "$apk" "out/Roan-${APP_VERSION}.apk"
+          test -n "${ANDROID_KEYSTORE_BASE64:-}" || { echo "::error::ANDROID_KEYSTORE_BASE64 is not set"; exit 1; }
+          mkdir -p out "$RUNNER_TEMP/signing"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/signing/release.jks"
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          BT="$(ls -d "$SDK"/build-tools/* | sort -V | tail -n 1)"
+          apk="$(find src-tauri/gen/android/app/build/outputs/apk -name '*.apk' | grep -i release | head -n 1 || true)"
+          test -n "$apk" || { echo "::error::Gradle produced no release .apk"; exit 1; }
+          "$BT/zipalign" -f -p 4 "$apk" "$RUNNER_TEMP/signing/aligned.apk"
+          "$BT/apksigner" sign --ks "$RUNNER_TEMP/signing/release.jks" --ks-key-alias "$ANDROID_KEY_ALIAS" --ks-pass "pass:$ANDROID_KEYSTORE_PASSWORD" --key-pass "pass:$ANDROID_KEY_PASSWORD" --out "out/Roan-${APP_VERSION}.apk" "$RUNNER_TEMP/signing/aligned.apk"
+          "$BT/apksigner" verify "out/Roan-${APP_VERSION}.apk"
+          got="$("$BT/apksigner" verify --print-certs "out/Roan-${APP_VERSION}.apk" | grep -i 'SHA-256 digest' | head -n 1 | awk '{print $NF}' | tr 'A-F' 'a-f')"
+          want="$(grep -v '^#' signing/android-cert-sha256.txt | tr -d '[:space:]')"
+          echo "apk signing cert: $got"
+          echo "pinned cert:      $want"
+          test "$got" = "$want" || { echo "::error::the APK is signed with a different key than signing/android-cert-sha256.txt"; exit 1; }
           ls -l out
 
       - uses: actions/upload-artifact@v4
