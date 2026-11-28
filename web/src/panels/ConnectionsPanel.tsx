@@ -5,9 +5,9 @@ import type { ChainClient } from "../chain.js";
  * Connections: the outside services Roan can use.
  *
  * A connection is an MCP server — the service's own description of what Roan
- * can do with it. Its name and address are shared with your other devices;
- * your sign-in is not: a token is saved on this device only, so each device
- * you want to use a service from is signed in once.
+ * can do with it. A connection and its sign-in are shared with all your
+ * devices, like everything else: connect a service once and every device can
+ * use it.
  */
 interface Connection {
   id: string;
@@ -123,7 +123,7 @@ export function ConnectionsPanel({ client }: { client: ChainClient }): ReactElem
   function signOut(connection: Connection): void {
     void client
       .request<Answer>("connection_token_clear", { id: connection.id })
-      .then((answer) => take(answer, `signed out of ${connection.label} on this device`))
+      .then((answer) => take(answer, `signed out of ${connection.label}`))
       .catch(() => setStatus("could not sign out"));
   }
 
@@ -149,7 +149,7 @@ export function ConnectionsPanel({ client }: { client: ChainClient }): ReactElem
         <h2 className="panel__title">Connections</h2>
       </header>
       <p className="panel__sub">
-        Services Roan can use for you. The list is shared with your other devices; a sign-in stays on this device.
+        Services Roan can use for you. Connect one here and all your devices can use it.
       </p>
       {status !== null ? <p className="panel__status">{status}</p> : null}
 
@@ -165,7 +165,7 @@ export function ConnectionsPanel({ client }: { client: ChainClient }): ReactElem
                   : connection.enabled
                     ? "Connecting…"
                     : "Switched off"}
-              {connection.signedIn ? " · signed in on this device" : ""}
+              {connection.signedIn ? " · signed in" : ""}
             </span>
             <span className="panel__sub">{connection.address}</span>
             {connection.transport === "http" ? (

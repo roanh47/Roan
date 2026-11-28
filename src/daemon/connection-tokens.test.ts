@@ -13,7 +13,7 @@ import {
 
 describe("connection tokens", () => {
   it("keeps a token per connection and forgets it on request", async () => {
-    const secrets = await mkdtemp(path.join(tmpdir(), "roan-secrets-"));
+    const secrets = await mkdtemp(path.join(tmpdir(), "roan-home-"));
     try {
       assert.equal(await loadConnectionToken(secrets, "github"), null);
       await saveConnectionToken(secrets, "github", "  tok-123  ");

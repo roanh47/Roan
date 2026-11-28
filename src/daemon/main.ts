@@ -82,6 +82,8 @@ import {
 } from "./connection-tokens.js";
 import { createGrantStore } from "../computer/grant.js";
 import { createLinuxDriver } from "../computer/driver-linux.js";
+import { createWindowsDriver } from "../computer/driver-windows.js";
+import { createMacDriver } from "../computer/driver-macos.js";
 import { createComputerTool, describeScreenPrompt, unavailableDriver } from "../computer/tool.js";
 import { buildAdapter } from "../agent.js";
 import type { ProviderConfig } from "../providers/adapter.js";
@@ -222,18 +224,22 @@ async function main(): Promise<void> {
   // Computer use: who may, and what moves the pointer on this platform.
   const computerGrants = createGrantStore();
   const computerDriver =
-    process.platform === "linux"
+    process.platform === "linux" && process.env["ROAN_SHELL"] !== "android"
       ? createLinuxDriver()
-      : unavailableDriver("computer use works on a Linux desktop for now; this device cannot be controlled yet");
+      : process.platform === "win32"
+        ? createWindowsDriver()
+        : process.platform === "darwin"
+          ? createMacDriver()
+          : unavailableDriver("a phone cannot be controlled this way; use computer use on a desktop");
   // Background jobs belong to this machine and this daemon run.
   const processes = new ProcessRegistry();
   const tools = [...allTools(), ...contextTools(memory, skills), createProcessTool(processes)];
   // MCP servers are chain config: this node dials them, every instance folds
   // the same list. Unreachable servers are skipped, never fatal.
-  // A connection's sign-in is looked up on this device at every dial.
+  // A connection's sign-in is read from the agent home at every dial.
   const mcp = new McpRuntime(
     (line) => log(line),
-    (id) => loadConnectionToken(paths.secrets, id),
+    (id) => loadConnectionToken(paths.home, id),
   );
   const agentContext: AgentContext = {
     memory,
@@ -1541,9 +1547,9 @@ async function main(): Promise<void> {
           return;
         }
         if (kind === "connections_list" || kind === "connection_token_set" || kind === "connection_token_clear") {
-          // Connections: the services Roan can reach, whether this device is
-          // signed in to each, and whether it is connected right now. A token
-          // is saved on this device and never sent back to the app.
+          // Connections: the services Roan can reach, whether the owner is
+          // signed in to each, and whether this device is connected right
+          // now. A token travels with the config and is never sent to the app.
           const current = session;
           if (current === null) {
             reply({ ok: false, error: "no chain to keep connections on yet" });
@@ -1563,10 +1569,17 @@ async function main(): Promise<void> {
                 reply({ ok: false, error: "the token is empty" });
                 return;
               }
-              await saveConnectionToken(paths.secrets, id, token);
+              await saveConnectionToken(paths.home, id, token);
             } else {
-              await removeConnectionToken(paths.secrets, id);
+              await removeConnectionToken(paths.home, id);
             }
+            // A sign-in travels like the rest of the config: publish it now.
+            void publishEnv({
+              store: current.store,
+              chain: current.identity.chainId,
+              node: current.identity.nodeId,
+              home: paths.home,
+            }).catch(() => undefined);
             // Dial again now, so the answer already says whether it worked.
             await mcp.sync(read());
           }
@@ -1578,7 +1591,7 @@ async function main(): Promise<void> {
               transport: server.transport,
               address: server.url ?? server.command ?? "",
               enabled: server.enabled,
-              signedIn: (await loadConnectionToken(paths.secrets, server.id)) !== null,
+              signedIn: (await loadConnectionToken(paths.home, server.id)) !== null,
               tools: mcp.toolCount(server.id),
               connected: mcp.toolCount(server.id) > 0,
               problem: mcp.failure(server.id),

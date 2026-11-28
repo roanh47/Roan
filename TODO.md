@@ -69,8 +69,8 @@ there comes back here, per version.
       over once, the way the lowercase home was migrated.
 - [ ] **Connections.** Top priority. Built, not proven: Settings →
       Connections adds a service by its MCP address, signs in with a token
-      kept on this device only (`secrets/connections/`,
-      `src/daemon/connection-tokens.ts`), shows whether it is connected and
+      that travels with the config so every device is signed in
+      (`mcp/tokens/`, `src/daemon/connection-tokens.ts`), shows whether it is connected and
       how many tools it brought, and signs out or removes it. Four services
       are offered by name. Still to do: sign-in in the browser (OAuth), which
       most services need (mail, calendar, notes); checking the four suggested
@@ -80,8 +80,13 @@ there comes back here, per version.
       looks at the screen (a model that can see describes it with pixel
       positions), then moves, clicks, types and presses keys
       (`src/computer/tool.ts`), and Settings → Computer use allows it for one
-      chat for 5, 10 or 30 minutes with a Stop button. Works on a Linux
-      desktop only. Still to do: drivers for Windows, macOS and Android; a
+      chat for 5, 10 or 30 minutes with a Stop button. Drivers for Linux
+      (`ydotool` / `xdotool`), Windows (PowerShell, nothing to install) and
+      macOS (`screencapture` and `osascript`, needs Screen Recording and
+      Accessibility permission). The Windows and macOS drivers have never
+      touched a real screen. Still to do: prove each on its platform; the
+      primary screen only, so more monitors; controlling another device of
+      the chain from this one; a
       visible "Roan is controlling this device" bar with Stop in the chat;
       scroll, drag and double-click; and sending the screenshot itself to a
       main model that can see, instead of a description.
