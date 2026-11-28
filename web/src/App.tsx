@@ -13,6 +13,7 @@ import { slashCommands } from "./commands.js";
 import { ModelRolesPanel } from "./panels/ModelRolesPanel.js";
 import { CommandsPanel } from "./panels/CommandsPanel.js";
 import { JobsPanel } from "./panels/JobsPanel.js";
+import { MinisPanel } from "./panels/MinisPanel.js";
 import { ComputerUsePanel } from "./panels/ComputerUsePanel.js";
 import { ConnectionsPanel } from "./panels/ConnectionsPanel.js";
 import { SkillsPanel } from "./panels/SkillsPanel.js";
@@ -95,6 +96,7 @@ type SettingsPage =
   | "connections"
   | "commands"
   | "jobs"
+  | "minis"
   | "computer"
   | "agent"
   | "workspace"
@@ -116,6 +118,7 @@ const SETTINGS_ROWS: readonly [SettingsPage, string, string][] = [
   ["tools", "Tools & rules", "on or off, ask first, MCP servers"],
   ["workspace", "Workspace", "files shared across devices"],
   ["schedules", "Schedules", "tasks that run later"],
+  ["minis", "Mini Roans", "tasks Roan handed to itself, and what they are doing"],
   ["jobs", "Background jobs", "commands left running on this device"],
   ["computer", "Computer use", "let Roan use this device's mouse and keyboard"],
   ["checkpoints", "Checkpoints", "named points to rewind to"],
@@ -581,6 +584,8 @@ export default function App({ client: injected }: { client?: ChainClient } = {})
             session={activeSession}
             sessionTitle={sessions.find((entry) => entry.id === activeSession)?.title ?? "This chat"}
           />
+        ) : settingsPage === "minis" ? (
+          <MinisPanel client={client} />
         ) : settingsPage === "jobs" ? (
           <JobsPanel client={client} />
         ) : settingsPage === "commands" ? (

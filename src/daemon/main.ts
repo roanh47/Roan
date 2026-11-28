@@ -75,6 +75,7 @@ import { guardTool, type ApprovalAnswer, type GuardOptions } from "../tools/guar
 import { dueJobs, loadCron, unparseableSchedule } from "../cron/jobs.js";
 import { isEffortLevel } from "../providers/effort.js";
 import { runMiniRoan } from "./mini.js";
+import { MiniRegistry, finishedMinisNote } from "./mini-registry.js";
 import { condense } from "../context/condense.js";
 import { normaliseSkillName } from "../skills/parse.js";
 import { skillUsage, skillVerdict } from "../skills/usage.js";
@@ -859,6 +860,8 @@ async function main(): Promise<void> {
       accounts,
     );
   };
+  /** Mini Roans that are working or finished, for the screen and the next turn. */
+  const minis = new MiniRegistry();
   /** The prompt each conversation started with, held still for its lifetime. */
   const sessionPrompts = new Map<string, { orders: string; prompt: string }>();
   /** Summaries of the older part of long conversations, by where they were cut. */
@@ -986,6 +989,11 @@ async function main(): Promise<void> {
           properties: {
             task: { type: "string", description: "What the Mini Roan must do, complete enough to stand alone" },
             cwd: { type: "string", description: "Folder to work in; the workspace by default" },
+            background: {
+              type: "boolean",
+              description:
+                "True to let it work while you carry on: you get its number now and its summary at the start of a later turn. Start several this way for work that can be done side by side.",
+            },
           },
           required: ["task"],
         },
@@ -993,25 +1001,41 @@ async function main(): Promise<void> {
           const task = String(args["task"] ?? "").trim();
           if (task.length === 0) throw new Error("task is required");
           const dir = typeof args["cwd"] === "string" ? args["cwd"] : paths.syncedWorkspace;
-          // Roan's own loop, not another engine: the Mini Roan is the same
-          // agent and passes the same guard, in a context nobody else reads.
-          return await runMiniRoan(
-            {
-              // A Mini Roan may run on a model of its own; empty means the main one.
-              provider: (await auxProvider("mini")) ?? {
-                baseUrl: settings.baseUrl,
-                apiKey: settings.apiKey,
-                model: settings.model,
-                providerId: settings.provider,
+          const background = args["background"] === true;
+          // A Mini Roan may run on a model of its own; empty means the main one.
+          const provider = (await auxProvider("mini")) ?? {
+            baseUrl: settings.baseUrl,
+            apiKey: settings.apiKey,
+            model: settings.model,
+            providerId: settings.provider,
+          };
+          const systemPrompt = await agentContext.prompt();
+          // Roan's own loop: the Mini Roan is the same agent and passes the
+          // same guard, in a context nobody else reads. It is registered
+          // either way, so the owner can watch it work and stop it.
+          const started = minis.start(task, background, (handle) => {
+            // Waited for, it also stops when the turn that asked is stopped;
+            // one in the background outlives the turn on purpose.
+            if (!background) {
+              ctx.signal?.addEventListener("abort", () => minis.stop(started.id), { once: true });
+            }
+            return runMiniRoan(
+              {
+                provider,
+                systemPrompt,
+                tools: shared,
+                cwd: dir,
+                effort: settings.effort,
+                signal: handle.signal,
+                onActivity: handle.note,
               },
-              systemPrompt: await agentContext.prompt(),
-              tools: shared,
-              cwd: dir,
-              effort: settings.effort,
-              ...(ctx.signal !== undefined ? { signal: ctx.signal } : {}),
-            },
-            task,
-          );
+              task,
+            );
+          });
+          if (background) {
+            return `Mini Roan ${String(started.id)} is working on it in the background; its summary arrives at the start of a later turn`;
+          }
+          return await started.finished;
         },
       },
     ];
@@ -1148,7 +1172,8 @@ async function main(): Promise<void> {
     // A main model that cannot see gets the image as words: the vision slot
     // looks at it first. When the slot is empty, or the look fails, the image
     // goes to the main model as before.
-    let turnText = finished.length > 0 ? `${prompt}\n\n${finished}` : prompt;
+    const minisDone = finishedMinisNote(minis.takeFinished());
+    let turnText = [prompt, finished, minisDone].filter((part) => part.length > 0).join("\n\n");
     let turnImage = image;
     if (image !== undefined) {
       const vision = await auxProvider("vision");
@@ -2260,6 +2285,19 @@ async function main(): Promise<void> {
             allowed: check.granted,
             expiresAt: check.granted ? check.grant.expiresAtMs : null,
           });
+          return;
+        }
+        if (kind === "minis_list" || kind === "mini_stop") {
+          // The Mini Roans of this device, for the screen that shows them work.
+          if (kind === "mini_stop") {
+            const id = typeof data["id"] === "number" ? data["id"] : Number.NaN;
+            if (!Number.isInteger(id)) {
+              reply({ ok: false, error: "mini_stop needs the number of a Mini Roan" });
+              return;
+            }
+            minis.stop(id);
+          }
+          reply({ ok: true, minis: minis.list() });
           return;
         }
         if (kind === "jobs_list" || kind === "job_stop") {
