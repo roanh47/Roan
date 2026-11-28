@@ -217,7 +217,7 @@ these are deliberately out for Roan even though Hermes has them.
 | Messaging gateway, ~20 platforms (Telegram, Discord, Slack, IRC, Feishu…) | The agent lives in a process that survives every window; channels are doors | **SOON (one channel)** — Roan's app is the channel; a daemon-fed Telegram door is possible later, never the core |
 | Gateway survives the desktop app | Close the window, the bots keep running | done — the Tauri shell spawns the daemon as a sidecar and the Android foreground service owns it when the app closes |
 | Persistent memory + user profile | Facts that survive sessions, injected every turn | done (`src/context/memory.ts`, `memory`/`skill_*` context tools) — invisible in the transcript |
-| Skills (263, with curator + auto-update) | Task-shaped instructions loaded when relevant | done for the loading half — `SkillLibrary` + `contextTools` put the index in every prompt and `skill_view` reads one; no curator or auto-update |
+| Skills (263, with curator + auto-update) | Task-shaped instructions loaded when relevant | loading done — `SkillLibrary` + `contextTools` put the index in every prompt and `skill_view` reads one. Self-improvement done in its first form: `skill_propose` lets the agent propose a new skill or a better version, and it is saved only when the owner presses Save skill (`src/skills/propose-tool.ts`, `propose-tool.test.ts`, `SkillProposals.tsx`). No curator (usage counts, stale skills), no undo button, no auto-update; not proven on a device |
 | Cron scheduler + background processes with notify-on-exit | Work happens when you are not there | cron done, notification done (the service tails `notify:turn-done`); notify-on-exit for a *process* is not built |
 | Delegation / subagents with structured output | A fresh context does a subtask and reports back | WON'T as a product — one agent; a single `delegate` tool rides in the relay set for a self-contained task |
 | Terminal with background jobs + PTY | Real shell, tracked processes | done for `run_shell` (timeout, process group, output cap); no PTY and no job list |
@@ -225,13 +225,13 @@ these are deliberately out for Roan even though Hermes has them.
 | Web search / extract | Grounded answers with sources | done — `web_search` / `web_fetch` plugins |
 | Model catalog + `/model` picker + thinking levels | Live provider catalog, switch mid-session | done (304 presets, sheet); effort levels done in the daemon, no picker (§3) |
 | Context compression | Old turns folded so the prompt stays affordable | done — `compactMessages` past 40 messages (`chain/compaction.ts`, `chain/summary.ts`) |
-| Session search / session librarian | Find anything back across sessions | done in the drawer (Ctrl-K over titles and the message text the client holds) |
+| Session search / session librarian | Find anything back across sessions | done in the drawer (Ctrl-K over titles and the message text the client holds), and for the agent itself: `memory_search` searches earlier messages and memory across all conversations (`src/tools/recall-tools.ts`) |
 | Goals / standing goals | A persistent target the agent keeps working toward | done — `goal`/`goal_update` events, `goalContext()` in every prompt, GoalsPanel |
 | Plugin system + catalog + host isolation | Third-party code, isolated | done for the loader (bundled + home drop-in, manifests); no catalog, no host isolation |
 | MCP client + MCP catalog | External tools through a standard | done — `McpRuntime` dials the chain's servers, tools gated (§7) |
 | Kanban board | Tracked work items | LATER |
 | Connectors (Gmail, Notion, Linear…) | Hosted app accounts through one auth | module only — read-only GitHub (`src/connectors/github.ts`), no route |
-| TTS / vision / clarify / todo | Speak, see images, ask instead of guess, track tasks | vision done (photos ride the message), clarify done (approval cards), todo LATER, TTS module only |
+| TTS / vision / clarify / todo | Speak, see images, ask instead of guess, track tasks | vision done (photos ride the message), clarify done (approval cards), todo done as a tool (`todo`, one list per conversation, in memory; no panel), TTS module only |
 | Profiles (one process, several identities) | Several "persons" on one install | WON'T — one agent, one identity |
 | Updater with fleet verification | Updates without breaking running bots | **BUILD** — the card is unmounted (§9) |
 
