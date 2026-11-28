@@ -28,6 +28,45 @@ komt hier per versie terug.
       the Tauri and Android shells hand to the UI.
 - [ ] **Skill curator.** Count how often each skill is used, show unused and
       recently changed ones, and give an approved proposal an undo.
+- [ ] **Roan's own loop is the default engine.** `settings.engine` defaults to
+      `hermes` and the builtin loop is the fallback (`src/daemon/settings.ts`).
+      An alternative to Hermes cannot need Hermes installed: builtin becomes
+      the default and `hermes` an opt-in.
+- [ ] **Background processes.** A job list, a notice when a process exits and
+      a PTY shell. `run_shell` blocks until the command ends or times out.
+- [ ] **Fallback model.** When the provider fails, the turn fails. Let the
+      owner name a second model the turn retries on.
+- [ ] **Voice.** `src/stt/` and `src/voice/` are modules only: wire the mic in
+      the composer (dictation) and read-aloud for an answer.
+- [ ] **Connectors.** `src/connectors/github.ts` is read-only and has no
+      caller. Give it a route and a tool, then decide which come next.
+- [ ] **Remote MCP with sign-in.** Local MCP servers work; hosted ones that
+      need OAuth do not.
+- [ ] **Computer use.** Module only (`src/computer/`), not wired into a turn.
+- [ ] **Reasoning for Google, and live.** The Thought block covers
+      OpenAI-compatible providers and Anthropic and appears when the turn
+      ends. Add Google's thought parts and stream it while the model thinks.
+- [ ] **Tool guard on relayed calls.** A `run_shell` that arrives from another
+      node as a `tool_req` skips the risky-command check (`src/tools/guard.ts`
+      wraps `toolsForTurn` only).
+- [ ] **Policy file.** An owner-editable file that says which tool may do
+      what; `decide()` in `src/tools/policy.ts` still has no caller.
+- [ ] **More slash commands.** `/compact`, `/sessions`, `/goal`, `/skills`.
+- [ ] **Per-conversation model.** `model_set` writes one model for the whole
+      device; the model belongs to the conversation.
+- [ ] **Finish the small screens.** Edit a sent message (branch from a
+      checkpoint), an archived-conversations view, a session cost total, and
+      the doctor behind a settings button (`src/daemon/health.ts`,
+      `diagnostics.ts`).
+- [ ] **API key out of the chain.** It sits in `config.json`, which travels.
+      Rolled over from 0.0.26; `docs/security.md` calls it a live defect.
+- [ ] **Auth on the control socket.** `/ws` is guarded by address only. The
+      same per-device token that tells the app from a local browser fixes it.
+- [ ] **Docs match the code.** About a dozen files in `docs/` contradict the
+      code or each other (`architecture.md`, `gui.md`, `install.md`,
+      `mobile.md`, `packaging.md`, `release.md`, `run-it-locally.md`,
+      `testing.md`, `chain.md`, `protocol.md`, `storage.md`, `updates.md`),
+      and `WORK-PARALLEL.md` lists finished work as open.
 - [ ] **Subagents are Mini Roans.** A subagent is not a second agent and not a
       Hermes turn but a small Roan: the same identity, skills and memory, with
       its own context for one bounded task, and only the summary comes back.
