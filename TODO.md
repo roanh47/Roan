@@ -67,13 +67,15 @@ there comes back here, per version.
       prompt. Rename it (for example `RULES.md`) in `src/daemon/bootstrap.ts`,
       `src/env/types.ts` and the prompt builder, and move an existing file
       over once, the way the lowercase home was migrated.
-- [ ] **Connectors.** Top priority. `src/connectors/github.ts` is read-only
-      and has no caller. Needed: a connector contract (sign in once, token in
-      `secrets/`, tools the agent can call), a Settings → Connectors page to
-      connect and disconnect, and the first real ones: mail, calendar, notes
-      and code hosting.
-- [ ] **Remote MCP with sign-in.** Local MCP servers work; hosted ones that
-      need OAuth do not.
+- [ ] **Connections.** Top priority. Built, not proven: Settings →
+      Connections adds a service by its MCP address, signs in with a token
+      kept on this device only (`secrets/connections/`,
+      `src/daemon/connection-tokens.ts`), shows whether it is connected and
+      how many tools it brought, and signs out or removes it. Four services
+      are offered by name. Still to do: sign-in in the browser (OAuth), which
+      most services need (mail, calendar, notes); checking the four suggested
+      addresses against the real services; and turning a connection off
+      without removing it from this page.
 - [ ] **Computer use.** Top priority. Built, not proven: the `computer` tool
       looks at the screen (a model that can see describes it with pixel
       positions), then moves, clicks, types and presses keys

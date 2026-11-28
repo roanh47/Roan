@@ -14,6 +14,7 @@ import { ModelRolesPanel } from "./panels/ModelRolesPanel.js";
 import { CommandsPanel } from "./panels/CommandsPanel.js";
 import { JobsPanel } from "./panels/JobsPanel.js";
 import { ComputerUsePanel } from "./panels/ComputerUsePanel.js";
+import { ConnectionsPanel } from "./panels/ConnectionsPanel.js";
 import { proposedSkills } from "../../src/skills/fold.js";
 import { SkillProposals } from "./components/SkillProposals.js";
 import { WebAccessCard } from "./panels/WebAccessCard.js";
@@ -83,6 +84,7 @@ type SettingsPage =
   | "menu"
   | "providers"
   | "models"
+  | "connections"
   | "commands"
   | "jobs"
   | "computer"
@@ -98,6 +100,7 @@ type SettingsPage =
 const SETTINGS_ROWS: readonly [SettingsPage, string, string][] = [
   ["providers", "Models & keys", "providers and API keys"],
   ["models", "Model roles", "thinking effort, fallback and helper models"],
+  ["connections", "Connections", "services Roan can use for you"],
   ["commands", "Commands", "your own slash commands"],
   ["agent", "Agent", "tools, skills and MCP servers"],
   ["tools", "Tools & rules", "on or off, ask first, MCP servers"],
@@ -550,6 +553,8 @@ export default function App({ client: injected }: { client?: ChainClient } = {})
           />
         ) : settingsPage === "models" ? (
           <ModelRolesPanel client={client} />
+        ) : settingsPage === "connections" ? (
+          <ConnectionsPanel client={client} />
         ) : settingsPage === "computer" ? (
           <ComputerUsePanel
             client={client}

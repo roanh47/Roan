@@ -77,16 +77,44 @@ export function flattenMcpContent(content: unknown): string {
   return parts.join("\n");
 }
 
-async function httpRpc(url: string, body: string): Promise<string> {
+/** What one HTTP connection remembers between calls. */
+interface HttpLink {
+  /** The owner's sign-in for this server, sent as a bearer token; never logged. */
+  readonly token: string | null;
+  /** The session the server opened at `initialize`, echoed on later calls. */
+  session: string | null;
+}
+
+/** The request headers for one call: the token and the session when there is one. */
+export function mcpHeaders(link: { readonly token: string | null; readonly session: string | null }): Record<string, string> {
+  return {
+    "content-type": "application/json",
+    accept: "application/json, text/event-stream",
+    ...(link.token !== null && link.token.length > 0 ? { authorization: `Bearer ${link.token}` } : {}),
+    ...(link.session !== null ? { "mcp-session-id": link.session } : {}),
+  };
+}
+
+async function httpRpc(url: string, body: string, link: HttpLink): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), CALL_TIMEOUT_MS);
   try {
     const response = await fetch(url, {
       method: "POST",
-      headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+      headers: mcpHeaders(link),
       body,
       signal: controller.signal,
     });
+    const opened = response.headers.get("mcp-session-id");
+    if (opened !== null && opened.length > 0) link.session = opened;
+    // A refused sign-in must read as that, not as "no answer".
+    if (response.status === 401 || response.status === 403) {
+      throw new Error(
+        link.token === null
+          ? "this server needs you to sign in: add its token on Settings → Connections"
+          : "the server refused the token; check it on Settings → Connections",
+      );
+    }
     return await response.text();
   } finally {
     clearTimeout(timer);
@@ -99,10 +127,11 @@ export interface McpConnection {
   readonly tools: readonly Tool[];
 }
 
-export async function connectMcpServer(server: McpServerConfig): Promise<McpConnection> {
+export async function connectMcpServer(server: McpServerConfig, token: string | null = null): Promise<McpConnection> {
+  const link: HttpLink = { token, session: null };
   const sender =
     server.transport === "http" && server.url !== undefined
-      ? async (body: string) => httpRpc(server.url as string, body)
+      ? async (body: string) => httpRpc(server.url as string, body, link)
       : server.transport === "stdio" && server.command !== undefined
         ? await stdioSender(server.command)
         : null;

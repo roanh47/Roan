@@ -74,6 +74,12 @@ import { guardTool, type ApprovalAnswer, type GuardOptions } from "../tools/guar
 import { dueJobs, loadCron, unparseableSchedule } from "../cron/jobs.js";
 import { isEffortLevel } from "../providers/effort.js";
 import { runMiniRoan } from "./mini.js";
+import {
+  isConnectionId,
+  loadConnectionToken,
+  removeConnectionToken,
+  saveConnectionToken,
+} from "./connection-tokens.js";
 import { createGrantStore } from "../computer/grant.js";
 import { createLinuxDriver } from "../computer/driver-linux.js";
 import { createComputerTool, describeScreenPrompt, unavailableDriver } from "../computer/tool.js";
@@ -224,7 +230,11 @@ async function main(): Promise<void> {
   const tools = [...allTools(), ...contextTools(memory, skills), createProcessTool(processes)];
   // MCP servers are chain config: this node dials them, every instance folds
   // the same list. Unreachable servers are skipped, never fatal.
-  const mcp = new McpRuntime((line) => log(line));
+  // A connection's sign-in is looked up on this device at every dial.
+  const mcp = new McpRuntime(
+    (line) => log(line),
+    (id) => loadConnectionToken(paths.secrets, id),
+  );
   const agentContext: AgentContext = {
     memory,
     skills,
@@ -1528,6 +1538,53 @@ async function main(): Promise<void> {
               live: live.has(server.id) && server.enabled,
             })),
           });
+          return;
+        }
+        if (kind === "connections_list" || kind === "connection_token_set" || kind === "connection_token_clear") {
+          // Connections: the services Roan can reach, whether this device is
+          // signed in to each, and whether it is connected right now. A token
+          // is saved on this device and never sent back to the app.
+          const current = session;
+          if (current === null) {
+            reply({ ok: false, error: "no chain to keep connections on yet" });
+            return;
+          }
+          const read = (): ReturnType<typeof mcpServersFromEvents> =>
+            mcpServersFromEvents(current.store.read(current.identity.chainId, 1, 100_000));
+          if (kind !== "connections_list") {
+            const id = typeof data["id"] === "string" ? data["id"].trim() : "";
+            if (!isConnectionId(id) || !read().some((server) => server.id === id)) {
+              reply({ ok: false, error: "that connection does not exist" });
+              return;
+            }
+            if (kind === "connection_token_set") {
+              const token = typeof data["token"] === "string" ? data["token"].trim() : "";
+              if (token.length === 0) {
+                reply({ ok: false, error: "the token is empty" });
+                return;
+              }
+              await saveConnectionToken(paths.secrets, id, token);
+            } else {
+              await removeConnectionToken(paths.secrets, id);
+            }
+            // Dial again now, so the answer already says whether it worked.
+            await mcp.sync(read());
+          }
+          const servers = read();
+          const connections = await Promise.all(
+            servers.map(async (server) => ({
+              id: server.id,
+              label: server.label,
+              transport: server.transport,
+              address: server.url ?? server.command ?? "",
+              enabled: server.enabled,
+              signedIn: (await loadConnectionToken(paths.secrets, server.id)) !== null,
+              tools: mcp.toolCount(server.id),
+              connected: mcp.toolCount(server.id) > 0,
+              problem: mcp.failure(server.id),
+            })),
+          );
+          reply({ ok: true, connections });
           return;
         }
         if (kind === "mcp_server_save") {
