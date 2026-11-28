@@ -72,7 +72,8 @@ import { runHooks, type HookConfig } from "../hooks/run.js";
 import { guardTool, type ApprovalAnswer, type GuardOptions } from "../tools/guard.js";
 import { dueJobs, loadCron, unparseableSchedule } from "../cron/jobs.js";
 import { isEffortLevel } from "../providers/effort.js";
-import { engineAvailable, runHermesTurn } from "../engine/hermes.js";
+import { engineAvailable } from "../engine/hermes.js";
+import { runMiniRoan } from "./mini.js";
 import { McpRuntime } from "./mcp-runtime.js";
 import { approvedToolsFromEvents, mcpServersFromEvents, toolRulesFromEvents } from "../chain/gates.js";
 import type { Tool } from "../types.js";
@@ -819,13 +820,18 @@ async function main(): Promise<void> {
     });
     const relayNow = relayOptions();
     if (relayNow === null) return gated;
-    return [
+    const shared: Tool[] = [
       ...gated,
-      createRunOnNodeTool(relayNow, () => {
-        if (session === null) return [];
-        const current = session;
-        return readNodes(current.store.read(current.identity.chainId, 1, 100_000));
-      }),
+      // Guarded like the rest: a risky shell line for another device asks
+      // here first, because here is where the owner can answer.
+      guardTool(
+        createRunOnNodeTool(relayNow, () => {
+          if (session === null) return [];
+          const current = session;
+          return readNodes(current.store.read(current.identity.chainId, 1, 100_000));
+        }),
+        { ask: false, askPermission, ...around },
+      ),
       // Recall: the agent looks up what was said and learned before, itself.
       createMemorySearchTool((query, limit) => {
         if (session === null) return [];
@@ -853,29 +859,45 @@ async function main(): Promise<void> {
           control?.broadcast({ t: "append", event });
         },
       }),
+    ];
+    return [
+      ...shared,
       {
         name: "delegate",
         description:
-          "Hand a self-contained task to a fresh agent with its own context and get only the summary back. " +
+          "Hand a self-contained task to a Mini Roan: yourself, with the same skills, memory and tools, " +
+          "in a context of its own. Only its summary comes back. " +
           "Use it for work that would flood this conversation.",
         parameters: {
           type: "object",
           properties: {
-            task: { type: "string", description: "What the subagent must do, complete enough to stand alone" },
+            task: { type: "string", description: "What the Mini Roan must do, complete enough to stand alone" },
             cwd: { type: "string", description: "Folder to work in; the workspace by default" },
           },
           required: ["task"],
         },
-        async run(args) {
+        async run(args, ctx) {
           const task = String(args["task"] ?? "").trim();
           if (task.length === 0) throw new Error("task is required");
           const dir = typeof args["cwd"] === "string" ? args["cwd"] : paths.syncedWorkspace;
-          const result = await runHermesTurn({
-            prompt: `Je bent een subagent. Doe deze taak en antwoord met een korte samenvatting van wat je deed en vond, zonder de hele uitvoer te herhalen.\n\n${task}`,
-            cwd: dir,
-            timeoutMs: 900_000,
-          });
-          return result.text;
+          // Roan's own loop, not another engine: the Mini Roan is the same
+          // agent and passes the same guard, in a context nobody else reads.
+          return await runMiniRoan(
+            {
+              provider: {
+                baseUrl: settings.baseUrl,
+                apiKey: settings.apiKey,
+                model: settings.model,
+                providerId: settings.provider,
+              },
+              systemPrompt: await agentContext.prompt(),
+              tools: shared,
+              cwd: dir,
+              effort: settings.effort,
+              ...(ctx.signal !== undefined ? { signal: ctx.signal } : {}),
+            },
+            task,
+          );
         },
       },
     ];

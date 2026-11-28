@@ -38,6 +38,13 @@ export interface GuardOptions {
  * The owner can still say yes — it is their machine — but never by default.
  */
 export function dangerReason(tool: string, args: Record<string, unknown>): string | null {
+  // A shell line sent to another device is judged here, where the owner is:
+  // the machine that executes it has nobody to ask.
+  if (tool === "run_on_node") {
+    const inner = args["args"];
+    if (args["tool"] !== "run_shell" || typeof inner !== "object" || inner === null) return null;
+    return dangerReason("run_shell", inner as Record<string, unknown>);
+  }
   if (tool !== "run_shell") return null;
   const command = typeof args["command"] === "string" ? args["command"] : "";
   if (command.trim() === "") return null;
