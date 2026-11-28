@@ -31,6 +31,11 @@ export interface Settings {
    */
   readonly effort: EffortLevel;
   readonly access: AccessSettings;
+  /**
+   * A second model of the same provider, tried once when a request to the
+   * first one fails before it answered anything. Empty means none.
+   */
+  readonly fallbackModel: string;
 }
 
 const DEFAULTS: Settings = {
@@ -41,6 +46,7 @@ const DEFAULTS: Settings = {
   provider: "lmstudio",
   effort: "normal",
   access: { fullDisk: false },
+  fallbackModel: "",
 };
 
 /** Only a literal `true` turns a capability on; `"true"` and `1` stay off. */
@@ -82,6 +88,7 @@ export async function loadSettings(paths: RoanPaths): Promise<Settings> {
       provider: pick("provider"),
       effort: isEffortLevel(level) ? level : DEFAULTS.effort,
       access: parseAccess(parsed["access"]),
+      fallbackModel: typeof parsed["fallbackModel"] === "string" ? parsed["fallbackModel"].trim() : "",
     };
   } catch {
     return DEFAULTS;

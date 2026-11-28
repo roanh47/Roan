@@ -1036,6 +1036,7 @@ async function main(): Promise<void> {
           providerId: settings.provider,
         },
         effort: settings.effort,
+        fallbackModel: settings.fallbackModel,
         cwd: paths.syncedWorkspace,
         systemPrompt,
         tools: toolsForTurn(hooks, { ROAN_CHAIN: current.identity.chainId, ROAN_SESSION: sessionId }),
@@ -1901,6 +1902,30 @@ async function main(): Promise<void> {
           control?.broadcast({ t: "append", event });
           control?.sendState();
           reply({ ok: true });
+          return;
+        }
+        if (kind === "fallback_model") {
+          // The model a turn retries on when the first one fails. Without a
+          // value it is a question; an empty string turns it off.
+          if (data["model"] === undefined) {
+            reply({ ok: true, model: settings.fallbackModel });
+            return;
+          }
+          if (typeof data["model"] !== "string") {
+            reply({ ok: false, error: "model must be a model id, or empty to turn the fallback off" });
+            return;
+          }
+          settings = await saveSettings(paths, { fallbackModel: data["model"] });
+          if (session !== null) {
+            const current = session;
+            void publishEnv({
+              store: current.store,
+              chain: current.identity.chainId,
+              node: current.identity.nodeId,
+              home: paths.home,
+            }).catch(() => undefined);
+          }
+          reply({ ok: true, model: settings.fallbackModel });
           return;
         }
         if (kind === "access") {

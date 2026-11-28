@@ -284,6 +284,19 @@ export default function App({ client: injected }: { client?: ChainClient } = {})
     else if (name === "model") setSheetOpen(true);
     else if (name === "plan") setPlanMode(!planMode);
     else if (name === "settings") setView("settings");
+    else if (name === "fallback") {
+      const wanted = args.trim();
+      const data = wanted.length === 0 ? {} : { model: wanted === "off" ? "" : wanted };
+      void client
+        .request<{ ok?: boolean; model?: string; error?: string }>("fallback_model", data)
+        .then((answer) => {
+          if (answer.ok !== true) setNotice(answer.error ?? "could not change the fallback model");
+          else setNotice(answer.model ? `fallback model: ${answer.model}` : "no fallback model set");
+        })
+        .catch((error: unknown) => {
+          setNotice(error instanceof Error ? error.message : "could not change the fallback model");
+        });
+    }
     else if (name === "command") {
       const edit = parseCommandEdit(args);
       if (!edit.ok) {
