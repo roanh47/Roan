@@ -1,1 +1,0 @@
-`.prettierrc.json` — width 100, double quotes, semicolons.

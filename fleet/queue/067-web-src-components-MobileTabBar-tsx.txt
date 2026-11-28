@@ -1,1 +1,0 @@
-`web/src/components/MobileTabBar.tsx` — four tabs, props only.

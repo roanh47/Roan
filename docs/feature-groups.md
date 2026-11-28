@@ -109,7 +109,7 @@ GEM=Gemini.
 | Lifecycle hooks | 40+ hooks (CC), JSON hooks (AG), hooks (GC, CRU, CL, OH, OCW, CX, DSH, CUR) | DONE — `hooks.json` runs a shell command at `turn_start` and `turn_end` (`src/hooks/run.ts`, called by `runMessage`) and at `before_tool`/`after_tool` around every tool call (`src/tools/guard.ts`) |
 | MCP client | MCP (every harness) | DONE — real JSON-RPC client (http + stdio), server list as chain events, tools gated, `McpRuntime` dials per turn |
 | Expose self as server | CC as MCP server, OCW as MCP server + ACP harness, app-server (CX), `opencode serve` + REST (OC), ACP server (GOO) | LATER — control API exists, shape it later |
-| Subagents | subagents (CC, OC, GC, AG, QW, CL, OH, DSH, OCW, CUR, GOO, CX, ROO, PI, OMP, AMP) | WON'T as a product — one agent, his rule; `run_on_node` moves *where*, and a single `delegate` tool (a fresh hermes turn, summary back) rides in the relay tool set without becoming an agent family |
+| Subagents | subagents (CC, OC, GC, AG, QW, CL, OH, DSH, OCW, CUR, GOO, CX, ROO, PI, OMP, AMP) | DONE as Mini Roans — one agent, his rule; `run_on_node` moves *where*, and `delegate` starts a Mini Roan (the same agent in a context of its own, summary back, `src/daemon/mini.ts`) without becoming an agent family |
 | Agent teams / swarm / board | agent teams (CC, CL, DSH, QW), `/boost` `/swarm` `/teamwork` (AG), swarm (OCW), hub-spoke (CL), parallel agents (ZED), multiplayer (OCW) | WON'T |
 | Dynamic agent-written workflows | dynamic workflows (CC), `/run-workflow` (AG) | WON'T |
 | Everything-is-a-plugin (incl. the loop) | plugin-composed loop & runtimes (DSH), agent runtimes as plugins (OCW) | WON'T |
@@ -217,7 +217,7 @@ GEM=Gemini.
 | Artifacts / canvas / side documents | Artifacts (CC, CLD), Canvas (GEM, GPT), Docs/Sheets/Whiteboards/Design/Science (CLD), Space pages (GPT) | LATER — markdown and attachments first |
 | Custom assistant store | GPTs + GPT Store (GPT, retiring), Gems → replaced by skills (GEM) | WON'T — one agent; Gemini itself replaced this with skills |
 | Deep research mode | deep research (GPT, GEM, CLD) | SOON — module only: bounded plan→search→extract→report with a citation guard (`src/research/`, 3 test files); no tool registered |
-| Connectors (Gmail, Drive, Slack…) | connected apps (GPT, GEM), connectors (CLD, CX, CL), Hermes connectors | SOON — module only: read-only GitHub issues and files (`src/connectors/github.ts`, token from `secrets/`) + tests; no route and no tool |
+| Connectors (Gmail, Drive, Slack…) | connected apps (GPT, GEM), connectors (CLD, CX, CL) | SOON — module only: read-only GitHub issues and files (`src/connectors/github.ts`, token from `secrets/`) + tests; no route and no tool |
 | Inter-agent protocols (A2A/Reef) | A2A channel, Reef (OCW), cross-session messaging (CC), agent send (OCW) | WON'T — the reasoning, what covers the same need and what an adapter would have to do are in [`docs/a2a.md`](a2a.md) |
 | Device control between own nodes | node devices & computer use (OCW), device assistance (GEM) | SOON — module only: `src/sync/device-control.ts` (request/grant/result shapes) with 16 tests; no `device_req` frame and no transport handler |
 | Consumer verticals (shopping, wallet, health, law, study, CarPlay, office suites, Sites) | shopping/wallet/finances/health/law/flashcards/CarPlay/office integrations/Sites (GPT), purchases (GEM), smart home (GEM), Google Docs (CLD) | WON'T — personal integrations happen through tools, not product features |

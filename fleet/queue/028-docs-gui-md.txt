@@ -1,1 +1,0 @@
-`docs/gui.md` — pane by pane what the GUI shows, in plain english.

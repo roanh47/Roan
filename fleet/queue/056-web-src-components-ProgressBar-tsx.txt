@@ -1,1 +1,0 @@
-`web/src/components/ProgressBar.tsx` — determinate and indeterminate.

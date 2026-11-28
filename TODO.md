@@ -1,12 +1,11 @@
 # To do
 
-Eén lijst, per versie. Een vinkje betekent: het werkt en het is bewezen — op een
-echte machine of met een test die de hele route aflegt. Wat een versie niet haalt,
-schuift naar de volgende versie; er is geen tweede lijst.
+One list, per version. A tick means it works and it is proven: on a real
+machine, or by a test that walks the whole route. What a version does not
+reach moves to the next one; there is no second list.
 
-De volledige vergelijking met Hermes — 66 features, 50 af, 15 open, 1 bewust niet —
-staat met vinkjes in `docs/feature-parity.md` (§ Samenvatting). Wat daar open staat,
-komt hier per versie terug.
+The feature-by-feature status is in `docs/feature-parity.md`. What is open
+there comes back here, per version.
 
 ## 0.1.0
 
@@ -14,8 +13,7 @@ komt hier per versie terug.
       names, docs, prompts and this file. Known Dutch today: most of this
       `TODO.md`, `docs/feature-map.md`, `docs/FINAL-0.0.23.md`,
       `docs/goals-0.0.23.md`, `docs/goal-orchestrator-0.0.23.md`, the summary
-      in `docs/feature-parity.md`, `fleet/prompt.txt`, the `delegate` prompt in
-      `src/daemon/main.ts`, variable names such as `stappen` / `antwoord` in
+      in `docs/feature-parity.md`, variable names such as `stappen` / `antwoord` in
       `src/agent.ts`, and some test names. The one exception is the
       writing-style skill: it has an upstream and is not touched.
 - [ ] **Prove the 0.1.0 work on a device.** Built and CI-checked only, never
@@ -28,13 +26,24 @@ komt hier per versie terug.
       the Tauri and Android shells hand to the UI.
 - [ ] **Skill curator.** Count how often each skill is used, show unused and
       recently changed ones, and give an approved proposal an undo.
+- [ ] **The UI gets better.** Same style, better app: it has to feel
+      finished on a phone, a tablet and a desktop. Go screen by screen (chat,
+      composer, drawer, settings pages, sheets, approval and skill cards) and
+      fix spacing, alignment, touch targets, empty and loading states, and
+      anything that jumps or overlaps. The new 0.1.0 pieces (slash menu,
+      Thought block, skill proposals, access card, effort picker) were written
+      without ever being seen on a screen and need this first.
 - [ ] **Roan is its own harness.** Built, not proven: every turn runs on
-      Roan's own loop (`src/agent.ts`). The Hermes engine, the `engine`
-      setting and `ROAN_ENGINE` are gone from the code. Still to do: prove a
-      full turn on each device, take the Hermes mentions out of the docs
-      (`docs/feature-map.md`, `docs/feature-parity.md` and others), and decide
-      what happens to `fleet/` and `.hermes/`, which are build tooling that
-      runs Hermes to write this repo.
+      Roan's own loop (`src/agent.ts`) and nothing else. Still to do: prove a
+      full turn on each device.
+- [ ] **Auxiliary models.** Built, not proven: `/vision model-id` names a
+      model that looks at an attached image and describes it for a main model
+      that cannot see, and `/background model-id` names a cheaper model for
+      memory distilling (`src/daemon/auxiliary.ts`). Either may sit on another
+      saved provider: `/vision provider model-id`. Still to do: a screen for
+      it, more slots (compaction, titles, web extraction), and picking the
+      vision model automatically when the catalog says the main one is
+      text-only.
 - [ ] **Background processes.** Built, not proven: the `process` tool starts
       a job, lists jobs, reads output and stops one, and the next turn is told
       which jobs ended (`src/tools/processes.ts`). Still to do: a jobs panel in

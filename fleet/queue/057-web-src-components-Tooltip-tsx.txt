@@ -1,1 +1,0 @@
-`web/src/components/Tooltip.tsx` — hover and focus tooltip, no dependency.

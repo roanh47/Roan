@@ -4,8 +4,7 @@ Date: 2026-11-18, re-checked against the code on the 0.0.23 branch (every verdic
 below was read back from `src/` and `web/src/`, not from the earlier plan). Sources: the
 agents' official docs (all research delivered — 1,024
 sourced rows in `docs/research/features/`), `docs/mobile-app-patterns.md`,
-`docs/reference-apps-apk-analysis.md` (ChatGPT APK), the Roan repo itself, and Hermes'
-own surface (I am that).
+`docs/reference-apps-apk-analysis.md` (ChatGPT APK), and the Roan repo itself.
 
 **Start here for the to-do:** `docs/feature-groups.md` — all 23 inventories collapsed
 into ~110 deduplicated concepts (YOLO = Auto Approve = Turbo = one row, aliases shown),
@@ -13,7 +12,7 @@ each with a DONE / BUILD / SOON / LATER / WON'T status, rejected ones included. 
 file keeps the reasoning per verdict; the JSONs keep the raw sourced rows.
 
 Legend — **CC** Claude Code · **CX** Codex CLI · **OC** opencode · **GC** Gemini CLI ·
-**GPT** ChatGPT app · **CL** Claude app · **HM** Hermes.
+**GPT** ChatGPT app · **CL** Claude app · **HM** Hermes, the agent that inspired Roan.
 Verdicts: **BUILD** (needed for parity, next rounds) · **SOON** (valuable, after BUILD) ·
 **LATER** (real but not near) · **WON'T** (does not fit Roan's model — see the next section).
 
@@ -204,22 +203,20 @@ What is genuinely still open on those seven items: editing a sent message
 (branch from a checkpoint), push notifications off-device, and cloning the
 writing-style skill into `skills/writing-style/`.
 
-## Hermes — the full surface, inventoried from the inside
+## The inspiration — its full surface
 
-Hermes is the agent writing this file, so this inventory comes from the running
-installation (`/home/roan/.hermes/hermes-agent`) rather than a website: CLI + TUI +
-gateway + desktop + dashboard, 42 platform-adapter files, 263 skills, plugins with
-host isolation. Per row: what Hermes has, and what Roan does with it — several of
-these are deliberately out for Roan even though Hermes has them.
+The agent Roan takes its inspiration from (HM in the legend): CLI, TUI, gateway,
+desktop app and dashboard, a large skill library, plugins. Per row: a feature it
+has, and what Roan does with it. Several are deliberately out for Roan.
 
-| Hermes feature | What it is | Verdict for Roan |
+| Feature | What it is | Verdict for Roan |
 |---|---|---|
 | Messaging gateway, ~20 platforms (Telegram, Discord, Slack, IRC, Feishu…) | The agent lives in a process that survives every window; channels are doors | **SOON (one channel)** — Roan's app is the channel; a daemon-fed Telegram door is possible later, never the core |
 | Gateway survives the desktop app | Close the window, the bots keep running | done — the Tauri shell spawns the daemon as a sidecar and the Android foreground service owns it when the app closes |
 | Persistent memory + user profile | Facts that survive sessions, injected every turn | done (`src/context/memory.ts`, `memory`/`skill_*` context tools) — invisible in the transcript |
 | Skills (263, with curator + auto-update) | Task-shaped instructions loaded when relevant | loading done — `SkillLibrary` + `contextTools` put the index in every prompt and `skill_view` reads one. Self-improvement done in its first form: `skill_propose` lets the agent propose a new skill or a better version, and it is saved only when the owner presses Save skill (`src/skills/propose-tool.ts`, `propose-tool.test.ts`, `SkillProposals.tsx`). No curator (usage counts, stale skills), no undo button, no auto-update; not proven on a device |
 | Cron scheduler + background processes with notify-on-exit | Work happens when you are not there | cron done, notification done (the service tails `notify:turn-done`); notify-on-exit for a *process* is not built |
-| Delegation / subagents with structured output | A fresh context does a subtask and reports back | WON'T as a product — one agent; a single `delegate` tool rides in the relay set for a self-contained task |
+| Delegation / subagents with structured output | A fresh context does a subtask and reports back | done as Mini Roans — `delegate` starts the same agent in a context of its own on Roan's loop and only its summary comes back (`src/daemon/mini.ts`); never a second agent or persona |
 | Terminal with background jobs + PTY | Real shell, tracked processes | done for `run_shell` (timeout, process group, output cap); no PTY and no job list |
 | Browser automation + computer use | A real browser driven for logins and scraping | browser done as a core tool (`BROWSER_CDP_URL`); computer use is a module only (§6) |
 | Web search / extract | Grounded answers with sources | done — `web_search` / `web_fetch` plugins |
@@ -243,7 +240,7 @@ rows that decide something for Roan.
 
 | OpenClaw feature | What it is | Verdict for Roan |
 |---|---|---|
-| Gateway daemon per host | One long-lived process owns sessions/tools/events; every surface is a client of it | **confirmed shape** — third vendor after Hermes and opencode's background service; Roan's daemon is right |
+| Gateway daemon per host | One long-lived process owns sessions/tools/events; every surface is a client of it | **confirmed shape** — the same as opencode's background service; Roan's daemon is right |
 | Workspace home | `~/.openclaw/workspace` with AGENTS.md, SOUL.md, IDENTITY.md, USER.md, MEMORY.md as editable Markdown | done — `ensureBootstrapFiles` writes SOUL.md, IDENTITY.md and AGENTS.md on first start; USER/MEMORY ride the chain |
 | BOOTSTRAP.md first-run ritual | On a fresh workspace the agent seeds its own files and walks through picking an identity, then deletes the bootstrap file | done in the seeding half (`src/daemon/bootstrap.ts`); there is no interview step |
 | Node devices | Companion devices pair as thin nodes: camera, screen recording, location, SMS, notifications via `node.invoke` | **WON'T as-is** — Roan devices are full peers, never thin clients; worth stealing is the device-command set (camera/screenshot/notify between Roan's own instances) — SOON after round 2 |
@@ -301,7 +298,7 @@ made; these are the ones that change or sharpen something:
 
 | Signal | Who has it | Verdict for Roan |
 |---|---|---|
-| Daemon + web shell + channels (`qwen serve`) | Qwen Code | **confirmed again** — fourth vendor after Hermes, opencode, OpenClaw: an always-on local daemon that surfaces plug into is the mainstream shape, not the exception |
+| Daemon + web shell + channels (`qwen serve`) | Qwen Code | **confirmed again** — after opencode and OpenClaw: an always-on local daemon that surfaces plug into is the mainstream shape, not the exception |
 | `/grill-me` — interview the user before implementing | Antigravity | **SOON** — the clarify pattern belongs in Roan's big-work flow: ask before building, not after guessing |
 | Stuck detector — catch a looping agent and handle it | OpenHands | done — a turn reports after 2 min of silence and owns up at 5 (`src/turn/lock.ts`) |
 | Persistent permission grants | Antigravity, Copilot CLI (trusted dirs) | done — `tool_approval` events, learned per tool, resettable in the Tools panel |

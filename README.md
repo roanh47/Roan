@@ -4,6 +4,8 @@ One agent, several machines. Your PC, your server and your phone sit next to eac
 other, all running the same agent, all holding the same conversation. No central
 server, no head agent, no cloud account.
 
+Roan is its own harness. Its inspiration is Hermes Agent.
+
 ```
         PC                    SERVER                PHONE
 ┌────────────────┐    ┌────────────────┐    ┌────────────────┐
