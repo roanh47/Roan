@@ -95,6 +95,9 @@ test or a script.
 
 ## Code conventions
 
+- Everything in this repository is English: code, comments, identifiers, test
+  names, docs, prompts, commit messages and UI copy. The one exception is the
+  writing-style skill, which has an upstream: do not translate or edit it.
 - TypeScript strict, plus `noUncheckedIndexedAccess`. Indexed access is `T | undefined`;
   handle it instead of asserting.
 - ESM with NodeNext: relative imports end in `.js`, even in `.ts` files.

@@ -42,6 +42,9 @@ import {
   foldSkillProposals,
 } from "../skills/fold.js";
 import { createSkillProposeTool, installSkill } from "../skills/propose-tool.js";
+import { searchStoreMemories } from "../knowledge/search.js";
+import { createMemorySearchTool, createTodoTool } from "../tools/recall-tools.js";
+import { TodoStore } from "../tools/todo.js";
 import { distilMemories, memoryTexts } from "../memory/index.js";
 import { foldMemoryMd, writeMemoryMd } from "../context/memory-md.js";
 import { approvePlan, planModeEnabled, planModeEvent } from "./plan.js";
@@ -785,6 +788,7 @@ async function main(): Promise<void> {
    * off, ask-flags gate them behind an approval, MCP servers add theirs. A
    * config that arrived from a peer dials here, at the next look.
    */
+  const todoLists = new Map<string, TodoStore>();
   const toolsForTurn = (
     hooks: HookConfig | null = null,
     hookEnv: Record<string, string> = {},
@@ -818,6 +822,18 @@ async function main(): Promise<void> {
         if (session === null) return [];
         const current = session;
         return readNodes(current.store.read(current.identity.chainId, 1, 100_000));
+      }),
+      // Recall: the agent looks up what was said and learned before, itself.
+      createMemorySearchTool((query, limit) => {
+        if (session === null) return [];
+        return searchStoreMemories(session.store, session.identity.chainId, query, limit);
+      }),
+      // One task list per conversation, kept for as long as the daemon runs.
+      createTodoTool(() => {
+        const key = hookEnv["ROAN_SESSION"] ?? "";
+        const found = todoLists.get(key) ?? new TodoStore();
+        todoLists.set(key, found);
+        return found;
       }),
       // Self-improvement: the agent may propose a skill, only the owner saves it.
       createSkillProposeTool({
