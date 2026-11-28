@@ -1,6 +1,8 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
+import { parseFrontmatter, type Frontmatter } from "./frontmatter.js";
+
 /**
  * Skills are instructions the agent reads only when a task calls for them.
  *
@@ -15,34 +17,6 @@ export interface SkillSummary {
   readonly dir: string;
   /** Support files next to SKILL.md, relative to the skill directory. */
   readonly files: readonly string[];
-}
-
-interface Frontmatter {
-  readonly name?: string;
-  readonly description?: string;
-  readonly body: string;
-}
-
-/** Reads `---` fenced key/value pairs. Deliberately small: two keys, no nesting. */
-export function parseFrontmatter(raw: string): Frontmatter {
-  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(raw);
-  if (match === null) return { body: raw };
-  const head = match[1] ?? "";
-  const body = match[2] ?? "";
-  const values: Record<string, string> = {};
-  for (const line of head.split(/\r?\n/)) {
-    const pair = /^([A-Za-z_][\w-]*)\s*:\s*(.*)$/.exec(line.trim());
-    if (pair === null) continue;
-    const key = pair[1];
-    const value = pair[2];
-    if (key === undefined || value === undefined) continue;
-    values[key] = value.replace(/^["']|["']$/g, "").trim();
-  }
-  return {
-    ...(values["name"] !== undefined ? { name: values["name"] } : {}),
-    ...(values["description"] !== undefined ? { description: values["description"] } : {}),
-    body,
-  };
 }
 
 export class SkillLibrary {

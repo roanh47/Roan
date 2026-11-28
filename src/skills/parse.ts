@@ -14,7 +14,7 @@
  * a check someone has to remember to keep.
  */
 
-import { parseFrontmatter } from "../context/skills.js";
+import { parseFrontmatter } from "../context/frontmatter.js";
 
 /** A skill body longer than this is not a skill, it is a document. */
 export const MAX_BODY_CHARS = 20000;
