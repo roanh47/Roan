@@ -104,8 +104,15 @@ there comes back here, per version.
       checkpoint), an archived-conversations view, a session cost total, and
       the doctor behind a settings button (`src/daemon/health.ts`,
       `diagnostics.ts`).
-- [ ] **API key out of the chain.** It sits in `config.json`, which travels.
-      Rolled over from 0.0.26; `docs/security.md` calls it a live defect.
+- [ ] **Everything is synced: check all of it.** The rule is rule 9 in
+      `AGENTS.md`: everything in `~/.Roan` is synced except `workspace/`.
+      Built, not proven: settings, keys, helper and fallback models,
+      connection sign-ins, the access switch and computer use permissions all
+      travel, and a device reloads its settings when a change arrives. Still
+      to do: the task list the agent keeps is in memory only and has to
+      become chain state; go through every module and move anything that
+      still writes outside the synced part of the home; and rewrite
+      `docs/security.md` and `PLAN.md`, which still say keys do not travel.
 - [ ] **Auth on the control socket.** `/ws` is guarded by address only. The
       same per-device token that tells the app from a local browser fixes it.
 - [ ] **Docs match the code.** About a dozen files in `docs/` contradict the

@@ -3,7 +3,7 @@ import { chmod, mkdir, open, rename, unlink } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { RoanPaths } from "./paths.js";
 import { isEffortLevel, type EffortLevel } from "../providers/effort.js";
-import { loadSettings, type Settings } from "./settings.js";
+import { loadSettings, parseComputerGrants, type Settings } from "./settings.js";
 import { parseAuxiliary, type AuxiliarySettings } from "./auxiliary.js";
 
 /**
@@ -20,6 +20,8 @@ const SETTINGS_KEYS = [
   "access",
   "fallbackModel",
   "auxiliary",
+  "deviceOnly",
+  "computerGrants",
 ] as const satisfies readonly (keyof Settings)[];
 
 type SettingsKey = (typeof SETTINGS_KEYS)[number];
@@ -39,6 +41,9 @@ export interface SettingsPatch {
   fallbackModel?: string;
   /** The whole auxiliary object; the caller merges one slot with `withAuxModel`. */
   auxiliary?: AuxiliarySettings;
+  deviceOnly?: boolean;
+  /** The whole map; the caller adds or removes one conversation. */
+  computerGrants?: Record<string, number>;
 }
 
 function isSettingsKey(key: string): key is SettingsKey {
@@ -87,6 +92,15 @@ function parsePatch(input: unknown): SettingsPatch {
     if (key === "auxiliary") {
       // Parsed, never trusted: a malformed slot becomes an empty one.
       patch.auxiliary = parseAuxiliary(value);
+      continue;
+    }
+    if (key === "deviceOnly") {
+      if (typeof value !== "boolean") throw new Error("setting deviceOnly must be a boolean");
+      patch.deviceOnly = value;
+      continue;
+    }
+    if (key === "computerGrants") {
+      patch.computerGrants = parseComputerGrants(value);
       continue;
     }
     if (typeof value !== "string") {

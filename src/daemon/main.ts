@@ -11,7 +11,8 @@ import { ANDROID_STORAGE_TARGETS, openStorageWindow, sharedStorageProbe } from "
 import { compactMessages } from "../chain/compaction.js";
 import { loadSettings } from "./settings.js";
 import { startControlServer } from "./control.js";
-import { loadDeviceAccess, mayControl, mayLoadUi, saveDeviceAccess } from "./device-access.js";
+import { mayControl, mayLoadUi } from "./device-access.js";
+import type { SettingsPatch } from "./settings-write.js";
 import { ChainNodeStore } from "./peer-store.js";
 import { addPeer, peers as peerList, PEER_PATH, startPeers, stopPeers } from "./peers.js";
 import { probe, startDiscovery, tailscaleHosts } from "./discovery.js";
@@ -80,7 +81,7 @@ import {
   removeConnectionToken,
   saveConnectionToken,
 } from "./connection-tokens.js";
-import { createGrantStore } from "../computer/grant.js";
+import { settingsGrantStore } from "../computer/synced-grants.js";
 import { createLinuxDriver } from "../computer/driver-linux.js";
 import { createWindowsDriver } from "../computer/driver-windows.js";
 import { createMacDriver } from "../computer/driver-macos.js";
@@ -217,12 +218,34 @@ async function main(): Promise<void> {
 
   // Everything this device knows before the first token: its own memory files
   // and the skills on its own disk. Both are copies, never a fetch from a peer.
-  // Who may reach this device from outside the app; local to this machine.
-  let deviceAccess = await loadDeviceAccess(paths.state);
   const memory = new MemoryStore(paths.home);
   const skills = new SkillLibrary(join(paths.home, "skills"));
-  // Computer use: who may, and what moves the pointer on this platform.
-  const computerGrants = createGrantStore();
+  /**
+   * Saves settings and publishes them: everything is synced, so a change made
+   * here has to reach the other devices of the chain.
+   */
+  const saveShared = async (patch: SettingsPatch): Promise<void> => {
+    settings = await saveSettings(paths, patch);
+    if (session === null) return;
+    const current = session;
+    void publishEnv({
+      store: current.store,
+      chain: current.identity.chainId,
+      node: current.identity.nodeId,
+      home: paths.home,
+    }).catch(() => undefined);
+  };
+  // Computer use: the permission is a synced setting (conversation → end
+  // time), so one given on the phone counts on the desktop being controlled.
+  const computerGrants = settingsGrantStore(
+    () => settings.computerGrants,
+    (grants) => {
+      // Held in memory at once, so the next action sees it; saved and
+      // published right behind.
+      settings = { ...settings, computerGrants: grants };
+      void saveShared({ computerGrants: grants }).catch((error: unknown) => log("computer: " + String(error)));
+    },
+  );
   const computerDriver =
     process.platform === "linux" && process.env["ROAN_SHELL"] !== "android"
       ? createLinuxDriver()
@@ -1155,8 +1178,13 @@ async function main(): Promise<void> {
           // Skills and memory are copies on every device: an env event that
           // arrives from a peer is written here, not fetched later.
           if (event.type === "env") {
-            void adoptEnvEvent(event, paths.home).then((applied) => {
-              if (applied) log("env: applied a snapshot from the chain");
+            void adoptEnvEvent(event, paths.home).then(async (applied) => {
+              if (!applied) return;
+              log("env: applied a snapshot from the chain");
+              // Everything is synced: a setting another device changed has
+              // to hold here from now on, not after a restart.
+              settings = await loadSettings(paths);
+              setFullDiskAccess(settings.access.fullDisk);
             });
           }
         },
@@ -1289,8 +1317,8 @@ async function main(): Promise<void> {
     // Read on every connection, so the switch in the app works at once.
     // The switch wins over the environment: with "this device only" on,
     // nothing but loopback opens the socket or loads the UI.
-    isLocal: (address) => mayControl(deviceAccess, address, process.env["ROAN_ALLOW_REMOTE_CONTROL"] === "1"),
-    allowWeb: (address) => mayLoadUi(deviceAccess, address),
+    isLocal: (address) => mayControl(settings, address, process.env["ROAN_ALLOW_REMOTE_CONTROL"] === "1"),
+    allowWeb: (address) => mayLoadUi(settings, address),
     store: () => session?.store ?? null,
     state,
     onMessage: runMessage,
@@ -2170,22 +2198,21 @@ async function main(): Promise<void> {
           return;
         }
         if (kind === "access") {
-          // Who may reach the UI and the control socket of this device. Without
-          // a value it is a question; with one it is saved and applies to the
-          // next connection (the gate reads the setting each time).
+          // Who may reach the UI and the control socket of a device. Without a
+          // value it is a question; with one it is saved, synced to every
+          // device, and applies to the next connection (the gate reads the
+          // setting each time).
           if (data["deviceOnly"] === undefined) {
-            reply({ ok: true, deviceOnly: deviceAccess.deviceOnly });
+            reply({ ok: true, deviceOnly: settings.deviceOnly });
             return;
           }
           if (typeof data["deviceOnly"] !== "boolean") {
             reply({ ok: false, error: "deviceOnly must be true or false" });
             return;
           }
-          // Per machine on purpose: it is this device's own listener, so it
-          // is kept in state/ and never published with the env.
-          deviceAccess = await saveDeviceAccess(paths.state, { deviceOnly: data["deviceOnly"] });
-          log(`access: ${deviceAccess.deviceOnly ? "this device only" : "this device and the tailnet"}`);
-          reply({ ok: true, deviceOnly: deviceAccess.deviceOnly });
+          await saveShared({ deviceOnly: data["deviceOnly"] });
+          log(`access: ${settings.deviceOnly ? "each device only" : "each device and the tailnet"}`);
+          reply({ ok: true, deviceOnly: settings.deviceOnly });
           return;
         }
         if (kind === "skill_approve" || kind === "skill_reject") {

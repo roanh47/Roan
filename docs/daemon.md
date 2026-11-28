@@ -72,15 +72,20 @@ overriding them per platform is how the phone ended up listening on loopback
 while its own invite named the tailnet address.
 | `ROAN_HOST` | `0.0.0.0` | bind address — every interface, so loopback and the tailnet both work (alias: `ROAN_CONTROL_HOST`); `lan`/`tailscale` resolve to an interface |
 | `ROAN_WEB_DIST` | `web/dist` next to the package root | where the built UI lives |
-| `ROAN_ALLOW_REMOTE_CONTROL` | unset | `1` lets a non-loopback caller open `/ws` (the tailnet may already). The app's own switch wins: with "this device only" on, only loopback gets in |
-
-**Access outside the app** is a switch in Settings → Devices, per device and
-never shared: it is kept in `state/access.json`, not in the env. Open (the
-default), this device and the tailnet may load the UI and open `/ws`. Closed,
-only loopback may; `/healthz` and `/peer` stay reachable so sync keeps working
-(`src/daemon/device-access.ts`, the `access` request). It does not yet tell
-the app's own window from a browser on the same device: both are loopback.
+| `ROAN_ALLOW_REMOTE_CONTROL` | unset | `1` lets a non-loopback caller open `/ws` (the tailnet may already). The app's own switch wins: with access closed, only loopback gets in |
 | `ROAN_PEER_ADVERTISE` | unset | comma-separated hosts to put in the invite instead of the derived ones |
+
+**Access outside the app** is a switch in Settings → Sync. It is a setting
+(`deviceOnly` in `config.json`), so it is synced and holds on every device.
+Open (the default), a device and the tailnet may load the UI and open `/ws`.
+Closed, only loopback may; `/healthz` and `/peer` stay reachable so sync keeps
+working (`src/daemon/device-access.ts`, the `access` request). It does not yet
+tell the app's own window from a browser on the same device: both are loopback.
+
+**What is synced:** everything in `~/.Roan` except `workspace/`. Settings,
+keys, connection sign-ins (`mcp/tokens/`), computer use permissions
+(`computerGrants` in `config.json`), skills, memory, commands. See rule 9 in
+`AGENTS.md`.
 | `ROAN_DISCOVERY` | on | `off` disables the Tailscale scan |
 | `ROAN_HOME` | `~/.Roan` | state root |
 | `ROAN_SHELL` | unset | `android` changes shutdown behaviour (section 4) |

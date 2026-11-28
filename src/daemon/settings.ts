@@ -37,6 +37,18 @@ export interface Settings {
   readonly fallbackModel: string;
   /** A model of its own for a job the main one is wrong for; see auxiliary.ts. */
   readonly auxiliary: AuxiliarySettings;
+  /**
+   * Only a device itself may open its UI and control socket; the tailnet is
+   * refused. Off by default. Synced like every setting: it holds on all
+   * devices of the chain.
+   */
+  readonly deviceOnly: boolean;
+  /**
+   * Computer use permissions: conversation id → the moment it ends, in
+   * milliseconds. Synced, so a permission given on one device counts on the
+   * device that is being controlled.
+   */
+  readonly computerGrants: Readonly<Record<string, number>>;
 }
 
 const DEFAULTS: Settings = {
@@ -48,7 +60,19 @@ const DEFAULTS: Settings = {
   access: { fullDisk: false },
   fallbackModel: "",
   auxiliary: NO_AUXILIARY,
+  deviceOnly: false,
+  computerGrants: {},
 };
+
+/** Conversation → end time; anything that is not a finite number is dropped. */
+export function parseComputerGrants(raw: unknown): Record<string, number> {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return {};
+  const grants: Record<string, number> = {};
+  for (const [session, until] of Object.entries(raw as Record<string, unknown>)) {
+    if (session.length > 0 && typeof until === "number" && Number.isFinite(until)) grants[session] = until;
+  }
+  return grants;
+}
 
 /** Only a literal `true` turns a capability on; `"true"` and `1` stay off. */
 function parseAccess(raw: unknown): AccessSettings {
@@ -85,6 +109,8 @@ export async function loadSettings(paths: RoanPaths): Promise<Settings> {
       access: parseAccess(parsed["access"]),
       fallbackModel: typeof parsed["fallbackModel"] === "string" ? parsed["fallbackModel"].trim() : "",
       auxiliary: parseAuxiliary(parsed["auxiliary"]),
+      deviceOnly: parsed["deviceOnly"] === true,
+      computerGrants: parseComputerGrants(parsed["computerGrants"]),
     };
   } catch {
     return DEFAULTS;

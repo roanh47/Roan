@@ -54,10 +54,22 @@ even if the tests pass.
    Linux) and a phone app (Android), built from one UI codebase. Starting, joining,
    inviting a machine, choosing a provider and a model, and approving a tool call are
    screens in that app. Dev scripts (`npm run build`, `typecheck`) are for us.
-9. **Everything is shared.** Anything that changes how the agent behaves travels in
-   the chain: config, skills, MCP definitions, identity files, tool settings. Stays
-   local only when it physically can't be shared: caches, logs, running processes,
-   secrets. "Local" is the exception and it needs a reason.
+9. **Everything is synced. Everything.** Whatever lives in `~/.Roan` is the same
+   on every device of the chain: conversations, config, model and helper models,
+   keys, sign-ins and tokens for connections, skills, memory, commands, tool
+   rules, permissions and every switch in Settings. A setting changed on the
+   phone is changed on the PC and the server.
+
+   Exactly two things are not synced:
+   - `~/.Roan/workspace/`, the local workspace folder of one machine;
+   - anything outside `~/.Roan`.
+
+   That is the whole list. A new feature never adds to it: if it has state, the
+   state is synced. Do not keep something "per device" because it seemed safer
+   or simpler, and do not store it in a place the chain does not carry. What a
+   machine holds only while it runs (a running process, an open socket, a cache,
+   a log) is not state and is not what this rule is about. The node id and the
+   peer token in `secrets/` identify one machine to the others and stay there.
 10. **Joining adopts the chain.** When you join a chain, that chain's data becomes
    yours: its sessions, its env, its skills. Your device does not merge its local
    state into the chain and does not push it up. The only way local data becomes

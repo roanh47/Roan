@@ -64,8 +64,8 @@ export function ComputerUsePanel({
         <h2 className="panel__title">Computer use</h2>
       </header>
       <p className="panel__sub">
-        Roan looks at this device's screen and uses its mouse and keyboard. You allow it for one chat, for a few
-        minutes; it switches off by itself.
+        Roan looks at a device's screen and uses its mouse and keyboard. You allow it for one chat, for a few
+        minutes, from any of your devices; it switches off by itself.
       </p>
 
       {session === null ? <p className="panel__status">Open a chat first.</p> : null}
