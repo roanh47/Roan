@@ -47,7 +47,10 @@ even if the tests pass.
    is `secrets/`: the node id and the peer token are per machine, and never travel.
    Never put a key in a commit, a log line or an error message — a key in a log
    line is a leaked key.
-8. **Everything happens in the app.** Roan ships as a desktop app (Windows, macOS,
+8. **Everything happens in the app, on a screen.** A feature the owner can
+   set or see has a button or a page. The slash menu is a shortcut to those
+   and to the owner's own commands; it is never the only way to do something.
+   The rest of this rule: Roan ships as a desktop app (Windows, macOS,
    Linux) and a phone app (Android), built from one UI codebase. Starting, joining,
    inviting a machine, choosing a provider and a model, and approving a tool call are
    screens in that app. Dev scripts (`npm run build`, `typecheck`) are for us.

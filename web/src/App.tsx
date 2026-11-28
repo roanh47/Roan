@@ -9,7 +9,10 @@ import { UpdateCard } from "./panels/UpdateCard.js";
 import { SchedulesPanel } from "./panels/SchedulesPanel.js";
 import { GoalsPanel } from "./panels/GoalsPanel.js";
 import { foldGoals } from "../../src/chain/goals.js";
-import { parseCommandEdit, slashCommands } from "./commands.js";
+import { slashCommands } from "./commands.js";
+import { ModelRolesPanel } from "./panels/ModelRolesPanel.js";
+import { CommandsPanel } from "./panels/CommandsPanel.js";
+import { JobsPanel } from "./panels/JobsPanel.js";
 import { proposedSkills } from "../../src/skills/fold.js";
 import { SkillProposals } from "./components/SkillProposals.js";
 import { WebAccessCard } from "./panels/WebAccessCard.js";
@@ -78,6 +81,9 @@ const NODE = deviceNode();
 type SettingsPage =
   | "menu"
   | "providers"
+  | "models"
+  | "commands"
+  | "jobs"
   | "agent"
   | "workspace"
   | "schedules"
@@ -89,10 +95,13 @@ type SettingsPage =
 
 const SETTINGS_ROWS: readonly [SettingsPage, string, string][] = [
   ["providers", "Models & keys", "providers and API keys"],
+  ["models", "Model roles", "thinking effort, fallback and helper models"],
+  ["commands", "Commands", "your own slash commands"],
   ["agent", "Agent", "tools, skills and MCP servers"],
   ["tools", "Tools & rules", "on or off, ask first, MCP servers"],
   ["workspace", "Workspace", "files shared across devices"],
   ["schedules", "Schedules", "tasks that run later"],
+  ["jobs", "Background jobs", "commands left running on this device"],
   ["checkpoints", "Checkpoints", "named points to rewind to"],
   ["devices", "Sync", "the chain, the nodes, the invite"],
   ["storage", "Storage window", "Android's files, next to the home"],
@@ -279,7 +288,7 @@ export default function App({ client: injected }: { client?: ChainClient } = {})
    * The slash lines the app answers itself. Anything it does not know goes out
    * as a message, where the daemon expands the owner's own commands.
    */
-  function runCommand(name: string, args: string): boolean {
+  function runCommand(name: string): boolean {
     if (name === "new") newChat();
     else if (name === "model") setSheetOpen(true);
     else if (name === "plan") setPlanMode(!planMode);
@@ -287,74 +296,6 @@ export default function App({ client: injected }: { client?: ChainClient } = {})
     else if (name === "sessions") {
       setView("chat");
       setMenuOpen(true);
-    } else if (name === "goal") {
-      const text = args.trim();
-      if (text.length === 0) {
-        setNotice("Use /goal followed by what Roan should keep working toward");
-        return true;
-      }
-      void client
-        .request<{ ok?: boolean; error?: string }>("goal", { text })
-        .then((answer) => setNotice(answer.ok === true ? "goal saved" : (answer.error ?? "could not save the goal")))
-        .catch((error: unknown) => setNotice(error instanceof Error ? error.message : "could not save the goal"));
-    } else if (name === "vision" || name === "background") {
-      // One word is a model of the provider in use; two are a saved provider
-      // and its model. "off" hands the job back to the main model.
-      const words = args.trim().split(/\s+/).filter((word) => word.length > 0);
-      const [first, second] = words;
-      const data =
-        first === undefined
-          ? {}
-          : second === undefined
-            ? { slot: name, model: first === "off" ? "" : first }
-            : { slot: name, provider: first, model: second };
-      void client
-        .request<{ ok?: boolean; error?: string; auxiliary?: Record<string, { provider?: string; model?: string } | null> }>(
-          "auxiliary",
-          data,
-        )
-        .then((answer) => {
-          if (answer.ok !== true) {
-            setNotice(answer.error ?? `could not change the ${name} model`);
-            return;
-          }
-          const set = answer.auxiliary?.[name] ?? null;
-          setNotice(set?.model ? `${name} model: ${set.model}` : `no ${name} model set; the main model does it`);
-        })
-        .catch((error: unknown) => {
-          setNotice(error instanceof Error ? error.message : `could not change the ${name} model`);
-        });
-    } else if (name === "fallback") {
-      const wanted = args.trim();
-      const data = wanted.length === 0 ? {} : { model: wanted === "off" ? "" : wanted };
-      void client
-        .request<{ ok?: boolean; model?: string; error?: string }>("fallback_model", data)
-        .then((answer) => {
-          if (answer.ok !== true) setNotice(answer.error ?? "could not change the fallback model");
-          else setNotice(answer.model ? `fallback model: ${answer.model}` : "no fallback model set");
-        })
-        .catch((error: unknown) => {
-          setNotice(error instanceof Error ? error.message : "could not change the fallback model");
-        });
-    }
-    else if (name === "command") {
-      const edit = parseCommandEdit(args);
-      if (!edit.ok) {
-        setNotice(edit.error);
-        return true;
-      }
-      const saved =
-        edit.prompt === null
-          ? client.request<{ ok?: boolean; error?: string }>("command_remove", { name: edit.name })
-          : client.request<{ ok?: boolean; error?: string }>("command_save", { name: edit.name, prompt: edit.prompt });
-      void saved
-        .then((answer) => {
-          if (answer.ok === true) setNotice(edit.prompt === null ? `/${edit.name} removed` : `/${edit.name} saved`);
-          else setNotice(answer.error ?? `could not change /${edit.name}`);
-        })
-        .catch((error: unknown) => {
-          setNotice(error instanceof Error ? error.message : `could not change /${edit.name}`);
-        });
     } else return false;
     return true;
   }
@@ -604,6 +545,12 @@ export default function App({ client: injected }: { client?: ChainClient } = {})
               setSheetOpen(true);
             }}
           />
+        ) : settingsPage === "models" ? (
+          <ModelRolesPanel client={client} />
+        ) : settingsPage === "jobs" ? (
+          <JobsPanel client={client} />
+        ) : settingsPage === "commands" ? (
+          <CommandsPanel client={client} events={snapshot.events} />
         ) : settingsPage === "agent" ? (
           <CapabilitiesPanel client={client} />
         ) : settingsPage === "tools" ? (

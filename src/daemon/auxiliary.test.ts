@@ -18,13 +18,15 @@ describe("auxiliary models", () => {
     assert.deepEqual(parseAuxiliary({ vision: { model: " see-1 " }, background: { model: "" } }), {
       vision: { provider: "", model: "see-1" },
       background: null,
+      mini: null,
     });
     assert.deepEqual(parseAuxiliary({ vision: "see-1", background: [1] }), NO_AUXILIARY);
   });
 
   it("changes one slot and leaves the other", () => {
     const set = withAuxModel(NO_AUXILIARY, "vision", "see-1", "other");
-    assert.deepEqual(set, { vision: { provider: "other", model: "see-1" }, background: null });
+    assert.deepEqual(set, { vision: { provider: "other", model: "see-1" }, background: null, mini: null });
+    assert.deepEqual(withAuxModel(NO_AUXILIARY, "mini", "small-1").mini, { provider: "", model: "small-1" });
     assert.deepEqual(withAuxModel(set, "vision", "  "), NO_AUXILIARY);
   });
 

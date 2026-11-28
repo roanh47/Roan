@@ -900,7 +900,8 @@ async function main(): Promise<void> {
           // agent and passes the same guard, in a context nobody else reads.
           return await runMiniRoan(
             {
-              provider: {
+              // A Mini Roan may run on a model of its own; empty means the main one.
+              provider: (await auxProvider("mini")) ?? {
                 baseUrl: settings.baseUrl,
                 apiKey: settings.apiKey,
                 model: settings.model,
@@ -1954,6 +1955,28 @@ async function main(): Promise<void> {
           reply({ ok: true });
           return;
         }
+        if (kind === "jobs_list" || kind === "job_stop") {
+          // The background jobs of this device, for the screen that shows them.
+          if (kind === "job_stop") {
+            const id = typeof data["id"] === "number" ? data["id"] : Number.NaN;
+            if (!Number.isInteger(id)) {
+              reply({ ok: false, error: "job_stop needs the number of a job" });
+              return;
+            }
+            processes.stop(id);
+          }
+          reply({
+            ok: true,
+            jobs: processes.list().map((job) => ({
+              id: job.id,
+              command: job.command,
+              status: job.status,
+              exitCode: job.exitCode,
+              output: job.output.slice(-4000),
+            })),
+          });
+          return;
+        }
         if (kind === "auxiliary") {
           // A model of its own for one job (vision, background). Without a
           // slot it is a question; an empty model hands the job back to the
@@ -1963,7 +1986,7 @@ async function main(): Promise<void> {
             return;
           }
           if (!isAuxSlot(data["slot"]) || typeof data["model"] !== "string") {
-            reply({ ok: false, error: "auxiliary needs a slot (vision or background) and a model" });
+            reply({ ok: false, error: "auxiliary needs a slot (vision, background or mini) and a model" });
             return;
           }
           const provider = typeof data["provider"] === "string" ? data["provider"] : "";

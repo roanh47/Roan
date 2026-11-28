@@ -36,22 +36,31 @@ there comes back here, per version.
 - [ ] **Roan is its own harness.** Built, not proven: every turn runs on
       Roan's own loop (`src/agent.ts`) and nothing else. Still to do: prove a
       full turn on each device.
-- [ ] **Auxiliary models.** Built, not proven: `/vision model-id` names a
-      model that looks at an attached image and describes it for a main model
-      that cannot see, and `/background model-id` names a cheaper model for
-      memory distilling (`src/daemon/auxiliary.ts`). Either may sit on another
-      saved provider: `/vision provider model-id`. Still to do: a screen for
-      it, more slots (compaction, titles, web extraction), and picking the
-      vision model automatically when the catalog says the main one is
-      text-only.
+- [ ] **Everything has a screen.** The rule: a feature is set and seen in the
+      app; the slash menu is only a shortcut to a screen or to your own
+      commands. Built, not proven: Settings → Model roles (effort, fallback,
+      helper models), Settings → Commands, Settings → Background jobs,
+      Settings → Sync → Access outside the app, and the skill card above the
+      composer. Still without a screen: the task list the agent keeps
+      (`todo`), a running Mini Roan, hooks, the fallback and helper models
+      inside the model sheet itself, and full-disk access.
+- [ ] **Auxiliary models.** Built, not proven: three helper slots on Settings
+      → Model roles (`src/daemon/auxiliary.ts`). Vision looks at an attached
+      image and describes it for a main model that cannot see; Background
+      does the memory distilling; Mini Roan is the model a delegated task
+      runs on. Each may sit on another saved provider, and an empty slot means
+      the main model does the job. Still to do: slots for compaction, titles
+      and web extraction once those use a model; a model picker instead of a
+      typed id; and picking the vision model automatically when the catalog
+      says the main one is text-only.
 - [ ] **Background processes.** Built, not proven: the `process` tool starts
-      a job, lists jobs, reads output and stops one, and the next turn is told
-      which jobs ended (`src/tools/processes.ts`). Still to do: a jobs panel in
-      the app, a notification when a job ends, and a PTY shell.
-- [ ] **Fallback model.** Built, not proven: `/fallback model-id` names a
-      second model of the same provider and a failed request is retried on it
-      once (`src/agent.ts`). Still to do: a field in the model sheet, and a
-      fallback on another provider.
+      a job, lists jobs, reads output and stops one, the next turn is told
+      which jobs ended (`src/tools/processes.ts`), and Settings → Background
+      jobs shows and stops them. Still to do: a notification when a job ends,
+      and a PTY shell.
+- [ ] **Fallback model.** Built, not proven: a second model of the same
+      provider, set on Settings → Model roles; a failed request is retried on
+      it once (`src/agent.ts`). Still to do: a fallback on another provider.
 - [ ] **`AGENTS.md` in `~/.Roan` gets another name.** `AGENTS.md` is a file
       for a project, like the one in this repo. The one in the home holds how
       Roan writes (`SOUL.md` holds who it is) and is the `rules` block of the
@@ -73,8 +82,6 @@ there comes back here, per version.
       do: the executing device trusts the chain and checks nothing itself.
 - [ ] **Policy file.** An owner-editable file that says which tool may do
       what; `decide()` in `src/tools/policy.ts` still has no caller.
-- [ ] **More slash commands.** `/sessions`, `/goal` and `/fallback` are built,
-      not proven. Still to do: `/compact` and `/skills`.
 - [ ] **Per-conversation model.** `model_set` writes one model for the whole
       device; the model belongs to the conversation.
 - [ ] **Finish the small screens.** Edit a sent message (branch from a

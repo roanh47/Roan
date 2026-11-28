@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BUILTIN_COMMANDS, parseCommandEdit, slashCommands, slashPrefix } from "./commands.js";
+import { BUILTIN_COMMANDS, slashCommands, slashPrefix } from "./commands.js";
 
 describe("slash commands in the composer", () => {
   it("offers the built-ins first, then the chain's own commands", () => {
@@ -22,17 +22,5 @@ describe("slash commands in the composer", () => {
     expect(slashPrefix("/review the parser")).toBeNull();
     expect(slashPrefix("hello /mo")).toBeNull();
     expect(slashPrefix("")).toBeNull();
-  });
-
-  it("reads /command as save or remove", () => {
-    expect(parseCommandEdit("review Review this: $args")).toEqual({
-      ok: true,
-      name: "review",
-      prompt: "Review this: $args",
-    });
-    expect(parseCommandEdit("/review")).toEqual({ ok: true, name: "review", prompt: null });
-    expect(parseCommandEdit("").ok).toBe(false);
-    expect(parseCommandEdit("bad/name prompt").ok).toBe(false);
-    expect(parseCommandEdit("new something").ok).toBe(false);
   });
 });
