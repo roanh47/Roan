@@ -226,6 +226,12 @@ export function foldFacts(events: readonly Event[]): { text: string; seq: number
     const clean = text.replace(/\s+/g, " ").trim();
     const key = normaliseFact(clean);
     if (key.length === 0) continue;
+    // The owner said this is wrong or no longer true: the fact leaves the
+    // fold. Stating it again later brings it back, like any new fact.
+    if ((data as Record<string, unknown>)["forgotten"] === true) {
+      kept.delete(key);
+      continue;
+    }
     // The newest event wins the text; the key keeps one fact per thing.
     kept.set(key, { text: clean, seq: event.seq });
   }

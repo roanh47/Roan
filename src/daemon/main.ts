@@ -49,6 +49,7 @@ import { createMemorySearchTool, createTodoTool } from "../tools/recall-tools.js
 import { TodoStore } from "../tools/todo.js";
 import { ProcessRegistry, createProcessTool, finishedJobsNote } from "../tools/processes.js";
 import { distilMemories, memoryTexts } from "../memory/index.js";
+import { foldFacts } from "../memory/distil.js";
 import { foldMemoryMd, writeMemoryMd } from "../context/memory-md.js";
 import { approvePlan, planModeEnabled, planModeEvent } from "./plan.js";
 import { createSteerInbox, type SteerInbox } from "../turn/index.js";
@@ -1612,6 +1613,47 @@ async function main(): Promise<void> {
           // The Memory page: what Roan keeps about the owner and what it
           // learned, as the entries the agent itself reads and writes.
           const target = data["target"] === "user" ? "user" : "memory";
+          // What Roan learned is folded from the chain, so the page edits the
+          // chain: a correction written to the file alone would be undone by
+          // the next fold. Forgetting is an event too, and it is synced.
+          if (target === "memory" && session !== null) {
+            const current = session;
+            const read = () => foldFacts(current.store.read(current.identity.chainId, 1, 100_000));
+            if (kind === "memory_edit") {
+              const text = typeof data["text"] === "string" ? data["text"].replace(/\s+/g, " ").trim() : "";
+              const index = typeof data["index"] === "number" ? data["index"] : Number.NaN;
+              const chosen = read()[index - 1];
+              const record = (payload: Record<string, unknown>): void => {
+                const event = current.store.append(current.identity.chainId, {
+                  id: uuid(),
+                  node: current.identity.nodeId,
+                  type: "memory",
+                  data: payload,
+                });
+                control?.broadcast({ t: "append", event });
+              };
+              const action = data["action"];
+              if (action === "add" && text.length > 0) record({ text });
+              else if (action === "remove" && chosen !== undefined) record({ text: chosen.text, forgotten: true });
+              else if (action === "replace" && chosen !== undefined && text.length > 0) {
+                record({ text: chosen.text, forgotten: true });
+                record({ text });
+              } else {
+                reply({ ok: false, error: "that memory does not exist, or the text is empty" });
+                return;
+              }
+              await writeMemoryMd(paths.home, foldMemoryMd(current.store.read(current.identity.chainId, 1, 100_000)));
+              sessionPrompts.clear();
+            }
+            const facts = read();
+            reply({
+              ok: true,
+              target,
+              entries: facts.map((fact, position) => ({ index: position + 1, text: fact.text })),
+              budget: await memory.budget(target),
+            });
+            return;
+          }
           if (kind === "memory_edit") {
             const text = typeof data["text"] === "string" ? data["text"] : "";
             const index = typeof data["index"] === "number" ? data["index"] : Number.NaN;
