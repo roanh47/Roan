@@ -12,12 +12,13 @@ import type { ProviderConfig } from "../providers/adapter.js";
  * - `vision`: looks at an attached image and describes it, so the main model
  *   gets the description as text. Without it the image goes to the main model.
  * - `background`: work nobody reads live, such as distilling memories.
+ * - `mini`: the model a Mini Roan runs on when a task is delegated.
  *
  * An empty slot always means "use the main model", so nothing changes until
  * the owner fills one in. Everything here is pure; the daemon does the calls.
  */
 
-export const AUX_SLOTS = ["vision", "background"] as const;
+export const AUX_SLOTS = ["vision", "background", "mini"] as const;
 export type AuxSlot = (typeof AUX_SLOTS)[number];
 
 export interface AuxModel {
@@ -28,10 +29,10 @@ export interface AuxModel {
 
 export type AuxiliarySettings = { readonly [K in AuxSlot]: AuxModel | null };
 
-export const NO_AUXILIARY: AuxiliarySettings = { vision: null, background: null };
+export const NO_AUXILIARY: AuxiliarySettings = { vision: null, background: null, mini: null };
 
 export function isAuxSlot(value: unknown): value is AuxSlot {
-  return value === "vision" || value === "background";
+  return typeof value === "string" && (AUX_SLOTS as readonly string[]).includes(value);
 }
 
 function parseModel(raw: unknown): AuxModel | null {
@@ -47,7 +48,11 @@ function parseModel(raw: unknown): AuxModel | null {
 export function parseAuxiliary(raw: unknown): AuxiliarySettings {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return NO_AUXILIARY;
   const record = raw as Record<string, unknown>;
-  return { vision: parseModel(record["vision"]), background: parseModel(record["background"]) };
+  return {
+    vision: parseModel(record["vision"]),
+    background: parseModel(record["background"]),
+    mini: parseModel(record["mini"]),
+  };
 }
 
 /** One slot changed, the others kept. A model of "" empties the slot. */
