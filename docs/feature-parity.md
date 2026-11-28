@@ -3,11 +3,11 @@
 Date: 2026-11-18, re-checked against the code on the 0.0.23 branch (every verdict
 below was read back from `src/` and `web/src/`, not from the earlier plan). Sources: the
 agents' official docs (all research delivered — 1,024
-sourced rows in `docs/research/features/`), `docs/mobile-app-patterns.md`,
-`docs/reference-apps-apk-analysis.md` (ChatGPT APK), the Roan repo itself, and Hermes'
+sourced rows in `docs/research/features/`), `docs/app/mobile-app-patterns.md`,
+`docs/research/reference-apps-apk-analysis.md` (ChatGPT APK), the Roan repo itself, and Hermes'
 own surface (I am that).
 
-**Start here for the to-do:** `docs/feature-groups.md` — all 23 inventories collapsed
+**Start here for the to-do:** `docs/history/feature-groups.md` — all 23 inventories collapsed
 into ~110 deduplicated concepts (YOLO = Auto Approve = Turbo = one row, aliases shown),
 each with a DONE / BUILD / SOON / LATER / WON'T status, rejected ones included. This
 file keeps the reasoning per verdict; the JSONs keep the raw sourced rows.
@@ -166,7 +166,7 @@ These exist in mainstream agents and are **deliberately out**:
 | Scheduled tasks / cron | GPT (tasks), HM | ✅ `cron/` + schedules panel | done (UI polish SOON) |
 | Workspace folder = the agent's home (OpenClaw-style), twice | OC (workspace home) | ✅ `~/.Roan/` holds `workspace/` (the agent's own desk, per machine) and `synced-workspace/` (every file in it travels as `workspace`/`blob` events), with `state/` for the chain — `paths.ts` + `migrateStateSplit` | done |
 | Phone storage as the user home | — (Termux precedent) | ✅ `storage_window` creates the symlink siblings (`shared/ downloads/ dcim/ documents/ pictures/ music/`) next to `.Roan` in the app's `files/`, and refuses with a reason when All files access is missing (`src/daemon/storage-window.ts`, tests) | done (the grant is the owner's) |
-| Background turns (app closed) | HM, OC | ✅ Android foreground service owns the node (`RoanService.kt`); on desktop the daemon runs as a systemd user service (`docs/webui.md`) | done |
+| Background turns (app closed) | HM, OC | ✅ Android foreground service owns the node (`RoanService.kt`); on desktop the daemon runs as a systemd user service (`docs/app/webui.md`) | done |
 | Notification when a turn finishes | GPT, CL, HM | ✅ the service tails the daemon's stderr for `notify:turn-done` and posts "Roan is done" | done |
 | Hooks (lifecycle events → script) | CC | ✅ `hooks.json` runs shell commands at `turn_start` and `turn_end` (`src/hooks/run.ts`, called from `runMessage`); a broken hook does not break the turn. `before_tool`/`after_tool` are declared and never fired | done (two points) |
 
@@ -186,7 +186,7 @@ These exist in mainstream agents and are **deliberately out**:
 
 | Feature | Mainstream | Roan now | Verdict |
 |---|---|---|---|
-| Runs headless / as a service | CC (headless), HM | ✅ daemon + systemd unit (`docs/webui.md`) | done |
+| Runs headless / as a service | CC (headless), HM | ✅ daemon + systemd unit (`docs/app/webui.md`) | done |
 | Update check in-app | CC, HM | ✅ About → Check for updates, through the daemon (`update_check` / `update_download`); an unreachable release is shown as unreachable, never as "newest" | done |
 | Crash/diag log reachable by the user | HM | ✅ `GET /log` on the one port + in-app | done |
 | Telemetry | CC (opt-in), others | — | WON'T — no telemetry, ever |
@@ -197,8 +197,8 @@ This list was the plan on 2026-11-18. Rounds 1–7 have since landed: transcript
 hygiene, the foreground service, the 6769 web UI, approval cards with plan mode,
 skills/persona in the prompt, real photo attachments, notifications, compaction,
 rename/edit/regenerate via branching, and MCP servers that actually start. The
-per-row status above is the current one; `docs/feature-groups.md` has the
-per-concept verdict and `docs/goals-progress.md` the ledger of what this branch
+per-row status above is the current one; `docs/history/feature-groups.md` has the
+per-concept verdict and `docs/history/goals-progress.md` the ledger of what this branch
 proves.
 
 What is genuinely still open on those seven items: editing a sent message
@@ -318,5 +318,5 @@ made; these are the ones that change or sharpen something:
 | ACP — editors drive external agents | Zed, Cline, Copilot, Cursor, Antigravity, opencode | WON'T — Roan is not an engine inside an editor; the app is the whole product |
 
 Coverage is now complete for every mainstream harness of November 2026 (consumer chat
-apps live separately in `docs/mobile-app-patterns.md` with their inventories in this
+apps live separately in `docs/app/mobile-app-patterns.md` with their inventories in this
 folder). What remains open: none.

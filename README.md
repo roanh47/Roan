@@ -34,11 +34,11 @@ Three documents carry the detail:
   `control.ts` / `control-protocol.ts` / `main.ts`, plus the SDK's subset.
 - [docs/a2a.md](docs/a2a.md) — why there is no agent-to-agent protocol here, and
   what covers the same need (webhooks, peer replication, read-only connectors).
-- [docs/goals-progress.md](docs/goals-progress.md) — the ledger: feature by
+- [docs/history/goals-progress.md](docs/history/goals-progress.md) — the ledger: feature by
   feature, what was built and which proof or test it rests on.
 
 Per-concept status against every mainstream harness is in
-[docs/feature-groups.md](docs/feature-groups.md); the reasoning per verdict is
+[docs/history/feature-groups.md](docs/history/feature-groups.md); the reasoning per verdict is
 [docs/feature-parity.md](docs/feature-parity.md).
 
 ## What it is
@@ -151,8 +151,8 @@ you close the window.
 | Distribution (binaries, npm) | **partial** — CI builds four installers; no published release, no npm package |
 
 What each part proves, and what is still open, is in
-[docs/goals-progress.md](docs/goals-progress.md) and
-[docs/feature-groups.md](docs/feature-groups.md). Nothing is published yet.
+[docs/history/goals-progress.md](docs/history/goals-progress.md) and
+[docs/history/feature-groups.md](docs/history/feature-groups.md). Nothing is published yet.
 
 ## Requirements for the full setup
 
@@ -168,4 +168,4 @@ MIT.
 
 The quickest way to a Roan you can open is the web UI on one machine:
 `scripts/webui.mjs` serves the bundle and proxies the socket to the daemon.
-See [docs/webui.md](docs/webui.md).
+See [docs/app/webui.md](docs/app/webui.md).

@@ -6,7 +6,7 @@
 
 **Architecture:** The web app (`web/src`) is the only UI; the daemon (`src/daemon`) serves provider/model state over the existing control socket. Presets stop being a hardcoded list and come from the live models.dev catalog (same source/pattern as `models_search`). A new ModelSheet makes model picking a one-tap sheet instead of a settings sub-list. Markdown is a small dependency-free renderer.
 
-**Tech Stack:** React 19 + TypeScript (web/), node:test (root tests), vitest (new, web/), apktool-verified reference: `docs/reference-apps-apk-analysis.md`.
+**Tech Stack:** React 19 + TypeScript (web/), node:test (root tests), vitest (new, web/), apktool-verified reference: `docs/research/reference-apps-apk-analysis.md`.
 
 **Ground rules:** UI copy is **English** (user has corrected this twice — record it, never retranslate). Commit locally after each task; **no push without explicit approval**. Emulator only for the final verification round (fans).
 
@@ -21,7 +21,7 @@
 | "Keys instellen is buggy" | `web/src/panels/ProvidersPanel.tsx`: one global key input at top; tapping a provider without a key pasted → error status; key draft cleared on every save; no per-provider edit |
 | "Niet alle providers van models.dev" | `src/daemon/providers.ts:28-39` — `PRESETS` is a hardcoded list of 10 |
 | "Modellen kiezen is niet makkelijk" | Models are an inline sub-list inside Settings; the model pill in chat just jumps to Settings |
-| "Zijbalk heeft te veel dingen" | Drawer carries panels + invite + sync line; ChatGPT's drawer is New chat / search / chats / settings only (see `docs/reference-apps-apk-analysis.md`) |
+| "Zijbalk heeft te veel dingen" | Drawer carries panels + invite + sync line; ChatGPT's drawer is New chat / search / chats / settings only (see `docs/research/reference-apps-apk-analysis.md`) |
 | LM Studio row clipped | `.conversation--panel` padding-bottom (40px) too small under the gesture bar |
 | "local-model" pill confusion | Pill shows `snapshot.model` which is null → falls back to a stale default string; when no model is chosen it must say "Select a model" |
 
@@ -334,7 +334,7 @@ Each row: back arrow in the titlebar when inside a page. The drawer's `rail__mor
 **Objective:** Never make these mistakes again.
 
 - Update skill `roan-harness`: "Roan app UI copy is **English**. The user said so twice (2026-11-16, 2026-11-18). Never translate UI strings."
-- Note in `docs/reference-apps-apk-analysis.md` if any new insight appeared during implementation.
+- Note in `docs/research/reference-apps-apk-analysis.md` if any new insight appeared during implementation.
 
 **Commit:** `docs: ui language rule`
 

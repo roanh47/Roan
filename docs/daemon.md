@@ -18,7 +18,7 @@ today; section 6 lists what it does not do yet.
 
 `src/daemon/autostart.ts` can start and stop a detached daemon after probing the
 control port, but nothing imports it: the sidecar and the systemd unit in
-`docs/webui.md` are the real startups.
+`docs/app/webui.md` are the real startups.
 
 `main()` runs in this order (`main.ts`, `main()`):
 

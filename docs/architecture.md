@@ -117,4 +117,4 @@ outside `src/env/` calls `packEnv` or `applyEnvSnapshot`. So joining writes an
 identity and opens the store; env adoption exists in `src/env/` but the join
 handler in `src/daemon/main.ts` does not call it. `PLAN.md` says joining "parks
 whatever was on this device" — the step exists, the call does not; the same gap is
-in `docs/invite-flow.md`.
+in `docs/ops/invite-flow.md`.
