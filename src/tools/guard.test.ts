@@ -40,6 +40,14 @@ describe("tool guard", () => {
     assert.equal(dangerReason("write_file", { command: "rm -rf /" }), null);
   });
 
+  it("judges a shell line sent to another device the same way", () => {
+    const risky = { node: "server", tool: "run_shell", args: { command: "rm -rf /" } };
+    assert.match(dangerReason("run_on_node", risky) ?? "", /delete/);
+    assert.equal(dangerReason("run_on_node", { node: "server", tool: "run_shell", args: { command: "ls" } }), null);
+    assert.equal(dangerReason("run_on_node", { node: "server", tool: "read_file", args: { path: "/" } }), null);
+    assert.equal(dangerReason("run_on_node", { node: "server", tool: "run_shell" }), null);
+  });
+
   it("runs an ordinary call without asking", async () => {
     const ran: string[] = [];
     const asked: Asked[] = [];

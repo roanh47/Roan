@@ -36,7 +36,7 @@ export interface Settings {
 const DEFAULTS: Settings = {
   baseUrl: "http://127.0.0.1:1234/v1",
   model: "local-model",
-  engine: "hermes",
+  engine: "builtin",
   apiKey: "",
   provider: "lmstudio",
   effort: "normal",
@@ -61,12 +61,16 @@ export async function loadSettings(paths: RoanPaths): Promise<Settings> {
   }
   try {
     const parsed = JSON.parse(raw) as Partial<Record<keyof Settings, unknown>>;
-    const pick = (key: "baseUrl" | "model" | "apiKey" | "provider" | "engine"): string => {
+    const pick = (key: "baseUrl" | "model" | "apiKey" | "provider"): string => {
       const value = parsed[key];
       if (typeof value === "string") return value;
       return DEFAULTS[key];
     };
-    const engine = pick("engine") === "builtin" || process.env["ROAN_ENGINE"] === "builtin" ? "builtin" : "hermes";
+    // Roan runs its own loop. Another engine is something this one machine
+    // asks for by name in its environment; the `engine` value in a config
+    // file was never a choice anyone made (it was the old default, written
+    // out), so it is not read.
+    const engine = process.env["ROAN_ENGINE"] === "hermes" ? "hermes" : "builtin";
     // A hand-edited config may hold anything; an unknown level falls back to
     // the default instead of reaching a provider as a nonsense knob.
     const level: unknown = parsed["effort"];
