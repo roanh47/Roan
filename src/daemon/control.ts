@@ -1,4 +1,4 @@
-import { createServer, type IncomingMessage } from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { Duplex } from "node:stream";
 import { WebSocketServer, type WebSocket } from "ws";
 import type { EventStore } from "../chain/store.js";
@@ -37,6 +37,11 @@ export interface ControlServerOptions {
    * default. `/healthz` is never gated: peers use it to find each other.
    */
   readonly allowWeb?: (address: string | undefined) => boolean;
+  /**
+   * A page the daemon answers itself before the UI is looked at: where a
+   * browser comes back to after a sign-in. Returns true when it answered.
+   */
+  readonly onPage?: (req: IncomingMessage, res: ServerResponse) => boolean;
   /** null until a chain exists on this machine. */
   readonly store: () => EventStore | null;
   readonly state: () => DaemonState;
@@ -160,6 +165,7 @@ export function startControlServer(options: ControlServerOptions): Promise<Contr
       res.end(body);
       return;
     }
+    if (options.onPage?.(req, res) === true) return;
     web(req, res);
   });
   const wss = new WebSocketServer({ noServer: true });

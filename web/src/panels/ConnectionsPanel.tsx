@@ -53,6 +53,7 @@ export function ConnectionsPanel({ client }: { client: ChainClient }): ReactElem
   const [newToken, setNewToken] = useState("");
   const [tokens, setTokens] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const [browserSignIn, setBrowserSignIn] = useState<{ label: string; url: string } | null>(null);
 
   const take = useCallback((answer: Answer, done: string | null): void => {
     if (answer.ok === true) {
@@ -120,6 +121,25 @@ export function ConnectionsPanel({ client }: { client: ChainClient }): ReactElem
       .finally(() => setBusy(false));
   }
 
+  /** Starts a sign-in on the service's own page and waits for it to finish. */
+  function signInWithBrowser(connection: Connection): void {
+    setBusy(true);
+    void client
+      .request<{ ok?: boolean; url?: string; error?: string }>("connection_sign_in", { id: connection.id })
+      .then((answer) => {
+        if (answer.ok !== true || answer.url === undefined) {
+          setStatus(answer.error ?? "could not start the sign-in");
+          return;
+        }
+        setBrowserSignIn({ label: connection.label, url: answer.url });
+        window.open(answer.url, "_blank", "noopener");
+        // The browser finishes on its own; look again a few times.
+        for (const wait of [5000, 12_000, 25_000, 45_000, 90_000]) setTimeout(() => void refresh(), wait);
+      })
+      .catch((error: unknown) => setStatus(error instanceof Error ? error.message : "could not start the sign-in"))
+      .finally(() => setBusy(false));
+  }
+
   function signOut(connection: Connection): void {
     void client
       .request<Answer>("connection_token_clear", { id: connection.id })
@@ -152,6 +172,15 @@ export function ConnectionsPanel({ client }: { client: ChainClient }): ReactElem
         Services Roan can use for you. Connect one here and all your devices can use it.
       </p>
       {status !== null ? <p className="panel__status">{status}</p> : null}
+      {browserSignIn !== null ? (
+        <p className="panel__status" role="status">
+          Finish signing in to {browserSignIn.label} in your browser, on this device. If no window opened,{" "}
+          <a href={browserSignIn.url} target="_blank" rel="noopener noreferrer">
+            open the sign-in page
+          </a>
+          .
+        </p>
+      ) : null}
 
       <ul className="panel__list">
         {(connections ?? []).map((connection) => (
@@ -189,6 +218,11 @@ export function ConnectionsPanel({ client }: { client: ChainClient }): ReactElem
                   onClick={() => signIn(connection)}
                 >
                   Sign in
+                </button>
+              ) : null}
+              {connection.transport === "http" && !connection.signedIn ? (
+                <button type="button" className="panel__secondary" disabled={busy} onClick={() => signInWithBrowser(connection)}>
+                  Sign in with browser
                 </button>
               ) : null}
               {connection.signedIn ? (

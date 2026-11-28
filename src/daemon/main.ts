@@ -82,10 +82,23 @@ import { normaliseSkillName } from "../skills/parse.js";
 import { skillUsage, skillVerdict } from "../skills/usage.js";
 import {
   isConnectionId,
+  loadConnectionSignIn,
   loadConnectionToken,
   removeConnectionToken,
+  saveConnectionSignIn,
   saveConnectionToken,
 } from "./connection-tokens.js";
+import {
+  authorizeUrl,
+  createPkce,
+  createState,
+  discover,
+  exchangeCode,
+  refreshToken,
+  registerClient,
+  type OAuthClient,
+  type OAuthEndpoints,
+} from "../mcp/oauth.js";
 import { settingsGrantStore } from "../computer/synced-grants.js";
 import { createLinuxDriver } from "../computer/driver-linux.js";
 import { createWindowsDriver } from "../computer/driver-windows.js";
@@ -267,7 +280,35 @@ async function main(): Promise<void> {
   // A connection's sign-in is read from the agent home at every dial.
   const mcp = new McpRuntime(
     (line) => log(line),
-    (id) => loadConnectionToken(paths.home, id),
+    async (id) => {
+      // A browser sign-in runs out; renew it just before it does, so a
+      // connection does not drop in the middle of a day.
+      const signIn = await loadConnectionSignIn(paths.home, id);
+      if (
+        signIn !== null &&
+        signIn.refreshToken !== null &&
+        signIn.expiresAt !== null &&
+        signIn.expiresAt - Date.now() < 60_000
+      ) {
+        try {
+          const fresh = await refreshToken(
+            { token: signIn.tokenEndpoint },
+            { clientId: signIn.clientId, clientSecret: signIn.clientSecret },
+            { refreshToken: signIn.refreshToken, resource: signIn.resource },
+          );
+          await saveConnectionSignIn(paths.home, id, {
+            ...signIn,
+            token: fresh.accessToken,
+            refreshToken: fresh.refreshToken,
+            expiresAt: fresh.expiresAt,
+          });
+          return fresh.accessToken;
+        } catch (error) {
+          log(`connection ${id}: could not renew the sign-in — ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+      return loadConnectionToken(paths.home, id);
+    },
   );
   const agentContext: AgentContext = {
     memory,
@@ -861,6 +902,18 @@ async function main(): Promise<void> {
       accounts,
     );
   };
+  /** Browser sign-ins that were started and are waiting for the browser to come back. */
+  const pendingSignIns = new Map<
+    string,
+    {
+      id: string;
+      endpoints: OAuthEndpoints;
+      client: OAuthClient;
+      verifier: string;
+      redirectUri: string;
+      resource: string;
+    }
+  >();
   /** Mini Roans that are working or finished, for the screen and the next turn. */
   const minis = new MiniRegistry();
   /** The prompt each conversation started with, held still for its lifetime. */
@@ -1388,6 +1441,65 @@ async function main(): Promise<void> {
     // nothing but loopback opens the socket or loads the UI.
     isLocal: (address) => mayControl(settings, address, process.env["ROAN_ALLOW_REMOTE_CONTROL"] === "1"),
     allowWeb: (address) => mayLoadUi(settings, address),
+    // Where the browser comes back to after the owner signed in to a
+    // connection. Answered here, then finished in the background.
+    onPage: (req, res) => {
+      let url: URL;
+      try {
+        url = new URL(req.url ?? "/", "http://127.0.0.1");
+      } catch {
+        return false;
+      }
+      if (url.pathname !== "/oauth/callback") return false;
+      const say = (status: number, line: string): void => {
+        const body = `<!doctype html><meta charset="utf-8"><title>Roan</title><body style="font-family:system-ui;padding:2rem"><p>${line}</p><p>You can close this window and go back to Roan.</p></body>`;
+        res.writeHead(status, { "content-type": "text/html; charset=utf-8", "content-length": Buffer.byteLength(body) });
+        res.end(body);
+      };
+      const state = url.searchParams.get("state") ?? "";
+      const code = url.searchParams.get("code") ?? "";
+      const waiting = pendingSignIns.get(state);
+      if (waiting === undefined || code.length === 0) {
+        say(400, "This sign-in was not started from Roan, or it was already used.");
+        return true;
+      }
+      pendingSignIns.delete(state);
+      void (async () => {
+        try {
+          const tokens = await exchangeCode(waiting.endpoints, waiting.client, {
+            code,
+            verifier: waiting.verifier,
+            redirectUri: waiting.redirectUri,
+            resource: waiting.resource,
+          });
+          await saveConnectionSignIn(paths.home, waiting.id, {
+            token: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
+            expiresAt: tokens.expiresAt,
+            clientId: waiting.client.clientId,
+            clientSecret: waiting.client.clientSecret,
+            tokenEndpoint: waiting.endpoints.token,
+            resource: waiting.resource,
+          });
+          log(`connection ${waiting.id}: signed in`);
+          if (session !== null) {
+            const current = session;
+            await mcp.sync(mcpServersFromEvents(current.store.read(current.identity.chainId, 1, 100_000)));
+            void publishEnv({
+              store: current.store,
+              chain: current.identity.chainId,
+              node: current.identity.nodeId,
+              home: paths.home,
+            }).catch(() => undefined);
+          }
+          say(200, "Signed in.");
+        } catch (error) {
+          log(`connection ${waiting.id}: sign-in failed — ${error instanceof Error ? error.message : String(error)}`);
+          say(502, "The service did not complete the sign-in. Try again from Roan.");
+        }
+      })();
+      return true;
+    },
     store: () => session?.store ?? null,
     state,
     onMessage: runMessage,
@@ -1777,6 +1889,47 @@ async function main(): Promise<void> {
               enabled: server.enabled,
               live: live.has(server.id) && server.enabled,
             })),
+          });
+          return;
+        }
+        if (kind === "connection_sign_in") {
+          // Starts a browser sign-in: find who signs people in for this
+          // service, introduce Roan, and hand the app the address to open.
+          // The browser comes back to this device on /oauth/callback.
+          const current = session;
+          const id = typeof data["id"] === "string" ? data["id"].trim() : "";
+          const server =
+            current === null
+              ? undefined
+              : mcpServersFromEvents(current.store.read(current.identity.chainId, 1, 100_000)).find((entry) => entry.id === id);
+          if (server === undefined || server.url === undefined) {
+            reply({ ok: false, error: "that connection does not exist, or has no address to sign in to" });
+            return;
+          }
+          const redirectUri = `http://127.0.0.1:${String(PORT)}/oauth/callback`;
+          const endpoints = await discover(server.url);
+          const client = await registerClient(endpoints, redirectUri);
+          const pkce = createPkce();
+          const state = createState();
+          pendingSignIns.set(state, {
+            id,
+            endpoints,
+            client,
+            verifier: pkce.verifier,
+            redirectUri,
+            resource: server.url,
+          });
+          // An unfinished sign-in is forgotten after ten minutes.
+          setTimeout(() => pendingSignIns.delete(state), 600_000).unref();
+          reply({
+            ok: true,
+            url: authorizeUrl(endpoints, {
+              clientId: client.clientId,
+              redirectUri,
+              state,
+              challenge: pkce.challenge,
+              resource: server.url,
+            }),
           });
           return;
         }
