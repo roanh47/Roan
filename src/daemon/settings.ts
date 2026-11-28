@@ -19,8 +19,6 @@ export interface AccessSettings {
 export interface Settings {
   readonly baseUrl: string;
   readonly model: string;
-  /** Who runs a turn: the engine on this machine, or the loop inside Roan. */
-  readonly engine: "builtin" | "hermes";
   readonly apiKey: string;
   readonly provider: string;
   /**
@@ -41,7 +39,6 @@ export interface Settings {
 const DEFAULTS: Settings = {
   baseUrl: "http://127.0.0.1:1234/v1",
   model: "local-model",
-  engine: "builtin",
   apiKey: "",
   provider: "lmstudio",
   effort: "normal",
@@ -72,16 +69,10 @@ export async function loadSettings(paths: RoanPaths): Promise<Settings> {
       if (typeof value === "string") return value;
       return DEFAULTS[key];
     };
-    // Roan runs its own loop. Another engine is something this one machine
-    // asks for by name in its environment; the `engine` value in a config
-    // file was never a choice anyone made (it was the old default, written
-    // out), so it is not read.
-    const engine = process.env["ROAN_ENGINE"] === "hermes" ? "hermes" : "builtin";
     // A hand-edited config may hold anything; an unknown level falls back to
     // the default instead of reaching a provider as a nonsense knob.
     const level: unknown = parsed["effort"];
     return {
-      engine,
       baseUrl: pick("baseUrl"),
       model: pick("model"),
       apiKey: pick("apiKey"),

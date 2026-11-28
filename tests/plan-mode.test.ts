@@ -224,7 +224,7 @@ test("plan mode is per conversation: another session keeps its tools", async () 
   }
 });
 
-test("a plan turn runs the loop Roan can gate, whatever engine the device picked", async () => {
+test("a plan turn offers no shell and runs nothing, even when the model asks for it", async () => {
   const stub = await createStubProvider([
     {
       chunks: [{ id: "call-1", name: "run_shell", arguments: JSON.stringify({ command: "touch out.txt" }) }],
@@ -246,18 +246,14 @@ test("a plan turn runs the loop Roan can gate, whatever engine the device picked
             systemPrompt: "You are Roan.",
             tools: allTools(),
             session: SESSION,
-            // The subprocess engine cannot be handed a tool list, so a planning
-            // turn must not go there at all.
-            engine: "hermes",
             planMode: true,
             onAppend: () => undefined,
           },
           "How would you fix the build?",
         );
 
-        // Two requests mean the builtin loop ran: a subprocess would have
-        // answered without ever reaching the stub.
-        assert.equal(stub.requests.length, 2, "a plan turn must use the builtin loop");
+        // Two requests: the refused tool call, then the plan.
+        assert.equal(stub.requests.length, 2, "the turn must answer after the refused call");
         assert.ok(!offeredTools(stub, 0).includes("run_shell"));
         assert.equal(existsSync(join(dir, "out.txt")), false, "plan mode ran a shell command");
         const errors = readChain(store).filter((event) => event.type === "error");

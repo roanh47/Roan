@@ -28,10 +28,13 @@ komt hier per versie terug.
       the Tauri and Android shells hand to the UI.
 - [ ] **Skill curator.** Count how often each skill is used, show unused and
       recently changed ones, and give an approved proposal an undo.
-- [ ] **Roan's own loop is the default engine.** Built, not proven: the
-      builtin loop runs every turn unless a machine sets `ROAN_ENGINE=hermes`
-      (`src/daemon/settings.ts`). Still to do: prove a full turn on each
-      device, then remove `src/engine/hermes.ts` and the opt-in altogether.
+- [ ] **Roan is its own harness.** Built, not proven: every turn runs on
+      Roan's own loop (`src/agent.ts`). The Hermes engine, the `engine`
+      setting and `ROAN_ENGINE` are gone from the code. Still to do: prove a
+      full turn on each device, take the Hermes mentions out of the docs
+      (`docs/feature-map.md`, `docs/feature-parity.md` and others), and decide
+      what happens to `fleet/` and `.hermes/`, which are build tooling that
+      runs Hermes to write this repo.
 - [ ] **Background processes.** Built, not proven: the `process` tool starts
       a job, lists jobs, reads output and stops one, and the next turn is told
       which jobs ended (`src/tools/processes.ts`). Still to do: a jobs panel in

@@ -8,7 +8,7 @@ import { webPlugin } from "./web/index.js";
 
 /**
  * The registrar table: one row per PluginContext method, each pointing at the
- * registry it feeds. Hermes generates its context the same way, so a new
+ * registry it feeds, so a new
  * capability is a new row — the loader never grows a condition per capability.
  */
 const REGISTRARS: ReadonlyArray<{ method: keyof PluginContext; bind: (value: never, pluginId: string) => void }> = [
@@ -70,7 +70,7 @@ export function ensureBundledPlugins(): void {
 /**
  * Loads plugins from `<home>/plugins/<name>/plugin.json` (+ the module it
  * names), after the bundled ones: a home plugin with the same id replaces the
- * bundled tool registrations, exactly like Hermes's later-wins rule.
+ * bundled tool registrations: later wins.
  */
 export async function loadHomePlugins(home: string): Promise<PluginReport[]> {
   ensureBundledPlugins();
