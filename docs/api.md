@@ -227,7 +227,7 @@ Everything else is a request/reply kind handled by `onRequest` in `main.ts`:
 | `models_search` | `query?` | `{ models: { provider, providerName, model, modelName, context? }[], total, source }` (at most 200) |
 | `settings_save` | any of `apiKey`, `baseUrl`, `model`, `provider` | `{ ok: true, model, provider, keySet }` or `{ error: "nothing to save" }`; the key is never echoed |
 | `model_set` | `provider`, `model` | `{ ok: true, model, baseUrl }` or `{ error }` |
-| `effort` | `effort: "low" \| "normal" \| "high"` | `{ ok: true, effort }` or `{ ok: false, error }`; appends nothing |
+| `effort` | `effort?: "low" \| "normal" \| "high"` | `{ ok: true, effort }` or `{ ok: false, error }`; appends nothing. Without `effort` it only reports the level that is set |
 
 ### MCP servers and tools
 

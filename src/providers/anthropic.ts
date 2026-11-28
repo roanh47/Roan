@@ -301,6 +301,10 @@ export function createAnthropicAdapter(cfg: AdapterConfig): ChatAdapter {
               content += text;
               opts.onDelta?.(text);
             }
+          } else if (deltaType === "thinking_delta") {
+            // Shown to the owner, never kept in the message.
+            const thinking = asString(delta["thinking"]);
+            if (thinking) opts.onReasoning?.(thinking);
           } else if (deltaType === "input_json_delta") {
             const pending = toolBlocks.get(index);
             if (pending) {

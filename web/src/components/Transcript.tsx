@@ -54,6 +54,8 @@ type Row =
   | ToolRow
   | { kind: "steps"; key: string; tools: ToolRow[] }
   | { kind: "notice"; key: string; text: string }
+  /** What the model thought before it answered; folded shut until opened. */
+  | { kind: "thought"; key: string; text: string }
   | {
       kind: "approval";
       key: string;
@@ -259,6 +261,14 @@ export function buildRows(events: readonly ChainEvent[], local: string): Row[] {
         rows.push({ kind: "meta", key: event.id, text: "new chat" });
         break;
       }
+      case "reasoning": {
+        // No text, no block: a provider that shares no reasoning leaves nothing.
+        const text = textOf(data).trim();
+        if (text.length === 0) break;
+        flush();
+        rows.push({ kind: "thought", key: event.id, text });
+        break;
+      }
       case "approval_request": {
         const data = event.data as { req?: unknown; tool?: unknown; reason?: unknown } | null | undefined;
         const req = typeof data?.req === "string" ? data.req : event.id;
@@ -413,6 +423,13 @@ function RowView({
           ) : null}
           {row.text}
         </div>
+      );
+    case "thought":
+      return (
+        <details className="thought" style={{ color: "var(--faint)", fontSize: 13 }}>
+          <summary style={{ cursor: "pointer" }}>Thought</summary>
+          <div style={{ whiteSpace: "pre-wrap", padding: "6px 0 2px 12px", lineHeight: 1.45 }}>{row.text}</div>
+        </details>
       );
     case "approval":
       return (

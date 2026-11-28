@@ -42,7 +42,17 @@ interface ToolCallDelta {
 /** The `delta` object of a streamed choice. */
 interface StreamDelta {
   content?: string | null;
+  /** The model's reasoning, as DeepSeek and most compatible servers spell it. */
+  reasoning_content?: string | null;
+  /** The same thing as OpenRouter-style gateways spell it. */
+  reasoning?: string | null;
   tool_calls?: ToolCallDelta[];
+}
+
+/** What a caller wants to hear while the answer streams. */
+interface StreamListeners {
+  readonly onDelta: ((text: string) => void) | undefined;
+  readonly onReasoning: ((text: string) => void) | undefined;
 }
 
 /** Token counts some providers attach to the final chunk. */
@@ -58,7 +68,7 @@ interface StreamChunk {
 }
 
 /** Mutable accumulator for one streamed answer. */
-interface Stream {
+export interface Stream {
   content: string;
   /** Keyed by `index` so fragments that arrive out of order still merge. */
   calls: Map<number, ToolCall>;
@@ -80,7 +90,7 @@ function applyUsage(state: Stream, usage: StreamUsage | null | undefined): void 
 }
 
 /** Folds one `data:` payload into the accumulator. Malformed JSON is ignored. */
-function applyPayload(state: Stream, payload: string, onDelta: ((text: string) => void) | undefined): void {
+export function applyPayload(state: Stream, payload: string, listeners: StreamListeners): void {
   let chunk: StreamChunk;
   try {
     chunk = JSON.parse(payload) as StreamChunk;
@@ -93,9 +103,14 @@ function applyPayload(state: Stream, payload: string, onDelta: ((text: string) =
   const delta = chunk.choices?.[0]?.delta;
   if (!delta) return;
 
+  // Reasoning is handed on and deliberately not kept in the message: it is
+  // for the owner to read, and is never sent back as part of the answer.
+  const reasoning = typeof delta.reasoning_content === "string" ? delta.reasoning_content : delta.reasoning;
+  if (typeof reasoning === "string" && reasoning.length > 0) listeners.onReasoning?.(reasoning);
+
   if (delta.content) {
     state.content += delta.content;
-    onDelta?.(delta.content);
+    listeners.onDelta?.(delta.content);
   }
 
   for (const tc of delta.tool_calls ?? []) {
@@ -111,11 +126,11 @@ function applyPayload(state: Stream, payload: string, onDelta: ((text: string) =
 }
 
 /** Consumes one SSE line; non-`data:` lines and `[DONE]` are skipped. */
-function applyLine(state: Stream, line: string, onDelta: ((text: string) => void) | undefined): void {
+function applyLine(state: Stream, line: string, listeners: StreamListeners): void {
   if (!line.startsWith("data:")) return;
   const payload = line.slice(5).trim();
   if (payload === "" || payload === "[DONE]") return;
-  applyPayload(state, payload, onDelta);
+  applyPayload(state, payload, listeners);
 }
 
 /** Splits a byte stream into lines, keeping the tail between chunks. */
@@ -205,7 +220,8 @@ export function createOpenAiCompatAdapter(cfg: AdapterConfig): ChatAdapter {
       }
 
       const state: Stream = { content: "", calls: new Map(), usage: null };
-      await readSse(res.body, (line) => applyLine(state, line, opts.onDelta));
+      const listeners: StreamListeners = { onDelta: opts.onDelta, onReasoning: opts.onReasoning };
+      await readSse(res.body, (line) => applyLine(state, line, listeners));
       return { message: toMessage(state), usage: state.usage };
     },
   };

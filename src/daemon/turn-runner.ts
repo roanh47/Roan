@@ -13,6 +13,7 @@ import { compactMessages, type ChatMessage } from "../chain/compaction.js";
 import type { EffortLevel } from "../providers/effort.js";
 import type { TokenUsage } from "../usage.js";
 import { PLAN_MODE_PROMPT, planModeForbidden, planModeRefusal, planModeTools } from "./plan.js";
+import { createThought } from "./thought.js";
 
 export interface TurnRunnerOptions {
   readonly store: EventStore;
@@ -188,6 +189,7 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
     // a suggestion. Whatever the device normally uses, a plan runs here.
     const engine = planning ? "builtin" : (options.engine ?? "builtin");
     let answer = "";
+    const thought = createThought();
     // A turn that ends without an explanation is a silent bug to a reader.
     // The error events of this turn say why it went nowhere; when none did,
     // the turn itself reports that it came back empty.
@@ -245,6 +247,9 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
           case "assistant_text":
             answer += event.text;
             break;
+          case "reasoning":
+            thought.add(event.text);
+            break;
           case "tool_start":
             append({ type: "tool_call", data: { name: event.name, args: event.args } });
             break;
@@ -267,6 +272,16 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
       // Also on a failed or cancelled turn: the requests that did reach the
       // model were still billed.
       measured.current = agent.usage;
+      // What the model thought is kept next to what it said, as its own
+      // event: the transcript folds it away and no replay ever reads it. A
+      // provider that streams no reasoning leaves no event, not an empty one.
+      const reasoning = thought.text();
+      if (reasoning !== null) {
+        append({
+          type: "reasoning",
+          data: { text: reasoning, ...(options.session !== undefined ? { session: options.session } : {}) },
+        });
+      }
     }
     if (answer.trim()) append({ type: "assistant", data: { text: answer } });
     else if (!failed) append({ type: "error", data: { message: "the turn ended without an answer" } });
