@@ -11,6 +11,7 @@ import { ANDROID_STORAGE_TARGETS, openStorageWindow, sharedStorageProbe } from "
 import { compactMessages } from "../chain/compaction.js";
 import { loadSettings } from "./settings.js";
 import { startControlServer } from "./control.js";
+import { loadDeviceAccess, mayControl, mayLoadUi, saveDeviceAccess } from "./device-access.js";
 import { ChainNodeStore } from "./peer-store.js";
 import { addPeer, peers as peerList, PEER_PATH, startPeers, stopPeers } from "./peers.js";
 import { probe, startDiscovery, tailscaleHosts } from "./discovery.js";
@@ -201,6 +202,8 @@ async function main(): Promise<void> {
 
   // Everything this device knows before the first token: its own memory files
   // and the skills on its own disk. Both are copies, never a fetch from a peer.
+  // Who may reach this device from outside the app; local to this machine.
+  let deviceAccess = await loadDeviceAccess(paths.state);
   const memory = new MemoryStore(paths.home);
   const skills = new SkillLibrary(join(paths.home, "skills"));
   const tools = [...allTools(), ...contextTools(memory, skills)];
@@ -1152,8 +1155,11 @@ async function main(): Promise<void> {
     // local unless ROAN_ALLOW_REMOTE_CONTROL=1 says otherwise.
     host: HOST,
     logText: () => logRing.join("\n"),
-    isLocal:
-      process.env["ROAN_ALLOW_REMOTE_CONTROL"] === "1" ? () => true : undefined,
+    // Read on every connection, so the switch in the app works at once.
+    // The switch wins over the environment: with "this device only" on,
+    // nothing but loopback opens the socket or loads the UI.
+    isLocal: (address) => mayControl(deviceAccess, address, process.env["ROAN_ALLOW_REMOTE_CONTROL"] === "1"),
+    allowWeb: (address) => mayLoadUi(deviceAccess, address),
     store: () => session?.store ?? null,
     state,
     onMessage: runMessage,
@@ -1873,6 +1879,25 @@ async function main(): Promise<void> {
           control?.broadcast({ t: "append", event });
           control?.sendState();
           reply({ ok: true });
+          return;
+        }
+        if (kind === "access") {
+          // Who may reach the UI and the control socket of this device. Without
+          // a value it is a question; with one it is saved and applies to the
+          // next connection (the gate reads the setting each time).
+          if (data["deviceOnly"] === undefined) {
+            reply({ ok: true, deviceOnly: deviceAccess.deviceOnly });
+            return;
+          }
+          if (typeof data["deviceOnly"] !== "boolean") {
+            reply({ ok: false, error: "deviceOnly must be true or false" });
+            return;
+          }
+          // Per machine on purpose: it is this device's own listener, so it
+          // is kept in state/ and never published with the env.
+          deviceAccess = await saveDeviceAccess(paths.state, { deviceOnly: data["deviceOnly"] });
+          log(`access: ${deviceAccess.deviceOnly ? "this device only" : "this device and the tailnet"}`);
+          reply({ ok: true, deviceOnly: deviceAccess.deviceOnly });
           return;
         }
         if (kind === "skill_approve" || kind === "skill_reject") {

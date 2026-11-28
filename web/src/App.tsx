@@ -12,6 +12,7 @@ import { foldGoals } from "../../src/chain/goals.js";
 import { parseCommandEdit, slashCommands } from "./commands.js";
 import { proposedSkills } from "../../src/skills/fold.js";
 import { SkillProposals } from "./components/SkillProposals.js";
+import { WebAccessCard } from "./panels/WebAccessCard.js";
 import { ProvidersPanel } from "./panels/ProvidersPanel.js";
 import { CapabilitiesPanel } from "./panels/CapabilitiesPanel.js";
 import { ToolsPanel } from "./panels/ToolsPanel.js";
@@ -574,7 +575,10 @@ export default function App({ client: injected }: { client?: ChainClient } = {})
             }}
           />
         ) : settingsPage === "devices" ? (
-          <DevicesPage snapshot={snapshot} client={client} />
+          <>
+            <DevicesPage snapshot={snapshot} client={client} />
+            <WebAccessCard client={client} />
+          </>
         ) : settingsPage === "storage" ? (
           <StorageWindowPage client={client} />
         ) : (

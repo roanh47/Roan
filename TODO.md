@@ -18,6 +18,16 @@ komt hier per versie terug.
       `src/daemon/main.ts`, variable names such as `stappen` / `antwoord` in
       `src/agent.ts`, and some test names. The one exception is the
       writing-style skill: it has an upstream and is not touched.
+- [ ] **Prove the 0.1.0 work on a device.** Built and CI-checked only, never
+      run on a real machine: the tool guard (risky shell lines ask), slash
+      commands, the Thought block and effort picker, skill proposals,
+      `memory_search` / `todo`, and the "Access outside the app" switch.
+- [ ] **Tell the app from a browser on the same device.** The access switch
+      closes the tailnet, but the app's own window and a local browser are
+      both loopback. Closing the local browser too needs a per-device token
+      the Tauri and Android shells hand to the UI.
+- [ ] **Skill curator.** Count how often each skill is used, show unused and
+      recently changed ones, and give an approved proposal an undo.
 - [ ] **Subagents are Mini Roans.** A subagent is not a second agent and not a
       Hermes turn but a small Roan: the same identity, skills and memory, with
       its own context for one bounded task, and only the summary comes back.

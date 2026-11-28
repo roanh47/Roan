@@ -73,7 +73,14 @@ overriding them per platform is how the phone ended up listening on loopback
 while its own invite named the tailnet address.
 | `ROAN_HOST` | `0.0.0.0` | bind address — every interface, so loopback and the tailnet both work (alias: `ROAN_CONTROL_HOST`); `lan`/`tailscale` resolve to an interface |
 | `ROAN_WEB_DIST` | `web/dist` next to the package root | where the built UI lives |
-| `ROAN_ALLOW_REMOTE_CONTROL` | unset | `1` lets a non-loopback caller open `/ws` |
+| `ROAN_ALLOW_REMOTE_CONTROL` | unset | `1` lets a non-loopback caller open `/ws` (the tailnet may already). The app's own switch wins: with "this device only" on, only loopback gets in |
+
+**Access outside the app** is a switch in Settings → Devices, per device and
+never shared: it is kept in `state/access.json`, not in the env. Open (the
+default), this device and the tailnet may load the UI and open `/ws`. Closed,
+only loopback may; `/healthz` and `/peer` stay reachable so sync keeps working
+(`src/daemon/device-access.ts`, the `access` request). It does not yet tell
+the app's own window from a browser on the same device: both are loopback.
 | `ROAN_PEER_ADVERTISE` | unset | comma-separated hosts to put in the invite instead of the derived ones |
 | `ROAN_DISCOVERY` | on | `off` disables the Tailscale scan |
 | `ROAN_HOME` | `~/.Roan` | state root |
@@ -145,7 +152,8 @@ The request kinds (`main.ts`, `onRequest`):
 `provider_save`, `provider_remove`, `provider_pick`, `models_list`,
 `models_search`, `settings_save`, `model_set`, `checkpoints_list`, `export`,
 `storage_window`, `take_shared`, `import_discover`, `import_plan`, `steer`,
-`session_archive`, `session_delete`, `command_save`, `command_remove`, `goal`,
+`session_archive`, `session_delete`, `access`, `skill_approve`, `skill_reject`,
+`command_save`, `command_remove`, `goal`,
 `goal_update`, `effort`, `plan_mode`. Anything else is answered `{ error: "unknown request: <kind>" }`.
 
 Daemon → client, three plain replies:
