@@ -185,7 +185,8 @@ export function buildRows(events: readonly ChainEvent[], local: string): Row[] {
         rows.push({
           kind: event.node === local ? "user" : "user",
           key: event.id,
-          text: textOf(data),
+          // A slash command is shown as it was typed; the model got the prompt.
+          text: isRecord(data) && typeof data["typed"] === "string" ? data["typed"] : textOf(data),
           ...(image !== undefined &&
           typeof image.mime === "string" &&
           typeof image.data === "string"

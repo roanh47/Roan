@@ -34,6 +34,7 @@ import { autoTitleFor, readSessions, sessionMessages } from "../chain/sessions.j
 import { openSession } from "./session-open.js";
 import { removeNode } from "./membership.js";
 import { foldGoals, goalContext } from "../chain/goals.js";
+import { parseCommandLine, resolveMessage } from "../chain/commands.js";
 import { distilMemories, memoryTexts } from "../memory/index.js";
 import { foldMemoryMd, writeMemoryMd } from "../context/memory-md.js";
 import { approvePlan, planModeEnabled, planModeEvent } from "./plan.js";
@@ -905,13 +906,22 @@ async function main(): Promise<void> {
     const current = session;
     const sessionId = resolveSession(wanted) ?? startSession(text.slice(0, 60));
     if (sessionId === null) return;
+    // A slash command the chain defines becomes its prompt here: `text` in
+    // the event is what the model reads, `typed` is what the owner wrote.
+    const resolved = resolveMessage(text, current.store.read(current.identity.chainId, 1, 100_000));
+    const prompt = resolved.prompt;
     const stored = current.store.append(current.identity.chainId, {
       // The app's own event id, when it sent one: its pending bubble clears
       // the moment this echo arrives, instead of a second copy appearing.
       id: echoId !== undefined && echoId.length > 0 ? echoId : uuid(),
       node: current.identity.nodeId,
       type: "message",
-      data: { text, session: sessionId, ...(image !== undefined ? { image } : {}) },
+      data: {
+        text: prompt,
+        ...(resolved.typed !== undefined ? { typed: resolved.typed } : {}),
+        session: sessionId,
+        ...(image !== undefined ? { image } : {}),
+      },
     });
     control?.broadcast({ t: "append", event: stored });
     // The first turn names the conversation after what was asked: a default
@@ -981,7 +991,7 @@ async function main(): Promise<void> {
           }
         },
       },
-      text,
+      prompt,
     );
     activeTurn = null;
     activeSteer = null;
@@ -1825,6 +1835,31 @@ async function main(): Promise<void> {
           control?.broadcast({ t: "append", event });
           control?.sendState();
           reply({ ok: true });
+          return;
+        }
+        if (kind === "command_save" || kind === "command_remove") {
+          // The owner's own slash commands are chain events, so a command
+          // saved on one device works on all of them.
+          const current = session;
+          const raw = typeof data["name"] === "string" ? data["name"].trim().replace(/^\//, "") : "";
+          const name = parseCommandLine(`/${raw}`)?.name === raw ? raw : null;
+          const prompt = typeof data["prompt"] === "string" ? data["prompt"].trim() : "";
+          if (current === null || name === null) {
+            reply({ ok: false, error: "no chain, or not a usable command name" });
+            return;
+          }
+          if (kind === "command_save" && prompt.length === 0) {
+            reply({ ok: false, error: "a command needs a prompt" });
+            return;
+          }
+          const event = current.store.append(current.identity.chainId, {
+            id: uuid(),
+            node: current.identity.nodeId,
+            type: "command",
+            data: kind === "command_save" ? { name, prompt } : { name, removed: true },
+          });
+          control?.broadcast({ t: "append", event });
+          reply({ ok: true, name });
           return;
         }
         if (kind === "goal") {

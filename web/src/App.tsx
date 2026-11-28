@@ -9,6 +9,7 @@ import { UpdateCard } from "./panels/UpdateCard.js";
 import { SchedulesPanel } from "./panels/SchedulesPanel.js";
 import { GoalsPanel } from "./panels/GoalsPanel.js";
 import { foldGoals } from "../../src/chain/goals.js";
+import { parseCommandEdit, slashCommands } from "./commands.js";
 import { ProvidersPanel } from "./panels/ProvidersPanel.js";
 import { CapabilitiesPanel } from "./panels/CapabilitiesPanel.js";
 import { ToolsPanel } from "./panels/ToolsPanel.js";
@@ -131,6 +132,9 @@ export default function App({ client: injected }: { client?: ChainClient } = {})
     }
     return false;
   }, [snapshot.events, activeSession]);
+
+  // The slash menu: the app's own commands plus the ones the chain defines.
+  const commands = useMemo(() => slashCommands(snapshot.events), [snapshot.events]);
 
   const setPlanMode = (enabled: boolean): void => {
     if (activeSession === null) return;
@@ -264,6 +268,37 @@ export default function App({ client: injected }: { client?: ChainClient } = {})
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "The message could not be sent.");
     }
+  }
+
+  /**
+   * The slash lines the app answers itself. Anything it does not know goes out
+   * as a message, where the daemon expands the owner's own commands.
+   */
+  function runCommand(name: string, args: string): boolean {
+    if (name === "new") newChat();
+    else if (name === "model") setSheetOpen(true);
+    else if (name === "plan") setPlanMode(!planMode);
+    else if (name === "settings") setView("settings");
+    else if (name === "command") {
+      const edit = parseCommandEdit(args);
+      if (!edit.ok) {
+        setNotice(edit.error);
+        return true;
+      }
+      const saved =
+        edit.prompt === null
+          ? client.request<{ ok?: boolean; error?: string }>("command_remove", { name: edit.name })
+          : client.request<{ ok?: boolean; error?: string }>("command_save", { name: edit.name, prompt: edit.prompt });
+      void saved
+        .then((answer) => {
+          if (answer.ok === true) setNotice(edit.prompt === null ? `/${edit.name} removed` : `/${edit.name} saved`);
+          else setNotice(answer.error ?? `could not change /${edit.name}`);
+        })
+        .catch((error: unknown) => {
+          setNotice(error instanceof Error ? error.message : `could not change /${edit.name}`);
+        });
+    } else return false;
+    return true;
   }
 
   function regenerate(seq: number): void {
@@ -696,6 +731,8 @@ export default function App({ client: injected }: { client?: ChainClient } = {})
           steerable={turn !== null && !disabled}
           onSteer={(text) => void client.steer(text)}
           focusSignal={focusSignal}
+          commands={commands}
+          onCommand={runCommand}
         />
       </footer>
 

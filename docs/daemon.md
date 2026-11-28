@@ -145,8 +145,8 @@ The request kinds (`main.ts`, `onRequest`):
 `provider_save`, `provider_remove`, `provider_pick`, `models_list`,
 `models_search`, `settings_save`, `model_set`, `checkpoints_list`, `export`,
 `storage_window`, `take_shared`, `import_discover`, `import_plan`, `steer`,
-`session_archive`, `session_delete`, `goal`, `goal_update`, `effort`,
-`plan_mode`. Anything else is answered `{ error: "unknown request: <kind>" }`.
+`session_archive`, `session_delete`, `command_save`, `command_remove`, `goal`,
+`goal_update`, `effort`, `plan_mode`. Anything else is answered `{ error: "unknown request: <kind>" }`.
 
 Daemon → client, three plain replies:
 

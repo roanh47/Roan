@@ -264,6 +264,12 @@ today. There is no `import_apply`.
 | `plan_mode` | `session?`, `enabled?`, `approve?` | `{ ok: true, session, enabled }` or `{ ok: false, error }`; appends a `plan_mode` event (`approve: true` records an approval) |
 | `goal` | `text` | `{ ok: true }` or `{ ok: false, error: "no chain or empty goal text" }`; appends a `goal` event |
 | `goal_update` | `id`, `status: "open" \| "done" \| "cancelled"`, `note?` | `{ ok: true }` or `{ ok: false, error }`; appends a `goal_update` event |
+| `command_save` | `name`, `prompt` | `{ ok: true, name }` or `{ ok: false, error }`; appends a `command` event. `$args` in the prompt is where the typed text goes |
+| `command_remove` | `name` | `{ ok: true, name }` or `{ ok: false, error }`; appends a `command` tombstone |
+
+A message that starts with `/name` and names a saved command is expanded by the
+daemon before the turn: the `message` event carries the prompt as `text` and
+the line as typed as `typed`. Any other slash line is sent unchanged.
 
 ## 6. What the code does not do
 

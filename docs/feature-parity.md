@@ -19,12 +19,12 @@ Verdicts: **BUILD** (needed for parity, next rounds) · **SOON** (valuable, afte
 
 ## Samenvatting — wat af is en wat niet
 
-49 van 66 features werken; 16 staan open en 1 vallen bewust af.
+50 van 66 features werken; 15 staan open en 1 vallen bewust af.
 
 | Onderdeel | af | open |
 |---|---|---|
 | 1. Transcript & messages | 8 | 2 |
-| 2. Composer & input | 3 | 4 |
+| 2. Composer & input | 4 | 3 |
 | 3. Models & providers | 5 | 2 |
 | 4. Sessions & history | 7 | 1 |
 | 5. Context, memory & skills | 4 | 1 |
@@ -43,7 +43,6 @@ wat een mainstream-agent doet en Roan nog niet.
 - [ ] **Read aloud (TTS)** (1) — SOON
 - [ ] **Dictate (speech → text in composer)** (2) — **BUILD**
 - [ ] **Voice conversation mode (call the agent)** (2) — SOON
-- [ ] **Slash commands (`/models`, `/compact`…)** (2) — **BUILD**
 - [ ] **Command palette / keyboard shortcuts** (2) — LATER
 - [ ] **Per-conversation model (not global)** (3) — **SOON**
 - [ ] **Fallback model when one fails** (3) — LATER
@@ -98,7 +97,7 @@ These exist in mainstream agents and are **deliberately out**:
 | Attach files/photos → to the model | GPT, CL, GC | ✅ a photo is resized to 1024px jpeg in the composer and rides the live message as base64 (0.0.20); workspace files travel as `workspace` events and big or binary ones through the `blob` chunk channel | done |
 | Dictate (speech → text in composer) | GPT | ❌ the mic is in the composer but disabled: `src/stt/` (registry, provider contract, local plugin) has no capture and nothing passes `onRecord` | **BUILD** |
 | Voice conversation mode (call the agent) | GPT, OC | module only — `src/voice/loop.ts` runs listen→think→speak, with no mic and no speaker from the shell | SOON |
-| Slash commands (`/models`, `/compact`…) | CC, CX, OC, GC | module only — `src/chain/commands.ts` (parse/fold/expand) and a `SlashMenu` component, neither mounted; the daemon has no `command` request | **BUILD** |
+| Slash commands (`/models`, `/compact`…) | CC, CX, OC, GC | ✅ `/` in the composer opens `SlashMenu` (arrows, Tab, Enter, Escape). `/new`, `/model`, `/plan` and `/settings` are answered by the app; `/command name prompt` saves the owner's own command in the chain, and the daemon expands it before the turn (`resolveMessage`, `commands-resolve.test.ts`, `web/src/commands.test.ts`). Not proven on a device yet; no `/compact` | done (device proof open) |
 | @-mention files | CC, OC | ✅ (workspace paths) | done |
 | Command palette / keyboard shortcuts | CC, OC | ❌ Ctrl-K opens the drawer on the search field; `CommandPalette.tsx` exists and is unmounted | LATER |
 
