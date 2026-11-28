@@ -7,12 +7,12 @@ import type { ChatMessage as AgentMessage, Tool, TurnEndReason } from "../types.
 import { acquire, release, SeqConflictError, type SteerInbox } from "../turn/index.js";
 import type { Event as TurnEvent, TurnEventDraft, TurnStore } from "../turn/types.js";
 import { historyFromEvents } from "./history.js";
-import { runHermesTurn } from "../engine/hermes.js";
 import { sessionMessages } from "../chain/sessions.js";
 import { compactMessages, type ChatMessage } from "../chain/compaction.js";
 import type { EffortLevel } from "../providers/effort.js";
 import type { TokenUsage } from "../usage.js";
 import { PLAN_MODE_PROMPT, planModeForbidden, planModeRefusal, planModeTools } from "./plan.js";
+import { createThought } from "./thought.js";
 
 export interface TurnRunnerOptions {
   readonly store: EventStore;
@@ -27,24 +27,19 @@ export interface TurnRunnerOptions {
     /** Catalog id, so the loop can pick the right adapter and effort spelling. */
     readonly providerId?: string;
   };
+  /** A second model of the same provider, tried once when the first fails. */
+  readonly fallbackModel?: string;
   /** How hard the model should think this turn; omitted means "normal". */
   readonly effort?: EffortLevel;
   readonly cwd: string;
   readonly systemPrompt: string;
   /** Tools this turn may use; the built-ins when a caller does not say. */
   readonly tools?: readonly Tool[];
-  /**
-   * Who runs the turn. `hermes` uses the engine on this machine (real tools,
-   * skills, MCP); `builtin` uses the small loop in this repo.
-   */
-  readonly engine?: "builtin" | "hermes";
   /** The conversation this turn belongs to; only its history is sent. */
   readonly session?: string;
   /**
    * Read-only plan mode for this turn. The tool list loses everything that
-   * writes or executes, so the gate is the mode rather than the prompt, and the
-   * turn runs the builtin loop even on a device configured for the hermes
-   * engine — that one owns its tools in a subprocess and cannot be gated.
+   * writes or executes, so the gate is the mode rather than the prompt.
    */
   readonly planMode?: boolean;
   /**
@@ -167,8 +162,7 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
           }));
     // Long conversations stay affordable: past a window the older half leaves
     // the request as a digest attached to the prompt; the recent half rides
-    // along whole. The hermes engine windows its own history, so this is the
-    // builtin loop only.
+    // along whole.
     const asChat = history
       .filter(
         (message): message is { role: "user" | "assistant"; content: string } =>
@@ -193,39 +187,20 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
         : [],
     );
     const guidedPrompt = planning ? `${PLAN_MODE_PROMPT}\n\n${turnPrompt}` : turnPrompt;
-    // A planning turn runs the loop Roan owns. The hermes engine keeps its own
-    // tool loop in a subprocess, which cannot be gated — promising read-only and
-    // then handing the machine to a process we do not steer would make the mode
-    // a suggestion. Whatever the device normally uses, a plan runs here.
-    const engine = planning ? "builtin" : (options.engine ?? "builtin");
     let answer = "";
+    const thought = createThought();
     // A turn that ends without an explanation is a silent bug to a reader.
     // The error events of this turn say why it went nowhere; when none did,
     // the turn itself reports that it came back empty.
     let failed = false;
 
-    if (engine === "hermes") {
-      // The engine keeps its own tool loop; the chain keeps the conversation.
-      const result = await runHermesTurn({
-        prompt: userText,
-        cwd: options.cwd,
-        history: history
-          .filter((message) => message.role === "user" || message.role === "assistant")
-          .map((message) => ({
-            role: message.role as "user" | "assistant",
-            text: typeof message.content === "string" ? message.content : "",
-          }))
-          .filter((message) => message.text.length > 0)
-          .slice(-20),
-        ...(options.provider.model.length > 0 ? { model: options.provider.model } : {}),
-      });
-      if (result.text.length > 0) append({ type: "assistant", data: { text: result.text } });
-      else append({ type: "error", data: { message: "the engine returned no answer" } });
-      return;
-    }
-
     const agent = new Agent({
       provider: options.provider,
+      ...(options.fallbackModel !== undefined &&
+      options.fallbackModel.length > 0 &&
+      options.fallbackModel !== options.provider.model
+        ? { fallback: { ...options.provider, model: options.fallbackModel } }
+        : {}),
       tools: turnTools,
       systemPrompt: guidedPrompt,
       cwd: options.cwd,
@@ -258,6 +233,9 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
           case "assistant_text":
             answer += event.text;
             break;
+          case "reasoning":
+            thought.add(event.text);
+            break;
           case "tool_start":
             append({ type: "tool_call", data: { name: event.name, args: event.args } });
             break;
@@ -283,6 +261,16 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
       // Also on a failed or cancelled turn: the requests that did reach the
       // model were still billed.
       measured.current = agent.usage;
+      // What the model thought is kept next to what it said, as its own
+      // event: the transcript folds it away and no replay ever reads it. A
+      // provider that streams no reasoning leaves no event, not an empty one.
+      const reasoning = thought.text();
+      if (reasoning !== null) {
+        append({
+          type: "reasoning",
+          data: { text: reasoning, ...(options.session !== undefined ? { session: options.session } : {}) },
+        });
+      }
     }
     // A turn the owner stopped says so, and says nothing else: the loop
     // already dropped whatever it was about to answer.
@@ -307,8 +295,7 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
     // A steer that arrived after the last request could not be seen by this
     // turn — the answer was already on its way. It is not dropped: it joins
     // the chain after the turn closed, exactly where the model reads the
-    // owner's next message. The subprocess engine lands here too, because it
-    // owns its loop and cannot be steered between requests.
+    // owner's next message.
     for (const text of steer?.drain() ?? []) recordSteer(text);
   }
 }

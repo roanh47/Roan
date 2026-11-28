@@ -7,6 +7,16 @@ interface LiveModel {
   name: string;
 }
 
+/** The levels the daemon accepts, in the order the picker shows them. */
+export const EFFORTS = ["low", "normal", "high"] as const;
+export type Effort = (typeof EFFORTS)[number];
+
+export function isEffort(value: unknown): value is Effort {
+  return value === "low" || value === "normal" || value === "high";
+}
+
+const EFFORT_LABEL: Record<Effort, string> = { low: "Low", normal: "Normal", high: "High" };
+
 interface Props {
   client: ChainClient;
   /** The active provider's account id, or null when none is configured. */
@@ -27,6 +37,7 @@ export function ModelSheet({ client, provider, model, onClose }: Props): ReactEl
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
+  const [effort, setEffort] = useState<Effort | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -47,6 +58,34 @@ export function ModelSheet({ client, provider, model, onClose }: Props): ReactEl
     };
     // The sheet reloads whenever it opens for a (new) provider.
   }, [client, provider]);
+
+  // How hard the model thinks is a setting of its own, not of one model.
+  useEffect(() => {
+    let alive = true;
+    void client
+      .request<{ effort?: string }>("effort")
+      .then((answer) => {
+        if (alive && isEffort(answer.effort)) setEffort(answer.effort);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [client]);
+
+  function pickEffort(level: Effort): void {
+    const previous = effort;
+    setEffort(level);
+    void client
+      .request<{ ok?: boolean; error?: string }>("effort", { effort: level })
+      .then((answer) => {
+        if (answer.ok !== true) {
+          setEffort(previous);
+          setError(answer.error ?? "could not change the thinking effort");
+        }
+      })
+      .catch(() => setEffort(previous));
+  }
 
   const shown =
     models === null
@@ -73,6 +112,32 @@ export function ModelSheet({ client, provider, model, onClose }: Props): ReactEl
           </div>
         ) : (
           <div className="sheet__body">
+            <div
+              className="sheet__effort"
+              role="group"
+              aria-label="Thinking effort"
+              style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, fontSize: 13 }}
+            >
+              <span style={{ color: "var(--faint)" }}>Thinking effort</span>
+              {EFFORTS.map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  aria-pressed={effort === level}
+                  onClick={() => pickEffort(level)}
+                  style={{
+                    padding: "5px 12px",
+                    border: "1px solid var(--line-soft)",
+                    borderRadius: 999,
+                    background: effort === level ? "rgba(126, 226, 184, 0.14)" : "transparent",
+                    color: effort === level ? "var(--accent)" : "inherit",
+                    cursor: "pointer",
+                  }}
+                >
+                  {EFFORT_LABEL[level]}
+                </button>
+              ))}
+            </div>
             <input
               className="sheet__search"
               placeholder="Search models"

@@ -7,8 +7,9 @@ not cover.
 
 One caveat changes how everything below reads: most of this machinery is written
 and tested but not on the path a turn takes. `src/tools/policy.ts` (its
-`decide()`), `src/tools/secrets-scan.ts` and `src/tools/shell-allowlist.ts` have
-a test file and no caller that matters: `policy.ts` is imported only for its
+`decide()`) and `src/tools/secrets-scan.ts` have a test file and no caller that
+matters (the shell allowlist is the exception since the tool guard, section 7):
+`policy.ts` is imported only for its
 `isInsideWorkspace` path helper (by `tools/exec.ts`, `tools/move.ts` and
 `workspace/library.ts`, none of which is the `run_shell` the model gets), and
 `src/protocol/redact.ts` is imported only by `connectors/github.ts` and
@@ -250,9 +251,17 @@ the allowlist is not a path guard, and it does not consult `policy.ts`. Its
 `npm test` / `npm run build` allowances execute whatever the workspace's
 `package.json` defines.
 
-And the decisive gap: `runShell` in `src/tools.ts` — the `run_shell` the agent
-actually has — calls `exec` with `shell: "/bin/bash"` and never calls
-`classifyCommand`. Only `src/tools/shell-allowlist.test.ts` does.
+**What a turn uses of it:** `src/tools/guard.ts` wraps every tool of a turn
+(`toolsForTurn` in `src/daemon/main.ts`) and calls `classifyCommand` on each
+`run_shell` line. Only the `deny` verdict acts: the call becomes an approval
+card that states the reason, the owner may still say yes (it is their machine),
+and that yes is recorded as `once` — never learned for `run_shell` as a whole.
+With nobody answering, the call is refused after three minutes. The `ask` and
+`allow` verdicts are not used: an ordinary command runs as before, and whether
+`run_shell` asks at all is still the chain's `tool_rule`.
+
+**Not covered by the guard:** a `run_shell` that arrives from a peer as a
+`tool_req` runs through the relay's own tool list, which is not wrapped.
 
 ## 8. What holds, what is written but unwired, and what does not hold
 
@@ -264,7 +273,8 @@ actually has — calls `exec` with `shell: "/bin/bash"` and never calls
 | `secrets/` outside the env packer | `src/env/types.ts`, `src/env/pack.ts` | `packEnv` (live: `publishEnv` every 10 s) |
 | provider key scrub | `src/providers/{anthropic,google}.ts` | their own error paths |
 | path containment for the app's file routes | `src/workspace/library.ts` (`isInsideWorkspace`) + the prefix check in `main.ts` | `workspace_read` / `workspace_write` |
-| approval gate for tools with a `tool_rule` ask | `src/daemon/main.ts` (`askPermission`) | every turn's tool list |
+| approval gate for tools with a `tool_rule` ask | `src/tools/guard.ts` + `askPermission` in `src/daemon/main.ts` | every turn's tool list |
+| dangerous shell lines always ask | `src/tools/guard.ts` over `src/tools/shell-allowlist.ts` (its `deny` rules) | every turn's `run_shell`; not the relay |
 
 **Written and tested, but no caller that a turn reaches:**
 
@@ -274,7 +284,6 @@ actually has — calls `exec` with `shell: "/bin/bash"` and never calls
 | registry built from a policy | `src/tools/registry.ts` | nothing |
 | redaction, home collapse | `src/protocol/redact.ts` | `connectors/github.ts`, `daemon/logging.ts` — both unwired |
 | secrets scanner | `src/tools/secrets-scan.ts` | its own test |
-| shell allowlist | `src/tools/shell-allowlist.ts` | its own test; the live `run_shell` calls `exec` directly |
 | sandbox, untrusted blocks, elevation, audit log | `src/safety/{sandbox,untrusted,elevation,audit-log}.ts` | nothing |
 | signed webhooks in and out | `src/webhooks/dispatch.ts`, `src/webhooks/sign.ts` | nothing — no HTTP route in the daemon, no trigger kind |
 | GitHub connector | `src/connectors/github.ts` | nothing — no route and no tool; the token is read from `secrets/` |

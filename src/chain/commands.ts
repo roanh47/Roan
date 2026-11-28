@@ -115,6 +115,25 @@ export function commandList(
 }
 
 /**
+ * What a typed line means for the turn: the prompt the model gets, and the
+ * line as typed when the two differ.
+ *
+ * Only a line that names a command the chain defines is expanded. Anything
+ * else — ordinary text, a path like `/etc`, a typo — is the owner's own words
+ * and reaches the model unchanged; guessing would be worse than passing it on.
+ */
+export function resolveMessage(
+  text: string,
+  events: readonly CommandEventLike[],
+): { readonly prompt: string; readonly typed?: string } {
+  const parsed = parseCommandLine(text);
+  if (parsed === null) return { prompt: text };
+  const expansion = expandCommand(parsed.name, parsed.args, foldCommands(events));
+  if (!expansion.ok || expansion.prompt === text) return { prompt: text };
+  return { prompt: expansion.prompt, typed: text };
+}
+
+/**
  * The prompt a command stands for, or a reason it cannot be expanded.
  *
  * With `$args` in the prompt the typed text takes its place; without it the

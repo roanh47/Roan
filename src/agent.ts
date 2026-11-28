@@ -40,6 +40,11 @@ export class TurnStallError extends Error {
 
 export interface AgentOptions {
   provider: ProviderConfig;
+  /**
+   * A second provider configuration, tried once when a request to the first
+   * fails before it produced anything. The rest of the turn stays on it.
+   */
+  fallback?: ProviderConfig;
   tools: Tool[];
   systemPrompt: string;
   cwd: string;
@@ -84,7 +89,7 @@ export interface AgentOptions {
  * assumed. The id is dropped on that path: an unknown id would only make
  * `effortParams` refuse to say anything.
  */
-function buildAdapter(provider: ProviderConfig): ChatAdapter {
+export function buildAdapter(provider: ProviderConfig): ChatAdapter {
   if (provider.providerId !== undefined && isSupported(provider.providerId)) {
     return createAdapter(provider.providerId, provider);
   }
@@ -199,13 +204,16 @@ export class Agent {
   private messages: ChatMessage[] = [];
   private readonly maxSteps: number;
   /** One adapter per agent: the provider family cannot change mid-turn. */
-  private readonly adapter: ChatAdapter;
+  private adapter: ChatAdapter;
+  /** The adapter to switch to when the first one fails; used at most once. */
+  private spare: ChatAdapter | null;
   /** Every count the provider disclosed this turn, one entry per request. */
   private readonly usages: TokenUsage[] = [];
 
   constructor(private readonly opts: AgentOptions) {
     this.maxSteps = opts.maxSteps ?? 24;
     this.adapter = buildAdapter(opts.provider);
+    this.spare = opts.fallback !== undefined ? buildAdapter(opts.fallback) : null;
     this.messages.push({ role: "system", content: opts.systemPrompt });
     if (opts.history) this.messages.push(...normalizeHistory(opts.history));
   }
@@ -279,7 +287,28 @@ export class Agent {
         // rather than by the provider halfway through the turn.
         this.opts.onBeforeRequest?.(this.messages);
         assertAlternating(this.messages, inheritedUserPair);
-        const response = await this.ask(atBudget ? [] : specs, emit);
+        let streamed = false;
+        // The grace call is the last request of the turn: it carries no tools,
+        // so the model has to answer in words instead of asking for one more.
+        const toolsForCall = atBudget ? [] : specs;
+        const request = (adapter: ChatAdapter) =>
+          this.ask(adapter, toolsForCall, emit, () => {
+            streamed = true;
+          });
+        let response: Awaited<ReturnType<ChatAdapter["send"]>>;
+        try {
+          response = await request(this.adapter);
+        } catch (err) {
+          // One second chance, on the fallback model: only when the owner did
+          // not stop the turn and nothing of the answer was shown yet, so a
+          // retry can never print the same words twice.
+          const spare = this.spare;
+          if (spare === null || streamed || this.opts.signal?.aborted === true) throw err;
+          this.adapter = spare;
+          this.spare = null;
+          response = await request(spare);
+        }
+
         antwoord = response.message;
         // A turn is several requests; each one's usage counts towards it. A
         // provider that reports none simply adds nothing.
@@ -423,15 +452,32 @@ export class Agent {
    * nothing — the "still thinking" that never ends — is cut. When there is no
    * deadline the adapter is awaited directly, exactly as before.
    */
-  private ask(specs: unknown[], emit: (event: AgentEvent) => void): Promise<{ message: ChatMessage; usage: { inputTokens: number; outputTokens: number } | null }> {
+  private ask(
+    adapter: ChatAdapter,
+    specs: unknown[],
+    emit: (event: AgentEvent) => void,
+    onDelta: () => void,
+  ): Promise<{ message: ChatMessage; usage: { inputTokens: number; outputTokens: number } | null }> {
     const timeoutMs = this.opts.stallTimeoutMs;
-    if (timeoutMs === undefined || timeoutMs <= 0) {
-      return this.adapter.send(this.messages, {
+    const send = (rearm: () => void) =>
+      adapter.send(this.messages, {
         tools: specs,
         signal: this.opts.signal,
-        onDelta: (t) => emit({ type: "assistant_text", text: t }),
+        onDelta: (t) => {
+          rearm();
+          onDelta();
+          emit({ type: "assistant_text", text: t });
+        },
+        onReasoning: (t) => {
+          rearm();
+          onDelta();
+          emit({ type: "reasoning", text: t });
+        },
         ...(this.opts.effort !== undefined ? { effort: this.opts.effort } : {}),
       });
+
+    if (timeoutMs === undefined || timeoutMs <= 0) {
+      return send(() => {});
     }
 
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -447,15 +493,7 @@ export class Agent {
     };
     arm();
 
-    const request = this.adapter.send(this.messages, {
-      tools: specs,
-      signal: this.opts.signal,
-      onDelta: (t) => {
-        arm();
-        emit({ type: "assistant_text", text: t });
-      },
-      ...(this.opts.effort !== undefined ? { effort: this.opts.effort } : {}),
-    });
+    const request = send(arm);
 
     return Promise.race([request, silent]).finally(() => {
       if (timer !== undefined) clearTimeout(timer);

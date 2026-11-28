@@ -1,11 +1,11 @@
 /**
- * The contract every web backend implements — the same shape Hermes uses:
- * one ABC, a registry, and thin tools that never contain vendor code.
+ * The contract every web backend implements:
+ * one interface, a registry, and thin tools that never contain vendor code.
  *
  * A provider answers with plain data; the tool wrapper owns formatting.
  */
 export interface WebConfig {
-  /** Shared choice for both capabilities, like `web.backend` in Hermes. */
+  /** Shared choice for both capabilities. */
   readonly backend?: string;
   /** Search-only choice, wins over the shared one. */
   readonly searchBackend?: string;
@@ -36,7 +36,7 @@ export interface WebProvider {
   extract?(url: string, config: WebConfig): Promise<string>;
 }
 
-/** What a plugin's `register()` gets: one method, like `PluginContext` in Hermes. */
+/** What a plugin's `register()` gets: one method. */
 export interface WebPluginContext {
   registerWebProvider(provider: WebProvider): void;
 }

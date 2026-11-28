@@ -227,7 +227,7 @@ Everything else is a request/reply kind handled by `onRequest` in `main.ts`:
 | `models_search` | `query?` | `{ models: { provider, providerName, model, modelName, context? }[], total, source }` (at most 200) |
 | `settings_save` | any of `apiKey`, `baseUrl`, `model`, `provider` | `{ ok: true, model, provider, keySet }` or `{ error: "nothing to save" }`; the key is never echoed |
 | `model_set` | `provider`, `model` | `{ ok: true, model, baseUrl }` or `{ error }` |
-| `effort` | `effort: "low" \| "normal" \| "high"` | `{ ok: true, effort }` or `{ ok: false, error }`; appends nothing |
+| `effort` | `effort?: "low" \| "normal" \| "high"` | `{ ok: true, effort }` or `{ ok: false, error }`; appends nothing. Without `effort` it only reports the level that is set |
 
 ### MCP servers and tools
 
@@ -237,7 +237,7 @@ Everything else is a request/reply kind handled by `onRequest` in `main.ts`:
 | `mcp_save` | `text` (whole file) | `{ ok: true }` or `{ error: "that is not valid JSON" }` |
 | `mcp_server_save` | `id`, `label?`, `transport?: "stdio" \| "http"`, `url?`, `command?`, `enabled?` | `{ ok: true, id }` or `{ ok: false, error }`; appends an `mcp_server` event |
 | `mcp_server_delete` | `id` | `{ ok: true, id }` or `{ ok: false, error }`; appends a removal event |
-| `tools_list` | — | `{ tools: { name, description }[], engine }` |
+| `tools_list` | — | `{ tools: { name, description }[] }` |
 | `tools_state` | — | `{ ok: true, tools: { name, source, enabled, ask, approved }[], servers }` |
 | `tool_rule` | `tool`, `enabled?`, `ask?` | `{ ok: true, tool }` or `{ ok: false, error }`; appends a `tool_rule` event |
 | `tool_approve` | `req`, `allow?` | `{ ok: true, tool, learned }` or `{ ok: false, error: "no pending approval for that req" }` |
@@ -264,6 +264,12 @@ today. There is no `import_apply`.
 | `plan_mode` | `session?`, `enabled?`, `approve?` | `{ ok: true, session, enabled }` or `{ ok: false, error }`; appends a `plan_mode` event (`approve: true` records an approval) |
 | `goal` | `text` | `{ ok: true }` or `{ ok: false, error: "no chain or empty goal text" }`; appends a `goal` event |
 | `goal_update` | `id`, `status: "open" \| "done" \| "cancelled"`, `note?` | `{ ok: true }` or `{ ok: false, error }`; appends a `goal_update` event |
+| `command_save` | `name`, `prompt` | `{ ok: true, name }` or `{ ok: false, error }`; appends a `command` event. `$args` in the prompt is where the typed text goes |
+| `command_remove` | `name` | `{ ok: true, name }` or `{ ok: false, error }`; appends a `command` tombstone |
+
+A message that starts with `/name` and names a saved command is expanded by the
+daemon before the turn: the `message` event carries the prompt as `text` and
+the line as typed as `typed`. Any other slash line is sent unchanged.
 
 ## 6. What the code does not do
 

@@ -1,7 +1,7 @@
 import type { SearchHit, WebConfig, WebProvider } from "./types.js";
 
 /**
- * Where providers live and how one is chosen. The rules are Hermes's rules:
+ * Where providers live and how one is chosen. The rules:
  * an explicit pin is strict (a wrong pin is an honest error, never a silent
  * swap), otherwise the first available provider that supports the capability
  * wins, in registration order.

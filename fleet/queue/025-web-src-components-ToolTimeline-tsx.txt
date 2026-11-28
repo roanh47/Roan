@@ -1,1 +1,0 @@
-`web/src/components/ToolTimeline.tsx` — vertical list of tool calls with status.

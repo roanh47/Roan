@@ -76,9 +76,6 @@ object RoanNode {
     val log = File(root, "roan-daemon.log")
     setEnvironment("ROAN_HOME", home.absolutePath)
     setEnvironment("ROAN_LOG_PATH", log.absolutePath)
-    // The engine is the loop in this repo: there is no `hermes` binary on a
-    // phone and no way to spawn one.
-    setEnvironment("ROAN_ENGINE", "builtin")
     // The app talks to the daemon over loopback; peers reach it on the tailnet.
     // Port, host and the control gate are NOT this layer's business: the daemon
     // owns those defaults (every interface, one port) and they must read the

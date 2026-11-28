@@ -5,9 +5,10 @@ code. The design rationale lives in `PLAN.md`; this file is the rulebook.
 
 ## What this is
 
-Roan is one agent spread over several machines. Today it is the core loop, four
-tools and a streaming provider client. Everything else — the chain, remote tools,
-the apps — is planned and described in `PLAN.md`.
+Roan is one agent spread over several machines. The core loop, the chain, remote
+tools, the daemon and the apps all exist; `README.md` has the status table and
+`docs/feature-parity.md` says per feature what works and what is only a module.
+`PLAN.md` holds the design and the reasons behind it.
 
 The interface is an app you open: a desktop app on your machines, the same app on
 your phone.
@@ -46,7 +47,10 @@ even if the tests pass.
    is `secrets/`: the node id and the peer token are per machine, and never travel.
    Never put a key in a commit, a log line or an error message — a key in a log
    line is a leaked key.
-8. **Everything happens in the app.** Roan ships as a desktop app (Windows, macOS,
+8. **Everything happens in the app, on a screen.** A feature the owner can
+   set or see has a button or a page. The slash menu is a shortcut to those
+   and to the owner's own commands; it is never the only way to do something.
+   The rest of this rule: Roan ships as a desktop app (Windows, macOS,
    Linux) and a phone app (Android), built from one UI codebase. Starting, joining,
    inviting a machine, choosing a provider and a model, and approving a tool call are
    screens in that app. Dev scripts (`npm run build`, `typecheck`) are for us.
@@ -94,6 +98,9 @@ test or a script.
 
 ## Code conventions
 
+- Everything in this repository is English: code, comments, identifiers, test
+  names, docs, prompts, commit messages and UI copy. The one exception is the
+  writing-style skill, which has an upstream: do not translate or edit it.
 - TypeScript strict, plus `noUncheckedIndexedAccess`. Indexed access is `T | undefined`;
   handle it instead of asserting.
 - ESM with NodeNext: relative imports end in `.js`, even in `.ts` files.

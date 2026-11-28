@@ -1,1 +1,0 @@
-`docs/android.md` — how the apk is built and installed, no invented steps.

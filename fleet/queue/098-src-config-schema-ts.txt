@@ -1,1 +1,0 @@
-`src/config/schema.ts` — a typed config with defaults and validation.

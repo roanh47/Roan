@@ -53,6 +53,8 @@ export type TurnEndReason =
 
 export type AgentEvent =
   | { type: "assistant_text"; text: string }
+  /** A fragment of the model's reasoning; shown to the owner, never replayed. */
+  | { type: "reasoning"; text: string }
   | { type: "tool_start"; name: string; args: string }
   | { type: "tool_end"; name: string; ok: boolean; output: string }
   | { type: "error"; message: string }

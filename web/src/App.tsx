@@ -9,6 +9,13 @@ import { UpdateCard } from "./panels/UpdateCard.js";
 import { SchedulesPanel } from "./panels/SchedulesPanel.js";
 import { GoalsPanel } from "./panels/GoalsPanel.js";
 import { foldGoals } from "../../src/chain/goals.js";
+import { slashCommands } from "./commands.js";
+import { ModelRolesPanel } from "./panels/ModelRolesPanel.js";
+import { CommandsPanel } from "./panels/CommandsPanel.js";
+import { JobsPanel } from "./panels/JobsPanel.js";
+import { proposedSkills } from "../../src/skills/fold.js";
+import { SkillProposals } from "./components/SkillProposals.js";
+import { WebAccessCard } from "./panels/WebAccessCard.js";
 import { ProvidersPanel } from "./panels/ProvidersPanel.js";
 import { CapabilitiesPanel } from "./panels/CapabilitiesPanel.js";
 import { ToolsPanel } from "./panels/ToolsPanel.js";
@@ -74,6 +81,9 @@ const NODE = deviceNode();
 type SettingsPage =
   | "menu"
   | "providers"
+  | "models"
+  | "commands"
+  | "jobs"
   | "agent"
   | "workspace"
   | "schedules"
@@ -85,10 +95,13 @@ type SettingsPage =
 
 const SETTINGS_ROWS: readonly [SettingsPage, string, string][] = [
   ["providers", "Models & keys", "providers and API keys"],
+  ["models", "Model roles", "thinking effort, fallback and helper models"],
+  ["commands", "Commands", "your own slash commands"],
   ["agent", "Agent", "tools, skills and MCP servers"],
   ["tools", "Tools & rules", "on or off, ask first, MCP servers"],
   ["workspace", "Workspace", "files shared across devices"],
   ["schedules", "Schedules", "tasks that run later"],
+  ["jobs", "Background jobs", "commands left running on this device"],
   ["checkpoints", "Checkpoints", "named points to rewind to"],
   ["devices", "Sync", "the chain, the nodes, the invite"],
   ["storage", "Storage window", "Android's files, next to the home"],
@@ -132,6 +145,11 @@ export default function App({ client: injected }: { client?: ChainClient } = {})
     return false;
   }, [snapshot.events, activeSession]);
 
+  // The slash menu: the app's own commands plus the ones the chain defines.
+  const commands = useMemo(() => slashCommands(snapshot.events), [snapshot.events]);
+  // Skills the agent proposed and nobody answered yet.
+  const skillProposals = useMemo(() => proposedSkills(snapshot.events), [snapshot.events]);
+
   const setPlanMode = (enabled: boolean): void => {
     if (activeSession === null) return;
     void client.request("plan_mode", enabled ? { session: activeSession, enabled: true } : { session: activeSession, approve: true });
@@ -142,7 +160,7 @@ export default function App({ client: injected }: { client?: ChainClient } = {})
     // Messages from before sessions existed belong to the oldest one, not to
     // everything: otherwise every new conversation shows the whole chain.
     const firstSession = snapshot.sessions[0]?.id;
-    const scoped = new Set(["message", "assistant", "error", "checkpoint", "workspace"]);
+    const scoped = new Set(["message", "assistant", "reasoning", "error", "checkpoint", "workspace"]);
     return snapshot.events.filter((event) => {
       const data = event.data as { session?: unknown; id?: unknown } | null;
       if (event.type === "session") return data?.id === activeSession;
@@ -264,6 +282,22 @@ export default function App({ client: injected }: { client?: ChainClient } = {})
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "The message could not be sent.");
     }
+  }
+
+  /**
+   * The slash lines the app answers itself. Anything it does not know goes out
+   * as a message, where the daemon expands the owner's own commands.
+   */
+  function runCommand(name: string): boolean {
+    if (name === "new") newChat();
+    else if (name === "model") setSheetOpen(true);
+    else if (name === "plan") setPlanMode(!planMode);
+    else if (name === "settings") setView("settings");
+    else if (name === "sessions") {
+      setView("chat");
+      setMenuOpen(true);
+    } else return false;
+    return true;
   }
 
   function regenerate(seq: number): void {
@@ -511,6 +545,12 @@ export default function App({ client: injected }: { client?: ChainClient } = {})
               setSheetOpen(true);
             }}
           />
+        ) : settingsPage === "models" ? (
+          <ModelRolesPanel client={client} />
+        ) : settingsPage === "jobs" ? (
+          <JobsPanel client={client} />
+        ) : settingsPage === "commands" ? (
+          <CommandsPanel client={client} events={snapshot.events} />
         ) : settingsPage === "agent" ? (
           <CapabilitiesPanel client={client} />
         ) : settingsPage === "tools" ? (
@@ -535,7 +575,10 @@ export default function App({ client: injected }: { client?: ChainClient } = {})
             }}
           />
         ) : settingsPage === "devices" ? (
-          <DevicesPage snapshot={snapshot} client={client} />
+          <>
+            <DevicesPage snapshot={snapshot} client={client} />
+            <WebAccessCard client={client} />
+          </>
         ) : settingsPage === "storage" ? (
           <StorageWindowPage client={client} />
         ) : (
@@ -684,6 +727,19 @@ export default function App({ client: injected }: { client?: ChainClient } = {})
             </button>
           </div>
         ) : null}
+        <SkillProposals
+          proposals={skillProposals}
+          onAnswer={(id, approve) => {
+            void client
+              .request<{ ok?: boolean; error?: string }>(approve ? "skill_approve" : "skill_reject", { id })
+              .then((answer) => {
+                if (answer.ok !== true) setNotice(answer.error ?? "could not answer the skill proposal");
+              })
+              .catch((error: unknown) => {
+                setNotice(error instanceof Error ? error.message : "could not answer the skill proposal");
+              });
+          }}
+        />
         <Composer
           disabled={disabled}
           placeholder={placeholder}
@@ -696,6 +752,8 @@ export default function App({ client: injected }: { client?: ChainClient } = {})
           steerable={turn !== null && !disabled}
           onSteer={(text) => void client.steer(text)}
           focusSignal={focusSignal}
+          commands={commands}
+          onCommand={runCommand}
         />
       </footer>
 

@@ -70,6 +70,7 @@ const EVENT_TYPES: readonly string[] = [
   "plan_mode",
   "cron_job",
   "command",
+  "reasoning",
   "device_grant",
   "device_result",
 ];

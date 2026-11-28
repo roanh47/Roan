@@ -27,7 +27,7 @@ te bedenken.
 ```
 Roan goal 1/34: de sync ademt beide kanten op. Repo /home/roan/Roan, geen push, geen tag, geen emulator.
 
-Hoofdzaak: lokaal geappende events na een join bereiken de joiner niet (join-time sync werkt, inkomende events landen, de push vanaf de ontvangende kant blijft stil). Zoek de oorzaak in de uitgaande sessies (store-subscribe versus het store-incident dat de control-kant gebruikt, en de lastSentSeq-boekhouding) en dicht het. Bewijs met drie wegwerp-daemons: B en C schrijven tegelijk, alle drie de nodes zien elkaars tak in hun eigen state (keten-DB bevat beide teksten), en de mirror-order blijft kloppen (elke node houdt zijn eigen tak eerst). Script in ~/.hermes/cache/scratch/proof-three-branches.cjs bestaat al; werk het bij en laat het PASS geven. Daarna: de presence-bug — de eigen node toont "offline" in het Sync-paneel terwijl de daemon draait; liveness mag niet alleen van peer-heartbeats afhangen. Unit-test dat bij.
+Hoofdzaak: lokaal geappende events na een join bereiken de joiner niet (join-time sync werkt, inkomende events landen, de push vanaf de ontvangende kant blijft stil). Zoek de oorzaak in de uitgaande sessies (store-subscribe versus het store-incident dat de control-kant gebruikt, en de lastSentSeq-boekhouding) en dicht het. Bewijs met drie wegwerp-daemons: B en C schrijven tegelijk, alle drie de nodes zien elkaars tak in hun eigen state (keten-DB bevat beide teksten), en de mirror-order blijft kloppen (elke node houdt zijn eigen tak eerst). Schrijf een script dat dit bewijst en laat het PASS geven. Daarna: de presence-bug — de eigen node toont "offline" in het Sync-paneel terwijl de daemon draait; liveness mag niet alleen van peer-heartbeats afhangen. Unit-test dat bij.
 
 Bewijs: root- en tests-suite groen, beide typechecks schoon, het drie-daemons-script PASS in beide richtingen.
 
@@ -171,7 +171,7 @@ AAN HET EINDE: 3 regels status + goal 13/34 letterlijk uit docs/goals-0.0.23.md.
 ```
 Roan goal 13/34: bijsturen midden in een beurt. Repo /home/roan/Roan, geen push, geen tag.
 
-Naast Stop: een "steer"-pad dat een bericht aan een lopende beurt toevoegt als user-bericht ná de laatste tool-call (dezelfde vorm als Hermes: assistant(tool_calls) → tool → user), zonder de beurt te breken. UI: tweede knop naast Stop zolang de beurt loopt. Tests: steer komt aan, volgorde blijft geldig, geen tweede user-bericht achter elkaar.
+Naast Stop: een "steer"-pad dat een bericht aan een lopende beurt toevoegt als user-bericht ná de laatste tool-call (assistant(tool_calls) → tool → user), zonder de beurt te breken. UI: tweede knop naast Stop zolang de beurt loopt. Tests: steer komt aan, volgorde blijft geldig, geen tweede user-bericht achter elkaar.
 
 Bewijs: tests groen, suites groen.
 
