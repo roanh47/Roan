@@ -9,6 +9,17 @@ there comes back here, per version.
 
 ## 0.1.0
 
+- [ ] **The APK is a release build, not a debug one.** Both workflows run
+      `tauri android build --apk --debug` and then sign the result with the
+      release key. So the key is right and the build is not: a debug build is
+      debuggable, unoptimised and much larger than it has to be (part of why
+      the apk is 162 MB). Switch to a release build. What has to be checked
+      first, on a phone: a release build shrinks and renames code, and
+      `RoanNode.kt` is reached by name from native code
+      (`startNodeWithArguments`, `setEnvironment`), so it needs a keep rule
+      for `dev.roan.**` or the app crashes at start. Do it in `release-dry.yml`
+      first, install that apk, then change `release.yml`.
+
 - [ ] **Built on 2026-11-28, none of it proven.** Written without being run;
       each needs CI green and a check on a device before it counts.
       - The loop: old tool output cleared past a budget

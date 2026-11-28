@@ -20,7 +20,7 @@ concurrency:
 jobs:
   # ---------------------------------------------------------------- Windows --
   windows:
-    name: Windows x64 (.exe)
+    name: Windows x64 (.msi)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -61,9 +61,18 @@ jobs:
           test -f web/dist/index.html || { echo "::error::web/dist/index.html is missing - the app would open blank"; exit 1; }
           node -e "const c=require('./src-tauri/tauri.conf.json'); if(c.build && c.build.devUrl){console.error('::error::build.devUrl is set; production must use frontendDist only');process.exit(1)}"
 
-      - name: Build Tauri app and NSIS installer
+      # The same steps as release.yml, so a dry run says something about a release.
+      - name: Build the agent as one executable
         shell: bash
-        run: npx --yes @tauri-apps/cli@^2 build --bundles nsis --verbose
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+          node scripts/build-sidecar.mjs x86_64-pc-windows-msvc
+
+      - name: Build Tauri app and MSI installer
+        shell: bash
+        run: npx --yes @tauri-apps/cli@^2 build --config src-tauri/tauri.desktop.conf.json --bundles msi --verbose
 
       - name: Collect the installer
         shell: bash
@@ -72,15 +81,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p out
-          exe="$(find src-tauri/target/release/bundle/nsis -maxdepth 1 -name '*.exe' | head -n 1)"
-          test -n "$exe" || { echo "::error::NSIS produced no .exe"; exit 1; }
-          cp "$exe" "out/Roan-${APP_VERSION}-x64.exe"
+          msi="$(find src-tauri/target/release/bundle/msi -maxdepth 1 -name '*.msi' | head -n 1)"
+          test -n "$msi" || { echo "::error::WiX produced no .msi"; exit 1; }
+          cp "$msi" "out/Roan-${APP_VERSION}-x64.msi"
           ls -l out
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows-x64
-          path: out/Roan-*-x64.exe
+          path: out/Roan-*-x64.msi
           if-no-files-found: error
           retention-days: 7
 
@@ -123,8 +132,19 @@ jobs:
           test -f web/dist/index.html || { echo "::error::web/dist/index.html is missing - the app would open blank"; exit 1; }
           node -e "const c=require('./src-tauri/tauri.conf.json'); if(c.build && c.build.devUrl){console.error('::error::build.devUrl is set; production must use frontendDist only');process.exit(1)}"
 
-      - name: Build Tauri app and DMG (unsigned)
-        run: npx --yes @tauri-apps/cli@^2 build --target aarch64-apple-darwin --bundles dmg --verbose
+      - name: Build the agent as one executable
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+          node scripts/build-sidecar.mjs aarch64-apple-darwin
+
+      # Signed ad-hoc ("-"), as in release.yml: without any signature Apple
+      # Silicon reports the app as damaged and the dmg cannot be opened.
+      - name: Build Tauri app and DMG (ad-hoc signed)
+        env:
+          APPLE_SIGNING_IDENTITY: "-"
+        run: npx --yes @tauri-apps/cli@^2 build --config src-tauri/tauri.desktop.conf.json --target aarch64-apple-darwin --bundles dmg --verbose
 
       - name: Collect the DMG
         env:
@@ -188,8 +208,15 @@ jobs:
           test -f web/dist/index.html || { echo "::error::web/dist/index.html is missing - the app would open blank"; exit 1; }
           node -e "const c=require('./src-tauri/tauri.conf.json'); if(c.build && c.build.devUrl){console.error('::error::build.devUrl is set; production must use frontendDist only');process.exit(1)}"
 
+      - name: Build the agent as one executable
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+          node scripts/build-sidecar.mjs x86_64-unknown-linux-gnu
+
       - name: Build Tauri app and AppImage
-        run: npx --yes @tauri-apps/cli@^2 build --bundles appimage --verbose
+        run: npx --yes @tauri-apps/cli@^2 build --config src-tauri/tauri.desktop.conf.json --bundles appimage --verbose
 
       - name: Collect the AppImage
         env:
@@ -286,6 +313,13 @@ jobs:
           find src-tauri/icons -name ic_launcher_background.xml -exec cp {} "$RES/values/" \; 2>/dev/null || true
           find "$RES" -name 'ic_launcher*' | sort
 
+      - name: Give the phone a daemon (libnode plus the bundle)
+        run: |
+          set -euo pipefail
+          chmod +x scripts/android-daemon.sh
+          ./scripts/android-daemon.sh arm64-v8a
+
+      # Still a debug build, as in release.yml; see TODO.md (release build).
       - name: Build debug APK
         run: npx --yes @tauri-apps/cli@^2 android build --apk --debug --ci
 
@@ -327,7 +361,7 @@ jobs:
         run: |
           set -euo pipefail
           version="$(node -p "require('./src-tauri/tauri.conf.json').version")"
-          expected="Roan-${version}-x64.exe Roan-${version}-arm64.dmg Roan-${version}-x86_64.AppImage Roan-${version}.apk"
+          expected="Roan-${version}-x64.msi Roan-${version}-arm64.dmg Roan-${version}-x86_64.AppImage Roan-${version}.apk"
           echo "Downloaded:"
           ls -lR artifacts
           for f in $expected; do
