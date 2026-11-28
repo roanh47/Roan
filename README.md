@@ -79,46 +79,100 @@ same time; that's a lock, not ownership.
 device doesn't push its local state into the chain; only creating a new chain seeds
 it, once per person.
 
-**Secrets stay local.** Keys are meant to stay local and never enter the chain.
-Today that rule is not held by the code: a key entered in the app is saved into
-`config.json`, which travels in the env snapshot — see
-[docs/security.md](docs/security.md) §1 for the exact path and TODO.md for the
-open defect.
+**Everything is synced.** Settings, keys, sign-ins, skills and memory are the
+same on every device: connect a service or change a setting once and it holds
+everywhere. Only the local `workspace/` folder, and anything outside `.Roan`,
+belongs to one device.
 
-## Home folder
+## Where Roan lives on a device
 
-Everything the agent is lives in `~/.Roan/`:
+Two places, and they have nothing to do with each other.
 
-```
-~/.Roan/
-├── config.json
-├── AGENTS.md            how it behaves
-├── SOUL.md              tone and boundaries
-├── USER.md              who you are
-├── MEMORY.md            what it remembers
-├── memory/              daily notes
-├── skills/              procedures that load only when relevant
-├── mcp/
-├── secrets/             per machine, encrypted
-├── workspace/           per machine — scratch work, caches
-└── synced-workspace/    identical everywhere — projects live here
-```
+**1. The app** is the program. It goes wherever that system keeps programs.
+Nothing of yours is in it; an update replaces it completely.
 
-`workspace/` and `synced-workspace/` are siblings, so moving a file between them is
-an `mv` on one disk. Anything in `synced-workspace/` appears on every machine;
-anything you take out of it disappears there too.
+**2. `.Roan`** is everything that is yours: settings, keys, conversations,
+memory, skills, files. It is always in your home folder, on every system, and the
+installer never touches it.
 
-Same paths on all systems:
+So Roan is not "installed in `.Roan`". The app is installed like any other app,
+and `.Roan` is its data.
+
+### 1. The app
+
+| System | Where the app goes | You get it as |
+|---|---|---|
+| Windows | `C:\Program Files\Roan\` | `.msi` installer |
+| macOS | `/Applications/Roan.app` | `.dmg`, drag to Applications |
+| Linux | wherever you save the file; it is not installed | `.AppImage`, one file you run |
+| Android | the app's own private storage | `.apk` |
+
+The app contains the window you see and the daemon that does the work. The app
+starts the daemon, and the daemon keeps running when you close the window.
+
+### 2. `.Roan`, your data
+
+The same folder name on every system:
 
 ```
 LINUX      /home/<user>/.Roan/
 MACOS      /Users/<user>/.Roan/
 WINDOWS    C:\Users\<user>\.Roan\
-ANDROID    /data/data/dev.roan/files/.Roan/   (app-private)
+ANDROID    /data/data/dev.roan/files/.Roan/   (inside the app's private storage)
 ```
 
-Where each of these lives, what travels between devices and what stays on the
-machine is in [docs/storage.md](docs/storage.md).
+What is in it:
+
+```
+~/.Roan/
+├── config.json          model, provider, key, every switch in Settings
+├── providers.json       your saved providers
+├── SOUL.md              who Roan is: tone and boundaries
+├── IDENTITY.md          its name and voice
+├── AGENTS.md            how it writes
+├── USER.md              who you are
+├── MEMORY.md            what it learned
+├── cron.json            scheduled tasks
+├── hooks.json           your hooks
+├── memory/              memory notes
+├── skills/              procedures that load only when relevant
+├── mcp/                 connections and their sign-ins
+├── imported/            conversations brought in from elsewhere
+├── synced-workspace/    files that should be on every device
+├── state/               the chain: every conversation and event
+├── secrets/             this device's own id and its key to your other devices
+└── workspace/           this device only: where Roan builds
+```
+
+### What is synced
+
+**Everything in `.Roan` is the same on all your devices**, with three exceptions:
+
+| Folder | Why it is not synced |
+|---|---|
+| `workspace/` | The one folder that is meant to be local. Roan clones, installs and builds here, and none of that should be copied to your phone. |
+| `secrets/` | It identifies this device to your other devices. Each device has its own. |
+| `state/` | It holds the chain itself. It is not copied as a folder: each device keeps its own copy and they end up with the same content. |
+
+Anything outside `.Roan` (a project in `~/code`, your Documents) belongs to that
+device and is not synced.
+
+### The two workspaces
+
+- **`workspace/`** is local. Roan works here: scratch files, a cloned repository,
+  a build.
+- **`synced-workspace/`** is shared. A file goes here only when it should be on
+  every device.
+
+They are siblings, so moving a file from one to the other is a move on one disk.
+A file put in `synced-workspace/` appears on every device; taking it out removes
+it there too.
+
+Roan is told all of this at the start of every conversation, and to ask when it
+is not clear where something belongs. It does not put work in `.Roan` itself:
+that folder holds who it is.
+
+More detail per file is in [docs/storage.md](docs/storage.md).
 
 ## Repository layout
 
@@ -149,7 +203,7 @@ you close the window.
 | Core loop, streaming, tools | **working** — `src/agent.ts`, `src/tools.ts` |
 | The chain (events, storage, catch-up) | **working** — SQLite in `~/.Roan/state/`, replication over the peer port |
 | Remote tools between nodes | **working** — `run_on_node` over `tool_req`/`tool_res` |
-| Desktop app (exe/dmg/AppImage) | **working** — Tauri shell, daemon as a sidecar; AppImage proven, macOS dmg not built yet |
+| Desktop app (msi/dmg/AppImage) | **working** — Tauri shell, daemon as a sidecar; AppImage proven, macOS dmg not built yet |
 | Phone app (apk) | **working** — daemon in the apk via `libnode`, foreground service; the start on a real phone is not proven yet |
 | Distribution (binaries, npm) | **partial** — CI builds four installers; no published release, no npm package |
 
