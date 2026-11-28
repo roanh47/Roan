@@ -9,13 +9,46 @@ there comes back here, per version.
 
 ## 0.1.0
 
-- [ ] **The whole codebase is English.** Code, comments, identifiers, test
-      names, docs, prompts and this file. Known Dutch today: most of this
-      `TODO.md`, `docs/feature-map.md`, `docs/FINAL-0.0.23.md`,
-      `docs/goals-0.0.23.md`, `docs/goal-orchestrator-0.0.23.md`, the summary
-      in `docs/feature-parity.md`, variable names such as `stappen` / `antwoord` in
-      `src/agent.ts`, and some test names. The one exception is the
+- [ ] **Built on 2026-11-28, none of it proven.** Written without being run;
+      each needs CI green and a check on a device before it counts.
+      - The loop: old tool output cleared past a budget
+        (`src/context/tool-clearing.ts`); a busy provider retried with a
+        growing wait (`src/agent.ts`); the older part of a long conversation
+        summarised in steps of twenty with a plain fallback
+        (`src/context/condense.ts`); the system prompt of a conversation held
+        still; tools that cannot work on a device not offered.
+      - Pages: Skills with use counts (`src/skills/usage.ts`), Memory, Usage,
+        Logs, Mini Roans, Connections, Computer use, Model roles, Commands,
+        Background jobs.
+      - Mini Roans in the background, up to four at once, visible and
+        stoppable (`src/daemon/mini-registry.ts`).
+      - Memory edits and forgetting as chain events (`src/memory/distil.ts`).
+      Still open from the same list: browser sign-in for connections,
+      reasoning sent back to providers that expect it, a model and an
+      approval mode per conversation, temporary chats, a Plugins page, an
+      archive view, the agent's task list as chain state, computer use on
+      another device of the chain.
+
+- [ ] **Remove all Dutch: code and comments first, then docs.** Everything in
+      this repository is English. Not one Dutch identifier, comment, test
+      name, string, log line or prompt stays. The one exception is the
       writing-style skill: it has an upstream and is not touched.
+      Dutch found in code on 2026-11-28, about a hundred places in 32 files:
+      - `src/agent.ts`: the variables `stappen`, `antwoord`, `laatsteTekst`.
+      - `src/mobile/backup-policy.ts` and `web/src/i18n.ts`: check whether the
+        Dutch there is data the feature needs or leftover text.
+      - Test names and fixtures in `src/chain/` (`compaction`, `export-html`,
+        `export-markdown`, `gates`, `sessions`, `summary`), `src/stt/registry`,
+        `src/tools/` (`web`, `todo`, `glob`, `search`, `secrets-scan`),
+        `src/mcp/client`, `src/mobile/queue`, `src/sync/`, `src/workspace/`,
+        `src/voice/tts`, `src/charts/spec`, `src/memory/distil`,
+        `src/daemon/control`, `src/daemon/discovery`, `src/testing/temp-dir`
+        and `tests/integration/sync-two-nodes`.
+      - `scripts/build-local.sh` and `scripts/dmg/build-dmg.sh`.
+      Dutch in docs: the old sections of this `TODO.md`, `docs/README.md`,
+      `docs/app/app-features.md`, everything in `docs/research/` and
+      `docs/history/`, `docs/feature-map.md`, and the summary in
+      `docs/feature-parity.md`.
 - [ ] **Prove the 0.1.0 work on a device.** Built and CI-checked only, never
       run on a real machine: the tool guard (risky shell lines ask), slash
       commands, the Thought block and effort picker, skill proposals,
@@ -67,13 +100,29 @@ there comes back here, per version.
       prompt. Rename it (for example `RULES.md`) in `src/daemon/bootstrap.ts`,
       `src/env/types.ts` and the prompt builder, and move an existing file
       over once, the way the lowercase home was migrated.
-- [ ] **Voice.** `src/stt/` and `src/voice/` are modules only: wire the mic in
-      the composer (dictation) and read-aloud for an answer.
-- [ ] **Connectors.** `src/connectors/github.ts` is read-only and has no
-      caller. Give it a route and a tool, then decide which come next.
-- [ ] **Remote MCP with sign-in.** Local MCP servers work; hosted ones that
-      need OAuth do not.
-- [ ] **Computer use.** Module only (`src/computer/`), not wired into a turn.
+- [ ] **Connections.** Top priority. Built, not proven: Settings →
+      Connections adds a service by its MCP address, signs in with a token
+      that travels with the config so every device is signed in
+      (`mcp/tokens/`, `src/daemon/connection-tokens.ts`), shows whether it is connected and
+      how many tools it brought, and signs out or removes it. Four services
+      are offered by name. Still to do: sign-in in the browser (OAuth), which
+      most services need (mail, calendar, notes); checking the four suggested
+      addresses against the real services; and turning a connection off
+      without removing it from this page.
+- [ ] **Computer use.** Top priority. Built, not proven: the `computer` tool
+      looks at the screen (a model that can see describes it with pixel
+      positions), then moves, clicks, types and presses keys
+      (`src/computer/tool.ts`), and Settings → Computer use allows it for one
+      chat for 5, 10 or 30 minutes with a Stop button. Drivers for Linux
+      (`ydotool` / `xdotool`), Windows (PowerShell, nothing to install) and
+      macOS (`screencapture` and `osascript`, needs Screen Recording and
+      Accessibility permission). The Windows and macOS drivers have never
+      touched a real screen. Still to do: prove each on its platform; the
+      primary screen only, so more monitors; controlling another device of
+      the chain from this one; a
+      visible "Roan is controlling this device" bar with Stop in the chat;
+      scroll, drag and double-click; and sending the screenshot itself to a
+      main model that can see, instead of a description.
 - [ ] **Reasoning for Google, and live.** The Thought block covers
       OpenAI-compatible providers and Anthropic and appears when the turn
       ends. Add Google's thought parts and stream it while the model thinks.
@@ -88,8 +137,15 @@ there comes back here, per version.
       checkpoint), an archived-conversations view, a session cost total, and
       the doctor behind a settings button (`src/daemon/health.ts`,
       `diagnostics.ts`).
-- [ ] **API key out of the chain.** It sits in `config.json`, which travels.
-      Rolled over from 0.0.26; `docs/security.md` calls it a live defect.
+- [ ] **Everything is synced: check all of it.** The rule is rule 9 in
+      `AGENTS.md`: everything in `~/.Roan` is synced except `workspace/`.
+      Built, not proven: settings, keys, helper and fallback models,
+      connection sign-ins, the access switch and computer use permissions all
+      travel, and a device reloads its settings when a change arrives. Still
+      to do: the task list the agent keeps is in memory only and has to
+      become chain state; go through every module and move anything that
+      still writes outside the synced part of the home; and rewrite
+      `docs/security.md` and `PLAN.md`, which still say keys do not travel.
 - [ ] **Auth on the control socket.** `/ws` is guarded by address only. The
       same per-device token that tells the app from a local browser fixes it.
 - [ ] **Docs match the code.** About a dozen files in `docs/` contradict the

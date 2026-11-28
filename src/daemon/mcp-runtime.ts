@@ -14,8 +14,17 @@ export class McpRuntime {
   private connections = new Map<string, McpConnection>();
   private syncing: Promise<void> = Promise.resolve();
   private lastSynced: readonly McpServerConfig[] = [];
+  /** Why the last dial of a server failed, for the screen that shows it. */
+  private failures = new Map<string, string>();
 
-  constructor(private readonly log: McpLog) {}
+  /**
+   * `tokenFor` looks up the owner's sign-in for a server on this device. It
+   * is asked at every dial, so a token saved a moment ago is used at once.
+   */
+  constructor(
+    private readonly log: McpLog,
+    private readonly tokenFor: (id: string) => Promise<string | null> = async () => null,
+  ) {}
 
   /** What the last sync was told to dial; compared per turn. */
   syncedConfigs(): readonly McpServerConfig[] {
@@ -31,14 +40,19 @@ export class McpRuntime {
     const run = async (): Promise<void> => {
       this.lastSynced = servers;
       this.connections.clear();
+      this.failures.clear();
       for (const config of servers) {
         if (!config.enabled) continue;
         try {
-          const connection = await connectMcpServer(config);
+          const token = await this.tokenFor(config.id).catch(() => null);
+          const connection = await connectMcpServer(config, token);
           this.connections.set(config.id, connection);
-          this.log(`mcp: ${config.label} verbonden — ${String(connection.tools.length)} tools`);
+          this.failures.delete(config.id);
+          this.log(`mcp: ${config.label} connected — ${String(connection.tools.length)} tools`);
         } catch (err) {
-          this.log(`mcp: ${config.label} onbereikbaar — ${err instanceof Error ? err.message : String(err)}`);
+          const reason = err instanceof Error ? err.message : String(err);
+          this.failures.set(config.id, reason);
+          this.log(`mcp: ${config.label} unreachable — ${reason}`);
         }
       }
     };
@@ -62,6 +76,16 @@ export class McpRuntime {
       live: true,
       tools: connection.tools.map((tool) => tool.name),
     }));
+  }
+
+  /** Why a server is not connected, or null when it is, or was never tried. */
+  failure(id: string): string | null {
+    return this.failures.get(id) ?? null;
+  }
+
+  /** How many tools a connected server brought; 0 when it is not connected. */
+  toolCount(id: string): number {
+    return this.connections.get(id)?.tools.length ?? 0;
   }
 
   /** True when the fleet matches the configs the chain just showed. */

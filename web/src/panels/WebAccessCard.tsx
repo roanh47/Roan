@@ -4,9 +4,9 @@ import type { ChainClient } from "../chain.js";
 /**
  * The switch for reaching this device's Roan from outside the app.
  *
- * Open, a browser on this device or on another device in the tailnet can load
- * the UI on the daemon's port. Closed, only this device itself can. The
- * setting belongs to this device and is not shared with the others.
+ * Open, a browser on a device or on another device in the tailnet can load
+ * the UI on the daemon's port. Closed, only the device itself can. Like every
+ * setting it is synced: it holds on all your devices.
  */
 export function WebAccessCard({ client }: { client: ChainClient }): ReactElement {
   const [deviceOnly, setDeviceOnly] = useState<boolean | null>(null);
@@ -46,8 +46,8 @@ export function WebAccessCard({ client }: { client: ChainClient }): ReactElement
         {deviceOnly === null
           ? "Checking…"
           : open
-            ? "Open: a browser on this device or on your tailnet can open Roan on port 6769."
-            : "Closed: only this device itself can open Roan. Other devices in your tailnet are refused."}
+            ? "Open: a browser on a device, or on another device in your tailnet, can open Roan on port 6769."
+            : "Closed: each device only opens Roan for itself. Browsers on other devices are refused."}
       </p>
       <button
         type="button"
@@ -56,9 +56,9 @@ export function WebAccessCard({ client }: { client: ChainClient }): ReactElement
         disabled={deviceOnly === null}
         onClick={() => change(open)}
       >
-        {open ? "Close it to this device only" : "Open it to my tailnet"}
+        {open ? "Close it" : "Open it to my tailnet"}
       </button>
-      <p className="panel__sub">This setting is for this device only; your other devices keep their own.</p>
+      <p className="panel__sub">This applies to all your devices, like every setting.</p>
       {note !== null ? <p className="panel__status">{note}</p> : null}
     </section>
   );

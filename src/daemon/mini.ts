@@ -37,6 +37,8 @@ export interface MiniRoanOptions {
   readonly effort?: EffortLevel;
   readonly signal?: AbortSignal;
   readonly maxSteps?: number;
+  /** Told the name of every tool the Mini Roan uses, as it uses it. */
+  readonly onActivity?: (line: string) => void;
 }
 
 /** The tools a Mini Roan gets: everything except starting another one. */
@@ -55,6 +57,13 @@ export async function runMiniRoan(options: MiniRoanOptions, task: string): Promi
     maxSteps: options.maxSteps ?? MINI_ROAN_STEPS,
     ...(options.effort !== undefined ? { effort: options.effort } : {}),
     ...(options.signal !== undefined ? { signal: options.signal } : {}),
+    ...(options.onActivity !== undefined
+      ? {
+          onEvent: (event) => {
+            if (event.type === "tool_start") options.onActivity?.(event.name);
+          },
+        }
+      : {}),
   });
   const summary = (await agent.send(wanted)).trim();
   if (summary.length === 0) throw new Error("the Mini Roan finished without a summary");

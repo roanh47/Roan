@@ -11,7 +11,8 @@ import { ANDROID_STORAGE_TARGETS, openStorageWindow, sharedStorageProbe } from "
 import { compactMessages } from "../chain/compaction.js";
 import { loadSettings } from "./settings.js";
 import { startControlServer } from "./control.js";
-import { loadDeviceAccess, mayControl, mayLoadUi, saveDeviceAccess } from "./device-access.js";
+import { mayControl, mayLoadUi } from "./device-access.js";
+import type { SettingsPatch } from "./settings-write.js";
 import { ChainNodeStore } from "./peer-store.js";
 import { addPeer, peers as peerList, PEER_PATH, startPeers, stopPeers } from "./peers.js";
 import { probe, startDiscovery, tailscaleHosts } from "./discovery.js";
@@ -48,6 +49,7 @@ import { createMemorySearchTool, createTodoTool } from "../tools/recall-tools.js
 import { TodoStore } from "../tools/todo.js";
 import { ProcessRegistry, createProcessTool, finishedJobsNote } from "../tools/processes.js";
 import { distilMemories, memoryTexts } from "../memory/index.js";
+import { foldFacts } from "../memory/distil.js";
 import { foldMemoryMd, writeMemoryMd } from "../context/memory-md.js";
 import { approvePlan, planModeEnabled, planModeEvent } from "./plan.js";
 import { createSteerInbox, type SteerInbox } from "../turn/index.js";
@@ -74,6 +76,21 @@ import { guardTool, type ApprovalAnswer, type GuardOptions } from "../tools/guar
 import { dueJobs, loadCron, unparseableSchedule } from "../cron/jobs.js";
 import { isEffortLevel } from "../providers/effort.js";
 import { runMiniRoan } from "./mini.js";
+import { MiniRegistry, finishedMinisNote } from "./mini-registry.js";
+import { condense } from "../context/condense.js";
+import { normaliseSkillName } from "../skills/parse.js";
+import { skillUsage, skillVerdict } from "../skills/usage.js";
+import {
+  isConnectionId,
+  loadConnectionToken,
+  removeConnectionToken,
+  saveConnectionToken,
+} from "./connection-tokens.js";
+import { settingsGrantStore } from "../computer/synced-grants.js";
+import { createLinuxDriver } from "../computer/driver-linux.js";
+import { createWindowsDriver } from "../computer/driver-windows.js";
+import { createMacDriver } from "../computer/driver-macos.js";
+import { createComputerTool, describeScreenPrompt, unavailableDriver } from "../computer/tool.js";
 import { buildAdapter } from "../agent.js";
 import type { ProviderConfig } from "../providers/adapter.js";
 import {
@@ -206,16 +223,52 @@ async function main(): Promise<void> {
 
   // Everything this device knows before the first token: its own memory files
   // and the skills on its own disk. Both are copies, never a fetch from a peer.
-  // Who may reach this device from outside the app; local to this machine.
-  let deviceAccess = await loadDeviceAccess(paths.state);
   const memory = new MemoryStore(paths.home);
   const skills = new SkillLibrary(join(paths.home, "skills"));
+  /**
+   * Saves settings and publishes them: everything is synced, so a change made
+   * here has to reach the other devices of the chain.
+   */
+  const saveShared = async (patch: SettingsPatch): Promise<void> => {
+    settings = await saveSettings(paths, patch);
+    if (session === null) return;
+    const current = session;
+    void publishEnv({
+      store: current.store,
+      chain: current.identity.chainId,
+      node: current.identity.nodeId,
+      home: paths.home,
+    }).catch(() => undefined);
+  };
+  // Computer use: the permission is a synced setting (conversation → end
+  // time), so one given on the phone counts on the desktop being controlled.
+  const computerGrants = settingsGrantStore(
+    () => settings.computerGrants,
+    (grants) => {
+      // Held in memory at once, so the next action sees it; saved and
+      // published right behind.
+      settings = { ...settings, computerGrants: grants };
+      void saveShared({ computerGrants: grants }).catch((error: unknown) => log("computer: " + String(error)));
+    },
+  );
+  const computerDriver =
+    process.platform === "linux" && process.env["ROAN_SHELL"] !== "android"
+      ? createLinuxDriver()
+      : process.platform === "win32"
+        ? createWindowsDriver()
+        : process.platform === "darwin"
+          ? createMacDriver()
+          : unavailableDriver("a phone cannot be controlled this way; use computer use on a desktop");
   // Background jobs belong to this machine and this daemon run.
   const processes = new ProcessRegistry();
   const tools = [...allTools(), ...contextTools(memory, skills), createProcessTool(processes)];
   // MCP servers are chain config: this node dials them, every instance folds
   // the same list. Unreachable servers are skipped, never fatal.
-  const mcp = new McpRuntime((line) => log(line));
+  // A connection's sign-in is read from the agent home at every dial.
+  const mcp = new McpRuntime(
+    (line) => log(line),
+    (id) => loadConnectionToken(paths.home, id),
+  );
   const agentContext: AgentContext = {
     memory,
     skills,
@@ -808,6 +861,12 @@ async function main(): Promise<void> {
       accounts,
     );
   };
+  /** Mini Roans that are working or finished, for the screen and the next turn. */
+  const minis = new MiniRegistry();
+  /** The prompt each conversation started with, held still for its lifetime. */
+  const sessionPrompts = new Map<string, { orders: string; prompt: string }>();
+  /** Summaries of the older part of long conversations, by where they were cut. */
+  const sessionDigests = new Map<string, string>();
   const todoLists = new Map<string, TodoStore>();
   const toolsForTurn = (
     hooks: HookConfig | null = null,
@@ -825,7 +884,17 @@ async function main(): Promise<void> {
       approved = approvedToolsFromEvents(events);
       fleet = mcp.tools();
     }
-    const visible = [...tools, ...fleet].filter((tool) => rules.get(tool.name)?.enabled !== false);
+    // A tool that cannot work here is not offered: a model that is shown a
+    // browser with no browser behind it will try it and lose a step finding out.
+    const unusable = new Set<string>();
+    if ((process.env["BROWSER_CDP_URL"] ?? "").length === 0) unusable.add("browser");
+    if (!computerDriver.available().available) unusable.add("computer");
+    if (session !== null && readNodes(session.store.read(session.identity.chainId, 1, 100_000)).length < 2) {
+      unusable.add("run_on_node");
+    }
+    const visible = [...tools, ...fleet].filter(
+      (tool) => rules.get(tool.name)?.enabled !== false && !unusable.has(tool.name),
+    );
     // Every tool passes the guard: it asks when the chain says so, always asks
     // before a dangerous shell line, and fires the tool hooks around the call.
     const around = toolHooks(hooks, hookEnv);
@@ -836,7 +905,7 @@ async function main(): Promise<void> {
     });
     const relayNow = relayOptions();
     if (relayNow === null) return gated;
-    const shared: Tool[] = [
+    const every: Tool[] = [
       ...gated,
       // Guarded like the rest: a risky shell line for another device asks
       // here first, because here is where the owner can answer.
@@ -845,6 +914,37 @@ async function main(): Promise<void> {
           if (session === null) return [];
           const current = session;
           return readNodes(current.store.read(current.identity.chainId, 1, 100_000));
+        }),
+        { ask: false, askPermission, ...around },
+      ),
+      // Computer use: mouse and keyboard of this device, only for a
+      // conversation the owner allowed, and only for a few minutes.
+      guardTool(
+        createComputerTool({
+          session: () => hookEnv["ROAN_SESSION"] ?? "",
+          grants: computerGrants,
+          driver: computerDriver,
+          describe: async (shot, size, question) => {
+            const seeing = (await auxProvider("vision")) ?? {
+              baseUrl: settings.baseUrl,
+              apiKey: settings.apiKey,
+              model: settings.model,
+              providerId: settings.provider,
+            };
+            const answer = await buildAdapter(seeing).send(
+              [
+                {
+                  role: "user",
+                  content: [
+                    { type: "text", text: describeScreenPrompt(size, question) },
+                    { type: "image_url", image_url: { url: `data:${shot.mimeType};base64,${shot.base64}` } },
+                  ],
+                },
+              ],
+              { maxTokens: 1500 },
+            );
+            return typeof answer.message.content === "string" ? answer.message.content : "";
+          },
         }),
         { ask: false, askPermission, ...around },
       ),
@@ -876,6 +976,7 @@ async function main(): Promise<void> {
         },
       }),
     ];
+    const shared = every.filter((tool) => !unusable.has(tool.name));
     return [
       ...shared,
       {
@@ -889,6 +990,11 @@ async function main(): Promise<void> {
           properties: {
             task: { type: "string", description: "What the Mini Roan must do, complete enough to stand alone" },
             cwd: { type: "string", description: "Folder to work in; the workspace by default" },
+            background: {
+              type: "boolean",
+              description:
+                "True to let it work while you carry on: you get its number now and its summary at the start of a later turn. Start several this way for work that can be done side by side.",
+            },
           },
           required: ["task"],
         },
@@ -896,25 +1002,41 @@ async function main(): Promise<void> {
           const task = String(args["task"] ?? "").trim();
           if (task.length === 0) throw new Error("task is required");
           const dir = typeof args["cwd"] === "string" ? args["cwd"] : paths.syncedWorkspace;
-          // Roan's own loop, not another engine: the Mini Roan is the same
-          // agent and passes the same guard, in a context nobody else reads.
-          return await runMiniRoan(
-            {
-              // A Mini Roan may run on a model of its own; empty means the main one.
-              provider: (await auxProvider("mini")) ?? {
-                baseUrl: settings.baseUrl,
-                apiKey: settings.apiKey,
-                model: settings.model,
-                providerId: settings.provider,
+          const background = args["background"] === true;
+          // A Mini Roan may run on a model of its own; empty means the main one.
+          const provider = (await auxProvider("mini")) ?? {
+            baseUrl: settings.baseUrl,
+            apiKey: settings.apiKey,
+            model: settings.model,
+            providerId: settings.provider,
+          };
+          const systemPrompt = await agentContext.prompt();
+          // Roan's own loop: the Mini Roan is the same agent and passes the
+          // same guard, in a context nobody else reads. It is registered
+          // either way, so the owner can watch it work and stop it.
+          const started = minis.start(task, background, (handle) => {
+            // Waited for, it also stops when the turn that asked is stopped;
+            // one in the background outlives the turn on purpose.
+            if (!background) {
+              ctx.signal?.addEventListener("abort", () => minis.stop(started.id), { once: true });
+            }
+            return runMiniRoan(
+              {
+                provider,
+                systemPrompt,
+                tools: shared,
+                cwd: dir,
+                effort: settings.effort,
+                signal: handle.signal,
+                onActivity: handle.note,
               },
-              systemPrompt: await agentContext.prompt(),
-              tools: shared,
-              cwd: dir,
-              effort: settings.effort,
-              ...(ctx.signal !== undefined ? { signal: ctx.signal } : {}),
-            },
-            task,
-          );
+              task,
+            );
+          });
+          if (background) {
+            return `Mini Roan ${String(started.id)} is working on it in the background; its summary arrives at the start of a later turn`;
+          }
+          return await started.finished;
         },
       },
     ];
@@ -1024,11 +1146,18 @@ async function main(): Promise<void> {
     // Standing orders ride the system prompt of every new turn: they are the
     // owner's own words, folded from the chain like everything else.
     const orders = goalContext(foldGoals(current.store.read(current.identity.chainId, 1, 100_000)));
-    const basePrompt = await agentContext.prompt();
-    // A background job that ended while nobody was looking is told once, to
-    // the next turn that runs here.
+    // The prompt of a conversation is written once and then held still: a
+    // provider only reuses its work on a request that starts exactly like the
+    // last one. What changed since (a new memory, a new skill) is picked up by
+    // the next conversation; standing orders are the exception, because the
+    // owner changing one means it now.
+    const frozen = sessionPrompts.get(sessionId);
+    const basePrompt = frozen !== undefined && frozen.orders === orders ? frozen.prompt : await agentContext.prompt();
+    sessionPrompts.set(sessionId, { orders, prompt: basePrompt });
+    const systemPrompt = [orders, basePrompt].filter((part) => part.length > 0).join("\n\n");
+    // A background job that ended while nobody was looking is told once, in
+    // the turn's own message, so the prompt above stays untouched.
     const finished = finishedJobsNote(processes.takeFinished());
-    const systemPrompt = [orders, finished, basePrompt].filter((part) => part.length > 0).join("\n\n");
     const hooks = await loadHooks();
     const started = await runHooks(hooks, "turn_start", {
       cwd: paths.syncedWorkspace,
@@ -1044,7 +1173,8 @@ async function main(): Promise<void> {
     // A main model that cannot see gets the image as words: the vision slot
     // looks at it first. When the slot is empty, or the look fails, the image
     // goes to the main model as before.
-    let turnText = prompt;
+    const minisDone = finishedMinisNote(minis.takeFinished());
+    let turnText = [prompt, finished, minisDone].filter((part) => part.length > 0).join("\n\n");
     let turnImage = image;
     if (image !== undefined) {
       const vision = await auxProvider("vision");
@@ -1064,7 +1194,7 @@ async function main(): Promise<void> {
           );
           const description = typeof seen.message.content === "string" ? seen.message.content.trim() : "";
           if (description.length > 0) {
-            turnText = withImageDescription(prompt, description, vision.model);
+            turnText = withImageDescription(turnText, description, vision.model);
             turnImage = undefined;
           }
         } catch (error) {
@@ -1088,6 +1218,24 @@ async function main(): Promise<void> {
         },
         effort: settings.effort,
         fallbackModel: settings.fallbackModel,
+        // The older part of a long conversation, summarised once per step by
+        // the background model and remembered until the boundary moves again.
+        condenseOlder: async (older) => {
+          const key = `${sessionId}:${String(older.length)}`;
+          const known = sessionDigests.get(key);
+          if (known !== undefined) return known;
+          const written = await condense(older, async (ask) => {
+            const cheap = (await auxProvider("background")) ?? {
+              baseUrl: settings.baseUrl,
+              apiKey: settings.apiKey,
+              model: settings.model,
+            };
+            const reply = await chat(cheap, [{ role: "user", content: ask }], { maxTokens: 900 });
+            return typeof reply.content === "string" ? reply.content : "";
+          });
+          sessionDigests.set(key, written);
+          return written;
+        },
         cwd: paths.syncedWorkspace,
         systemPrompt,
         tools: toolsForTurn(hooks, { ROAN_CHAIN: current.identity.chainId, ROAN_SESSION: sessionId }),
@@ -1099,8 +1247,13 @@ async function main(): Promise<void> {
           // Skills and memory are copies on every device: an env event that
           // arrives from a peer is written here, not fetched later.
           if (event.type === "env") {
-            void adoptEnvEvent(event, paths.home).then((applied) => {
-              if (applied) log("env: applied a snapshot from the chain");
+            void adoptEnvEvent(event, paths.home).then(async (applied) => {
+              if (!applied) return;
+              log("env: applied a snapshot from the chain");
+              // Everything is synced: a setting another device changed has
+              // to hold here from now on, not after a restart.
+              settings = await loadSettings(paths);
+              setFullDiskAccess(settings.access.fullDisk);
             });
           }
         },
@@ -1233,8 +1386,8 @@ async function main(): Promise<void> {
     // Read on every connection, so the switch in the app works at once.
     // The switch wins over the environment: with "this device only" on,
     // nothing but loopback opens the socket or loads the UI.
-    isLocal: (address) => mayControl(deviceAccess, address, process.env["ROAN_ALLOW_REMOTE_CONTROL"] === "1"),
-    allowWeb: (address) => mayLoadUi(deviceAccess, address),
+    isLocal: (address) => mayControl(settings, address, process.env["ROAN_ALLOW_REMOTE_CONTROL"] === "1"),
+    allowWeb: (address) => mayLoadUi(settings, address),
     store: () => session?.store ?? null,
     state,
     onMessage: runMessage,
@@ -1393,6 +1546,143 @@ async function main(): Promise<void> {
           });
           return;
         }
+        if (kind === "skills_overview" || kind === "skill_read" || kind === "skill_save" || kind === "skill_delete") {
+          // The Skills page: every skill with how often it was used, its text,
+          // and the owner's own edits. A skill is a file in the home, so a
+          // change is published like the rest of the config.
+          const name = typeof data["name"] === "string" ? data["name"].trim() : "";
+          const publish = (): void => {
+            sessionPrompts.clear();
+            if (session === null) return;
+            const current = session;
+            void publishEnv({
+              store: current.store,
+              chain: current.identity.chainId,
+              node: current.identity.nodeId,
+              home: paths.home,
+            }).catch(() => undefined);
+          };
+          if (kind === "skill_read") {
+            reply({ ok: true, name, body: await skills.view(name) });
+            return;
+          }
+          if (kind === "skill_save") {
+            const slug = normaliseSkillName(name);
+            const body = typeof data["body"] === "string" ? data["body"].trim() : "";
+            const description = typeof data["description"] === "string" ? data["description"].replace(/\s+/g, " ").trim() : "";
+            if (slug === null || body.length === 0 || description.length === 0) {
+              reply({ ok: false, error: "a skill needs a name, one line saying when to use it, and its instructions" });
+              return;
+            }
+            await installSkill(paths.home, { name: slug, description, body });
+            publish();
+            reply({ ok: true, name: slug });
+            return;
+          }
+          if (kind === "skill_delete") {
+            const slug = normaliseSkillName(name);
+            if (slug === null) {
+              reply({ ok: false, error: "that is not a skill name" });
+              return;
+            }
+            await rm(join(paths.home, "skills", slug), { recursive: true, force: true });
+            publish();
+            reply({ ok: true, name: slug });
+            return;
+          }
+          const events = session === null ? [] : session.store.read(session.identity.chainId, 1, 100_000);
+          const usage = skillUsage(events);
+          const all = await skills.list();
+          reply({
+            ok: true,
+            skills: all.map((skill) => {
+              const use = usage.get(skill.name);
+              return {
+                name: skill.name,
+                description: skill.description,
+                files: skill.files.length,
+                uses: use?.uses ?? 0,
+                lastUsed: use?.lastUsed ?? null,
+                verdict: skillVerdict(use, Date.now()),
+              };
+            }),
+          });
+          return;
+        }
+        if (kind === "memory_view" || kind === "memory_edit") {
+          // The Memory page: what Roan keeps about the owner and what it
+          // learned, as the entries the agent itself reads and writes.
+          const target = data["target"] === "user" ? "user" : "memory";
+          // What Roan learned is folded from the chain, so the page edits the
+          // chain: a correction written to the file alone would be undone by
+          // the next fold. Forgetting is an event too, and it is synced.
+          if (target === "memory" && session !== null) {
+            const current = session;
+            const read = () => foldFacts(current.store.read(current.identity.chainId, 1, 100_000));
+            if (kind === "memory_edit") {
+              const text = typeof data["text"] === "string" ? data["text"].replace(/\s+/g, " ").trim() : "";
+              const index = typeof data["index"] === "number" ? data["index"] : Number.NaN;
+              const chosen = read()[index - 1];
+              const record = (payload: Record<string, unknown>): void => {
+                const event = current.store.append(current.identity.chainId, {
+                  id: uuid(),
+                  node: current.identity.nodeId,
+                  type: "memory",
+                  data: payload,
+                });
+                control?.broadcast({ t: "append", event });
+              };
+              const action = data["action"];
+              if (action === "add" && text.length > 0) record({ text });
+              else if (action === "remove" && chosen !== undefined) record({ text: chosen.text, forgotten: true });
+              else if (action === "replace" && chosen !== undefined && text.length > 0) {
+                record({ text: chosen.text, forgotten: true });
+                record({ text });
+              } else {
+                reply({ ok: false, error: "that memory does not exist, or the text is empty" });
+                return;
+              }
+              await writeMemoryMd(paths.home, foldMemoryMd(current.store.read(current.identity.chainId, 1, 100_000)));
+              sessionPrompts.clear();
+            }
+            const facts = read();
+            reply({
+              ok: true,
+              target,
+              entries: facts.map((fact, position) => ({ index: position + 1, text: fact.text })),
+              budget: await memory.budget(target),
+            });
+            return;
+          }
+          if (kind === "memory_edit") {
+            const text = typeof data["text"] === "string" ? data["text"] : "";
+            const index = typeof data["index"] === "number" ? data["index"] : Number.NaN;
+            if (data["action"] === "add") await memory.add(target, text);
+            else if (data["action"] === "replace") await memory.replace(target, index, text);
+            else if (data["action"] === "remove") await memory.remove(target, index);
+            else {
+              reply({ ok: false, error: "action must be add, replace or remove" });
+              return;
+            }
+            sessionPrompts.clear();
+            if (session !== null) {
+              const current = session;
+              void publishEnv({
+                store: current.store,
+                chain: current.identity.chainId,
+                node: current.identity.nodeId,
+                home: paths.home,
+              }).catch(() => undefined);
+            }
+          }
+          reply({
+            ok: true,
+            target,
+            entries: (await memory.entries(target)).map((entry) => ({ index: entry.index, text: entry.text })),
+            budget: await memory.budget(target),
+          });
+          return;
+        }
         if (kind === "tools_list") {
           reply({
             tools: toolsForTurn().map((tool) => ({ name: tool.name, description: tool.description })),
@@ -1488,6 +1778,60 @@ async function main(): Promise<void> {
               live: live.has(server.id) && server.enabled,
             })),
           });
+          return;
+        }
+        if (kind === "connections_list" || kind === "connection_token_set" || kind === "connection_token_clear") {
+          // Connections: the services Roan can reach, whether the owner is
+          // signed in to each, and whether this device is connected right
+          // now. A token travels with the config and is never sent to the app.
+          const current = session;
+          if (current === null) {
+            reply({ ok: false, error: "no chain to keep connections on yet" });
+            return;
+          }
+          const read = (): ReturnType<typeof mcpServersFromEvents> =>
+            mcpServersFromEvents(current.store.read(current.identity.chainId, 1, 100_000));
+          if (kind !== "connections_list") {
+            const id = typeof data["id"] === "string" ? data["id"].trim() : "";
+            if (!isConnectionId(id) || !read().some((server) => server.id === id)) {
+              reply({ ok: false, error: "that connection does not exist" });
+              return;
+            }
+            if (kind === "connection_token_set") {
+              const token = typeof data["token"] === "string" ? data["token"].trim() : "";
+              if (token.length === 0) {
+                reply({ ok: false, error: "the token is empty" });
+                return;
+              }
+              await saveConnectionToken(paths.home, id, token);
+            } else {
+              await removeConnectionToken(paths.home, id);
+            }
+            // A sign-in travels like the rest of the config: publish it now.
+            void publishEnv({
+              store: current.store,
+              chain: current.identity.chainId,
+              node: current.identity.nodeId,
+              home: paths.home,
+            }).catch(() => undefined);
+            // Dial again now, so the answer already says whether it worked.
+            await mcp.sync(read());
+          }
+          const servers = read();
+          const connections = await Promise.all(
+            servers.map(async (server) => ({
+              id: server.id,
+              label: server.label,
+              transport: server.transport,
+              address: server.url ?? server.command ?? "",
+              enabled: server.enabled,
+              signedIn: (await loadConnectionToken(paths.home, server.id)) !== null,
+              tools: mcp.toolCount(server.id),
+              connected: mcp.toolCount(server.id) > 0,
+              problem: mcp.failure(server.id),
+            })),
+          );
+          reply({ ok: true, connections });
           return;
         }
         if (kind === "mcp_server_save") {
@@ -1955,6 +2299,49 @@ async function main(): Promise<void> {
           reply({ ok: true });
           return;
         }
+        if (kind === "computer_state" || kind === "computer_allow" || kind === "computer_stop") {
+          // The owner's switch for computer use, per conversation and for a
+          // limited time. The grant lives in this daemon and nowhere else.
+          const wanted = typeof data["session"] === "string" && data["session"].length > 0 ? data["session"] : resolveSession();
+          if (wanted === null) {
+            reply({ ok: false, error: "no conversation to allow computer use for" });
+            return;
+          }
+          if (kind === "computer_allow") {
+            const minutes = typeof data["minutes"] === "number" && data["minutes"] > 0 ? Math.min(data["minutes"], 60) : 10;
+            computerGrants.grantSession(wanted, { ttlMs: minutes * 60_000 });
+            log(`computer: allowed for ${wanted.slice(0, 8)} for ${String(minutes)} minutes`);
+          }
+          if (kind === "computer_stop") {
+            computerGrants.revokeSession(wanted);
+            log(`computer: stopped for ${wanted.slice(0, 8)}`);
+          }
+          const availability = computerDriver.available();
+          const check = computerGrants.check(wanted);
+          reply({
+            ok: true,
+            session: wanted,
+            available: availability.available,
+            reason: availability.available ? null : availability.reason,
+            driver: computerDriver.name,
+            allowed: check.granted,
+            expiresAt: check.granted ? check.grant.expiresAtMs : null,
+          });
+          return;
+        }
+        if (kind === "minis_list" || kind === "mini_stop") {
+          // The Mini Roans of this device, for the screen that shows them work.
+          if (kind === "mini_stop") {
+            const id = typeof data["id"] === "number" ? data["id"] : Number.NaN;
+            if (!Number.isInteger(id)) {
+              reply({ ok: false, error: "mini_stop needs the number of a Mini Roan" });
+              return;
+            }
+            minis.stop(id);
+          }
+          reply({ ok: true, minis: minis.list() });
+          return;
+        }
         if (kind === "jobs_list" || kind === "job_stop") {
           // The background jobs of this device, for the screen that shows them.
           if (kind === "job_stop") {
@@ -2030,22 +2417,21 @@ async function main(): Promise<void> {
           return;
         }
         if (kind === "access") {
-          // Who may reach the UI and the control socket of this device. Without
-          // a value it is a question; with one it is saved and applies to the
-          // next connection (the gate reads the setting each time).
+          // Who may reach the UI and the control socket of a device. Without a
+          // value it is a question; with one it is saved, synced to every
+          // device, and applies to the next connection (the gate reads the
+          // setting each time).
           if (data["deviceOnly"] === undefined) {
-            reply({ ok: true, deviceOnly: deviceAccess.deviceOnly });
+            reply({ ok: true, deviceOnly: settings.deviceOnly });
             return;
           }
           if (typeof data["deviceOnly"] !== "boolean") {
             reply({ ok: false, error: "deviceOnly must be true or false" });
             return;
           }
-          // Per machine on purpose: it is this device's own listener, so it
-          // is kept in state/ and never published with the env.
-          deviceAccess = await saveDeviceAccess(paths.state, { deviceOnly: data["deviceOnly"] });
-          log(`access: ${deviceAccess.deviceOnly ? "this device only" : "this device and the tailnet"}`);
-          reply({ ok: true, deviceOnly: deviceAccess.deviceOnly });
+          await saveShared({ deviceOnly: data["deviceOnly"] });
+          log(`access: ${settings.deviceOnly ? "each device only" : "each device and the tailnet"}`);
+          reply({ ok: true, deviceOnly: settings.deviceOnly });
           return;
         }
         if (kind === "skill_approve" || kind === "skill_reject") {
