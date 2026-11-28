@@ -9,6 +9,26 @@ there comes back here, per version.
 
 ## 0.1.0
 
+- [ ] **Built on 2026-11-28, none of it proven.** Written without being run;
+      each needs CI green and a check on a device before it counts.
+      - The loop: old tool output cleared past a budget
+        (`src/context/tool-clearing.ts`); a busy provider retried with a
+        growing wait (`src/agent.ts`); the older part of a long conversation
+        summarised in steps of twenty with a plain fallback
+        (`src/context/condense.ts`); the system prompt of a conversation held
+        still; tools that cannot work on a device not offered.
+      - Pages: Skills with use counts (`src/skills/usage.ts`), Memory, Usage,
+        Logs, Mini Roans, Connections, Computer use, Model roles, Commands,
+        Background jobs.
+      - Mini Roans in the background, up to four at once, visible and
+        stoppable (`src/daemon/mini-registry.ts`).
+      - Memory edits and forgetting as chain events (`src/memory/distil.ts`).
+      Still open from the same list: browser sign-in for connections,
+      reasoning sent back to providers that expect it, a model and an
+      approval mode per conversation, temporary chats, a Plugins page, an
+      archive view, the agent's task list as chain state, computer use on
+      another device of the chain.
+
 - [ ] **Remove all Dutch: code and comments first, then docs.** Everything in
       this repository is English. Not one Dutch identifier, comment, test
       name, string, log line or prompt stays. The one exception is the
