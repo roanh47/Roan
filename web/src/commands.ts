@@ -15,6 +15,8 @@ export const BUILTIN_COMMANDS: readonly SlashCommand[] = [
   { name: "model", description: "Choose the provider and model" },
   { name: "plan", description: "Turn plan mode on, or approve the plan" },
   { name: "settings", description: "Open settings" },
+  { name: "sessions", description: "Open the list of chats" },
+  { name: "goal", description: "Give Roan a standing goal: /goal what to keep working toward" },
   { name: "fallback", description: "Model to retry on when the first fails: /fallback model-id, or /fallback off" },
   { name: "command", description: "Save your own: /command name prompt — no prompt removes it" },
 ];

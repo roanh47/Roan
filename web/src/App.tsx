@@ -284,7 +284,20 @@ export default function App({ client: injected }: { client?: ChainClient } = {})
     else if (name === "model") setSheetOpen(true);
     else if (name === "plan") setPlanMode(!planMode);
     else if (name === "settings") setView("settings");
-    else if (name === "fallback") {
+    else if (name === "sessions") {
+      setView("chat");
+      setMenuOpen(true);
+    } else if (name === "goal") {
+      const text = args.trim();
+      if (text.length === 0) {
+        setNotice("Use /goal followed by what Roan should keep working toward");
+        return true;
+      }
+      void client
+        .request<{ ok?: boolean; error?: string }>("goal", { text })
+        .then((answer) => setNotice(answer.ok === true ? "goal saved" : (answer.error ?? "could not save the goal")))
+        .catch((error: unknown) => setNotice(error instanceof Error ? error.message : "could not save the goal"));
+    } else if (name === "fallback") {
       const wanted = args.trim();
       const data = wanted.length === 0 ? {} : { model: wanted === "off" ? "" : wanted };
       void client

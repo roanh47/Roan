@@ -46,6 +46,7 @@ import { createSkillProposeTool, installSkill } from "../skills/propose-tool.js"
 import { searchStoreMemories } from "../knowledge/search.js";
 import { createMemorySearchTool, createTodoTool } from "../tools/recall-tools.js";
 import { TodoStore } from "../tools/todo.js";
+import { ProcessRegistry, createProcessTool, finishedJobsNote } from "../tools/processes.js";
 import { distilMemories, memoryTexts } from "../memory/index.js";
 import { foldMemoryMd, writeMemoryMd } from "../context/memory-md.js";
 import { approvePlan, planModeEnabled, planModeEvent } from "./plan.js";
@@ -207,7 +208,9 @@ async function main(): Promise<void> {
   let deviceAccess = await loadDeviceAccess(paths.state);
   const memory = new MemoryStore(paths.home);
   const skills = new SkillLibrary(join(paths.home, "skills"));
-  const tools = [...allTools(), ...contextTools(memory, skills)];
+  // Background jobs belong to this machine and this daemon run.
+  const processes = new ProcessRegistry();
+  const tools = [...allTools(), ...contextTools(memory, skills), createProcessTool(processes)];
   // MCP servers are chain config: this node dials them, every instance folds
   // the same list. Unreachable servers are skipped, never fatal.
   const mcp = new McpRuntime((line) => log(line));
@@ -1008,7 +1011,10 @@ async function main(): Promise<void> {
     // owner's own words, folded from the chain like everything else.
     const orders = goalContext(foldGoals(current.store.read(current.identity.chainId, 1, 100_000)));
     const basePrompt = await agentContext.prompt();
-    const systemPrompt = orders.length > 0 ? `${orders}\n\n${basePrompt}` : basePrompt;
+    // A background job that ended while nobody was looking is told once, to
+    // the next turn that runs here.
+    const finished = finishedJobsNote(processes.takeFinished());
+    const systemPrompt = [orders, finished, basePrompt].filter((part) => part.length > 0).join("\n\n");
     const hooks = await loadHooks();
     const started = await runHooks(hooks, "turn_start", {
       cwd: paths.syncedWorkspace,
