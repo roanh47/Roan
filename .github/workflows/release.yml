@@ -331,8 +331,20 @@ jobs:
           chmod +x scripts/android-daemon.sh
           ./scripts/android-daemon.sh arm64-v8a
 
-      - name: Build debug APK
-        run: npx --yes @tauri-apps/cli@^2 android build --apk --debug --ci
+      # A release build shrinks and renames code. The daemon is started by
+      # native code that finds these classes and methods by name, so they are
+      # kept as written; without this the app would crash at start.
+      - name: Keep the classes native code looks up by name
+        run: |
+          set -euo pipefail
+          printf '%s\n' \
+            '-keep class dev.roan.** { *; }' \
+            '-keepclasseswithmembernames class * { native <methods>; }' \
+            > src-tauri/gen/android/app/roan-keep.pro
+          cat src-tauri/gen/android/app/roan-keep.pro
+
+      - name: Build release APK
+        run: npx --yes @tauri-apps/cli@^2 android build --apk --ci
 
       - name: Sign the APK with the release key and prove it
         run: |
@@ -342,9 +354,8 @@ jobs:
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/signing/release.jks"
           SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
           BT="$(ls -d "$SDK"/build-tools/* | sort -V | tail -n 1)"
-          apk="$(find src-tauri/gen/android/app/build/outputs/apk -name '*.apk' | grep -i debug | head -n 1 || true)"
-          if [ -z "$apk" ]; then apk="$(find src-tauri/gen/android/app/build/outputs/apk -name '*.apk' | head -n 1)"; fi
-          test -n "$apk" || { echo "::error::Gradle produced no .apk"; exit 1; }
+          apk="$(find src-tauri/gen/android/app/build/outputs/apk -name '*.apk' | grep -i release | head -n 1 || true)"
+          test -n "$apk" || { echo "::error::Gradle produced no release .apk"; exit 1; }
           "$BT/zipalign" -f -p 4 "$apk" "$RUNNER_TEMP/signing/aligned.apk"
           "$BT/apksigner" sign             --ks "$RUNNER_TEMP/signing/release.jks"             --ks-key-alias "$ANDROID_KEY_ALIAS"             --ks-pass "pass:$ANDROID_KEYSTORE_PASSWORD"             --key-pass "pass:$ANDROID_KEY_PASSWORD"             --out "out/Roan-${APP_VERSION}.apk"             "$RUNNER_TEMP/signing/aligned.apk"
           "$BT/apksigner" verify "out/Roan-${APP_VERSION}.apk"
@@ -417,8 +428,8 @@ jobs:
             Roan ${{ env.APP_VERSION }} — every device is a node: the app starts its own daemon, on the phone in-process on libnode, on the desktop as a sidecar. Model and key travel with the chain.
 
             Unsigned builds: macOS shows a Gatekeeper prompt on first open
-            (right click -> Open). The APK is debug-signed and installs with
-            "install unknown apps" enabled.
+            (right click -> Open). The APK is signed with Roan's own key and
+            installs with "install unknown apps" enabled.
           draft: false
           prerelease: false
           fail_on_unmatched_files: true

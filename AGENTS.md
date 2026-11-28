@@ -68,8 +68,10 @@ even if the tests pass.
    state is synced. Do not keep something "per device" because it seemed safer
    or simpler, and do not store it in a place the chain does not carry. What a
    machine holds only while it runs (a running process, an open socket, a cache,
-   a log) is not state and is not what this rule is about. The node id and the
-   peer token in `secrets/` identify one machine to the others and stay there.
+   a log) is not state and is not what this rule is about. The id that tells
+   one device from another is how syncing works, not something that is synced;
+   it is the only thing in `secrets/`, and no key, token or sign-in ever goes
+   there.
 10. **Joining adopts the chain.** When you join a chain, that chain's data becomes
    yours: its sessions, its env, its skills. Your device does not merge its local
    state into the chain and does not push it up. The only way local data becomes

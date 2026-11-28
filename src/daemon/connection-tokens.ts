@@ -53,6 +53,59 @@ export async function saveConnectionToken(home: string, id: string, token: strin
   await chmod(file, 0o600).catch(() => undefined);
 }
 
+/**
+ * A browser sign-in: the token, what renews it, and who Roan is to that
+ * service. Kept in the same file as a pasted token, so it travels the same way.
+ */
+export interface ConnectionSignIn {
+  readonly token: string;
+  readonly refreshToken: string | null;
+  /** When the token ends, in milliseconds; null when it does not say. */
+  readonly expiresAt: number | null;
+  readonly clientId: string;
+  readonly clientSecret: string | null;
+  readonly tokenEndpoint: string;
+  /** The server the token is for. */
+  readonly resource: string;
+}
+
+function optional(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+/** The browser sign-in of a connection, or null when it has none (a pasted token is not one). */
+export async function loadConnectionSignIn(home: string, id: string): Promise<ConnectionSignIn | null> {
+  if (!isConnectionId(id)) return null;
+  try {
+    const parsed: unknown = JSON.parse(await readFile(tokenFile(home, id), "utf8"));
+    if (typeof parsed !== "object" || parsed === null) return null;
+    const data = parsed as Record<string, unknown>;
+    const token = optional(data["token"]);
+    const clientId = optional(data["clientId"]);
+    const tokenEndpoint = optional(data["tokenEndpoint"]);
+    const resource = optional(data["resource"]);
+    if (token === null || clientId === null || tokenEndpoint === null || resource === null) return null;
+    return {
+      token,
+      refreshToken: optional(data["refreshToken"]),
+      expiresAt: typeof data["expiresAt"] === "number" && Number.isFinite(data["expiresAt"]) ? data["expiresAt"] : null,
+      clientId,
+      clientSecret: optional(data["clientSecret"]),
+      tokenEndpoint,
+      resource,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function saveConnectionSignIn(home: string, id: string, signIn: ConnectionSignIn): Promise<void> {
+  const file = tokenFile(home, id);
+  await mkdir(tokenDir(home), { recursive: true });
+  await writeFile(file, `${JSON.stringify(signIn)}\n`, { encoding: "utf8", mode: 0o600 });
+  await chmod(file, 0o600).catch(() => undefined);
+}
+
 export async function removeConnectionToken(home: string, id: string): Promise<void> {
   if (!isConnectionId(id)) return;
   await rm(tokenFile(home, id), { force: true });
