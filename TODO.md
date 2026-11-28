@@ -10,16 +10,23 @@ komt hier per versie terug.
 
 ## 0.1.0
 
-- [ ] **Subagents zijn Mini Roans.** Een subagent is geen tweede agent en geen
-      Hermes-beurt, maar een kleine Roan: dezelfde identiteit, dezelfde skills
-      en hetzelfde geheugen, met een eigen context voor één afgebakende taak
-      en alleen de samenvatting terug. De `delegate`-tool draait nu een
-      Hermes-beurt (`runHermesTurn` in `src/daemon/main.ts`) en heeft een
-      Nederlandse prompt; dat moet de eigen loop worden (`src/agent.ts`).
-- [ ] **Update-knop repareren.** About → Check for updates doet niet wat hij
-      moet. Eerst vaststellen wat er misgaat (de check, de download of het
-      installeren, en op welk platform), dan repareren en op een echt apparaat
-      bewijzen. Route: `UpdateCard`, `update_check` / `update_download`,
+- [ ] **The whole codebase is English.** Code, comments, identifiers, test
+      names, docs, prompts and this file. Known Dutch today: most of this
+      `TODO.md`, `docs/feature-map.md`, `docs/FINAL-0.0.23.md`,
+      `docs/goals-0.0.23.md`, `docs/goal-orchestrator-0.0.23.md`, the summary
+      in `docs/feature-parity.md`, `fleet/prompt.txt`, the `delegate` prompt in
+      `src/daemon/main.ts`, variable names such as `stappen` / `antwoord` in
+      `src/agent.ts`, and some test names. The one exception is the
+      writing-style skill: it has an upstream and is not touched.
+- [ ] **Subagents are Mini Roans.** A subagent is not a second agent and not a
+      Hermes turn but a small Roan: the same identity, skills and memory, with
+      its own context for one bounded task, and only the summary comes back.
+      The `delegate` tool runs a Hermes turn today (`runHermesTurn` in
+      `src/daemon/main.ts`); it has to become Roan's own loop (`src/agent.ts`).
+- [ ] **Fix the update button.** About → Check for updates does not do its
+      job. First find out what fails (the check, the download or the install,
+      and on which platform), then fix it and prove it on a real device.
+      Route: `UpdateCard`, `update_check` / `update_download`,
       `src/packaging/update-flow.ts`.
 
 ## 0.0.25 — nu
