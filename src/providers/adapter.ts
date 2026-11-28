@@ -45,6 +45,12 @@ export interface ChatOptions {
   tools?: unknown[];
   /** Called with each text fragment as it streams in. */
   onDelta?: (text: string) => void;
+  /**
+   * Called with each fragment of the model's reasoning, for providers that
+   * stream it. It is never part of the returned message: reasoning is shown
+   * to the owner, not sent back to the model.
+   */
+  onReasoning?: (text: string) => void;
   signal?: AbortSignal | undefined;
   /** Optional per-call output cap. */
   maxTokens?: number | undefined;

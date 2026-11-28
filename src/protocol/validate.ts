@@ -73,6 +73,7 @@ const EVENT_TYPES = {
   plan_mode: true,
   cron_job: true,
   command: true,
+  reasoning: true,
   device_grant: true,
   device_result: true,
 } as const satisfies { readonly [K in EventType]: true };

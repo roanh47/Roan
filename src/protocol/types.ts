@@ -57,6 +57,8 @@ export type EventType =
   | "cron_job"
   /** A user-defined slash command: name, prompt, tombstone. */
   | "command"
+  /** What the model thought during one turn: shown folded, never replayed. */
+  | "reasoning"
   /** One node may ask another for allowlisted commands: { node, enabled }. */
   | "device_grant"
   /** The outcome of one device request: { node, command, accepted, ... }. */

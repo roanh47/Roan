@@ -1901,6 +1901,11 @@ async function main(): Promise<void> {
           // A preference, not chain state: it appends nothing and only changes
           // how the next turn is asked. Invalid values are rejected here so a
           // typo never becomes a request field.
+          // Without a level it is a question: the picker asks what is set.
+          if (data["effort"] === undefined) {
+            reply({ ok: true, effort: settings.effort });
+            return;
+          }
           const requested = typeof data["effort"] === "string" ? data["effort"] : "";
           if (!isEffortLevel(requested)) {
             reply({ ok: false, error: "effort must be low, normal or high" });

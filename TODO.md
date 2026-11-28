@@ -8,6 +8,14 @@ De volledige vergelijking met Hermes — 66 features, 50 af, 15 open, 1 bewust n
 staat met vinkjes in `docs/feature-parity.md` (§ Samenvatting). Wat daar open staat,
 komt hier per versie terug.
 
+## 0.0.32
+
+- [ ] **Update-knop repareren.** About → Check for updates doet niet wat hij
+      moet. Eerst vaststellen wat er misgaat (de check, de download of het
+      installeren, en op welk platform), dan repareren en op een echt apparaat
+      bewijzen. Route: `UpdateCard`, `update_check` / `update_download`,
+      `src/packaging/update-flow.ts`.
+
 ## 0.0.25 — nu
 
 - [x] **Alles op één poort (6769).** De daemon serveert de UI, `/ws` (control) en
@@ -42,6 +50,9 @@ komt hier per versie terug.
       verschijnen — dichtgeklapt by default, open te klikken, en nooit
       meegestuurd als gewoon antwoord. Ook voor providers die het níet leveren:
       dan is er geen blok, geen leeg blok.
+      Gebouwd (`src/daemon/thought.ts`, `reasoning`-event, "Thought"-blok in
+      `Transcript.tsx`) voor OpenAI-compatibele providers en Anthropic; nog
+      niet voor Google en nog niet op een apparaat bewezen, dus geen vinkje.
 - [ ] **Libnode niet twee keer initialiseren.** De log van de telefoon toont
       `Assertion failed: !init_called.exchange(true)` en
       `pthread_mutex_lock called on a destroyed mutex`: de Node-runtime start

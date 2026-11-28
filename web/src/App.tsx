@@ -146,7 +146,7 @@ export default function App({ client: injected }: { client?: ChainClient } = {})
     // Messages from before sessions existed belong to the oldest one, not to
     // everything: otherwise every new conversation shows the whole chain.
     const firstSession = snapshot.sessions[0]?.id;
-    const scoped = new Set(["message", "assistant", "error", "checkpoint", "workspace"]);
+    const scoped = new Set(["message", "assistant", "reasoning", "error", "checkpoint", "workspace"]);
     return snapshot.events.filter((event) => {
       const data = event.data as { session?: unknown; id?: unknown } | null;
       if (event.type === "session") return data?.id === activeSession;

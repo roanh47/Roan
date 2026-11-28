@@ -222,6 +222,7 @@ export class Agent {
           tools: specs,
           signal: this.opts.signal,
           onDelta: (t) => emit({ type: "assistant_text", text: t }),
+          onReasoning: (t) => emit({ type: "reasoning", text: t }),
           ...(this.opts.effort !== undefined ? { effort: this.opts.effort } : {}),
         });
         antwoord = response.message;
