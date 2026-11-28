@@ -28,14 +28,24 @@ komt hier per versie terug.
       the Tauri and Android shells hand to the UI.
 - [ ] **Skill curator.** Count how often each skill is used, show unused and
       recently changed ones, and give an approved proposal an undo.
-- [ ] **Roan's own loop is the default engine.** `settings.engine` defaults to
-      `hermes` and the builtin loop is the fallback (`src/daemon/settings.ts`).
-      An alternative to Hermes cannot need Hermes installed: builtin becomes
-      the default and `hermes` an opt-in.
-- [ ] **Background processes.** A job list, a notice when a process exits and
-      a PTY shell. `run_shell` blocks until the command ends or times out.
-- [ ] **Fallback model.** When the provider fails, the turn fails. Let the
-      owner name a second model the turn retries on.
+- [ ] **Roan's own loop is the default engine.** Built, not proven: the
+      builtin loop runs every turn unless a machine sets `ROAN_ENGINE=hermes`
+      (`src/daemon/settings.ts`). Still to do: prove a full turn on each
+      device, then remove `src/engine/hermes.ts` and the opt-in altogether.
+- [ ] **Background processes.** Built, not proven: the `process` tool starts
+      a job, lists jobs, reads output and stops one, and the next turn is told
+      which jobs ended (`src/tools/processes.ts`). Still to do: a jobs panel in
+      the app, a notification when a job ends, and a PTY shell.
+- [ ] **Fallback model.** Built, not proven: `/fallback model-id` names a
+      second model of the same provider and a failed request is retried on it
+      once (`src/agent.ts`). Still to do: a field in the model sheet, and a
+      fallback on another provider.
+- [ ] **`AGENTS.md` in `~/.Roan` gets another name.** `AGENTS.md` is a file
+      for a project, like the one in this repo. The one in the home holds how
+      Roan writes (`SOUL.md` holds who it is) and is the `rules` block of the
+      prompt. Rename it (for example `RULES.md`) in `src/daemon/bootstrap.ts`,
+      `src/env/types.ts` and the prompt builder, and move an existing file
+      over once, the way the lowercase home was migrated.
 - [ ] **Voice.** `src/stt/` and `src/voice/` are modules only: wire the mic in
       the composer (dictation) and read-aloud for an answer.
 - [ ] **Connectors.** `src/connectors/github.ts` is read-only and has no
@@ -46,12 +56,13 @@ komt hier per versie terug.
 - [ ] **Reasoning for Google, and live.** The Thought block covers
       OpenAI-compatible providers and Anthropic and appears when the turn
       ends. Add Google's thought parts and stream it while the model thinks.
-- [ ] **Tool guard on relayed calls.** A `run_shell` that arrives from another
-      node as a `tool_req` skips the risky-command check (`src/tools/guard.ts`
-      wraps `toolsForTurn` only).
+- [ ] **Tool guard on relayed calls.** Built, not proven: a risky shell line
+      sent with `run_on_node` asks on the device where the turn runs. Still to
+      do: the executing device trusts the chain and checks nothing itself.
 - [ ] **Policy file.** An owner-editable file that says which tool may do
       what; `decide()` in `src/tools/policy.ts` still has no caller.
-- [ ] **More slash commands.** `/compact`, `/sessions`, `/goal`, `/skills`.
+- [ ] **More slash commands.** `/sessions`, `/goal` and `/fallback` are built,
+      not proven. Still to do: `/compact` and `/skills`.
 - [ ] **Per-conversation model.** `model_set` writes one model for the whole
       device; the model belongs to the conversation.
 - [ ] **Finish the small screens.** Edit a sent message (branch from a
@@ -67,11 +78,11 @@ komt hier per versie terug.
       `mobile.md`, `packaging.md`, `release.md`, `run-it-locally.md`,
       `testing.md`, `chain.md`, `protocol.md`, `storage.md`, `updates.md`),
       and `WORK-PARALLEL.md` lists finished work as open.
-- [ ] **Subagents are Mini Roans.** A subagent is not a second agent and not a
-      Hermes turn but a small Roan: the same identity, skills and memory, with
-      its own context for one bounded task, and only the summary comes back.
-      The `delegate` tool runs a Hermes turn today (`runHermesTurn` in
-      `src/daemon/main.ts`); it has to become Roan's own loop (`src/agent.ts`).
+- [ ] **Subagents are Mini Roans.** Built, not proven: `delegate` starts a
+      Mini Roan on Roan's own loop with the same prompt, memory, skills and
+      guarded tools, in its own context, and only its summary comes back
+      (`src/daemon/mini.ts`). Still to do: show a running Mini Roan in the
+      app, and let several run side by side.
 - [ ] **Fix the update button.** About → Check for updates does not do its
       job. First find out what fails (the check, the download or the install,
       and on which platform), then fix it and prove it on a real device.

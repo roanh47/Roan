@@ -45,7 +45,9 @@ export function dangerReason(tool: string, args: Record<string, unknown>): strin
     if (args["tool"] !== "run_shell" || typeof inner !== "object" || inner === null) return null;
     return dangerReason("run_shell", inner as Record<string, unknown>);
   }
-  if (tool !== "run_shell") return null;
+  // A background job is a shell line too; only starting one is judged.
+  if (tool === "process" && args["action"] !== "start") return null;
+  if (tool !== "run_shell" && tool !== "process") return null;
   const command = typeof args["command"] === "string" ? args["command"] : "";
   if (command.trim() === "") return null;
   const decision = classifyCommand(command);
