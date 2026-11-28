@@ -74,6 +74,9 @@ import { guardTool, type ApprovalAnswer, type GuardOptions } from "../tools/guar
 import { dueJobs, loadCron, unparseableSchedule } from "../cron/jobs.js";
 import { isEffortLevel } from "../providers/effort.js";
 import { runMiniRoan } from "./mini.js";
+import { createGrantStore } from "../computer/grant.js";
+import { createLinuxDriver } from "../computer/driver-linux.js";
+import { createComputerTool, describeScreenPrompt, unavailableDriver } from "../computer/tool.js";
 import { buildAdapter } from "../agent.js";
 import type { ProviderConfig } from "../providers/adapter.js";
 import {
@@ -210,6 +213,12 @@ async function main(): Promise<void> {
   let deviceAccess = await loadDeviceAccess(paths.state);
   const memory = new MemoryStore(paths.home);
   const skills = new SkillLibrary(join(paths.home, "skills"));
+  // Computer use: who may, and what moves the pointer on this platform.
+  const computerGrants = createGrantStore();
+  const computerDriver =
+    process.platform === "linux"
+      ? createLinuxDriver()
+      : unavailableDriver("computer use works on a Linux desktop for now; this device cannot be controlled yet");
   // Background jobs belong to this machine and this daemon run.
   const processes = new ProcessRegistry();
   const tools = [...allTools(), ...contextTools(memory, skills), createProcessTool(processes)];
@@ -845,6 +854,37 @@ async function main(): Promise<void> {
           if (session === null) return [];
           const current = session;
           return readNodes(current.store.read(current.identity.chainId, 1, 100_000));
+        }),
+        { ask: false, askPermission, ...around },
+      ),
+      // Computer use: mouse and keyboard of this device, only for a
+      // conversation the owner allowed, and only for a few minutes.
+      guardTool(
+        createComputerTool({
+          session: () => hookEnv["ROAN_SESSION"] ?? "",
+          grants: computerGrants,
+          driver: computerDriver,
+          describe: async (shot, size, question) => {
+            const seeing = (await auxProvider("vision")) ?? {
+              baseUrl: settings.baseUrl,
+              apiKey: settings.apiKey,
+              model: settings.model,
+              providerId: settings.provider,
+            };
+            const answer = await buildAdapter(seeing).send(
+              [
+                {
+                  role: "user",
+                  content: [
+                    { type: "text", text: describeScreenPrompt(size, question) },
+                    { type: "image_url", image_url: { url: `data:${shot.mimeType};base64,${shot.base64}` } },
+                  ],
+                },
+              ],
+              { maxTokens: 1500 },
+            );
+            return typeof answer.message.content === "string" ? answer.message.content : "";
+          },
         }),
         { ask: false, askPermission, ...around },
       ),
@@ -1953,6 +1993,36 @@ async function main(): Promise<void> {
           control?.broadcast({ t: "append", event });
           control?.sendState();
           reply({ ok: true });
+          return;
+        }
+        if (kind === "computer_state" || kind === "computer_allow" || kind === "computer_stop") {
+          // The owner's switch for computer use, per conversation and for a
+          // limited time. The grant lives in this daemon and nowhere else.
+          const wanted = typeof data["session"] === "string" && data["session"].length > 0 ? data["session"] : resolveSession();
+          if (wanted === null) {
+            reply({ ok: false, error: "no conversation to allow computer use for" });
+            return;
+          }
+          if (kind === "computer_allow") {
+            const minutes = typeof data["minutes"] === "number" && data["minutes"] > 0 ? Math.min(data["minutes"], 60) : 10;
+            computerGrants.grantSession(wanted, { ttlMs: minutes * 60_000 });
+            log(`computer: allowed for ${wanted.slice(0, 8)} for ${String(minutes)} minutes`);
+          }
+          if (kind === "computer_stop") {
+            computerGrants.revokeSession(wanted);
+            log(`computer: stopped for ${wanted.slice(0, 8)}`);
+          }
+          const availability = computerDriver.available();
+          const check = computerGrants.check(wanted);
+          reply({
+            ok: true,
+            session: wanted,
+            available: availability.available,
+            reason: availability.available ? null : availability.reason,
+            driver: computerDriver.name,
+            allowed: check.granted,
+            expiresAt: check.granted ? check.grant.expiresAtMs : null,
+          });
           return;
         }
         if (kind === "jobs_list" || kind === "job_stop") {

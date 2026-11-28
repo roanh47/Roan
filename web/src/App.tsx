@@ -13,6 +13,7 @@ import { slashCommands } from "./commands.js";
 import { ModelRolesPanel } from "./panels/ModelRolesPanel.js";
 import { CommandsPanel } from "./panels/CommandsPanel.js";
 import { JobsPanel } from "./panels/JobsPanel.js";
+import { ComputerUsePanel } from "./panels/ComputerUsePanel.js";
 import { proposedSkills } from "../../src/skills/fold.js";
 import { SkillProposals } from "./components/SkillProposals.js";
 import { WebAccessCard } from "./panels/WebAccessCard.js";
@@ -84,6 +85,7 @@ type SettingsPage =
   | "models"
   | "commands"
   | "jobs"
+  | "computer"
   | "agent"
   | "workspace"
   | "schedules"
@@ -102,6 +104,7 @@ const SETTINGS_ROWS: readonly [SettingsPage, string, string][] = [
   ["workspace", "Workspace", "files shared across devices"],
   ["schedules", "Schedules", "tasks that run later"],
   ["jobs", "Background jobs", "commands left running on this device"],
+  ["computer", "Computer use", "let Roan use this device's mouse and keyboard"],
   ["checkpoints", "Checkpoints", "named points to rewind to"],
   ["devices", "Sync", "the chain, the nodes, the invite"],
   ["storage", "Storage window", "Android's files, next to the home"],
@@ -547,6 +550,12 @@ export default function App({ client: injected }: { client?: ChainClient } = {})
           />
         ) : settingsPage === "models" ? (
           <ModelRolesPanel client={client} />
+        ) : settingsPage === "computer" ? (
+          <ComputerUsePanel
+            client={client}
+            session={activeSession}
+            sessionTitle={sessions.find((entry) => entry.id === activeSession)?.title ?? "This chat"}
+          />
         ) : settingsPage === "jobs" ? (
           <JobsPanel client={client} />
         ) : settingsPage === "commands" ? (

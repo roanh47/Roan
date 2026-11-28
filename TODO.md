@@ -67,13 +67,22 @@ there comes back here, per version.
       prompt. Rename it (for example `RULES.md`) in `src/daemon/bootstrap.ts`,
       `src/env/types.ts` and the prompt builder, and move an existing file
       over once, the way the lowercase home was migrated.
-- [ ] **Voice.** `src/stt/` and `src/voice/` are modules only: wire the mic in
-      the composer (dictation) and read-aloud for an answer.
-- [ ] **Connectors.** `src/connectors/github.ts` is read-only and has no
-      caller. Give it a route and a tool, then decide which come next.
+- [ ] **Connectors.** Top priority. `src/connectors/github.ts` is read-only
+      and has no caller. Needed: a connector contract (sign in once, token in
+      `secrets/`, tools the agent can call), a Settings → Connectors page to
+      connect and disconnect, and the first real ones: mail, calendar, notes
+      and code hosting.
 - [ ] **Remote MCP with sign-in.** Local MCP servers work; hosted ones that
       need OAuth do not.
-- [ ] **Computer use.** Module only (`src/computer/`), not wired into a turn.
+- [ ] **Computer use.** Top priority. Built, not proven: the `computer` tool
+      looks at the screen (a model that can see describes it with pixel
+      positions), then moves, clicks, types and presses keys
+      (`src/computer/tool.ts`), and Settings → Computer use allows it for one
+      chat for 5, 10 or 30 minutes with a Stop button. Works on a Linux
+      desktop only. Still to do: drivers for Windows, macOS and Android; a
+      visible "Roan is controlling this device" bar with Stop in the chat;
+      scroll, drag and double-click; and sending the screenshot itself to a
+      main model that can see, instead of a description.
 - [ ] **Reasoning for Google, and live.** The Thought block covers
       OpenAI-compatible providers and Anthropic and appears when the turn
       ends. Add Google's thought parts and stream it while the model thinks.
