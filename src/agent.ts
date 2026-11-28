@@ -6,6 +6,9 @@ import type { EffortLevel } from "./providers/effort.js";
 import { sessionTotal, type TokenUsage } from "./usage.js";
 import { toToolSpecs } from "./tools.js";
 import { compressForOverflow, isContextOverflow } from "./context/overflow.js";
+import { clearOldToolResults } from "./context/tool-clearing.js";
+import { ProviderError } from "./providers/adapter.js";
+import { computeDelay, isRetryableStatus } from "./providers/retry.js";
 import type {
   AgentEvent,
   ChatMessage,
@@ -14,6 +17,9 @@ import type {
   ToolContext,
   TurnEndReason,
 } from "./types.js";
+
+/** How often one request is tried when the provider is busy or briefly gone. */
+export const DEFAULT_RETRY_ATTEMPTS = 3;
 
 /** How long a provider may stay silent before the turn is considered dead. */
 export const DEFAULT_STALL_TIMEOUT_MS = 120_000;
@@ -71,6 +77,10 @@ export interface AgentOptions {
   onBeforeRequest?: (messages: ChatMessage[]) => void;
   onEvent?: (event: AgentEvent) => void;
   signal?: AbortSignal;
+  /** How often one request is tried when the provider is busy. Default 3. */
+  retryAttempts?: number;
+  /** Waits between tries; a test passes one that does not really wait. */
+  retrySleep?: (ms: number) => Promise<void>;
   /**
    * How long one request may go without a single delta before the turn is
    * aborted as stalled. The deadline re-arms on every delta, so a slow stream
@@ -286,6 +296,10 @@ export class Agent {
         // invariant check, so text appended at the wrong point is refused here
         // rather than by the provider halfway through the turn.
         this.opts.onBeforeRequest?.(this.messages);
+        // A long turn sheds its oldest tool output before it hits the window,
+        // instead of waiting for the provider to refuse the request.
+        const lighter = clearOldToolResults(this.messages);
+        if (lighter !== null) this.messages = lighter;
         assertAlternating(this.messages, inheritedUserPair);
         let streamed = false;
         // The grace call is the last request of the turn: it carries no tools,
@@ -297,7 +311,7 @@ export class Agent {
           });
         let response: Awaited<ReturnType<ChatAdapter["send"]>>;
         try {
-          response = await request(this.adapter);
+          response = await this.withPatience(() => request(this.adapter), () => streamed);
         } catch (err) {
           // One second chance, on the fallback model: only when the owner did
           // not stop the turn and nothing of the answer was shown yet, so a
@@ -437,6 +451,29 @@ export class Agent {
     }
     emit({ type: "turn_end", steps: stappen, reason });
     return laatsteTekst;
+  }
+
+  /**
+   * A request that fails because the provider is busy or briefly gone is
+   * asked again, with a growing wait: a rate limit or a 5xx is not a reason
+   * to lose a turn. Never after the owner stopped, and never once part of
+   * the answer was shown, so a retry cannot print the same words twice.
+   */
+  private async withPatience<T>(request: () => Promise<T>, streamed: () => boolean): Promise<T> {
+    const attempts = this.opts.retryAttempts ?? DEFAULT_RETRY_ATTEMPTS;
+    const sleep = this.opts.retrySleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        return await request();
+      } catch (err) {
+        const transient =
+          err instanceof TypeError ||
+          (err instanceof ProviderError && err.status !== null && isRetryableStatus(err.status));
+        if (!transient || attempt >= attempts || streamed() || this.aborted()) throw err;
+        await sleep(computeDelay(attempt, undefined));
+        if (this.aborted()) throw err;
+      }
+    }
   }
 
   /** The interrupt gate's one test, in a method so no earlier check narrows it. */
