@@ -76,6 +76,8 @@ import { dueJobs, loadCron, unparseableSchedule } from "../cron/jobs.js";
 import { isEffortLevel } from "../providers/effort.js";
 import { runMiniRoan } from "./mini.js";
 import { condense } from "../context/condense.js";
+import { normaliseSkillName } from "../skills/parse.js";
+import { skillUsage, skillVerdict } from "../skills/usage.js";
 import {
   isConnectionId,
   loadConnectionToken,
@@ -878,7 +880,17 @@ async function main(): Promise<void> {
       approved = approvedToolsFromEvents(events);
       fleet = mcp.tools();
     }
-    const visible = [...tools, ...fleet].filter((tool) => rules.get(tool.name)?.enabled !== false);
+    // A tool that cannot work here is not offered: a model that is shown a
+    // browser with no browser behind it will try it and lose a step finding out.
+    const unusable = new Set<string>();
+    if ((process.env["BROWSER_CDP_URL"] ?? "").length === 0) unusable.add("browser");
+    if (!computerDriver.available().available) unusable.add("computer");
+    if (session !== null && readNodes(session.store.read(session.identity.chainId, 1, 100_000)).length < 2) {
+      unusable.add("run_on_node");
+    }
+    const visible = [...tools, ...fleet].filter(
+      (tool) => rules.get(tool.name)?.enabled !== false && !unusable.has(tool.name),
+    );
     // Every tool passes the guard: it asks when the chain says so, always asks
     // before a dangerous shell line, and fires the tool hooks around the call.
     const around = toolHooks(hooks, hookEnv);
@@ -889,7 +901,7 @@ async function main(): Promise<void> {
     });
     const relayNow = relayOptions();
     if (relayNow === null) return gated;
-    const shared: Tool[] = [
+    const every: Tool[] = [
       ...gated,
       // Guarded like the rest: a risky shell line for another device asks
       // here first, because here is where the owner can answer.
@@ -960,6 +972,7 @@ async function main(): Promise<void> {
         },
       }),
     ];
+    const shared = every.filter((tool) => !unusable.has(tool.name));
     return [
       ...shared,
       {
@@ -1504,6 +1517,102 @@ async function main(): Promise<void> {
               files: skill.files.length,
             })),
             root: join(paths.home, "skills"),
+          });
+          return;
+        }
+        if (kind === "skills_overview" || kind === "skill_read" || kind === "skill_save" || kind === "skill_delete") {
+          // The Skills page: every skill with how often it was used, its text,
+          // and the owner's own edits. A skill is a file in the home, so a
+          // change is published like the rest of the config.
+          const name = typeof data["name"] === "string" ? data["name"].trim() : "";
+          const publish = (): void => {
+            sessionPrompts.clear();
+            if (session === null) return;
+            const current = session;
+            void publishEnv({
+              store: current.store,
+              chain: current.identity.chainId,
+              node: current.identity.nodeId,
+              home: paths.home,
+            }).catch(() => undefined);
+          };
+          if (kind === "skill_read") {
+            reply({ ok: true, name, body: await skills.view(name) });
+            return;
+          }
+          if (kind === "skill_save") {
+            const slug = normaliseSkillName(name);
+            const body = typeof data["body"] === "string" ? data["body"].trim() : "";
+            const description = typeof data["description"] === "string" ? data["description"].replace(/\s+/g, " ").trim() : "";
+            if (slug === null || body.length === 0 || description.length === 0) {
+              reply({ ok: false, error: "a skill needs a name, one line saying when to use it, and its instructions" });
+              return;
+            }
+            await installSkill(paths.home, { name: slug, description, body });
+            publish();
+            reply({ ok: true, name: slug });
+            return;
+          }
+          if (kind === "skill_delete") {
+            const slug = normaliseSkillName(name);
+            if (slug === null) {
+              reply({ ok: false, error: "that is not a skill name" });
+              return;
+            }
+            await rm(join(paths.home, "skills", slug), { recursive: true, force: true });
+            publish();
+            reply({ ok: true, name: slug });
+            return;
+          }
+          const events = session === null ? [] : session.store.read(session.identity.chainId, 1, 100_000);
+          const usage = skillUsage(events);
+          const all = await skills.list();
+          reply({
+            ok: true,
+            skills: all.map((skill) => {
+              const use = usage.get(skill.name);
+              return {
+                name: skill.name,
+                description: skill.description,
+                files: skill.files.length,
+                uses: use?.uses ?? 0,
+                lastUsed: use?.lastUsed ?? null,
+                verdict: skillVerdict(use, Date.now()),
+              };
+            }),
+          });
+          return;
+        }
+        if (kind === "memory_view" || kind === "memory_edit") {
+          // The Memory page: what Roan keeps about the owner and what it
+          // learned, as the entries the agent itself reads and writes.
+          const target = data["target"] === "user" ? "user" : "memory";
+          if (kind === "memory_edit") {
+            const text = typeof data["text"] === "string" ? data["text"] : "";
+            const index = typeof data["index"] === "number" ? data["index"] : Number.NaN;
+            if (data["action"] === "add") await memory.add(target, text);
+            else if (data["action"] === "replace") await memory.replace(target, index, text);
+            else if (data["action"] === "remove") await memory.remove(target, index);
+            else {
+              reply({ ok: false, error: "action must be add, replace or remove" });
+              return;
+            }
+            sessionPrompts.clear();
+            if (session !== null) {
+              const current = session;
+              void publishEnv({
+                store: current.store,
+                chain: current.identity.chainId,
+                node: current.identity.nodeId,
+                home: paths.home,
+              }).catch(() => undefined);
+            }
+          }
+          reply({
+            ok: true,
+            target,
+            entries: (await memory.entries(target)).map((entry) => ({ index: entry.index, text: entry.text })),
+            budget: await memory.budget(target),
           });
           return;
         }

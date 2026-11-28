@@ -15,6 +15,10 @@ import { CommandsPanel } from "./panels/CommandsPanel.js";
 import { JobsPanel } from "./panels/JobsPanel.js";
 import { ComputerUsePanel } from "./panels/ComputerUsePanel.js";
 import { ConnectionsPanel } from "./panels/ConnectionsPanel.js";
+import { SkillsPanel } from "./panels/SkillsPanel.js";
+import { MemoryPanel } from "./panels/MemoryPanel.js";
+import { UsagePanel } from "./panels/UsagePanel.js";
+import { LogsPanel } from "./panels/LogsPanel.js";
 import { proposedSkills } from "../../src/skills/fold.js";
 import { SkillProposals } from "./components/SkillProposals.js";
 import { WebAccessCard } from "./panels/WebAccessCard.js";
@@ -84,6 +88,10 @@ type SettingsPage =
   | "menu"
   | "providers"
   | "models"
+  | "skills"
+  | "memory"
+  | "usage"
+  | "logs"
   | "connections"
   | "commands"
   | "jobs"
@@ -100,6 +108,8 @@ type SettingsPage =
 const SETTINGS_ROWS: readonly [SettingsPage, string, string][] = [
   ["providers", "Models & keys", "providers and API keys"],
   ["models", "Model roles", "thinking effort, fallback and helper models"],
+  ["skills", "Skills", "procedures Roan knows, and how often it uses them"],
+  ["memory", "Memory", "what Roan remembers about you and your work"],
   ["connections", "Connections", "services Roan can use for you"],
   ["commands", "Commands", "your own slash commands"],
   ["agent", "Agent", "tools, skills and MCP servers"],
@@ -110,6 +120,8 @@ const SETTINGS_ROWS: readonly [SettingsPage, string, string][] = [
   ["computer", "Computer use", "let Roan use this device's mouse and keyboard"],
   ["checkpoints", "Checkpoints", "named points to rewind to"],
   ["devices", "Sync", "the chain, the nodes, the invite"],
+  ["usage", "Usage", "tokens per day, across all devices"],
+  ["logs", "Logs", "what Roan on this device wrote"],
   ["storage", "Storage window", "Android's files, next to the home"],
   ["about", "About", "chain, node and version"],
 ];
@@ -553,6 +565,14 @@ export default function App({ client: injected }: { client?: ChainClient } = {})
           />
         ) : settingsPage === "models" ? (
           <ModelRolesPanel client={client} />
+        ) : settingsPage === "skills" ? (
+          <SkillsPanel client={client} />
+        ) : settingsPage === "memory" ? (
+          <MemoryPanel client={client} />
+        ) : settingsPage === "usage" ? (
+          <UsagePanel events={snapshot.events} />
+        ) : settingsPage === "logs" ? (
+          <LogsPanel url={`${window.location.protocol}//${window.location.host}/log`} />
         ) : settingsPage === "connections" ? (
           <ConnectionsPanel client={client} />
         ) : settingsPage === "computer" ? (
