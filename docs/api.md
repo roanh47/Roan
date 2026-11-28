@@ -237,7 +237,7 @@ Everything else is a request/reply kind handled by `onRequest` in `main.ts`:
 | `mcp_save` | `text` (whole file) | `{ ok: true }` or `{ error: "that is not valid JSON" }` |
 | `mcp_server_save` | `id`, `label?`, `transport?: "stdio" \| "http"`, `url?`, `command?`, `enabled?` | `{ ok: true, id }` or `{ ok: false, error }`; appends an `mcp_server` event |
 | `mcp_server_delete` | `id` | `{ ok: true, id }` or `{ ok: false, error }`; appends a removal event |
-| `tools_list` | — | `{ tools: { name, description }[], engine }` |
+| `tools_list` | — | `{ tools: { name, description }[] }` |
 | `tools_state` | — | `{ ok: true, tools: { name, source, enabled, ask, approved }[], servers }` |
 | `tool_rule` | `tool`, `enabled?`, `ask?` | `{ ok: true, tool }` or `{ ok: false, error }`; appends a `tool_rule` event |
 | `tool_approve` | `req`, `allow?` | `{ ok: true, tool, learned }` or `{ ok: false, error: "no pending approval for that req" }` |

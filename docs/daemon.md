@@ -33,9 +33,8 @@ control port, but nothing imports it: the sidecar and the systemd unit in
    `IDENTITY.md` and `AGENTS.md`, never over an existing file.
 5. `ensurePaths(paths)` — creates `home`, `secrets`, `workspace`,
    `synced-workspace`, `state`.
-6. `loadSettings(paths)` — provider settings from `config.json`. If
-   `settings.engine` is `hermes` and no `hermes` binary answers, it falls back to
-   `builtin` and says so in one log line.
+6. `loadSettings(paths)` — provider settings from `config.json`. Every turn
+   runs on Roan's own loop (`src/agent.ts`); there is no other engine.
 7. The agent's context: `MemoryStore`, `SkillLibrary`, `allTools()` +
    `contextTools()`, and an `McpRuntime`. `agentContext.prompt()` rebuilds the
    system prompt per turn from `SOUL.md`, `AGENTS.md`, memory, user profile and
@@ -67,7 +66,7 @@ webui proxy process, no log server, no second peer port.
 
 The shell never sets the port or the host. `RoanNode.kt` (Android), the Tauri
 sidecar (desktop) and the systemd unit (server) pass only what they alone know:
-`ROAN_HOME`, `ROAN_LOG_PATH`, `ROAN_ENGINE`, `ROAN_SHELL`. Port, bind address and
+`ROAN_HOME`, `ROAN_LOG_PATH`, `ROAN_SHELL`. Port, bind address and
 the control gate are the daemon's defaults, identical on every platform —
 overriding them per platform is how the phone ended up listening on loopback
 while its own invite named the tailnet address.
@@ -253,8 +252,7 @@ is known, so a turn only sees its own conversation.
 6. It builds history (`sessionMessages`), compacts past 40 messages into a
    digest attached to the prompt (`compactMessages`), and gates the tool list:
    in plan mode only `planModeTools` are offered, the rest are answered with a
-   refusal sentence (`planModeForbidden` / `planModeRefusal`), and the turn runs
-   on the builtin loop even when the device normally uses the hermes engine.
+   refusal sentence (`planModeForbidden` / `planModeRefusal`).
 7. `new Agent({ provider, tools, systemPrompt, cwd, history, effort, signal,
    onBeforeRequest })` drives `model → tool → model`. Its events become chain
    events: `tool_start` → `tool_call` `{ name, args }`, `tool_end` →

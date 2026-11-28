@@ -73,7 +73,6 @@ import { runHooks, type HookConfig } from "../hooks/run.js";
 import { guardTool, type ApprovalAnswer, type GuardOptions } from "../tools/guard.js";
 import { dueJobs, loadCron, unparseableSchedule } from "../cron/jobs.js";
 import { isEffortLevel } from "../providers/effort.js";
-import { engineAvailable } from "../engine/hermes.js";
 import { runMiniRoan } from "./mini.js";
 import { McpRuntime } from "./mcp-runtime.js";
 import { approvedToolsFromEvents, mcpServersFromEvents, toolRulesFromEvents } from "../chain/gates.js";
@@ -194,13 +193,6 @@ async function main(): Promise<void> {
   // The file tools resolve paths through the policy, so the setting has to be
   // live in this process from the first turn, not just written to disk.
   setFullDiskAccess(settings.access.fullDisk);
-  // A packaged app on a machine without the hermes binary must still answer:
-  // erroring on every turn would make it a dead window. The in-process loop is
-  // the fallback, and the log says which one is running.
-  if (settings.engine === "hermes" && !(await engineAvailable().catch(() => false))) {
-    settings = { ...settings, engine: "builtin" };
-    log("engine: no hermes binary on this machine, using the builtin loop");
-  }
 
   // Everything this device knows before the first token: its own memory files
   // and the skills on its own disk. Both are copies, never a fetch from a peer.
@@ -1046,7 +1038,6 @@ async function main(): Promise<void> {
         cwd: paths.syncedWorkspace,
         systemPrompt,
         tools: toolsForTurn(hooks, { ROAN_CHAIN: current.identity.chainId, ROAN_SESSION: sessionId }),
-        engine: settings.engine,
         planMode: planModeEnabled(current.store.read(current.identity.chainId, 1, 100_000), sessionId),
         steer: inbox,
         session: sessionId,
@@ -1350,12 +1341,11 @@ async function main(): Promise<void> {
         if (kind === "tools_list") {
           reply({
             tools: toolsForTurn().map((tool) => ({ name: tool.name, description: tool.description })),
-            engine: settings.engine,
           });
           return;
         }
         if (kind === "mcp_list") {
-          // The file is what travels; the builtin engine does not start servers
+          // The file is what travels; nothing starts servers from it
           // yet, and the screen says so instead of implying it does.
           const file = join(paths.home, "mcp.json");
           let text = "";
