@@ -78,6 +78,7 @@ import { isEffortLevel } from "../providers/effort.js";
 import { runMiniRoan } from "./mini.js";
 import { MiniRegistry, finishedMinisNote } from "./mini-registry.js";
 import { condense } from "../context/condense.js";
+import { placesPrompt } from "../context/places.js";
 import { normaliseSkillName } from "../skills/parse.js";
 import { skillUsage, skillVerdict } from "../skills/usage.js";
 import {
@@ -316,7 +317,13 @@ async function main(): Promise<void> {
     tools,
     prompt: async () =>
       buildSystemPrompt({
-        base: SYSTEM_PROMPT,
+        // Roan is told where things go on this device, with its real paths:
+        // nothing about a folder name says "this one is copied everywhere".
+        base: `${SYSTEM_PROMPT}\n\n${placesPrompt({
+          home: paths.home,
+          workspace: paths.workspace,
+          syncedWorkspace: paths.syncedWorkspace,
+        })}`,
         soul: await readGuideFile(paths, "SOUL.md"),
         rules: await readGuideFile(paths, "AGENTS.md"),
         user: await memory.render("user"),

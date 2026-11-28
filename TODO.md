@@ -9,6 +9,22 @@ there comes back here, per version.
 
 ## 0.1.0
 
+- [ ] **Two workspaces, used the way they are meant.** `workspace/` is local:
+      Roan builds there. `synced-workspace/` is for a file that should be on
+      every device. The home itself (`SOUL.md` and the rest) is not a place
+      to put work. Built, not proven: Roan is told all of this in every
+      conversation, with the real paths, and to ask when it is unclear
+      (`src/context/places.ts`). Still to do:
+      - Turns, commands, hooks and Mini Roans still start in
+        `synced-workspace/`, so a path without a folder lands there. Decide
+        whether they should start in `workspace/`; the file explorer and the
+        file picker in the composer show the synced folder and have to keep
+        working.
+      - The home is protected by instruction only. Make the file tools and
+        the shell guard refuse to write the home's own files.
+      - On Windows the leading dot does not hide `.Roan`; set the hidden flag
+        when the folder is created.
+
 - [ ] **The APK is a release build, not a debug one.** Both workflows run
       `tauri android build --apk --debug` and then sign the result with the
       release key. So the key is right and the build is not: a debug build is
