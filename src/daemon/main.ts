@@ -57,6 +57,7 @@ import { randomUUID as uuid } from "node:crypto";
 import { existsSync } from "node:fs";
 import { copyFile, cp, mkdir, readFile as readFileAsync, rm, writeFile as writeFileAsync } from "node:fs/promises";
 import { runHooks, type HookConfig } from "../hooks/run.js";
+import { guardTool, type ApprovalAnswer, type GuardOptions } from "../tools/guard.js";
 import { dueJobs, loadCron, unparseableSchedule } from "../cron/jobs.js";
 import { isEffortLevel } from "../providers/effort.js";
 import { engineAvailable, runHermesTurn } from "../engine/hermes.js";
@@ -718,9 +719,17 @@ async function main(): Promise<void> {
   const APPROVAL_TIMEOUT_MS = 180_000;
   const pendingApprovals = new Map<
     string,
-    { tool: string; resolve: (decision: "allow" | "deny" | "timeout") => void }
+    { tool: string; learn: boolean; resolve: (decision: ApprovalAnswer) => void }
   >();
-  const askPermission = (tool: string, args: Record<string, unknown>): Promise<"allow" | "deny" | "timeout"> => {
+  /**
+   * A `reason` means the question is about this one call (a dangerous shell
+   * line): the card shows why, and a yes is never learned for the whole tool.
+   */
+  const askPermission = (
+    tool: string,
+    args: Record<string, unknown>,
+    reason?: string,
+  ): Promise<ApprovalAnswer> => {
     if (session === null) return Promise.resolve("deny");
     const current = session;
     const req = uuid();
@@ -728,31 +737,39 @@ async function main(): Promise<void> {
       id: uuid(),
       node: current.identity.nodeId,
       type: "approval_request",
-      data: { req, tool, args },
+      data: { req, tool, args, ...(reason !== undefined ? { reason, once: true } : {}) },
     });
     control?.broadcast({ t: "append", event: request });
     return new Promise((resolve) => {
-      pendingApprovals.set(req, { tool, resolve });
+      pendingApprovals.set(req, { tool, learn: reason === undefined, resolve });
       setTimeout(() => {
         if (pendingApprovals.delete(req)) resolve("timeout");
       }, APPROVAL_TIMEOUT_MS);
     });
   };
-  const withApproval = (tool: Tool): Tool => ({
-    ...tool,
-    async run(args, ctx) {
-      const decision = await askPermission(tool.name, args);
-      if (decision === "allow") return await tool.run(args, ctx);
-      if (decision === "timeout") throw new Error("no approval arrived in time");
-      throw new Error("the user refused this tool call");
-    },
-  });
-  const answerApproval = (req: string, allow: boolean): string | null => {
+  const answerApproval = (req: string, allow: boolean): { tool: string; learn: boolean } | null => {
     const pending = pendingApprovals.get(req);
     if (pending === undefined) return null;
     pendingApprovals.delete(req);
     pending.resolve(allow ? "allow" : "deny");
-    return pending.tool;
+    return { tool: pending.tool, learn: pending.learn };
+  };
+
+  /** The `before_tool` / `after_tool` hooks of one turn, with its env. */
+  const toolHooks = (
+    hooks: HookConfig | null,
+    extra: Record<string, string>,
+  ): Pick<GuardOptions, "beforeTool" | "afterTool"> => {
+    const fire = async (point: "before_tool" | "after_tool", more: Record<string, string>): Promise<void> => {
+      const results = await runHooks(hooks, point, { cwd: paths.syncedWorkspace, extra: { ...extra, ...more } });
+      for (const result of results) {
+        if (result.exitCode !== 0) log(`hook ${point} failed (${String(result.exitCode)}): ${result.command}`);
+      }
+    };
+    return {
+      beforeTool: (tool) => fire("before_tool", { ROAN_TOOL: tool }),
+      afterTool: (tool, ok) => fire("after_tool", { ROAN_TOOL: tool, ROAN_TOOL_OK: ok ? "1" : "0" }),
+    };
   };
 
   /**
@@ -760,7 +777,10 @@ async function main(): Promise<void> {
    * off, ask-flags gate them behind an approval, MCP servers add theirs. A
    * config that arrived from a peer dials here, at the next look.
    */
-  const toolsForTurn = (): readonly Tool[] => {
+  const toolsForTurn = (
+    hooks: HookConfig | null = null,
+    hookEnv: Record<string, string> = {},
+  ): readonly Tool[] => {
     let rules = new Map<string, { enabled: boolean; ask: boolean }>();
     let approved = new Set<string>();
     let fleet: readonly Tool[] = [];
@@ -774,9 +794,13 @@ async function main(): Promise<void> {
       fleet = mcp.tools();
     }
     const visible = [...tools, ...fleet].filter((tool) => rules.get(tool.name)?.enabled !== false);
+    // Every tool passes the guard: it asks when the chain says so, always asks
+    // before a dangerous shell line, and fires the tool hooks around the call.
+    const around = toolHooks(hooks, hookEnv);
     const gated = visible.map((tool) => {
       const rule = rules.get(tool.name);
-      return rule !== undefined && rule.ask && !approved.has(tool.name) ? withApproval(tool) : tool;
+      const ask = rule !== undefined && rule.ask && !approved.has(tool.name);
+      return guardTool(tool, { ask, askPermission, ...around });
     });
     const relayNow = relayOptions();
     if (relayNow === null) return gated;
@@ -941,7 +965,7 @@ async function main(): Promise<void> {
         effort: settings.effort,
         cwd: paths.syncedWorkspace,
         systemPrompt,
-        tools: toolsForTurn(),
+        tools: toolsForTurn(hooks, { ROAN_CHAIN: current.identity.chainId, ROAN_SESSION: sessionId }),
         engine: settings.engine,
         planMode: planModeEnabled(current.store.read(current.identity.chainId, 1, 100_000), sessionId),
         steer: inbox,
@@ -1429,22 +1453,27 @@ async function main(): Promise<void> {
             return;
           }
           const allow = data["allow"] !== false;
-          const tool = answerApproval(req, allow);
-          if (tool === null) {
+          const answered = answerApproval(req, allow);
+          if (answered === null) {
             reply({ ok: false, error: "no pending approval for that req" });
             return;
           }
-          if (allow && session !== null) {
+          const tool = answered.tool;
+          // A yes to one dangerous call is not a yes to the tool from now on.
+          const learned = allow && answered.learn;
+          if (session !== null) {
             const current = session;
+            // Every answer is recorded so the card closes on every device. Only
+            // "allow" is learned by the fold; "once" and "deny" answer this call.
             const event = current.store.append(current.identity.chainId, {
               id: uuid(),
               node: current.identity.nodeId,
               type: "tool_approval",
-              data: { tool, decision: "allow" },
+              data: { tool, req, decision: learned ? "allow" : allow ? "once" : "deny" },
             });
             control?.broadcast({ t: "append", event });
           }
-          reply({ ok: true, tool, learned: allow });
+          reply({ ok: true, tool, learned });
           return;
         }
         if (kind === "tool_approval_reset") {

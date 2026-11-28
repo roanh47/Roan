@@ -143,7 +143,7 @@ These exist in mainstream agents and are **deliberately out**:
 |---|---|---|---|
 | Tool registry with descriptions to the model | all | ✅ `read_file`, `write_file`, `list_dir`, `run_shell`, `browser`, `web_search`, `web_fetch`, `memory`, `skill_view`, `skill_file`, plus `run_on_node`, `delegate` and every MCP server's tools — built by `toolSurface` in `src/tools.ts` | done |
 | Approval flow (allow / ask / deny) with a UI card | CC, CX, OC, HM | ✅ `approval_request` events, the card in the transcript with Approve/Deny, an allow learned as `tool_approval` | done |
-| Policy file (which tool may what) | CC, OC | partial — `policy.ts`, `shell-allowlist.ts` and `secrets-scan.ts` are tested modules; the live `run_shell` in `src/tools.ts` calls `exec` directly and consults none of them | **BUILD** — put `decide()` in front of the tool call |
+| Policy file (which tool may what) | CC, OC | partial — every tool of a turn passes `src/tools/guard.ts`: a `run_shell` line the shell allowlist calls `deny` always asks first, with the reason on the card, and that yes is never learned (`guard.test.ts`). There is still no policy *file*: `decide()` in `policy.ts` and `secrets-scan.ts` have no caller, and a relayed `tool_req` is not guarded | **BUILD** — an owner-editable policy file, and the guard on the relay |
 | Plan mode (propose first, execute after approval) | CC, GC | ✅ tool list gated per turn, `plan_mode` event, composer toggle, `tests/plan-mode.test.ts` | done |
 | Dry-run of destructive tools | — | ✅ `dry-run.ts` | done |
 | Run a tool on another device in the chain | — (unique) | ✅ `run_on_node` | done |
@@ -168,7 +168,7 @@ These exist in mainstream agents and are **deliberately out**:
 | Phone storage as the user home | — (Termux precedent) | ✅ `storage_window` creates the symlink siblings (`shared/ downloads/ dcim/ documents/ pictures/ music/`) next to `.Roan` in the app's `files/`, and refuses with a reason when All files access is missing (`src/daemon/storage-window.ts`, tests) | done (the grant is the owner's) |
 | Background turns (app closed) | HM, OC | ✅ Android foreground service owns the node (`RoanService.kt`); on desktop the daemon runs as a systemd user service (`docs/webui.md`) | done |
 | Notification when a turn finishes | GPT, CL, HM | ✅ the service tails the daemon's stderr for `notify:turn-done` and posts "Roan is done" | done |
-| Hooks (lifecycle events → script) | CC | ✅ `hooks.json` runs shell commands at `turn_start` and `turn_end` (`src/hooks/run.ts`, called from `runMessage`); a broken hook does not break the turn. `before_tool`/`after_tool` are declared and never fired | done (two points) |
+| Hooks (lifecycle events → script) | CC | ✅ `hooks.json` runs shell commands at `turn_start` and `turn_end` (`src/hooks/run.ts`, called from `runMessage`); a broken hook does not break the turn. `before_tool`/`after_tool` fire around every tool call of a turn through `src/tools/guard.ts`, with `ROAN_TOOL` (and `ROAN_TOOL_OK` afterwards) in the environment (`guard.test.ts`) | done (four points) |
 
 ## 9. Devices & surfaces
 

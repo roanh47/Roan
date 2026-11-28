@@ -5,9 +5,10 @@ code. The design rationale lives in `PLAN.md`; this file is the rulebook.
 
 ## What this is
 
-Roan is one agent spread over several machines. Today it is the core loop, four
-tools and a streaming provider client. Everything else — the chain, remote tools,
-the apps — is planned and described in `PLAN.md`.
+Roan is one agent spread over several machines. The core loop, the chain, remote
+tools, the daemon and the apps all exist; `README.md` has the status table and
+`docs/feature-parity.md` says per feature what works and what is only a module.
+`PLAN.md` holds the design and the reasons behind it.
 
 The interface is an app you open: a desktop app on your machines, the same app on
 your phone.

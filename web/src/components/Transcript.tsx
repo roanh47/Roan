@@ -54,7 +54,14 @@ type Row =
   | ToolRow
   | { kind: "steps"; key: string; tools: ToolRow[] }
   | { kind: "notice"; key: string; text: string }
-  | { kind: "approval"; key: string; req: string; tool: string; resolved: "allow" | "deny" | null }
+  | {
+      kind: "approval";
+      key: string;
+      req: string;
+      tool: string;
+      reason: string | null;
+      resolved: "allow" | "deny" | null;
+    }
   | { kind: "meta"; key: string; text: string };
 
 interface OpenTool {
@@ -252,21 +259,32 @@ export function buildRows(events: readonly ChainEvent[], local: string): Row[] {
         break;
       }
       case "approval_request": {
-        const data = event.data as { req?: unknown; tool?: unknown } | null | undefined;
+        const data = event.data as { req?: unknown; tool?: unknown; reason?: unknown } | null | undefined;
         const req = typeof data?.req === "string" ? data.req : event.id;
         const tool = typeof data?.tool === "string" ? data.tool : "a tool";
-        rows.push({ kind: "approval", key: event.id, req, tool, resolved: null });
+        // A reason marks a one-off question about a dangerous call.
+        const reason = typeof data?.reason === "string" && data.reason.length > 0 ? data.reason : null;
+        rows.push({ kind: "approval", key: event.id, req, tool, reason, resolved: null });
         break;
       }
       case "tool_approval": {
-        // The answer to a request: allow learns, deny answers this call,
-        // reset only touches the fold — none of them needs a row.
-        const data = event.data as { tool?: unknown; decision?: unknown } | null | undefined;
+        // The answer to a request: allow learns, once and deny answer this
+        // call, reset only touches the fold — none of them needs a row.
+        const data = event.data as { tool?: unknown; req?: unknown; decision?: unknown } | null | undefined;
         const tool = typeof data?.tool === "string" ? data.tool : null;
-        const decision = data?.decision === "allow" ? "allow" : data?.decision === "deny" ? "deny" : null;
+        const answered = typeof data?.req === "string" ? data.req : null;
+        const decision =
+          data?.decision === "allow" || data?.decision === "once"
+            ? "allow"
+            : data?.decision === "deny"
+              ? "deny"
+              : null;
         if (tool !== null && decision !== null) {
           for (const row of rows) {
-            if (row.kind === "approval" && row.tool === tool && row.resolved === null) row.resolved = decision;
+            if (row.kind !== "approval" || row.resolved !== null) continue;
+            // An answer that names its request closes that card only; an older
+            // event without one closes every open card of the tool.
+            if (answered !== null ? row.req === answered : row.tool === tool) row.resolved = decision;
           }
         }
         break;
@@ -400,7 +418,9 @@ function RowView({
         <div className="approval" data-resolved={row.resolved ?? "open"}>
           <span className="approval__text">
             {row.resolved === null
-              ? `Roan asks to use ${row.tool}`
+              ? row.reason !== null
+                ? `Roan asks to run a risky command with ${row.tool}: ${row.reason}`
+                : `Roan asks to use ${row.tool}`
               : row.resolved === "allow"
                 ? `${row.tool} — approved`
                 : `${row.tool} — denied`}

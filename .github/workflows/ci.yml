@@ -38,15 +38,19 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Test
-        run: npm test
-
+      # The tests run from dist/, so the build comes first.
       - name: Build
         run: npm run build
+
+      - name: Test
+        run: npm test
 
       # ------------------------------------------------------------- web --
       - name: Install web dependencies
         run: npm --prefix web ci --no-audit --no-fund
+
+      - name: Web test
+        run: npm --prefix web test
 
       - name: Web build
         run: npm --prefix web run build
