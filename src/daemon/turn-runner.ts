@@ -28,6 +28,8 @@ export interface TurnRunnerOptions {
     /** Catalog id, so the loop can pick the right adapter and effort spelling. */
     readonly providerId?: string;
   };
+  /** A second model of the same provider, tried once when the first fails. */
+  readonly fallbackModel?: string;
   /** How hard the model should think this turn; omitted means "normal". */
   readonly effort?: EffortLevel;
   readonly cwd: string;
@@ -217,6 +219,11 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
 
     const agent = new Agent({
       provider: options.provider,
+      ...(options.fallbackModel !== undefined &&
+      options.fallbackModel.length > 0 &&
+      options.fallbackModel !== options.provider.model
+        ? { fallback: { ...options.provider, model: options.fallbackModel } }
+        : {}),
       tools: turnTools,
       systemPrompt: guidedPrompt,
       cwd: options.cwd,

@@ -9,6 +9,11 @@ import type { AgentEvent, ChatMessage, ContentPart, Tool, ToolContext } from "./
 
 export interface AgentOptions {
   provider: ProviderConfig;
+  /**
+   * A second provider configuration, tried once when a request to the first
+   * fails before it produced anything. The rest of the turn stays on it.
+   */
+  fallback?: ProviderConfig;
   tools: Tool[];
   systemPrompt: string;
   cwd: string;
@@ -161,13 +166,16 @@ export class Agent {
   private messages: ChatMessage[] = [];
   private readonly maxSteps: number;
   /** One adapter per agent: the provider family cannot change mid-turn. */
-  private readonly adapter: ChatAdapter;
+  private adapter: ChatAdapter;
+  /** The adapter to switch to when the first one fails; used at most once. */
+  private spare: ChatAdapter | null;
   /** Every count the provider disclosed this turn, one entry per request. */
   private readonly usages: TokenUsage[] = [];
 
   constructor(private readonly opts: AgentOptions) {
     this.maxSteps = opts.maxSteps ?? 24;
     this.adapter = buildAdapter(opts.provider);
+    this.spare = opts.fallback !== undefined ? buildAdapter(opts.fallback) : null;
     this.messages.push({ role: "system", content: opts.systemPrompt });
     if (opts.history) this.messages.push(...normalizeHistory(opts.history));
   }
@@ -218,13 +226,31 @@ export class Agent {
         // rather than by the provider halfway through the turn.
         this.opts.onBeforeRequest?.(this.messages);
         assertAlternating(this.messages, inheritedUserPair);
-        const response = await this.adapter.send(this.messages, {
-          tools: specs,
-          signal: this.opts.signal,
-          onDelta: (t) => emit({ type: "assistant_text", text: t }),
-          onReasoning: (t) => emit({ type: "reasoning", text: t }),
-          ...(this.opts.effort !== undefined ? { effort: this.opts.effort } : {}),
-        });
+        let streamed = false;
+        const request = (adapter: ChatAdapter) =>
+          adapter.send(this.messages, {
+            tools: specs,
+            signal: this.opts.signal,
+            onDelta: (t) => {
+              streamed = true;
+              emit({ type: "assistant_text", text: t });
+            },
+            onReasoning: (t) => emit({ type: "reasoning", text: t }),
+            ...(this.opts.effort !== undefined ? { effort: this.opts.effort } : {}),
+          });
+        let response: Awaited<ReturnType<ChatAdapter["send"]>>;
+        try {
+          response = await request(this.adapter);
+        } catch (err) {
+          // One second chance, on the fallback model: only when the owner did
+          // not stop the turn and nothing of the answer was shown yet, so a
+          // retry can never print the same words twice.
+          const spare = this.spare;
+          if (spare === null || streamed || this.opts.signal?.aborted === true) throw err;
+          this.adapter = spare;
+          this.spare = null;
+          response = await request(spare);
+        }
         antwoord = response.message;
         // A turn is several requests; each one's usage counts towards it. A
         // provider that reports none simply adds nothing.

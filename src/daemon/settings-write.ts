@@ -17,6 +17,7 @@ const SETTINGS_KEYS = [
   "provider",
   "effort",
   "access",
+  "fallbackModel",
 ] as const satisfies readonly (keyof Settings)[];
 
 type SettingsKey = (typeof SETTINGS_KEYS)[number];
@@ -33,6 +34,7 @@ export interface SettingsPatch {
   provider?: string;
   effort?: EffortLevel;
   access?: { fullDisk?: boolean };
+  fallbackModel?: string;
 }
 
 function isSettingsKey(key: string): key is SettingsKey {
@@ -98,6 +100,9 @@ function parsePatch(input: unknown): SettingsPatch {
         break;
       case "provider":
         patch.provider = value;
+        break;
+      case "fallbackModel":
+        patch.fallbackModel = value.trim();
         break;
     }
   }
