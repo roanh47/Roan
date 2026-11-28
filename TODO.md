@@ -9,13 +9,26 @@ there comes back here, per version.
 
 ## 0.1.0
 
-- [ ] **The whole codebase is English.** Code, comments, identifiers, test
-      names, docs, prompts and this file. Known Dutch today: most of this
-      `TODO.md`, `docs/feature-map.md`, `docs/FINAL-0.0.23.md`,
-      `docs/goals-0.0.23.md`, `docs/goal-orchestrator-0.0.23.md`, the summary
-      in `docs/feature-parity.md`, variable names such as `stappen` / `antwoord` in
-      `src/agent.ts`, and some test names. The one exception is the
+- [ ] **Remove all Dutch: code and comments first, then docs.** Everything in
+      this repository is English. Not one Dutch identifier, comment, test
+      name, string, log line or prompt stays. The one exception is the
       writing-style skill: it has an upstream and is not touched.
+      Dutch found in code on 2026-11-28, about a hundred places in 32 files:
+      - `src/agent.ts`: the variables `stappen`, `antwoord`, `laatsteTekst`.
+      - `src/mobile/backup-policy.ts` and `web/src/i18n.ts`: check whether the
+        Dutch there is data the feature needs or leftover text.
+      - Test names and fixtures in `src/chain/` (`compaction`, `export-html`,
+        `export-markdown`, `gates`, `sessions`, `summary`), `src/stt/registry`,
+        `src/tools/` (`web`, `todo`, `glob`, `search`, `secrets-scan`),
+        `src/mcp/client`, `src/mobile/queue`, `src/sync/`, `src/workspace/`,
+        `src/voice/tts`, `src/charts/spec`, `src/memory/distil`,
+        `src/daemon/control`, `src/daemon/discovery`, `src/testing/temp-dir`
+        and `tests/integration/sync-two-nodes`.
+      - `scripts/build-local.sh` and `scripts/dmg/build-dmg.sh`.
+      Dutch in docs: the old sections of this `TODO.md`, `docs/README.md`,
+      `docs/app/app-features.md`, everything in `docs/research/` and
+      `docs/history/`, `docs/feature-map.md`, and the summary in
+      `docs/feature-parity.md`.
 - [ ] **Prove the 0.1.0 work on a device.** Built and CI-checked only, never
       run on a real machine: the tool guard (risky shell lines ask), slash
       commands, the Thought block and effort picker, skill proposals,
