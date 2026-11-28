@@ -13,6 +13,7 @@ import type { EffortLevel } from "../providers/effort.js";
 import type { TokenUsage } from "../usage.js";
 import { PLAN_MODE_PROMPT, planModeForbidden, planModeRefusal, planModeTools } from "./plan.js";
 import { createThought } from "./thought.js";
+import { splitForCondensing, type PlainMessage } from "../context/condense.js";
 
 export interface TurnRunnerOptions {
   readonly store: EventStore;
@@ -27,6 +28,12 @@ export interface TurnRunnerOptions {
     /** Catalog id, so the loop can pick the right adapter and effort spelling. */
     readonly providerId?: string;
   };
+  /**
+   * Writes the summary of the older part of a long conversation. The caller
+   * decides which model does it and remembers the answer; without it the
+   * older part becomes a plain digest behind a fixed window.
+   */
+  readonly condenseOlder?: (older: readonly PlainMessage[]) => Promise<string>;
   /** A second model of the same provider, tried once when the first fails. */
   readonly fallbackModel?: string;
   /** How hard the model should think this turn; omitted means "normal". */
@@ -170,9 +177,21 @@ export async function runTurn(options: TurnRunnerOptions, userText: string): Pro
           typeof message.content === "string",
       )
       .map((message): ChatMessage => ({ role: message.role, content: message.content }));
-    const compacted = compactMessages(asChat, 40);
+    // With a summariser the boundary moves in steps and the summary holds
+    // still in between, so most requests of a long conversation start with
+    // the same text as the one before. Without one, the fixed window applies.
+    let compacted: { digest: string | null; recent: readonly ChatMessage[] };
+    if (options.condenseOlder !== undefined) {
+      const split = splitForCondensing(asChat);
+      compacted = {
+        digest: split.older.length > 0 ? await options.condenseOlder(split.older) : null,
+        recent: split.recent,
+      };
+    } else {
+      compacted = compactMessages(asChat, 40);
+    }
     const turnPrompt =
-      compacted.digest === null
+      compacted.digest === null || compacted.digest.length === 0
         ? options.systemPrompt
         : `${options.systemPrompt}\n\n# Earlier in this conversation (condensed)\n\n${compacted.digest}`;
     // Plan mode is enforced on the tool list, not on the wording: what the

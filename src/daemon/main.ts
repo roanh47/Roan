@@ -75,6 +75,7 @@ import { guardTool, type ApprovalAnswer, type GuardOptions } from "../tools/guar
 import { dueJobs, loadCron, unparseableSchedule } from "../cron/jobs.js";
 import { isEffortLevel } from "../providers/effort.js";
 import { runMiniRoan } from "./mini.js";
+import { condense } from "../context/condense.js";
 import {
   isConnectionId,
   loadConnectionToken,
@@ -856,6 +857,10 @@ async function main(): Promise<void> {
       accounts,
     );
   };
+  /** The prompt each conversation started with, held still for its lifetime. */
+  const sessionPrompts = new Map<string, { orders: string; prompt: string }>();
+  /** Summaries of the older part of long conversations, by where they were cut. */
+  const sessionDigests = new Map<string, string>();
   const todoLists = new Map<string, TodoStore>();
   const toolsForTurn = (
     hooks: HookConfig | null = null,
@@ -1103,11 +1108,18 @@ async function main(): Promise<void> {
     // Standing orders ride the system prompt of every new turn: they are the
     // owner's own words, folded from the chain like everything else.
     const orders = goalContext(foldGoals(current.store.read(current.identity.chainId, 1, 100_000)));
-    const basePrompt = await agentContext.prompt();
-    // A background job that ended while nobody was looking is told once, to
-    // the next turn that runs here.
+    // The prompt of a conversation is written once and then held still: a
+    // provider only reuses its work on a request that starts exactly like the
+    // last one. What changed since (a new memory, a new skill) is picked up by
+    // the next conversation; standing orders are the exception, because the
+    // owner changing one means it now.
+    const frozen = sessionPrompts.get(sessionId);
+    const basePrompt = frozen !== undefined && frozen.orders === orders ? frozen.prompt : await agentContext.prompt();
+    sessionPrompts.set(sessionId, { orders, prompt: basePrompt });
+    const systemPrompt = [orders, basePrompt].filter((part) => part.length > 0).join("\n\n");
+    // A background job that ended while nobody was looking is told once, in
+    // the turn's own message, so the prompt above stays untouched.
     const finished = finishedJobsNote(processes.takeFinished());
-    const systemPrompt = [orders, finished, basePrompt].filter((part) => part.length > 0).join("\n\n");
     const hooks = await loadHooks();
     const started = await runHooks(hooks, "turn_start", {
       cwd: paths.syncedWorkspace,
@@ -1123,7 +1135,7 @@ async function main(): Promise<void> {
     // A main model that cannot see gets the image as words: the vision slot
     // looks at it first. When the slot is empty, or the look fails, the image
     // goes to the main model as before.
-    let turnText = prompt;
+    let turnText = finished.length > 0 ? `${prompt}\n\n${finished}` : prompt;
     let turnImage = image;
     if (image !== undefined) {
       const vision = await auxProvider("vision");
@@ -1143,7 +1155,7 @@ async function main(): Promise<void> {
           );
           const description = typeof seen.message.content === "string" ? seen.message.content.trim() : "";
           if (description.length > 0) {
-            turnText = withImageDescription(prompt, description, vision.model);
+            turnText = withImageDescription(turnText, description, vision.model);
             turnImage = undefined;
           }
         } catch (error) {
@@ -1167,6 +1179,24 @@ async function main(): Promise<void> {
         },
         effort: settings.effort,
         fallbackModel: settings.fallbackModel,
+        // The older part of a long conversation, summarised once per step by
+        // the background model and remembered until the boundary moves again.
+        condenseOlder: async (older) => {
+          const key = `${sessionId}:${String(older.length)}`;
+          const known = sessionDigests.get(key);
+          if (known !== undefined) return known;
+          const written = await condense(older, async (ask) => {
+            const cheap = (await auxProvider("background")) ?? {
+              baseUrl: settings.baseUrl,
+              apiKey: settings.apiKey,
+              model: settings.model,
+            };
+            const reply = await chat(cheap, [{ role: "user", content: ask }], { maxTokens: 900 });
+            return typeof reply.content === "string" ? reply.content : "";
+          });
+          sessionDigests.set(key, written);
+          return written;
+        },
         cwd: paths.syncedWorkspace,
         systemPrompt,
         tools: toolsForTurn(hooks, { ROAN_CHAIN: current.identity.chainId, ROAN_SESSION: sessionId }),
