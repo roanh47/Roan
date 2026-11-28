@@ -32,6 +32,11 @@ export interface ControlServerOptions {
    * caller is local or the operator set `ROAN_ALLOW_REMOTE_CONTROL=1`.
    */
   readonly isLocal?: (address: string | undefined) => boolean;
+  /**
+   * Whether this address may load the UI and the log over HTTP. Everyone by
+   * default. `/healthz` is never gated: peers use it to find each other.
+   */
+  readonly allowWeb?: (address: string | undefined) => boolean;
   /** null until a chain exists on this machine. */
   readonly store: () => EventStore | null;
   readonly state: () => DaemonState;
@@ -113,6 +118,11 @@ function refuseUpgrade(socket: Duplex, status: number, reason: string, body: str
   socket.destroy();
 }
 
+/** `/healthz`, with or without a query string. */
+function isHealthCheck(url: string | undefined): boolean {
+  return (url ?? "").split("?")[0] === "/healthz";
+}
+
 /**
  * A peer authenticates with the chain token, in the `Authorization` header or a
  * `?token=` parameter. The control socket takes neither, so a request that
@@ -141,7 +151,17 @@ export function startControlServer(options: ControlServerOptions): Promise<Contr
   const clients = new Set<WebSocket>();
 
   const dist = options.webDist ?? process.env["ROAN_WEB_DIST"] ?? defaultWebDist();
-  const server = createServer(createWebHandler({ dist, ...(options.logText === undefined ? {} : { log: options.logText }) }));
+  const web = createWebHandler({ dist, ...(options.logText === undefined ? {} : { log: options.logText }) });
+  const server = createServer((req, res) => {
+    const allowWeb = options.allowWeb;
+    if (allowWeb !== undefined && !isHealthCheck(req.url) && !allowWeb(req.socket.remoteAddress)) {
+      const body = "the Roan UI on this device is only open to the device itself\n";
+      res.writeHead(403, { "content-type": "text/plain; charset=utf-8", "content-length": Buffer.byteLength(body) });
+      res.end(body);
+      return;
+    }
+    web(req, res);
+  });
   const wss = new WebSocketServer({ noServer: true });
 
   const log = (message: string): void => options.log?.(message);

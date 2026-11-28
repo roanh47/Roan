@@ -4,8 +4,7 @@ Date: 2026-11-18, re-checked against the code on the 0.0.23 branch (every verdic
 below was read back from `src/` and `web/src/`, not from the earlier plan). Sources: the
 agents' official docs (all research delivered — 1,024
 sourced rows in `docs/research/features/`), `docs/mobile-app-patterns.md`,
-`docs/reference-apps-apk-analysis.md` (ChatGPT APK), the Roan repo itself, and Hermes'
-own surface (I am that).
+`docs/reference-apps-apk-analysis.md` (ChatGPT APK), and the Roan repo itself.
 
 **Start here for the to-do:** `docs/feature-groups.md` — all 23 inventories collapsed
 into ~110 deduplicated concepts (YOLO = Auto Approve = Turbo = one row, aliases shown),
@@ -13,18 +12,18 @@ each with a DONE / BUILD / SOON / LATER / WON'T status, rejected ones included. 
 file keeps the reasoning per verdict; the JSONs keep the raw sourced rows.
 
 Legend — **CC** Claude Code · **CX** Codex CLI · **OC** opencode · **GC** Gemini CLI ·
-**GPT** ChatGPT app · **CL** Claude app · **HM** Hermes.
+**GPT** ChatGPT app · **CL** Claude app · **HM** Hermes, the agent that inspired Roan.
 Verdicts: **BUILD** (needed for parity, next rounds) · **SOON** (valuable, after BUILD) ·
 **LATER** (real but not near) · **WON'T** (does not fit Roan's model — see the next section).
 
 ## Samenvatting — wat af is en wat niet
 
-49 van 66 features werken; 16 staan open en 1 vallen bewust af.
+50 van 66 features werken; 15 staan open en 1 vallen bewust af.
 
 | Onderdeel | af | open |
 |---|---|---|
 | 1. Transcript & messages | 8 | 2 |
-| 2. Composer & input | 3 | 4 |
+| 2. Composer & input | 4 | 3 |
 | 3. Models & providers | 5 | 2 |
 | 4. Sessions & history | 7 | 1 |
 | 5. Context, memory & skills | 4 | 1 |
@@ -43,7 +42,6 @@ wat een mainstream-agent doet en Roan nog niet.
 - [ ] **Read aloud (TTS)** (1) — SOON
 - [ ] **Dictate (speech → text in composer)** (2) — **BUILD**
 - [ ] **Voice conversation mode (call the agent)** (2) — SOON
-- [ ] **Slash commands (`/models`, `/compact`…)** (2) — **BUILD**
 - [ ] **Command palette / keyboard shortcuts** (2) — LATER
 - [ ] **Per-conversation model (not global)** (3) — **SOON**
 - [ ] **Fallback model when one fails** (3) — LATER
@@ -84,7 +82,7 @@ These exist in mainstream agents and are **deliberately out**:
 | Copy whole message | GPT, CL, OC | ✅ copy chip under every answer (`CopyChip` in `Transcript.tsx`) | done |
 | Edit your sent message → branch from there | GPT, CL | ❌ (chain is append-only) | **SOON** — implement as a checkpoint + branch, never a mutation |
 | Regenerate answer | GPT, CL, CC | ✅ `regenerate` frame: a checkpoint marks the seam, the same question is asked again, the new answer lands below | done |
-| Thinking / reasoning visibility ("Thinking…", expandable reasoning) | GPT, CL, CC, GC | the dock opens at `turn_start` (phase, stuck report after 2 min) ✅, but the **reasoning text itself is never captured**: nothing reads a provider's reasoning deltas and no `reasoning` event exists, so there is nothing to expand | **BUILD** — capture deltas into a `reasoning` part and show it as a collapsible "Thought" block |
+| Thinking / reasoning visibility ("Thinking…", expandable reasoning) | GPT, CL, CC, GC | the dock opens at `turn_start` (phase, stuck report after 2 min) ✅. The reasoning itself is captured for OpenAI-compatible providers (`reasoning_content` / `reasoning` deltas) and Anthropic (`thinking_delta`), kept as one `reasoning` event per turn (`src/daemon/thought.ts`, `thought.test.ts`) and shown as a folded "Thought" block; it is never replayed to the model. Not for Google, not streamed live, not proven on a device | done for two provider families (device proof open) |
 | Tool traces kept out of the conversation (silent context fetching) | GPT, CL | ✅ ≥3 internal steps collapse into one "internal steps N" pill | done |
 | Message actions row (copy / regenerate / share) | GPT, CL | ✅ copy + regenerate on the answer; no share | done (share below) |
 | Read aloud (TTS) | GPT, CL | module only — `src/voice/tts.ts` with a provider contract and tests; nothing plays it | SOON |
@@ -98,7 +96,7 @@ These exist in mainstream agents and are **deliberately out**:
 | Attach files/photos → to the model | GPT, CL, GC | ✅ a photo is resized to 1024px jpeg in the composer and rides the live message as base64 (0.0.20); workspace files travel as `workspace` events and big or binary ones through the `blob` chunk channel | done |
 | Dictate (speech → text in composer) | GPT | ❌ the mic is in the composer but disabled: `src/stt/` (registry, provider contract, local plugin) has no capture and nothing passes `onRecord` | **BUILD** |
 | Voice conversation mode (call the agent) | GPT, OC | module only — `src/voice/loop.ts` runs listen→think→speak, with no mic and no speaker from the shell | SOON |
-| Slash commands (`/models`, `/compact`…) | CC, CX, OC, GC | module only — `src/chain/commands.ts` (parse/fold/expand) and a `SlashMenu` component, neither mounted; the daemon has no `command` request | **BUILD** |
+| Slash commands (`/models`, `/compact`…) | CC, CX, OC, GC | ✅ `/` in the composer opens `SlashMenu` (arrows, Tab, Enter, Escape). `/new`, `/model`, `/plan`, `/sessions` and `/settings` are jumps the app answers itself; the owner's own commands are made on Settings → Commands, live in the chain, and the daemon expands one before the turn (`resolveMessage`, `commands-resolve.test.ts`, `web/src/commands.test.ts`). Not proven on a device yet; no `/compact` | done (device proof open) |
 | @-mention files | CC, OC | ✅ (workspace paths) | done |
 | Command palette / keyboard shortcuts | CC, OC | ❌ Ctrl-K opens the drawer on the search field; `CommandPalette.tsx` exists and is unmounted | LATER |
 
@@ -109,7 +107,7 @@ These exist in mainstream agents and are **deliberately out**:
 | Provider catalog, live (models.dev) | OC | ✅ 304 presets, live `/models` per key | done |
 | BYOK, multiple custom providers | OC, GC | ✅ provider_save/pick/remove | done |
 | Model picker one tap from chat | GPT, CL, OC | ✅ v0.0.12 sheet | done |
-| Reasoning effort / thinking level (low–high) | GPT, CC, GC | ✅ `EffortLevel` in `config.json`, applied per turn and spelled per provider family (`src/providers/effort.ts`, `effort-request.test.ts`); no picker in the app yet | done (no screen) |
+| Reasoning effort / thinking level (low–high) | GPT, CC, GC | ✅ `EffortLevel` in `config.json`, applied per turn and spelled per provider family (`src/providers/effort.ts`, `effort-request.test.ts`); Low / Normal / High sit at the top of the model sheet | done (device proof open) |
 | Per-conversation model (not global) | GPT | ❌ — `model_set` still writes one model for the device | **SOON** — model belongs to the session event |
 | Usage / cost display | CC, OC | ✅ tokens and cost ride on `turn_end` and print as a line under the answer (`usageLine` in `Transcript.tsx`) | done per turn; no session total |
 | Fallback model when one fails | OC | ❌ | LATER |
@@ -143,7 +141,7 @@ These exist in mainstream agents and are **deliberately out**:
 |---|---|---|---|
 | Tool registry with descriptions to the model | all | ✅ `read_file`, `write_file`, `list_dir`, `run_shell`, `browser`, `web_search`, `web_fetch`, `memory`, `skill_view`, `skill_file`, plus `run_on_node`, `delegate` and every MCP server's tools — built by `toolSurface` in `src/tools.ts` | done |
 | Approval flow (allow / ask / deny) with a UI card | CC, CX, OC, HM | ✅ `approval_request` events, the card in the transcript with Approve/Deny, an allow learned as `tool_approval` | done |
-| Policy file (which tool may what) | CC, OC | partial — `policy.ts`, `shell-allowlist.ts` and `secrets-scan.ts` are tested modules; the live `run_shell` in `src/tools.ts` calls `exec` directly and consults none of them | **BUILD** — put `decide()` in front of the tool call |
+| Policy file (which tool may what) | CC, OC | partial — every tool of a turn passes `src/tools/guard.ts`: a `run_shell` line the shell allowlist calls `deny` always asks first, with the reason on the card, and that yes is never learned (`guard.test.ts`). There is still no policy *file*: `decide()` in `policy.ts` and `secrets-scan.ts` have no caller, and a relayed `tool_req` is not guarded | **BUILD** — an owner-editable policy file, and the guard on the relay |
 | Plan mode (propose first, execute after approval) | CC, GC | ✅ tool list gated per turn, `plan_mode` event, composer toggle, `tests/plan-mode.test.ts` | done |
 | Dry-run of destructive tools | — | ✅ `dry-run.ts` | done |
 | Run a tool on another device in the chain | — (unique) | ✅ `run_on_node` | done |
@@ -168,7 +166,7 @@ These exist in mainstream agents and are **deliberately out**:
 | Phone storage as the user home | — (Termux precedent) | ✅ `storage_window` creates the symlink siblings (`shared/ downloads/ dcim/ documents/ pictures/ music/`) next to `.Roan` in the app's `files/`, and refuses with a reason when All files access is missing (`src/daemon/storage-window.ts`, tests) | done (the grant is the owner's) |
 | Background turns (app closed) | HM, OC | ✅ Android foreground service owns the node (`RoanService.kt`); on desktop the daemon runs as a systemd user service (`docs/webui.md`) | done |
 | Notification when a turn finishes | GPT, CL, HM | ✅ the service tails the daemon's stderr for `notify:turn-done` and posts "Roan is done" | done |
-| Hooks (lifecycle events → script) | CC | ✅ `hooks.json` runs shell commands at `turn_start` and `turn_end` (`src/hooks/run.ts`, called from `runMessage`); a broken hook does not break the turn. `before_tool`/`after_tool` are declared and never fired | done (two points) |
+| Hooks (lifecycle events → script) | CC | ✅ `hooks.json` runs shell commands at `turn_start` and `turn_end` (`src/hooks/run.ts`, called from `runMessage`); a broken hook does not break the turn. `before_tool`/`after_tool` fire around every tool call of a turn through `src/tools/guard.ts`, with `ROAN_TOOL` (and `ROAN_TOOL_OK` afterwards) in the environment (`guard.test.ts`) | done (four points) |
 
 ## 9. Devices & surfaces
 
@@ -205,34 +203,32 @@ What is genuinely still open on those seven items: editing a sent message
 (branch from a checkpoint), push notifications off-device, and cloning the
 writing-style skill into `skills/writing-style/`.
 
-## Hermes — the full surface, inventoried from the inside
+## The inspiration — its full surface
 
-Hermes is the agent writing this file, so this inventory comes from the running
-installation (`/home/roan/.hermes/hermes-agent`) rather than a website: CLI + TUI +
-gateway + desktop + dashboard, 42 platform-adapter files, 263 skills, plugins with
-host isolation. Per row: what Hermes has, and what Roan does with it — several of
-these are deliberately out for Roan even though Hermes has them.
+The agent Roan takes its inspiration from (HM in the legend): CLI, TUI, gateway,
+desktop app and dashboard, a large skill library, plugins. Per row: a feature it
+has, and what Roan does with it. Several are deliberately out for Roan.
 
-| Hermes feature | What it is | Verdict for Roan |
+| Feature | What it is | Verdict for Roan |
 |---|---|---|
 | Messaging gateway, ~20 platforms (Telegram, Discord, Slack, IRC, Feishu…) | The agent lives in a process that survives every window; channels are doors | **SOON (one channel)** — Roan's app is the channel; a daemon-fed Telegram door is possible later, never the core |
 | Gateway survives the desktop app | Close the window, the bots keep running | done — the Tauri shell spawns the daemon as a sidecar and the Android foreground service owns it when the app closes |
 | Persistent memory + user profile | Facts that survive sessions, injected every turn | done (`src/context/memory.ts`, `memory`/`skill_*` context tools) — invisible in the transcript |
-| Skills (263, with curator + auto-update) | Task-shaped instructions loaded when relevant | done for the loading half — `SkillLibrary` + `contextTools` put the index in every prompt and `skill_view` reads one; no curator or auto-update |
+| Skills (263, with curator + auto-update) | Task-shaped instructions loaded when relevant | loading done — `SkillLibrary` + `contextTools` put the index in every prompt and `skill_view` reads one. Self-improvement done in its first form: `skill_propose` lets the agent propose a new skill or a better version, and it is saved only when the owner presses Save skill (`src/skills/propose-tool.ts`, `propose-tool.test.ts`, `SkillProposals.tsx`). No curator (usage counts, stale skills), no undo button, no auto-update; not proven on a device |
 | Cron scheduler + background processes with notify-on-exit | Work happens when you are not there | cron done, notification done (the service tails `notify:turn-done`); notify-on-exit for a *process* is not built |
-| Delegation / subagents with structured output | A fresh context does a subtask and reports back | WON'T as a product — one agent; a single `delegate` tool rides in the relay set for a self-contained task |
+| Delegation / subagents with structured output | A fresh context does a subtask and reports back | done as Mini Roans — `delegate` starts the same agent in a context of its own on Roan's loop and only its summary comes back (`src/daemon/mini.ts`); never a second agent or persona |
 | Terminal with background jobs + PTY | Real shell, tracked processes | done for `run_shell` (timeout, process group, output cap); no PTY and no job list |
 | Browser automation + computer use | A real browser driven for logins and scraping | browser done as a core tool (`BROWSER_CDP_URL`); computer use is a module only (§6) |
 | Web search / extract | Grounded answers with sources | done — `web_search` / `web_fetch` plugins |
 | Model catalog + `/model` picker + thinking levels | Live provider catalog, switch mid-session | done (304 presets, sheet); effort levels done in the daemon, no picker (§3) |
 | Context compression | Old turns folded so the prompt stays affordable | done — `compactMessages` past 40 messages (`chain/compaction.ts`, `chain/summary.ts`) |
-| Session search / session librarian | Find anything back across sessions | done in the drawer (Ctrl-K over titles and the message text the client holds) |
+| Session search / session librarian | Find anything back across sessions | done in the drawer (Ctrl-K over titles and the message text the client holds), and for the agent itself: `memory_search` searches earlier messages and memory across all conversations (`src/tools/recall-tools.ts`) |
 | Goals / standing goals | A persistent target the agent keeps working toward | done — `goal`/`goal_update` events, `goalContext()` in every prompt, GoalsPanel |
 | Plugin system + catalog + host isolation | Third-party code, isolated | done for the loader (bundled + home drop-in, manifests); no catalog, no host isolation |
 | MCP client + MCP catalog | External tools through a standard | done — `McpRuntime` dials the chain's servers, tools gated (§7) |
 | Kanban board | Tracked work items | LATER |
 | Connectors (Gmail, Notion, Linear…) | Hosted app accounts through one auth | module only — read-only GitHub (`src/connectors/github.ts`), no route |
-| TTS / vision / clarify / todo | Speak, see images, ask instead of guess, track tasks | vision done (photos ride the message), clarify done (approval cards), todo LATER, TTS module only |
+| TTS / vision / clarify / todo | Speak, see images, ask instead of guess, track tasks | vision done (photos ride the message), clarify done (approval cards), todo done as a tool (`todo`, one list per conversation, in memory; no panel), TTS module only |
 | Profiles (one process, several identities) | Several "persons" on one install | WON'T — one agent, one identity |
 | Updater with fleet verification | Updates without breaking running bots | **BUILD** — the card is unmounted (§9) |
 
@@ -244,7 +240,7 @@ rows that decide something for Roan.
 
 | OpenClaw feature | What it is | Verdict for Roan |
 |---|---|---|
-| Gateway daemon per host | One long-lived process owns sessions/tools/events; every surface is a client of it | **confirmed shape** — third vendor after Hermes and opencode's background service; Roan's daemon is right |
+| Gateway daemon per host | One long-lived process owns sessions/tools/events; every surface is a client of it | **confirmed shape** — the same as opencode's background service; Roan's daemon is right |
 | Workspace home | `~/.openclaw/workspace` with AGENTS.md, SOUL.md, IDENTITY.md, USER.md, MEMORY.md as editable Markdown | done — `ensureBootstrapFiles` writes SOUL.md, IDENTITY.md and AGENTS.md on first start; USER/MEMORY ride the chain |
 | BOOTSTRAP.md first-run ritual | On a fresh workspace the agent seeds its own files and walks through picking an identity, then deletes the bootstrap file | done in the seeding half (`src/daemon/bootstrap.ts`); there is no interview step |
 | Node devices | Companion devices pair as thin nodes: camera, screen recording, location, SMS, notifications via `node.invoke` | **WON'T as-is** — Roan devices are full peers, never thin clients; worth stealing is the device-command set (camera/screenshot/notify between Roan's own instances) — SOON after round 2 |
@@ -302,7 +298,7 @@ made; these are the ones that change or sharpen something:
 
 | Signal | Who has it | Verdict for Roan |
 |---|---|---|
-| Daemon + web shell + channels (`qwen serve`) | Qwen Code | **confirmed again** — fourth vendor after Hermes, opencode, OpenClaw: an always-on local daemon that surfaces plug into is the mainstream shape, not the exception |
+| Daemon + web shell + channels (`qwen serve`) | Qwen Code | **confirmed again** — after opencode and OpenClaw: an always-on local daemon that surfaces plug into is the mainstream shape, not the exception |
 | `/grill-me` — interview the user before implementing | Antigravity | **SOON** — the clarify pattern belongs in Roan's big-work flow: ask before building, not after guessing |
 | Stuck detector — catch a looping agent and handle it | OpenHands | done — a turn reports after 2 min of silence and owns up at 5 (`src/turn/lock.ts`) |
 | Persistent permission grants | Antigravity, Copilot CLI (trusted dirs) | done — `tool_approval` events, learned per tool, resettable in the Tools panel |

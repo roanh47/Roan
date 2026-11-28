@@ -58,6 +58,7 @@ const EVENT_TYPES: ReadonlySet<string> = new Set<EventType>([
   "plan_mode",
   "cron_job",
   "command",
+  "reasoning",
   "device_grant",
   "device_result",
 ]);

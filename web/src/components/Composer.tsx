@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, CSSProperties, FormEvent, KeyboardEvent, ReactElement } from "react";
 import type { ChainClient } from "../chain.js";
+import { parseCommandLine } from "../../../src/chain/commands.js";
+import { slashPrefix } from "../commands.js";
+import { SlashMenu, filterCommands, highlightedCommand, stepHighlight, type SlashCommand } from "./SlashMenu.js";
 
 interface WorkspaceFile {
   path: string;
@@ -103,13 +106,23 @@ interface ComposerProps {
    * 0/undefined means "nothing to focus yet".
    */
   focusSignal?: number;
+  /** What a leading slash can mean; the menu shows while a name is typed. */
+  commands?: readonly SlashCommand[];
+  /**
+   * Offered every slash line before it is sent. Returning true means the app
+   * answered it itself (a screen opened, a switch flipped) and nothing is sent;
+   * anything else goes out as a message and the daemon expands it.
+   */
+  onCommand?: (name: string, args: string) => boolean;
 }
+
+const NO_COMMANDS: readonly SlashCommand[] = [];
 
 /** What the disabled mic says, and why it says nothing else. */
 export const MIC_UNAVAILABLE_HINT =
   "Voice input needs a speech-to-text provider; none is set up on this device.";
 
-export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, client, planMode = false, onPlanModeChange, onRecord, recording = false, steerable = false, onSteer, focusSignal = 0 }: ComposerProps): ReactElement {
+export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, client, planMode = false, onPlanModeChange, onRecord, recording = false, steerable = false, onSteer, focusSignal = 0, commands = NO_COMMANDS, onCommand }: ComposerProps): ReactElement {
   // The plus always exists: a photo needs neither workspace nor dictation.
   const hasMenu = true;
   const planning = planMode === true;
@@ -119,6 +132,20 @@ export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, c
   const [image, setImage] = useState<AttachedImage | null>(null);
   const photoInput = useRef<HTMLInputElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
+  const [highlight, setHighlight] = useState(0);
+  /** The draft the menu was closed on with Escape; typing on reopens it. */
+  const [dismissed, setDismissed] = useState<string | null>(null);
+
+  // The slash menu lives between the slash and the first space of the draft.
+  const prefix = disabled ? null : slashPrefix(value);
+  const offered = prefix !== null && dismissed !== value ? filterCommands(commands, prefix) : [];
+  const slashOpen = prefix !== null && offered.length > 0;
+
+  function completeCommand(name: string): void {
+    setValue(`/${name} `);
+    setHighlight(0);
+    input.current?.focus();
+  }
 
   useEffect(() => {
     const element = input.current;
@@ -150,6 +177,12 @@ export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, c
   function submit(): void {
     const text = value.trim();
     if (disabled || (text.length === 0 && image === null)) return;
+    // A slash line the app answers itself never becomes a message.
+    const command = image === null ? parseCommandLine(text) : null;
+    if (command !== null && onCommand?.(command.name, command.args) === true) {
+      setValue("");
+      return;
+    }
     // Mid-turn the draft steers the running turn instead of starting a new one.
     if (steerable && onSteer !== undefined && text.length > 0) {
       onSteer(text);
@@ -195,6 +228,26 @@ export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, c
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>): void {
+    if (slashOpen && prefix !== null && !event.nativeEvent.isComposing) {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        setHighlight((index) => stepHighlight(index, event.key === "ArrowDown" ? 1 : -1, offered.length));
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setDismissed(value);
+        return;
+      }
+      const picked = highlightedCommand(commands, prefix, highlight);
+      // Tab always completes; Enter completes a half-typed name and only
+      // sends once the name is whole, so a typo never goes out as a message.
+      if (picked !== null && (event.key === "Tab" || (event.key === "Enter" && !event.shiftKey && picked.name !== prefix))) {
+        event.preventDefault();
+        completeCommand(picked.name);
+        return;
+      }
+    }
     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
       submit();
@@ -272,6 +325,21 @@ export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, c
           >
             Approve plan
           </button>
+        </div>
+      ) : null}
+
+      {slashOpen && prefix !== null ? (
+        <div
+          className="composer__slash"
+          style={{ position: "absolute", left: 0, right: 0, bottom: "calc(100% + 8px)", zIndex: 2 }}
+        >
+          <SlashMenu
+            commands={commands}
+            prefix={prefix}
+            highlight={highlight}
+            onHighlightChange={setHighlight}
+            onPick={completeCommand}
+          />
         </div>
       ) : null}
 
@@ -362,7 +430,10 @@ export function Composer({ disabled, placeholder, onSend, onPickFile, prefill, c
         enterKeyHint="send"
         autoComplete="off"
         autoCorrect="on"
-        onChange={(event: ChangeEvent<HTMLTextAreaElement>) => setValue(event.target.value)}
+        onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
+          setValue(event.target.value);
+          setHighlight(0);
+        }}
         onKeyDown={onKeyDown}
       />
       <button

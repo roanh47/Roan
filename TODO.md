@@ -1,12 +1,112 @@
 # To do
 
-Eén lijst, per versie. Een vinkje betekent: het werkt en het is bewezen — op een
-echte machine of met een test die de hele route aflegt. Wat een versie niet haalt,
-schuift naar de volgende versie; er is geen tweede lijst.
+One list, per version. A tick means it works and it is proven: on a real
+machine, or by a test that walks the whole route. What a version does not
+reach moves to the next one; there is no second list.
 
-De volledige vergelijking met Hermes — 66 features, 49 af, 16 open, 1 bewust niet —
-staat met vinkjes in `docs/feature-parity.md` (§ Samenvatting). Wat daar open staat,
-komt hier per versie terug.
+The feature-by-feature status is in `docs/feature-parity.md`. What is open
+there comes back here, per version.
+
+## 0.1.0
+
+- [ ] **The whole codebase is English.** Code, comments, identifiers, test
+      names, docs, prompts and this file. Known Dutch today: most of this
+      `TODO.md`, `docs/feature-map.md`, `docs/FINAL-0.0.23.md`,
+      `docs/goals-0.0.23.md`, `docs/goal-orchestrator-0.0.23.md`, the summary
+      in `docs/feature-parity.md`, variable names such as `stappen` / `antwoord` in
+      `src/agent.ts`, and some test names. The one exception is the
+      writing-style skill: it has an upstream and is not touched.
+- [ ] **Prove the 0.1.0 work on a device.** Built and CI-checked only, never
+      run on a real machine: the tool guard (risky shell lines ask), slash
+      commands, the Thought block and effort picker, skill proposals,
+      `memory_search` / `todo`, and the "Access outside the app" switch.
+- [ ] **Tell the app from a browser on the same device.** The access switch
+      closes the tailnet, but the app's own window and a local browser are
+      both loopback. Closing the local browser too needs a per-device token
+      the Tauri and Android shells hand to the UI.
+- [ ] **Skill curator.** Count how often each skill is used, show unused and
+      recently changed ones, and give an approved proposal an undo.
+- [ ] **The UI gets better.** Same style, better app: it has to feel
+      finished on a phone, a tablet and a desktop. Go screen by screen (chat,
+      composer, drawer, settings pages, sheets, approval and skill cards) and
+      fix spacing, alignment, touch targets, empty and loading states, and
+      anything that jumps or overlaps. The new 0.1.0 pieces (slash menu,
+      Thought block, skill proposals, access card, effort picker) were written
+      without ever being seen on a screen and need this first.
+- [ ] **Roan is its own harness.** Built, not proven: every turn runs on
+      Roan's own loop (`src/agent.ts`) and nothing else. Still to do: prove a
+      full turn on each device.
+- [ ] **Everything has a screen.** The rule: a feature is set and seen in the
+      app; the slash menu is only a shortcut to a screen or to your own
+      commands. Built, not proven: Settings → Model roles (effort, fallback,
+      helper models), Settings → Commands, Settings → Background jobs,
+      Settings → Sync → Access outside the app, and the skill card above the
+      composer. Still without a screen: the task list the agent keeps
+      (`todo`), a running Mini Roan, hooks, the fallback and helper models
+      inside the model sheet itself, and full-disk access.
+- [ ] **Auxiliary models.** Built, not proven: three helper slots on Settings
+      → Model roles (`src/daemon/auxiliary.ts`). Vision looks at an attached
+      image and describes it for a main model that cannot see; Background
+      does the memory distilling; Mini Roan is the model a delegated task
+      runs on. Each may sit on another saved provider, and an empty slot means
+      the main model does the job. Still to do: slots for compaction, titles
+      and web extraction once those use a model; a model picker instead of a
+      typed id; and picking the vision model automatically when the catalog
+      says the main one is text-only.
+- [ ] **Background processes.** Built, not proven: the `process` tool starts
+      a job, lists jobs, reads output and stops one, the next turn is told
+      which jobs ended (`src/tools/processes.ts`), and Settings → Background
+      jobs shows and stops them. Still to do: a notification when a job ends,
+      and a PTY shell.
+- [ ] **Fallback model.** Built, not proven: a second model of the same
+      provider, set on Settings → Model roles; a failed request is retried on
+      it once (`src/agent.ts`). Still to do: a fallback on another provider.
+- [ ] **`AGENTS.md` in `~/.Roan` gets another name.** `AGENTS.md` is a file
+      for a project, like the one in this repo. The one in the home holds how
+      Roan writes (`SOUL.md` holds who it is) and is the `rules` block of the
+      prompt. Rename it (for example `RULES.md`) in `src/daemon/bootstrap.ts`,
+      `src/env/types.ts` and the prompt builder, and move an existing file
+      over once, the way the lowercase home was migrated.
+- [ ] **Voice.** `src/stt/` and `src/voice/` are modules only: wire the mic in
+      the composer (dictation) and read-aloud for an answer.
+- [ ] **Connectors.** `src/connectors/github.ts` is read-only and has no
+      caller. Give it a route and a tool, then decide which come next.
+- [ ] **Remote MCP with sign-in.** Local MCP servers work; hosted ones that
+      need OAuth do not.
+- [ ] **Computer use.** Module only (`src/computer/`), not wired into a turn.
+- [ ] **Reasoning for Google, and live.** The Thought block covers
+      OpenAI-compatible providers and Anthropic and appears when the turn
+      ends. Add Google's thought parts and stream it while the model thinks.
+- [ ] **Tool guard on relayed calls.** Built, not proven: a risky shell line
+      sent with `run_on_node` asks on the device where the turn runs. Still to
+      do: the executing device trusts the chain and checks nothing itself.
+- [ ] **Policy file.** An owner-editable file that says which tool may do
+      what; `decide()` in `src/tools/policy.ts` still has no caller.
+- [ ] **Per-conversation model.** `model_set` writes one model for the whole
+      device; the model belongs to the conversation.
+- [ ] **Finish the small screens.** Edit a sent message (branch from a
+      checkpoint), an archived-conversations view, a session cost total, and
+      the doctor behind a settings button (`src/daemon/health.ts`,
+      `diagnostics.ts`).
+- [ ] **API key out of the chain.** It sits in `config.json`, which travels.
+      Rolled over from 0.0.26; `docs/security.md` calls it a live defect.
+- [ ] **Auth on the control socket.** `/ws` is guarded by address only. The
+      same per-device token that tells the app from a local browser fixes it.
+- [ ] **Docs match the code.** About a dozen files in `docs/` contradict the
+      code or each other (`architecture.md`, `gui.md`, `install.md`,
+      `mobile.md`, `packaging.md`, `release.md`, `run-it-locally.md`,
+      `testing.md`, `chain.md`, `protocol.md`, `storage.md`, `updates.md`),
+      and `WORK-PARALLEL.md` lists finished work as open.
+- [ ] **Subagents are Mini Roans.** Built, not proven: `delegate` starts a
+      Mini Roan on Roan's own loop with the same prompt, memory, skills and
+      guarded tools, in its own context, and only its summary comes back
+      (`src/daemon/mini.ts`). Still to do: show a running Mini Roan in the
+      app, and let several run side by side.
+- [ ] **Fix the update button.** About → Check for updates does not do its
+      job. First find out what fails (the check, the download or the install,
+      and on which platform), then fix it and prove it on a real device.
+      Route: `UpdateCard`, `update_check` / `update_download`,
+      `src/packaging/update-flow.ts`.
 
 ## 0.0.25 — nu
 
@@ -42,6 +142,9 @@ komt hier per versie terug.
       verschijnen — dichtgeklapt by default, open te klikken, en nooit
       meegestuurd als gewoon antwoord. Ook voor providers die het níet leveren:
       dan is er geen blok, geen leeg blok.
+      Gebouwd (`src/daemon/thought.ts`, `reasoning`-event, "Thought"-blok in
+      `Transcript.tsx`) voor OpenAI-compatibele providers en Anthropic; nog
+      niet voor Google en nog niet op een apparaat bewezen, dus geen vinkje.
 - [ ] **Libnode niet twee keer initialiseren.** De log van de telefoon toont
       `Assertion failed: !init_called.exchange(true)` en
       `pthread_mutex_lock called on a destroyed mutex`: de Node-runtime start

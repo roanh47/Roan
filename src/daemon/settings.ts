@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import type { RoanPaths } from "./paths.js";
 import { isEffortLevel, type EffortLevel } from "../providers/effort.js";
+import { NO_AUXILIARY, parseAuxiliary, type AuxiliarySettings } from "./auxiliary.js";
 
 /**
  * Owner-granted capabilities. Every flag defaults to off; a hand-edited config
@@ -19,8 +20,6 @@ export interface AccessSettings {
 export interface Settings {
   readonly baseUrl: string;
   readonly model: string;
-  /** Who runs a turn: the engine on this machine, or the loop inside Roan. */
-  readonly engine: "builtin" | "hermes";
   readonly apiKey: string;
   readonly provider: string;
   /**
@@ -31,16 +30,24 @@ export interface Settings {
    */
   readonly effort: EffortLevel;
   readonly access: AccessSettings;
+  /**
+   * A second model of the same provider, tried once when a request to the
+   * first one fails before it answered anything. Empty means none.
+   */
+  readonly fallbackModel: string;
+  /** A model of its own for a job the main one is wrong for; see auxiliary.ts. */
+  readonly auxiliary: AuxiliarySettings;
 }
 
 const DEFAULTS: Settings = {
   baseUrl: "http://127.0.0.1:1234/v1",
   model: "local-model",
-  engine: "hermes",
   apiKey: "",
   provider: "lmstudio",
   effort: "normal",
   access: { fullDisk: false },
+  fallbackModel: "",
+  auxiliary: NO_AUXILIARY,
 };
 
 /** Only a literal `true` turns a capability on; `"true"` and `1` stay off. */
@@ -61,23 +68,23 @@ export async function loadSettings(paths: RoanPaths): Promise<Settings> {
   }
   try {
     const parsed = JSON.parse(raw) as Partial<Record<keyof Settings, unknown>>;
-    const pick = (key: "baseUrl" | "model" | "apiKey" | "provider" | "engine"): string => {
+    const pick = (key: "baseUrl" | "model" | "apiKey" | "provider"): string => {
       const value = parsed[key];
       if (typeof value === "string") return value;
       return DEFAULTS[key];
     };
-    const engine = pick("engine") === "builtin" || process.env["ROAN_ENGINE"] === "builtin" ? "builtin" : "hermes";
     // A hand-edited config may hold anything; an unknown level falls back to
     // the default instead of reaching a provider as a nonsense knob.
     const level: unknown = parsed["effort"];
     return {
-      engine,
       baseUrl: pick("baseUrl"),
       model: pick("model"),
       apiKey: pick("apiKey"),
       provider: pick("provider"),
       effort: isEffortLevel(level) ? level : DEFAULTS.effort,
       access: parseAccess(parsed["access"]),
+      fallbackModel: typeof parsed["fallbackModel"] === "string" ? parsed["fallbackModel"].trim() : "",
+      auxiliary: parseAuxiliary(parsed["auxiliary"]),
     };
   } catch {
     return DEFAULTS;

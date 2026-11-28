@@ -1,1 +1,0 @@
-`src/platform.ts` — detect desktop or mobile at runtime from user agent, typed.

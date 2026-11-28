@@ -33,9 +33,8 @@ control port, but nothing imports it: the sidecar and the systemd unit in
    `IDENTITY.md` and `AGENTS.md`, never over an existing file.
 5. `ensurePaths(paths)` — creates `home`, `secrets`, `workspace`,
    `synced-workspace`, `state`.
-6. `loadSettings(paths)` — provider settings from `config.json`. If
-   `settings.engine` is `hermes` and no `hermes` binary answers, it falls back to
-   `builtin` and says so in one log line.
+6. `loadSettings(paths)` — provider settings from `config.json`. Every turn
+   runs on Roan's own loop (`src/agent.ts`); there is no other engine.
 7. The agent's context: `MemoryStore`, `SkillLibrary`, `allTools()` +
    `contextTools()`, and an `McpRuntime`. `agentContext.prompt()` rebuilds the
    system prompt per turn from `SOUL.md`, `AGENTS.md`, memory, user profile and
@@ -67,13 +66,20 @@ webui proxy process, no log server, no second peer port.
 
 The shell never sets the port or the host. `RoanNode.kt` (Android), the Tauri
 sidecar (desktop) and the systemd unit (server) pass only what they alone know:
-`ROAN_HOME`, `ROAN_LOG_PATH`, `ROAN_ENGINE`, `ROAN_SHELL`. Port, bind address and
+`ROAN_HOME`, `ROAN_LOG_PATH`, `ROAN_SHELL`. Port, bind address and
 the control gate are the daemon's defaults, identical on every platform —
 overriding them per platform is how the phone ended up listening on loopback
 while its own invite named the tailnet address.
 | `ROAN_HOST` | `0.0.0.0` | bind address — every interface, so loopback and the tailnet both work (alias: `ROAN_CONTROL_HOST`); `lan`/`tailscale` resolve to an interface |
 | `ROAN_WEB_DIST` | `web/dist` next to the package root | where the built UI lives |
-| `ROAN_ALLOW_REMOTE_CONTROL` | unset | `1` lets a non-loopback caller open `/ws` |
+| `ROAN_ALLOW_REMOTE_CONTROL` | unset | `1` lets a non-loopback caller open `/ws` (the tailnet may already). The app's own switch wins: with "this device only" on, only loopback gets in |
+
+**Access outside the app** is a switch in Settings → Devices, per device and
+never shared: it is kept in `state/access.json`, not in the env. Open (the
+default), this device and the tailnet may load the UI and open `/ws`. Closed,
+only loopback may; `/healthz` and `/peer` stay reachable so sync keeps working
+(`src/daemon/device-access.ts`, the `access` request). It does not yet tell
+the app's own window from a browser on the same device: both are loopback.
 | `ROAN_PEER_ADVERTISE` | unset | comma-separated hosts to put in the invite instead of the derived ones |
 | `ROAN_DISCOVERY` | on | `off` disables the Tailscale scan |
 | `ROAN_HOME` | `~/.Roan` | state root |
@@ -145,8 +151,9 @@ The request kinds (`main.ts`, `onRequest`):
 `provider_save`, `provider_remove`, `provider_pick`, `models_list`,
 `models_search`, `settings_save`, `model_set`, `checkpoints_list`, `export`,
 `storage_window`, `take_shared`, `import_discover`, `import_plan`, `steer`,
-`session_archive`, `session_delete`, `goal`, `goal_update`, `effort`,
-`plan_mode`. Anything else is answered `{ error: "unknown request: <kind>" }`.
+`session_archive`, `session_delete`, `access`, `skill_approve`, `skill_reject`,
+`command_save`, `command_remove`, `goal`,
+`goal_update`, `effort`, `plan_mode`. Anything else is answered `{ error: "unknown request: <kind>" }`.
 
 Daemon → client, three plain replies:
 
@@ -245,8 +252,7 @@ is known, so a turn only sees its own conversation.
 6. It builds history (`sessionMessages`), compacts past 40 messages into a
    digest attached to the prompt (`compactMessages`), and gates the tool list:
    in plan mode only `planModeTools` are offered, the rest are answered with a
-   refusal sentence (`planModeForbidden` / `planModeRefusal`), and the turn runs
-   on the builtin loop even when the device normally uses the hermes engine.
+   refusal sentence (`planModeForbidden` / `planModeRefusal`).
 7. `new Agent({ provider, tools, systemPrompt, cwd, history, effort, signal,
    onBeforeRequest })` drives `model → tool → model`. Its events become chain
    events: `tool_start` → `tool_call` `{ name, args }`, `tool_end` →

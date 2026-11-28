@@ -1,1 +1,0 @@
-`web/src/mobile.css` — safe-area insets, 390 px layout, tap targets 44 px.

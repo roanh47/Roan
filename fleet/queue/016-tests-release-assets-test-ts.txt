@@ -1,1 +1,0 @@
-`tests/release-assets.test.ts` — read `.github/workflows/release.yml` and assert exactly four artifacts and the four exact filenames.

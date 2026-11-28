@@ -4,6 +4,8 @@ One agent, several machines. Your PC, your server and your phone sit next to eac
 other, all running the same agent, all holding the same conversation. No central
 server, no head agent, no cloud account.
 
+Roan is its own harness. Its inspiration is Hermes Agent.
+
 ```
         PC                    SERVER                PHONE
 ┌────────────────┐    ┌────────────────┐    ┌────────────────┐
@@ -19,12 +21,13 @@ server, no head agent, no cloud account.
 The branch turns the design into a working node: the daemon (chain, peers,
 discovery, one turn at a time), the desktop and Android shells, plan mode,
 auto-memory, goals, effort levels, usage per turn, schedules, steer, export,
+slash commands, the tool guard (risky shell lines always ask, tool hooks),
 the workspace panel, the CLI and the SDK — each wired through the
 daemon or the app, each with tests.
 
 A second set of modules is written and tested but **not yet wired into a turn or
 a screen**: deep research, side questions and message queueing, the safety layer,
-the knowledge store, slash commands, computer use, image generation, the voice
+the knowledge store, computer use, image generation, the voice
 loop and speech capture, webhooks and connectors, and the git panel. The
 documents below say per feature which half it is in.
 

@@ -24,13 +24,12 @@ type Tab = "tools" | "skills" | "mcp";
  * Three lists, because they are three different things: tools are the functions
  * a turn may call, skills are procedures on disk that load only when relevant,
  * and MCP is the file that describes external servers. Nothing here invents a
- * setting the daemon does not have — the MCP tab says plainly that the builtin
- * engine does not start servers yet.
+ * setting the daemon does not have — the MCP tab says plainly that nothing
+ * starts servers from that file yet.
  */
 export function CapabilitiesPanel({ client }: Props): ReactElement {
   const [tab, setTab] = useState<Tab>("tools");
   const [tools, setTools] = useState<ToolInfo[]>([]);
-  const [engine, setEngine] = useState<string>("");
   const [skills, setSkills] = useState<Skill[]>([]);
   const [skillsRoot, setSkillsRoot] = useState<string>("");
   const [mcpPath, setMcpPath] = useState<string>("");
@@ -41,9 +40,8 @@ export function CapabilitiesPanel({ client }: Props): ReactElement {
 
   useEffect(() => {
     void (async () => {
-      const answer = await client.request<{ tools?: ToolInfo[]; engine?: string }>("tools_list");
+      const answer = await client.request<{ tools?: ToolInfo[] }>("tools_list");
       setTools(answer.tools ?? []);
-      setEngine(answer.engine ?? "");
       const skillAnswer = await client.request<{ skills?: Skill[]; root?: string }>("skills_list");
       setSkills(skillAnswer.skills ?? []);
       setSkillsRoot(skillAnswer.root ?? "");
@@ -85,7 +83,7 @@ export function CapabilitiesPanel({ client }: Props): ReactElement {
 
       {tab === "tools" ? (
         <>
-          <p className="panel__sub">engine: {engine === "" ? "…" : engine} · {tools.length} tools</p>
+          <p className="panel__sub">{tools.length} tools</p>
           <ul className="panel__list">
             {tools.map((tool) => (
               <li key={tool.name} className="panel__item">
@@ -116,7 +114,7 @@ export function CapabilitiesPanel({ client }: Props): ReactElement {
         <>
           <p className="panel__sub">{mcpPath}</p>
           {mcpStarted ? null : (
-            <p className="panel__status">The builtin engine does not start MCP servers yet; the file does travel with the chain.</p>
+            <p className="panel__status">Roan does not start MCP servers from this file yet; the file does travel with the chain.</p>
           )}
           <textarea
             className="panel__input panel__textarea"

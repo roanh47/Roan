@@ -1,1 +1,0 @@
-`src/tools/move.ts` — move or rename inside the workspace, refuses to overwrite.

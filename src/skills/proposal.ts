@@ -185,7 +185,7 @@ export function approveSkillOnce(
   id: string,
 ): SkillApprovalAppend | null {
   const found = foldSkillProposals(events).find((proposal) => proposal.id === id);
-  if (found === undefined || found.status === "approved") return null;
+  if (found === undefined || found.status !== "pending") return null;
   const clean = nonEmptyString(id);
   return clean === null ? null : approveSkill(clean);
 }

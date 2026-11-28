@@ -11,6 +11,7 @@ import { ANDROID_STORAGE_TARGETS, openStorageWindow, sharedStorageProbe } from "
 import { compactMessages } from "../chain/compaction.js";
 import { loadSettings } from "./settings.js";
 import { startControlServer } from "./control.js";
+import { loadDeviceAccess, mayControl, mayLoadUi, saveDeviceAccess } from "./device-access.js";
 import { ChainNodeStore } from "./peer-store.js";
 import { addPeer, peers as peerList, PEER_PATH, startPeers, stopPeers } from "./peers.js";
 import { probe, startDiscovery, tailscaleHosts } from "./discovery.js";
@@ -34,6 +35,18 @@ import { autoTitleFor, readSessions, sessionMessages } from "../chain/sessions.j
 import { openSession } from "./session-open.js";
 import { removeNode } from "./membership.js";
 import { foldGoals, goalContext } from "../chain/goals.js";
+import { parseCommandLine, resolveMessage } from "../chain/commands.js";
+import {
+  SKILL_APPROVAL_KIND,
+  SKILL_PROPOSAL_EVENT,
+  SKILL_REJECTION_KIND,
+  foldSkillProposals,
+} from "../skills/fold.js";
+import { createSkillProposeTool, installSkill } from "../skills/propose-tool.js";
+import { searchStoreMemories } from "../knowledge/search.js";
+import { createMemorySearchTool, createTodoTool } from "../tools/recall-tools.js";
+import { TodoStore } from "../tools/todo.js";
+import { ProcessRegistry, createProcessTool, finishedJobsNote } from "../tools/processes.js";
 import { distilMemories, memoryTexts } from "../memory/index.js";
 import { foldMemoryMd, writeMemoryMd } from "../context/memory-md.js";
 import { approvePlan, planModeEnabled, planModeEvent } from "./plan.js";
@@ -57,9 +70,20 @@ import { randomUUID as uuid } from "node:crypto";
 import { existsSync } from "node:fs";
 import { copyFile, cp, mkdir, readFile as readFileAsync, rm, writeFile as writeFileAsync } from "node:fs/promises";
 import { runHooks, type HookConfig } from "../hooks/run.js";
+import { guardTool, type ApprovalAnswer, type GuardOptions } from "../tools/guard.js";
 import { dueJobs, loadCron, unparseableSchedule } from "../cron/jobs.js";
 import { isEffortLevel } from "../providers/effort.js";
-import { engineAvailable, runHermesTurn } from "../engine/hermes.js";
+import { runMiniRoan } from "./mini.js";
+import { buildAdapter } from "../agent.js";
+import type { ProviderConfig } from "../providers/adapter.js";
+import {
+  describeImagePrompt,
+  isAuxSlot,
+  resolveAux,
+  withAuxModel,
+  withImageDescription,
+  type AuxSlot,
+} from "./auxiliary.js";
 import { McpRuntime } from "./mcp-runtime.js";
 import { approvedToolsFromEvents, mcpServersFromEvents, toolRulesFromEvents } from "../chain/gates.js";
 import type { Tool } from "../types.js";
@@ -179,19 +203,16 @@ async function main(): Promise<void> {
   // The file tools resolve paths through the policy, so the setting has to be
   // live in this process from the first turn, not just written to disk.
   setFullDiskAccess(settings.access.fullDisk);
-  // A packaged app on a machine without the hermes binary must still answer:
-  // erroring on every turn would make it a dead window. The in-process loop is
-  // the fallback, and the log says which one is running.
-  if (settings.engine === "hermes" && !(await engineAvailable().catch(() => false))) {
-    settings = { ...settings, engine: "builtin" };
-    log("engine: no hermes binary on this machine, using the builtin loop");
-  }
 
   // Everything this device knows before the first token: its own memory files
   // and the skills on its own disk. Both are copies, never a fetch from a peer.
+  // Who may reach this device from outside the app; local to this machine.
+  let deviceAccess = await loadDeviceAccess(paths.state);
   const memory = new MemoryStore(paths.home);
   const skills = new SkillLibrary(join(paths.home, "skills"));
-  const tools = [...allTools(), ...contextTools(memory, skills)];
+  // Background jobs belong to this machine and this daemon run.
+  const processes = new ProcessRegistry();
+  const tools = [...allTools(), ...contextTools(memory, skills), createProcessTool(processes)];
   // MCP servers are chain config: this node dials them, every instance folds
   // the same list. Unreachable servers are skipped, never fatal.
   const mcp = new McpRuntime((line) => log(line));
@@ -718,9 +739,17 @@ async function main(): Promise<void> {
   const APPROVAL_TIMEOUT_MS = 180_000;
   const pendingApprovals = new Map<
     string,
-    { tool: string; resolve: (decision: "allow" | "deny" | "timeout") => void }
+    { tool: string; learn: boolean; resolve: (decision: ApprovalAnswer) => void }
   >();
-  const askPermission = (tool: string, args: Record<string, unknown>): Promise<"allow" | "deny" | "timeout"> => {
+  /**
+   * A `reason` means the question is about this one call (a dangerous shell
+   * line): the card shows why, and a yes is never learned for the whole tool.
+   */
+  const askPermission = (
+    tool: string,
+    args: Record<string, unknown>,
+    reason?: string,
+  ): Promise<ApprovalAnswer> => {
     if (session === null) return Promise.resolve("deny");
     const current = session;
     const req = uuid();
@@ -728,31 +757,39 @@ async function main(): Promise<void> {
       id: uuid(),
       node: current.identity.nodeId,
       type: "approval_request",
-      data: { req, tool, args },
+      data: { req, tool, args, ...(reason !== undefined ? { reason, once: true } : {}) },
     });
     control?.broadcast({ t: "append", event: request });
     return new Promise((resolve) => {
-      pendingApprovals.set(req, { tool, resolve });
+      pendingApprovals.set(req, { tool, learn: reason === undefined, resolve });
       setTimeout(() => {
         if (pendingApprovals.delete(req)) resolve("timeout");
       }, APPROVAL_TIMEOUT_MS);
     });
   };
-  const withApproval = (tool: Tool): Tool => ({
-    ...tool,
-    async run(args, ctx) {
-      const decision = await askPermission(tool.name, args);
-      if (decision === "allow") return await tool.run(args, ctx);
-      if (decision === "timeout") throw new Error("no approval arrived in time");
-      throw new Error("the user refused this tool call");
-    },
-  });
-  const answerApproval = (req: string, allow: boolean): string | null => {
+  const answerApproval = (req: string, allow: boolean): { tool: string; learn: boolean } | null => {
     const pending = pendingApprovals.get(req);
     if (pending === undefined) return null;
     pendingApprovals.delete(req);
     pending.resolve(allow ? "allow" : "deny");
-    return pending.tool;
+    return { tool: pending.tool, learn: pending.learn };
+  };
+
+  /** The `before_tool` / `after_tool` hooks of one turn, with its env. */
+  const toolHooks = (
+    hooks: HookConfig | null,
+    extra: Record<string, string>,
+  ): Pick<GuardOptions, "beforeTool" | "afterTool"> => {
+    const fire = async (point: "before_tool" | "after_tool", more: Record<string, string>): Promise<void> => {
+      const results = await runHooks(hooks, point, { cwd: paths.syncedWorkspace, extra: { ...extra, ...more } });
+      for (const result of results) {
+        if (result.exitCode !== 0) log(`hook ${point} failed (${String(result.exitCode)}): ${result.command}`);
+      }
+    };
+    return {
+      beforeTool: (tool) => fire("before_tool", { ROAN_TOOL: tool }),
+      afterTool: (tool, ok) => fire("after_tool", { ROAN_TOOL: tool, ROAN_TOOL_OK: ok ? "1" : "0" }),
+    };
   };
 
   /**
@@ -760,7 +797,22 @@ async function main(): Promise<void> {
    * off, ask-flags gate them behind an approval, MCP servers add theirs. A
    * config that arrived from a peer dials here, at the next look.
    */
-  const toolsForTurn = (): readonly Tool[] => {
+  /** How to reach the model of an auxiliary slot, or null for "the main model". */
+  const auxProvider = async (slot: AuxSlot): Promise<ProviderConfig | null> => {
+    if (settings.auxiliary[slot] === null) return null;
+    const accounts = (await loadProviders(paths).catch(() => ({ accounts: [] }))).accounts;
+    return resolveAux(
+      settings.auxiliary,
+      slot,
+      { baseUrl: settings.baseUrl, apiKey: settings.apiKey, model: settings.model, providerId: settings.provider },
+      accounts,
+    );
+  };
+  const todoLists = new Map<string, TodoStore>();
+  const toolsForTurn = (
+    hooks: HookConfig | null = null,
+    hookEnv: Record<string, string> = {},
+  ): readonly Tool[] => {
     let rules = new Map<string, { enabled: boolean; ask: boolean }>();
     let approved = new Set<string>();
     let fleet: readonly Tool[] = [];
@@ -774,42 +826,95 @@ async function main(): Promise<void> {
       fleet = mcp.tools();
     }
     const visible = [...tools, ...fleet].filter((tool) => rules.get(tool.name)?.enabled !== false);
+    // Every tool passes the guard: it asks when the chain says so, always asks
+    // before a dangerous shell line, and fires the tool hooks around the call.
+    const around = toolHooks(hooks, hookEnv);
     const gated = visible.map((tool) => {
       const rule = rules.get(tool.name);
-      return rule !== undefined && rule.ask && !approved.has(tool.name) ? withApproval(tool) : tool;
+      const ask = rule !== undefined && rule.ask && !approved.has(tool.name);
+      return guardTool(tool, { ask, askPermission, ...around });
     });
     const relayNow = relayOptions();
     if (relayNow === null) return gated;
-    return [
+    const shared: Tool[] = [
       ...gated,
-      createRunOnNodeTool(relayNow, () => {
+      // Guarded like the rest: a risky shell line for another device asks
+      // here first, because here is where the owner can answer.
+      guardTool(
+        createRunOnNodeTool(relayNow, () => {
+          if (session === null) return [];
+          const current = session;
+          return readNodes(current.store.read(current.identity.chainId, 1, 100_000));
+        }),
+        { ask: false, askPermission, ...around },
+      ),
+      // Recall: the agent looks up what was said and learned before, itself.
+      createMemorySearchTool((query, limit) => {
         if (session === null) return [];
-        const current = session;
-        return readNodes(current.store.read(current.identity.chainId, 1, 100_000));
+        return searchStoreMemories(session.store, session.identity.chainId, query, limit);
       }),
+      // One task list per conversation, kept for as long as the daemon runs.
+      createTodoTool(() => {
+        const key = hookEnv["ROAN_SESSION"] ?? "";
+        const found = todoLists.get(key) ?? new TodoStore();
+        todoLists.set(key, found);
+        return found;
+      }),
+      // Self-improvement: the agent may propose a skill, only the owner saves it.
+      createSkillProposeTool({
+        newId: () => uuid().slice(0, 8),
+        append: (proposal) => {
+          if (session === null) return;
+          const current = session;
+          const event = current.store.append(current.identity.chainId, {
+            id: uuid(),
+            node: current.identity.nodeId,
+            type: proposal.type,
+            data: proposal.data,
+          });
+          control?.broadcast({ t: "append", event });
+        },
+      }),
+    ];
+    return [
+      ...shared,
       {
         name: "delegate",
         description:
-          "Hand a self-contained task to a fresh agent with its own context and get only the summary back. " +
+          "Hand a self-contained task to a Mini Roan: yourself, with the same skills, memory and tools, " +
+          "in a context of its own. Only its summary comes back. " +
           "Use it for work that would flood this conversation.",
         parameters: {
           type: "object",
           properties: {
-            task: { type: "string", description: "What the subagent must do, complete enough to stand alone" },
+            task: { type: "string", description: "What the Mini Roan must do, complete enough to stand alone" },
             cwd: { type: "string", description: "Folder to work in; the workspace by default" },
           },
           required: ["task"],
         },
-        async run(args) {
+        async run(args, ctx) {
           const task = String(args["task"] ?? "").trim();
           if (task.length === 0) throw new Error("task is required");
           const dir = typeof args["cwd"] === "string" ? args["cwd"] : paths.syncedWorkspace;
-          const result = await runHermesTurn({
-            prompt: `Je bent een subagent. Doe deze taak en antwoord met een korte samenvatting van wat je deed en vond, zonder de hele uitvoer te herhalen.\n\n${task}`,
-            cwd: dir,
-            timeoutMs: 900_000,
-          });
-          return result.text;
+          // Roan's own loop, not another engine: the Mini Roan is the same
+          // agent and passes the same guard, in a context nobody else reads.
+          return await runMiniRoan(
+            {
+              // A Mini Roan may run on a model of its own; empty means the main one.
+              provider: (await auxProvider("mini")) ?? {
+                baseUrl: settings.baseUrl,
+                apiKey: settings.apiKey,
+                model: settings.model,
+                providerId: settings.provider,
+              },
+              systemPrompt: await agentContext.prompt(),
+              tools: shared,
+              cwd: dir,
+              effort: settings.effort,
+              ...(ctx.signal !== undefined ? { signal: ctx.signal } : {}),
+            },
+            task,
+          );
         },
       },
     ];
@@ -881,13 +986,22 @@ async function main(): Promise<void> {
     const current = session;
     const sessionId = resolveSession(wanted) ?? startSession(text.slice(0, 60));
     if (sessionId === null) return;
+    // A slash command the chain defines becomes its prompt here: `text` in
+    // the event is what the model reads, `typed` is what the owner wrote.
+    const resolved = resolveMessage(text, current.store.read(current.identity.chainId, 1, 100_000));
+    const prompt = resolved.prompt;
     const stored = current.store.append(current.identity.chainId, {
       // The app's own event id, when it sent one: its pending bubble clears
       // the moment this echo arrives, instead of a second copy appearing.
       id: echoId !== undefined && echoId.length > 0 ? echoId : uuid(),
       node: current.identity.nodeId,
       type: "message",
-      data: { text, session: sessionId, ...(image !== undefined ? { image } : {}) },
+      data: {
+        text: prompt,
+        ...(resolved.typed !== undefined ? { typed: resolved.typed } : {}),
+        session: sessionId,
+        ...(image !== undefined ? { image } : {}),
+      },
     });
     control?.broadcast({ t: "append", event: stored });
     // The first turn names the conversation after what was asked: a default
@@ -911,7 +1025,10 @@ async function main(): Promise<void> {
     // owner's own words, folded from the chain like everything else.
     const orders = goalContext(foldGoals(current.store.read(current.identity.chainId, 1, 100_000)));
     const basePrompt = await agentContext.prompt();
-    const systemPrompt = orders.length > 0 ? `${orders}\n\n${basePrompt}` : basePrompt;
+    // A background job that ended while nobody was looking is told once, to
+    // the next turn that runs here.
+    const finished = finishedJobsNote(processes.takeFinished());
+    const systemPrompt = [orders, finished, basePrompt].filter((part) => part.length > 0).join("\n\n");
     const hooks = await loadHooks();
     const started = await runHooks(hooks, "turn_start", {
       cwd: paths.syncedWorkspace,
@@ -924,9 +1041,40 @@ async function main(): Promise<void> {
     const inbox = createSteerInbox();
     activeTurn = controller;
     activeSteer = inbox;
+    // A main model that cannot see gets the image as words: the vision slot
+    // looks at it first. When the slot is empty, or the look fails, the image
+    // goes to the main model as before.
+    let turnText = prompt;
+    let turnImage = image;
+    if (image !== undefined) {
+      const vision = await auxProvider("vision");
+      if (vision !== null) {
+        try {
+          const seen = await buildAdapter(vision).send(
+            [
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: describeImagePrompt(prompt) },
+                  { type: "image_url", image_url: { url: `data:${image.mime};base64,${image.data}` } },
+                ],
+              },
+            ],
+            { maxTokens: 1200, signal: controller.signal },
+          );
+          const description = typeof seen.message.content === "string" ? seen.message.content.trim() : "";
+          if (description.length > 0) {
+            turnText = withImageDescription(prompt, description, vision.model);
+            turnImage = undefined;
+          }
+        } catch (error) {
+          log("vision: " + (error instanceof Error ? error.message : String(error)));
+        }
+      }
+    }
     await runTurn(
       {
-        ...(image !== undefined ? { image } : {}),
+        ...(turnImage !== undefined ? { image: turnImage } : {}),
         signal: controller.signal,
         store: current.store,
         chain: current.identity.chainId,
@@ -939,10 +1087,10 @@ async function main(): Promise<void> {
           providerId: settings.provider,
         },
         effort: settings.effort,
+        fallbackModel: settings.fallbackModel,
         cwd: paths.syncedWorkspace,
         systemPrompt,
-        tools: toolsForTurn(),
-        engine: settings.engine,
+        tools: toolsForTurn(hooks, { ROAN_CHAIN: current.identity.chainId, ROAN_SESSION: sessionId }),
         planMode: planModeEnabled(current.store.read(current.identity.chainId, 1, 100_000), sessionId),
         steer: inbox,
         session: sessionId,
@@ -957,7 +1105,7 @@ async function main(): Promise<void> {
           }
         },
       },
-      text,
+      turnText,
     );
     activeTurn = null;
     activeSteer = null;
@@ -979,8 +1127,10 @@ async function main(): Promise<void> {
         { session: sessionId, messages: sessionMessages(all, sessionId) },
         memoryTexts(all),
         async (prompt) => {
+          // Nobody reads this live, so the background slot does it when set.
+          const background = await auxProvider("background");
           const answer = await chat(
-            { baseUrl: settings.baseUrl, apiKey: settings.apiKey, model: settings.model },
+            background ?? { baseUrl: settings.baseUrl, apiKey: settings.apiKey, model: settings.model },
             [{ role: "user", content: prompt }],
             { maxTokens: 300 },
           );
@@ -1080,8 +1230,11 @@ async function main(): Promise<void> {
     // local unless ROAN_ALLOW_REMOTE_CONTROL=1 says otherwise.
     host: HOST,
     logText: () => logRing.join("\n"),
-    isLocal:
-      process.env["ROAN_ALLOW_REMOTE_CONTROL"] === "1" ? () => true : undefined,
+    // Read on every connection, so the switch in the app works at once.
+    // The switch wins over the environment: with "this device only" on,
+    // nothing but loopback opens the socket or loads the UI.
+    isLocal: (address) => mayControl(deviceAccess, address, process.env["ROAN_ALLOW_REMOTE_CONTROL"] === "1"),
+    allowWeb: (address) => mayLoadUi(deviceAccess, address),
     store: () => session?.store ?? null,
     state,
     onMessage: runMessage,
@@ -1243,12 +1396,11 @@ async function main(): Promise<void> {
         if (kind === "tools_list") {
           reply({
             tools: toolsForTurn().map((tool) => ({ name: tool.name, description: tool.description })),
-            engine: settings.engine,
           });
           return;
         }
         if (kind === "mcp_list") {
-          // The file is what travels; the builtin engine does not start servers
+          // The file is what travels; nothing starts servers from it
           // yet, and the screen says so instead of implying it does.
           const file = join(paths.home, "mcp.json");
           let text = "";
@@ -1429,22 +1581,27 @@ async function main(): Promise<void> {
             return;
           }
           const allow = data["allow"] !== false;
-          const tool = answerApproval(req, allow);
-          if (tool === null) {
+          const answered = answerApproval(req, allow);
+          if (answered === null) {
             reply({ ok: false, error: "no pending approval for that req" });
             return;
           }
-          if (allow && session !== null) {
+          const tool = answered.tool;
+          // A yes to one dangerous call is not a yes to the tool from now on.
+          const learned = allow && answered.learn;
+          if (session !== null) {
             const current = session;
+            // Every answer is recorded so the card closes on every device. Only
+            // "allow" is learned by the fold; "once" and "deny" answer this call.
             const event = current.store.append(current.identity.chainId, {
               id: uuid(),
               node: current.identity.nodeId,
               type: "tool_approval",
-              data: { tool, decision: "allow" },
+              data: { tool, req, decision: learned ? "allow" : allow ? "once" : "deny" },
             });
             control?.broadcast({ t: "append", event });
           }
-          reply({ ok: true, tool, learned: allow });
+          reply({ ok: true, tool, learned });
           return;
         }
         if (kind === "tool_approval_reset") {
@@ -1798,6 +1955,167 @@ async function main(): Promise<void> {
           reply({ ok: true });
           return;
         }
+        if (kind === "jobs_list" || kind === "job_stop") {
+          // The background jobs of this device, for the screen that shows them.
+          if (kind === "job_stop") {
+            const id = typeof data["id"] === "number" ? data["id"] : Number.NaN;
+            if (!Number.isInteger(id)) {
+              reply({ ok: false, error: "job_stop needs the number of a job" });
+              return;
+            }
+            processes.stop(id);
+          }
+          reply({
+            ok: true,
+            jobs: processes.list().map((job) => ({
+              id: job.id,
+              command: job.command,
+              status: job.status,
+              exitCode: job.exitCode,
+              output: job.output.slice(-4000),
+            })),
+          });
+          return;
+        }
+        if (kind === "auxiliary") {
+          // A model of its own for one job (vision, background). Without a
+          // slot it is a question; an empty model hands the job back to the
+          // main model.
+          if (data["slot"] === undefined) {
+            reply({ ok: true, auxiliary: settings.auxiliary });
+            return;
+          }
+          if (!isAuxSlot(data["slot"]) || typeof data["model"] !== "string") {
+            reply({ ok: false, error: "auxiliary needs a slot (vision, background or mini) and a model" });
+            return;
+          }
+          const provider = typeof data["provider"] === "string" ? data["provider"] : "";
+          settings = await saveSettings(paths, {
+            auxiliary: withAuxModel(settings.auxiliary, data["slot"], data["model"], provider),
+          });
+          if (session !== null) {
+            const current = session;
+            void publishEnv({
+              store: current.store,
+              chain: current.identity.chainId,
+              node: current.identity.nodeId,
+              home: paths.home,
+            }).catch(() => undefined);
+          }
+          reply({ ok: true, auxiliary: settings.auxiliary });
+          return;
+        }
+        if (kind === "fallback_model") {
+          // The model a turn retries on when the first one fails. Without a
+          // value it is a question; an empty string turns it off.
+          if (data["model"] === undefined) {
+            reply({ ok: true, model: settings.fallbackModel });
+            return;
+          }
+          if (typeof data["model"] !== "string") {
+            reply({ ok: false, error: "model must be a model id, or empty to turn the fallback off" });
+            return;
+          }
+          settings = await saveSettings(paths, { fallbackModel: data["model"] });
+          if (session !== null) {
+            const current = session;
+            void publishEnv({
+              store: current.store,
+              chain: current.identity.chainId,
+              node: current.identity.nodeId,
+              home: paths.home,
+            }).catch(() => undefined);
+          }
+          reply({ ok: true, model: settings.fallbackModel });
+          return;
+        }
+        if (kind === "access") {
+          // Who may reach the UI and the control socket of this device. Without
+          // a value it is a question; with one it is saved and applies to the
+          // next connection (the gate reads the setting each time).
+          if (data["deviceOnly"] === undefined) {
+            reply({ ok: true, deviceOnly: deviceAccess.deviceOnly });
+            return;
+          }
+          if (typeof data["deviceOnly"] !== "boolean") {
+            reply({ ok: false, error: "deviceOnly must be true or false" });
+            return;
+          }
+          // Per machine on purpose: it is this device's own listener, so it
+          // is kept in state/ and never published with the env.
+          deviceAccess = await saveDeviceAccess(paths.state, { deviceOnly: data["deviceOnly"] });
+          log(`access: ${deviceAccess.deviceOnly ? "this device only" : "this device and the tailnet"}`);
+          reply({ ok: true, deviceOnly: deviceAccess.deviceOnly });
+          return;
+        }
+        if (kind === "skill_approve" || kind === "skill_reject") {
+          // The owner's answer to a skill the agent proposed. A yes writes the
+          // skill to this device; the env loop carries it to the others.
+          const current = session;
+          const id = typeof data["id"] === "string" ? data["id"].trim() : "";
+          if (current === null || id.length === 0) {
+            reply({ ok: false, error: "no chain, or no proposal id" });
+            return;
+          }
+          const events = current.store.read(current.identity.chainId, 1, 100_000);
+          const proposal = foldSkillProposals(events).find((entry) => entry.id === id);
+          if (proposal === undefined || proposal.status !== "pending") {
+            reply({ ok: false, error: "that proposal is not waiting for an answer" });
+            return;
+          }
+          const approve = kind === "skill_approve";
+          if (approve) {
+            await installSkill(paths.home, {
+              name: proposal.name,
+              description: proposal.description,
+              body: proposal.body,
+            });
+          }
+          const event = current.store.append(current.identity.chainId, {
+            id: uuid(),
+            node: current.identity.nodeId,
+            type: SKILL_PROPOSAL_EVENT,
+            data: approve
+              ? { kind: SKILL_APPROVAL_KIND, id, status: "approved" }
+              : { kind: SKILL_REJECTION_KIND, id },
+          });
+          control?.broadcast({ t: "append", event });
+          if (approve) {
+            void publishEnv({
+              store: current.store,
+              chain: current.identity.chainId,
+              node: current.identity.nodeId,
+              home: paths.home,
+            }).catch(() => undefined);
+          }
+          reply({ ok: true, name: proposal.name, saved: approve });
+          return;
+        }
+        if (kind === "command_save" || kind === "command_remove") {
+          // The owner's own slash commands are chain events, so a command
+          // saved on one device works on all of them.
+          const current = session;
+          const raw = typeof data["name"] === "string" ? data["name"].trim().replace(/^\//, "") : "";
+          const name = parseCommandLine(`/${raw}`)?.name === raw ? raw : null;
+          const prompt = typeof data["prompt"] === "string" ? data["prompt"].trim() : "";
+          if (current === null || name === null) {
+            reply({ ok: false, error: "no chain, or not a usable command name" });
+            return;
+          }
+          if (kind === "command_save" && prompt.length === 0) {
+            reply({ ok: false, error: "a command needs a prompt" });
+            return;
+          }
+          const event = current.store.append(current.identity.chainId, {
+            id: uuid(),
+            node: current.identity.nodeId,
+            type: "command",
+            data: kind === "command_save" ? { name, prompt } : { name, removed: true },
+          });
+          control?.broadcast({ t: "append", event });
+          reply({ ok: true, name });
+          return;
+        }
         if (kind === "goal") {
           const current = session;
           const text = typeof data["text"] === "string" ? data["text"].trim() : "";
@@ -1837,6 +2155,11 @@ async function main(): Promise<void> {
           // A preference, not chain state: it appends nothing and only changes
           // how the next turn is asked. Invalid values are rejected here so a
           // typo never becomes a request field.
+          // Without a level it is a question: the picker asks what is set.
+          if (data["effort"] === undefined) {
+            reply({ ok: true, effort: settings.effort });
+            return;
+          }
           const requested = typeof data["effort"] === "string" ? data["effort"] : "";
           if (!isEffortLevel(requested)) {
             reply({ ok: false, error: "effort must be low, normal or high" });

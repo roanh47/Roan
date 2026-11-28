@@ -23,16 +23,15 @@ It runs inside the app instead.
   with `ws` inside it and `node:sqlite` built into the runtime.
 - **`RoanNode.ensureStarted()`** runs from `MainActivity.onCreate`, copies the
   bundle to `filesDir`, then sets `ROAN_HOME=filesDir/.Roan`,
-  `ROAN_ENGINE=builtin`, `ROAN_HOST=127.0.0.1`, `ROAN_PORT=6769` and starts it.
+  `ROAN_HOST=127.0.0.1`, `ROAN_PORT=6769` and starts it.
   That one port is the page, `/ws` and `/peer`; there is no separate peer port.
   (The Android bridge still passes `ROAN_CONTROL_*`/`ROAN_PEER_*`; both are read
   as aliases.)
 - **The WebView talks to loopback.** `ws://127.0.0.1:6769/ws`, the same socket
   the desktop app uses. Cleartext to loopback is allowed by
   `res/xml/network_security_config.xml` and nowhere else.
-- **The engine is the loop in this repo.** `ROAN_ENGINE=builtin` selects
-  `src/agent.ts`: there is no `hermes` binary on Android and no way to spawn one,
-  so a turn is model → tool → model in-process.
+- **A turn runs in-process.** `src/agent.ts` is the loop on every device:
+  model → tool → model, with nothing spawned to run it.
 
 `scripts/android-daemon.sh [abi ...]` does all of it, idempotently, after
 `tauri android init`: it fetches libnode (cached in `~/.cache/roan/libnode`),
